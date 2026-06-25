@@ -460,6 +460,7 @@ impl Position {
                 &no_pins,
                 king_sq,
                 white_first_rank_double,
+                false,
             );
         } else {
             // Without a king there is no en-passant legality king to consult; the
@@ -474,6 +475,7 @@ impl Position {
                 &no_pins,
                 Square::A1,
                 white_first_rank_double,
+                false,
             );
         }
         self.gen_knight_moves(out, us, our_pieces, their_pieces, full, &no_pins);
@@ -590,6 +592,7 @@ impl Position {
             &pin_lines,
             king_sq,
             false,
+            true,
         );
         self.gen_knight_moves(out, us, our_pieces, their_pieces, check_mask, &pin_lines);
         self.gen_slider_moves(
@@ -694,6 +697,7 @@ impl Position {
         pins: &[(Square, Bitboard)],
         king_sq: Square,
         white_first_rank_double: bool,
+        filter_ep_pin: bool,
     ) {
         let board = &self.board;
         let pawns = board.pieces(us, Role::Pawn);
@@ -780,10 +784,13 @@ impl Position {
                     // En passant resolves check only if it captures the checking
                     // pawn or blocks on the ep target.
                     let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
-                    if resolves_check
-                        && pin_line.contains(ep)
-                        && self.ep_is_legal(us, from, ep, captured, king_sq)
-                    {
+                    // The standard discovered-check ep-pin filter is a king-safety
+                    // concern; a variant on the make-move filter path (e.g. atomic,
+                    // whose explosion may remove the would-be pinning slider) passes
+                    // `filter_ep_pin = false` and re-validates the move itself.
+                    let ep_pin_ok =
+                        !filter_ep_pin || self.ep_is_legal(us, from, ep, captured, king_sq);
+                    if resolves_check && pin_line.contains(ep) && ep_pin_ok {
                         out.push(Move::new(from, ep, MoveKind::EnPassant));
                     }
                 }
@@ -1127,6 +1134,20 @@ impl Position {
     /// variant toggles its old contribution out and the new one in.
     pub(crate) fn xor_hash(&mut self, key: u64) {
         self.hash ^= key;
+    }
+
+    /// Removes whatever piece sits on `square` (if any), keeping the incremental
+    /// Zobrist key consistent and revoking any castling right anchored on a rook
+    /// that is removed. Exposed for the atomic variant's explosion side effect.
+    ///
+    /// Returns the removed piece, or `None` if the square was empty.
+    pub(crate) fn remove_piece_tracked(&mut self, square: Square) -> Option<Piece> {
+        let piece = self.board.piece_at(square)?;
+        self.hash_remove(square, piece);
+        if piece.role == Role::Rook {
+            self.revoke_rights_for_square(square, piece.color);
+        }
+        Some(piece)
     }
 
     /// In-place application of a move (see [`Position::play`]).
