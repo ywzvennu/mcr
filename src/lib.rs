@@ -14,6 +14,7 @@
 //! the usual bitwise operators and edge-masked directional shifts.
 #![doc(html_root_url = "https://docs.rs/mce")]
 
+pub mod attacks;
 mod bitboard;
 mod color;
 mod file;
@@ -21,6 +22,10 @@ mod piece;
 mod rank;
 mod square;
 
+pub use crate::attacks::{
+    between, bishop_attacks, king_attacks, knight_attacks, line, pawn_attacks, queen_attacks,
+    rook_attacks,
+};
 pub use crate::bitboard::{Bitboard, Squares};
 pub use crate::color::Color;
 pub use crate::file::File;
