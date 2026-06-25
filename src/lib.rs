@@ -50,9 +50,10 @@ pub use crate::rank::Rank;
 pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
 pub use crate::variant::{
-    perft_variant, Antichess, AntichessRules, Atomic, AtomicRules, CastleGeometry, CheckCounters,
-    Chess, Chess960, Chess960Rules, ChessRules, Crazyhouse, CrazyhouseRules, CrazyhouseState,
-    Horde, HordeRules, KingOfTheHill, KingOfTheHillRules, RacingKings, RacingKingsRules,
-    ThreeCheck, ThreeCheckRules, Variant, VariantId, VariantPosition, VariantState,
+    perft_variant, Antichess, AntichessRules, AnyVariant, Atomic, AtomicRules, CastleGeometry,
+    CheckCounters, Chess, Chess960, Chess960Rules, ChessRules, Crazyhouse, CrazyhouseRules,
+    CrazyhouseState, Horde, HordeRules, KingOfTheHill, KingOfTheHillRules, RacingKings,
+    RacingKingsRules, ThreeCheck, ThreeCheckRules, UnknownVariant, Variant, VariantId,
+    VariantPosition, VariantState,
 };
 pub use crate::zobrist::Zobrist;
