@@ -307,7 +307,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// is `false`) and [`Variant::USES_FAST_LEGALITY`] is `false`.
     ///
     /// Default: the standard pseudo-legal generator
-    /// ([`Position::pseudo_into`]), which suits every variant whose piece movement
+    /// (`Position::pseudo_into`), which suits every variant whose piece movement
     /// is standard. Horde overrides this so white's first-rank pawns may
     /// double-push; the override is purely additive (standard pawns are generated
     /// identically) and never touches the fast path.

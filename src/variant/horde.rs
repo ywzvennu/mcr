@@ -76,7 +76,7 @@ impl Variant for HordeRules {
     /// When white is to move there is no white king, so no move can leave it in
     /// check — every pseudo-legal white move is legal. When black is to move the
     /// ordinary king-safety filter applies to black's royal king. The core
-    /// [`Position::move_keeps_king_safe`] already returns `true` when the moving
+    /// `Position::move_keeps_king_safe` already returns `true` when the moving
     /// side has no king, so it expresses both cases directly.
     fn is_legal_after(parent: &Position, mv: &Move, child: &Position) -> bool {
         let _ = child;
