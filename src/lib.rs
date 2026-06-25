@@ -29,6 +29,7 @@ mod position;
 mod rank;
 mod san;
 mod square;
+mod variant;
 mod zobrist;
 
 pub use crate::attacks::{
@@ -48,4 +49,8 @@ pub use crate::position::{
 pub use crate::rank::Rank;
 pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
+pub use crate::variant::{
+    perft_variant, CastleGeometry, Chess, ChessRules, Variant, VariantId, VariantPosition,
+    VariantState,
+};
 pub use crate::zobrist::Zobrist;

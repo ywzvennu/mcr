@@ -39,6 +39,16 @@ pub enum MoveKind {
         /// Whether the promoting push also captures a piece.
         capture: bool,
     },
+    /// Crazyhouse drop: a pocketed piece placed on an empty square.
+    ///
+    /// A drop has no distinct origin; the move's `from` and `to` are both set to
+    /// the target square. No standard-chess move generator emits this kind — it
+    /// exists for the crazyhouse variant — but the notation plumbing for it lives
+    /// here so the shared move type is stable across variants.
+    Drop {
+        /// The role of the pocketed piece being placed.
+        role: Role,
+    },
 }
 
 impl MoveKind {
@@ -71,6 +81,23 @@ impl MoveKind {
             _ => None,
         }
     }
+
+    /// Returns `true` if this move kind is a pocket drop.
+    #[must_use]
+    #[inline]
+    pub const fn is_drop(self) -> bool {
+        matches!(self, MoveKind::Drop { .. })
+    }
+
+    /// Returns the dropped role if this is a drop, otherwise `None`.
+    #[must_use]
+    #[inline]
+    pub const fn drop_role(self) -> Option<Role> {
+        match self {
+            MoveKind::Drop { role } => Some(role),
+            _ => None,
+        }
+    }
 }
 
 /// A chess move: where a piece moves from, where it moves to, and the
@@ -97,6 +124,20 @@ impl Move {
     #[inline]
     pub const fn new(from: Square, to: Square, kind: MoveKind) -> Move {
         Move { from, to, kind }
+    }
+
+    /// Creates a pocket-drop move placing a piece of `role` on `square`.
+    ///
+    /// A drop has no distinct origin, so both [`Move::from`] and [`Move::to`]
+    /// report `square`.
+    #[must_use]
+    #[inline]
+    pub const fn drop(role: Role, square: Square) -> Move {
+        Move {
+            from: square,
+            to: square,
+            kind: MoveKind::Drop { role },
+        }
     }
 
     /// The square the moving piece starts on.
@@ -148,6 +189,20 @@ impl Move {
         self.kind.promotion()
     }
 
+    /// Returns `true` if this move is a pocket drop.
+    #[must_use]
+    #[inline]
+    pub const fn is_drop(self) -> bool {
+        self.kind.is_drop()
+    }
+
+    /// Returns the dropped role, if this move is a drop.
+    #[must_use]
+    #[inline]
+    pub const fn drop_role(self) -> Option<Role> {
+        self.kind.drop_role()
+    }
+
     /// Formats this move in UCI long algebraic notation.
     ///
     /// The format is the origin square, the destination square, and — for
@@ -172,6 +227,14 @@ impl Move {
     /// ```
     #[must_use]
     pub fn to_uci(self) -> String {
+        // Crazyhouse drops use the `{ROLE}@{square}` form, e.g. `N@f3`.
+        if let MoveKind::Drop { role } = self.kind {
+            let mut s = String::with_capacity(4);
+            s.push(role.upper_char());
+            s.push('@');
+            s.push_str(&self.to.to_string());
+            return s;
+        }
         let mut s = String::with_capacity(5);
         s.push_str(&self.from.to_string());
         s.push_str(&self.to.to_string());
@@ -229,6 +292,27 @@ mod tests {
         assert!(MoveKind::CastleKingside.is_castle());
         assert!(MoveKind::CastleQueenside.is_castle());
         assert!(!MoveKind::Quiet.is_castle());
+    }
+
+    #[test]
+    fn drop_classification_and_uci() {
+        let d = Move::drop(Role::Knight, Square::F3);
+        assert!(d.is_drop());
+        assert!(d.kind().is_drop());
+        assert_eq!(d.drop_role(), Some(Role::Knight));
+        assert_eq!(d.kind().drop_role(), Some(Role::Knight));
+        // A drop has no distinct origin: from == to == the target square.
+        assert_eq!(d.from(), Square::F3);
+        assert_eq!(d.to(), Square::F3);
+        assert!(!d.is_capture());
+        assert!(!d.is_castle());
+        assert_eq!(d.promotion(), None);
+        assert_eq!(d.to_uci(), "N@f3");
+        assert_eq!(d.to_string(), "N@f3");
+        // Non-drop kinds report no drop role.
+        assert!(!MoveKind::Quiet.is_drop());
+        assert_eq!(MoveKind::Quiet.drop_role(), None);
+        assert_eq!(Move::drop(Role::Pawn, Square::E4).to_uci(), "P@e4");
     }
 
     #[test]
