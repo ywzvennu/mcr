@@ -137,6 +137,9 @@ pub struct ThreeCheckRules;
 impl Variant for ThreeCheckRules {
     type State = CheckCounters;
     const ID: VariantId = VariantId::ThreeCheck;
+    // The check counters affect outcome only; the legal-move set is exactly
+    // standard chess, so perft leaves bulk-count.
+    const BULK_COUNTABLE: bool = true;
 
     /// H1: the first side to reach `WIN_CHECKS` checks wins immediately.
     ///

@@ -150,6 +150,81 @@ const fn back_rank(color: Color) -> Rank {
     }
 }
 
+/// The destination for the generators' emitted moves.
+///
+/// The standard move-generation routines push each candidate into a sink rather
+/// than directly into a [`MoveList`], so the same generator body serves two
+/// callers: the materializing path (a [`MoveList`], which records every move),
+/// and the *bulk leaf-counting* path used by perft at depth 1 ([`CountSink`],
+/// which only tallies how many moves there are). Because a perft leaf needs the
+/// *number* of legal moves and never the moves themselves, the counting sink can
+/// replace each per-target loop with a single population count, skipping the move
+/// construction entirely.
+///
+/// The two `emit` methods are the only two shapes the generators use. Every
+/// implementor must treat them identically in count: `emit_targets(from, t, _)`
+/// is exactly `t.count()` single moves, one per set bit of `t`.
+pub(crate) trait MoveSink {
+    /// Records a single move with explicit `from`, `to`, and `kind`.
+    fn emit(&mut self, from: Square, to: Square, kind: MoveKind);
+
+    /// Records one move from `from` to each square in `targets`, tagging each as
+    /// a capture when the target square is in `their_pieces` and quiet otherwise.
+    ///
+    /// The materializing sink iterates the targets and constructs a [`Move`] per
+    /// bit; the counting sink replaces the whole loop with two population counts
+    /// (captures and quiets), which is the core of the perft bulk-count speedup.
+    fn emit_targets(&mut self, from: Square, targets: Bitboard, their_pieces: Bitboard);
+}
+
+impl MoveSink for MoveList {
+    #[inline]
+    fn emit(&mut self, from: Square, to: Square, kind: MoveKind) {
+        self.push(Move::new(from, to, kind));
+    }
+
+    #[inline]
+    fn emit_targets(&mut self, from: Square, targets: Bitboard, their_pieces: Bitboard) {
+        for to in targets {
+            let kind = if their_pieces.contains(to) {
+                MoveKind::Capture
+            } else {
+                MoveKind::Quiet
+            };
+            self.push(Move::new(from, to, kind));
+        }
+    }
+}
+
+/// A [`MoveSink`] that only counts the moves it is given, never materializing
+/// any of them — the bulk leaf-counting destination for perft at depth 1.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct CountSink {
+    count: u64,
+}
+
+impl CountSink {
+    /// The number of moves recorded so far.
+    #[inline]
+    fn count(self) -> u64 {
+        self.count
+    }
+}
+
+impl MoveSink for CountSink {
+    #[inline]
+    fn emit(&mut self, _from: Square, _to: Square, _kind: MoveKind) {
+        self.count += 1;
+    }
+
+    #[inline]
+    fn emit_targets(&mut self, _from: Square, targets: Bitboard, _their_pieces: Bitboard) {
+        // The whole per-target loop collapses to a single population count: the
+        // capture/quiet split does not change *how many* moves there are.
+        self.count += u64::from(targets.count());
+    }
+}
+
 /// A full standard-chess game position.
 ///
 /// ```
@@ -327,11 +402,24 @@ impl Position {
 
     /// Number of legal moves without allocating the full list — used by
     /// checkmate / stalemate queries and perft at depth 1.
+    ///
+    /// Counts via the bulk leaf-counting [`CountSink`] (population counts over
+    /// the target masks) rather than materializing every move, so it is both
+    /// allocation-free and cheaper than building and measuring a [`MoveList`].
     #[must_use]
     pub fn legal_move_count(&self) -> usize {
-        let mut count = 0usize;
-        self.for_each_legal(|_| count += 1);
-        count
+        self.count_legal() as usize
+    }
+
+    /// Tallies the legal moves of the side to move through the bulk-counting
+    /// [`CountSink`], the standard chess perft leaf count (`perft(pos, 1)`). This
+    /// drives the *same* legal generator as [`Position::generate_into`], so the
+    /// count is exactly `generate_into(..).len()`, only without writing any move
+    /// into a buffer.
+    pub(crate) fn count_legal(&self) -> u64 {
+        let mut sink = CountSink::default();
+        self.generate_into_with_castles(&mut sink, true);
+        sink.count()
     }
 
     /// Whether the side to move has been checkmated (in check with no legal
@@ -520,16 +608,6 @@ impl Position {
         }
     }
 
-    /// Invokes `f` once for each legal move, in generation order, without
-    /// collecting them.
-    fn for_each_legal(&self, mut f: impl FnMut(Move)) {
-        let mut buf = MoveList::new();
-        self.generate_into(&mut buf);
-        for &mv in buf.iter() {
-            f(mv);
-        }
-    }
-
     /// Pushes all legal moves into `out`.
     pub(crate) fn generate_into(&self, out: &mut MoveList) {
         self.generate_into_with_castles(out, true);
@@ -545,8 +623,10 @@ impl Position {
     }
 
     /// Shared body of the fast legal generator; `standard_castles` controls
-    /// whether the standard castle generator runs at the end.
-    fn generate_into_with_castles(&self, out: &mut MoveList, standard_castles: bool) {
+    /// whether the standard castle generator runs at the end. Generic over the
+    /// [`MoveSink`] so the same generation drives both the materializing path (a
+    /// [`MoveList`]) and the bulk leaf-counting path ([`CountSink`]).
+    fn generate_into_with_castles<S: MoveSink>(&self, out: &mut S, standard_castles: bool) {
         let us = self.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -570,14 +650,7 @@ impl Position {
         // King moves are always generated (the only legal moves under double
         // check).
         let king_targets = king_attacks(king_sq) & !our_pieces & !king_danger;
-        for to in king_targets {
-            let kind = if their_pieces.contains(to) {
-                MoveKind::Capture
-            } else {
-                MoveKind::Quiet
-            };
-            out.push(Move::new(king_sq, to, kind));
-        }
+        out.emit_targets(king_sq, king_targets, their_pieces);
 
         if num_checkers >= 2 {
             // Double check: only king moves are legal.
@@ -695,6 +768,7 @@ impl Position {
     }
 
     /// Returns the pin line restricting `sq`, or `Bitboard::FULL` if unpinned.
+    #[inline]
     fn pin_line_of(pins: &[(Square, Bitboard)], sq: Square) -> Bitboard {
         for &(p, line) in pins {
             if p == sq {
@@ -705,9 +779,9 @@ impl Position {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn gen_pawn_moves(
+    fn gen_pawn_moves<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         us: Color,
         occupied: Bitboard,
         their_pieces: Bitboard,
@@ -750,7 +824,7 @@ impl Position {
                                 && check_mask.contains(two)
                                 && pin_line.contains(two)
                             {
-                                out.push(Move::new(from, two, MoveKind::DoublePawnPush));
+                                out.emit(from, two, MoveKind::DoublePawnPush);
                             }
                         }
                     } else if white_first_rank_double
@@ -764,7 +838,7 @@ impl Position {
                             {
                                 // No en-passant target for a first-rank double
                                 // push: a quiet two-square advance.
-                                out.push(Move::new(from, two, MoveKind::Quiet));
+                                out.emit(from, two, MoveKind::Quiet);
                             }
                         }
                     }
@@ -779,17 +853,17 @@ impl Position {
                 }
                 if to.rank() == promo_rank {
                     for role in PROMOTION_ROLES {
-                        out.push(Move::new(
+                        out.emit(
                             from,
                             to,
                             MoveKind::Promotion {
                                 role,
                                 capture: true,
                             },
-                        ));
+                        );
                     }
                 } else {
-                    out.push(Move::new(from, to, MoveKind::Capture));
+                    out.emit(from, to, MoveKind::Capture);
                 }
             }
 
@@ -809,7 +883,7 @@ impl Position {
                     let ep_pin_ok =
                         !filter_ep_pin || self.ep_is_legal(us, from, ep, captured, king_sq);
                     if resolves_check && pin_line.contains(ep) && ep_pin_ok {
-                        out.push(Move::new(from, ep, MoveKind::EnPassant));
+                        out.emit(from, ep, MoveKind::EnPassant);
                     }
                 }
             }
@@ -818,9 +892,9 @@ impl Position {
 
     /// Pushes a pawn single-advance, expanding promotions, subject to the check
     /// mask and pin line.
-    fn push_pawn_advance(
+    fn push_pawn_advance<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         from: Square,
         to: Square,
         promo_rank: Rank,
@@ -832,17 +906,17 @@ impl Position {
         }
         if to.rank() == promo_rank {
             for role in PROMOTION_ROLES {
-                out.push(Move::new(
+                out.emit(
                     from,
                     to,
                     MoveKind::Promotion {
                         role,
                         capture: false,
                     },
-                ));
+                );
             }
         } else {
-            out.push(Move::new(from, to, MoveKind::Quiet));
+            out.emit(from, to, MoveKind::Quiet);
         }
     }
 
@@ -876,9 +950,9 @@ impl Position {
         (bishop_attacks(king_sq, occ) & bishop_like).is_empty()
     }
 
-    fn gen_knight_moves(
+    fn gen_knight_moves<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         us: Color,
         our_pieces: Bitboard,
         their_pieces: Bitboard,
@@ -890,21 +964,14 @@ impl Position {
             // knight cannot stay on it).
             let pin_line = Self::pin_line_of(pins, from);
             let targets = knight_attacks(from) & !our_pieces & check_mask & pin_line;
-            for to in targets {
-                let kind = if their_pieces.contains(to) {
-                    MoveKind::Capture
-                } else {
-                    MoveKind::Quiet
-                };
-                out.push(Move::new(from, to, kind));
-            }
+            out.emit_targets(from, targets, their_pieces);
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn gen_slider_moves(
+    fn gen_slider_moves<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         us: Color,
         occupied: Bitboard,
         our_pieces: Bitboard,
@@ -928,21 +995,14 @@ impl Position {
                     attacks |= rook_attacks(from, occupied);
                 }
                 let targets = attacks & !our_pieces & check_mask & pin_line;
-                for to in targets {
-                    let kind = if their_pieces.contains(to) {
-                        MoveKind::Capture
-                    } else {
-                        MoveKind::Quiet
-                    };
-                    out.push(Move::new(from, to, kind));
-                }
+                out.emit_targets(from, targets, their_pieces);
             }
         }
     }
 
-    fn gen_castles(
+    fn gen_castles<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         us: Color,
         occupied: Bitboard,
         king_danger: Bitboard,
@@ -992,7 +1052,7 @@ impl Position {
                 CastleSide::King => MoveKind::CastleKingside,
                 CastleSide::Queen => MoveKind::CastleQueenside,
             };
-            out.push(Move::new(king_sq, king_dest, kind));
+            out.emit(king_sq, king_dest, kind);
         }
     }
 
@@ -1717,13 +1777,13 @@ pub fn perft(position: &Position, depth: u32) -> u64 {
     if depth == 0 {
         return 1;
     }
-    // Allocate one reusable move buffer per interior ply once, up front, and
+    // Allocate one reusable move buffer per *interior* ply once, up front, and
     // thread them through the recursion. Each buffer is `clear`ed (not freshly
     // value-initialized) before reuse at its ply, so perft touches the stack
     // buffers exactly `depth - 1` times total rather than allocating a fresh
-    // `MoveList` per node. The leaf ply counts moves directly without filling a
-    // buffer.
-    let mut buffers: Vec<MoveList> = (0..depth).map(|_| MoveList::new()).collect();
+    // `MoveList` per node. The leaf ply (`depth == 1`) bulk-counts its moves
+    // directly and never fills a buffer, so only `depth - 1` are needed.
+    let mut buffers: Vec<MoveList> = (0..depth - 1).map(|_| MoveList::new()).collect();
     perft_with(position, depth, &mut buffers)
 }
 
@@ -1732,12 +1792,17 @@ pub fn perft(position: &Position, depth: u32) -> u64 {
 /// each buffer is `clear`ed (not value-initialized) before reuse, so the buffers
 /// are filled in place rather than reallocated per node.
 fn perft_with(position: &Position, depth: u32, buffers: &mut [MoveList]) -> u64 {
+    // Bulk leaf counting: at the last ply the only thing perft wants is *how
+    // many* legal moves there are, so count them directly (population counts over
+    // the generators' target masks) instead of materializing each move into a
+    // buffer and taking its length. `count_legal()` drives the identical legal
+    // generator, so the count equals `generate_into(..).len()` exactly.
+    if depth == 1 {
+        return position.count_legal();
+    }
     let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
     here.clear();
     position.generate_into(here);
-    if depth == 1 {
-        return here.len() as u64;
-    }
     let mut nodes = 0;
     here.for_each(|mv| {
         nodes += perft_with(&position.play(&mv), depth - 1, rest);
@@ -2104,6 +2169,38 @@ mod tests {
         assert_eq!(perft(&pos, 1), 20);
         assert_eq!(perft(&pos, 2), 400);
         assert_eq!(perft(&pos, 3), 8902);
+    }
+
+    #[test]
+    fn bulk_count_equals_materialized_count() {
+        // The bulk-counting `CountSink` (population counts over the target masks,
+        // promotions expanded, ep / castling gated) must agree exactly with the
+        // length of the fully materialized legal move list, on positions
+        // exercising checks, double checks, pins, en passant, promotions, and
+        // castling. This is the invariant perft's depth-1 bulk count relies on.
+        for fen in [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+            // En-passant available, pin and check positions.
+            "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1",
+            "8/8/8/8/k2Pp2Q/8/8/3K4 b - d3 0 1",
+            // Double check: only king moves are legal.
+            "4k3/8/4r3/8/8/4R3/8/3RK3 b - - 0 1",
+            // Promotions, including capturing promotions.
+            "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+        ] {
+            let pos = Position::from_fen(fen).unwrap();
+            let materialized = pos.legal_moves().len() as u64;
+            assert_eq!(
+                pos.count_legal(),
+                materialized,
+                "bulk count != materialized for {fen}"
+            );
+            // And the public count helper agrees.
+            assert_eq!(pos.legal_move_count(), materialized as usize);
+        }
     }
 
     #[test]

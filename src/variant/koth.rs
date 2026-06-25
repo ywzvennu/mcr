@@ -30,6 +30,9 @@ pub struct KingOfTheHillRules;
 impl Variant for KingOfTheHillRules {
     type State = ();
     const ID: VariantId = VariantId::KingOfTheHill;
+    // The hill rule only affects outcome, never the legal-move set, so perft is
+    // standard chess and the leaves bulk-count.
+    const BULK_COUNTABLE: bool = true;
 
     /// H1: a king on a central square wins immediately for its owner.
     ///

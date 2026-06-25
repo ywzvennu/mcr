@@ -162,6 +162,26 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// pseudo-legal + make-move filter path.
     const USES_FAST_LEGALITY: bool = true;
 
+    /// Whether [`perft_variant`] may bulk-count this variant's leaf nodes: at the
+    /// last ply, tally the legal-move *count* without materializing each move
+    /// (the standard perft speedup).
+    ///
+    /// This is sound exactly when the variant's legal-move set is the core
+    /// standard fast generator's set unchanged — i.e. it runs on the fast
+    /// standard-castling path ([`Variant::USES_FAST_LEGALITY`] true and
+    /// [`Variant::VARIANT_CASTLING`] false), adds no [`Variant::extra_moves`], and
+    /// applies no [`Variant::filter_forced`]. Then the leaf count is precisely
+    /// [`Position::count_legal`]. A variant whose *outcome* rules differ but whose
+    /// *move set* is identical (king-of-the-hill, three-check) is still bulk-
+    /// countable, since perft counts moves, not terminal states.
+    ///
+    /// Default: `false` (materialize and count, always correct). Standard chess
+    /// and the standard-move-set variants opt in. Variants that drop pieces
+    /// (crazyhouse), force captures (antichess, racing kings), generate their own
+    /// castles (chess960), or run the slow legality path (atomic, horde) leave it
+    /// `false`, so their leaf counts come from the full materialized list.
+    const BULK_COUNTABLE: bool = false;
+
     /// A variant-specific terminal condition derivable from a single position,
     /// consulted before the standard checkmate/stalemate/material/clock rules.
     ///
@@ -940,6 +960,15 @@ fn perft_variant_with<V: Variant>(
     depth: u32,
     buffers: &mut [MoveList],
 ) -> u64 {
+    // Bulk leaf counting: at the last ply, variants whose legal-move set is the
+    // core standard generator's set unchanged ([`Variant::BULK_COUNTABLE`]) tally
+    // the count via [`Position::count_legal`] without materializing any move.
+    // This is exactly `generate_legal_into(..).len()` for those variants (no
+    // extra moves, no forced filter, standard castling), so it leaves every perft
+    // count byte-identical while skipping the move construction at the leaves.
+    if depth == 1 && V::BULK_COUNTABLE {
+        return position.core().count_legal();
+    }
     let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
     position.generate_legal_into(here);
     if depth == 1 {
