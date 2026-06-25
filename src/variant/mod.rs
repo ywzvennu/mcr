@@ -32,6 +32,7 @@
 
 mod chess;
 mod chess960;
+mod koth;
 mod three_check;
 
 use core::fmt;
@@ -39,6 +40,7 @@ use core::hash::Hash;
 
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
+pub use koth::{KingOfTheHill, KingOfTheHillRules};
 pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
 
 use crate::board::Board;

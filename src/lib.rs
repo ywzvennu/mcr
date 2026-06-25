@@ -51,6 +51,7 @@ pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
 pub use crate::variant::{
     perft_variant, CastleGeometry, CheckCounters, Chess, Chess960, Chess960Rules, ChessRules,
-    ThreeCheck, ThreeCheckRules, Variant, VariantId, VariantPosition, VariantState,
+    KingOfTheHill, KingOfTheHillRules, ThreeCheck, ThreeCheckRules, Variant, VariantId,
+    VariantPosition, VariantState,
 };
 pub use crate::zobrist::Zobrist;
