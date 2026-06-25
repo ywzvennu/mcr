@@ -23,6 +23,7 @@ mod board;
 mod chess_move;
 mod color;
 mod file;
+mod outcome;
 mod piece;
 mod position;
 mod rank;
@@ -39,6 +40,7 @@ pub use crate::board::{Board, ParseBoardError};
 pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::file::File;
+pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, IllegalMove, Outcome};
 pub use crate::piece::{Piece, Role};
 pub use crate::position::{
     perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position,
