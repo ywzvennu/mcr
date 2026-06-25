@@ -626,8 +626,21 @@ impl<V: Variant> VariantPosition<V> {
     fn generate_legal_into(&self, out: &mut MoveList) {
         out.clear();
         if V::USES_FAST_LEGALITY {
-            // Sentinel: standard king safety, so reuse the fast core generator.
-            self.core.generate_into(out);
+            if V::VARIANT_CASTLING {
+                // Sentinel: standard king safety on the fast pin/check-mask path,
+                // but the variant supplies its own arbitrary-geometry castles
+                // (Chess960). The fast generator emits every fully-legal
+                // non-castling move without the standard castles, then the
+                // variant appends its self-validating castles. No make-move
+                // filter runs, so `generate_castles` must itself enforce king
+                // safety of the castle (the core 960 helper does).
+                self.core.generate_no_castles_into(out);
+                V::generate_castles(&self.core, out);
+            } else {
+                // Standard king safety and standard castles: reuse the fast core
+                // generator wholesale.
+                self.core.generate_into(out);
+            }
         } else {
             // Slow path: the variant's own legal generation (by default the
             // pseudo-legal + make-move filter; horde routes by side instead).

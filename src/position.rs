@@ -532,6 +532,21 @@ impl Position {
 
     /// Pushes all legal moves into `out`.
     pub(crate) fn generate_into(&self, out: &mut MoveList) {
+        self.generate_into_with_castles(out, true);
+    }
+
+    /// Pushes all legal moves into `out` *except* castling, for variant layers
+    /// that run on the fast pin/check-mask path but supply their own
+    /// arbitrary-geometry castle generator (Chess960). Every non-castling move
+    /// is already fully legal, so the variant appends its self-validating castles
+    /// without any make-move filter.
+    pub(crate) fn generate_no_castles_into(&self, out: &mut MoveList) {
+        self.generate_into_with_castles(out, false);
+    }
+
+    /// Shared body of the fast legal generator; `standard_castles` controls
+    /// whether the standard castle generator runs at the end.
+    fn generate_into_with_castles(&self, out: &mut MoveList, standard_castles: bool) {
         let us = self.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -606,8 +621,10 @@ impl Position {
             &pin_lines,
         );
 
-        // Castling is only possible when not in check.
-        if num_checkers == 0 {
+        // Castling is only possible when not in check. A variant that supplies
+        // its own arbitrary-geometry castles (Chess960) passes `false` here and
+        // appends them afterward.
+        if standard_castles && num_checkers == 0 {
             self.gen_castles(out, us, occupied, king_danger, king_sq);
         }
     }
@@ -990,8 +1007,17 @@ impl Position {
     /// squares, excepting the castling king and rook from the empty test so a
     /// rook the king passes over (or vice versa) does not block. The king is
     /// removed from the occupancy when computing danger so it cannot shield
-    /// itself, matching [`Position::pseudo_into`]. King safety of the final
-    /// position is still left to the caller's filter.
+    /// itself, matching [`Position::pseudo_into`].
+    ///
+    /// The emitted castles are *fully legal*, not merely pseudo-legal: in
+    /// addition to the king-walk-not-attacked test (under the pre-castle
+    /// occupancy, which forbids passing through check), the king's final square
+    /// is re-tested under the *post-castle* occupancy — the king and the
+    /// castling rook removed from their start squares and the rook added at its
+    /// destination. This catches the Chess960-only case where the castling
+    /// rook's own departure opens an enemy slider line onto the king's landing
+    /// square (impossible in standard chess, where the rook starts in the corner
+    /// outside the king's walk), so callers need no further king-safety filter.
     ///
     /// `geom(side)` returns `(king_dest_file, rook_dest_file)` for that side, or
     /// `None` if the variant does not offer it.
@@ -1044,9 +1070,20 @@ impl Position {
                 continue;
             }
 
-            // The king must not pass through or land on an attacked square.
+            // The king must not pass through or land on a square attacked under
+            // the pre-castle occupancy (forbids castling through check).
             let king_walk = between(king_sq, king_dest).with(king_dest);
             if !(king_walk & king_danger).is_empty() {
+                continue;
+            }
+
+            // The king must also be safe on its destination under the *post*-
+            // castle occupancy: king and rook off their start squares, rook on
+            // its destination. Unlike standard chess, a Chess960 castling rook
+            // can shield the king's landing square, so its departure may open a
+            // discovered check that `king_danger` (rook still home) misses.
+            let after = occupied.without(king_sq).without(rook_from).with(rook_dest);
+            if !self.attackers_to(king_dest, them, after).is_empty() {
                 continue;
             }
 

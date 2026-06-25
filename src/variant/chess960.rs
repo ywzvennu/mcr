@@ -6,12 +6,18 @@
 //! start files while keeping the standard destinations (king to the g-/c-file,
 //! rook to the f-/d-file). Movement of every piece is otherwise identical.
 //!
-//! Because the king need not start on the e-file, [`Chess960Rules`] supplies its
-//! own arbitrary-geometry castle generator ([`Variant::generate_castles`], via
-//! the core [`crate::Position`] 960 helper) and runs on the pseudo-legal +
-//! make-move filter path ([`Variant::USES_FAST_LEGALITY`] is `false`), so a
-//! castle that opens a line onto the king's destination is rejected by the same
-//! king-safety filter as any other move.
+//! Chess960 movement, pins, checks, en-passant discovered checks, and king
+//! safety are identical to standard chess — only castling differs — so
+//! [`Chess960Rules`] runs on the same fast pin/check-mask legal generator
+//! ([`Variant::USES_FAST_LEGALITY`] is `true`) and only *specializes castling*.
+//! It supplies its own arbitrary-geometry castle generator
+//! ([`Variant::generate_castles`], via the core [`crate::Position`] 960 helper)
+//! through the [`Variant::VARIANT_CASTLING`] seam: the fast generator emits every
+//! fully-legal non-castling move while suppressing the standard castles, then the
+//! 960 helper appends its castles. Those castles are themselves fully legal — the
+//! 960 helper re-tests the king's landing square under the post-castle occupancy,
+//! catching a castle that opens a line onto the king's destination — so no
+//! make-move filter is needed.
 //!
 //! Castling rights are stored as the files of the castling rooks (the core
 //! [`crate::CastlingRights`] already keys on rook files), and the castling FEN
@@ -32,10 +38,12 @@ impl Variant for Chess960Rules {
     type State = ();
     const ID: VariantId = VariantId::Chess960;
 
-    // The king may start off the e-file, so the fast pin/check generator (which
-    // assumes standard castle geometry) cannot be used; run the pseudo-legal +
-    // make-move filter path and supply our own castle generator.
-    const USES_FAST_LEGALITY: bool = false;
+    // Non-castling movement, pins, checks, and king safety are identical to
+    // standard chess, so use the fast pin/check-mask generator. Only castling
+    // differs (arbitrary king/rook geometry), so it is supplied via the
+    // `VARIANT_CASTLING` seam below; the fast generator suppresses its standard
+    // castles and the 960 generator appends fully-legal ones.
+    const USES_FAST_LEGALITY: bool = true;
     const VARIANT_CASTLING: bool = true;
 
     fn generate_castles(core: &crate::Position, out: &mut MoveList) {
@@ -568,6 +576,17 @@ mod tests {
             let pos: Chess960 = fen.parse().unwrap();
             assert_eq!(pos.to_fen(), fen, "round trip for {fen}");
         }
+    }
+
+    #[test]
+    fn castle_rejected_when_rook_departure_discovers_check_on_destination() {
+        // White king e1, white queenside castling rook on b1, black rook on a1.
+        // The b1 rook shields the king's queenside destination (c1) from the a1
+        // rook; castling moves it to d1, opening a1->c1 and leaving the king in
+        // check on c1. On the fast path no make-move filter runs, so the 960
+        // castle generator must reject this itself.
+        let pos: Chess960 = "4k3/8/8/8/8/8/8/rR2K3 w B - 0 1".parse().unwrap();
+        assert_eq!(castles(&pos), vec![]);
     }
 
     #[test]
