@@ -76,6 +76,24 @@ impl CastlingRights {
         black_queen: Some(File::A),
     };
 
+    /// Builds castling rights directly from each side's rook file (or `None`),
+    /// for variants whose castling rooks are not on the a-/h-files (Chess960).
+    #[must_use]
+    #[inline]
+    pub(crate) const fn from_rook_files(
+        white_king: Option<File>,
+        white_queen: Option<File>,
+        black_king: Option<File>,
+        black_queen: Option<File>,
+    ) -> CastlingRights {
+        CastlingRights {
+            white_king,
+            white_queen,
+            black_king,
+            black_queen,
+        }
+    }
+
     /// Returns the rook file for `color` castling toward `side`, if that right is
     /// still held.
     #[must_use]
@@ -387,6 +405,19 @@ impl Position {
     /// the castling rule, not king-safety of the destination); the caller's
     /// king-safety filter still validates the resulting position.
     pub(crate) fn pseudo_into(&self, out: &mut Vec<Move>) {
+        self.pseudo_into_with_castles(out, true);
+    }
+
+    /// Pushes the pseudo-legal moves of the side to move into `out` *excluding*
+    /// castling, for variant layers that generate castling themselves (Chess960
+    /// supplies its own arbitrary-geometry castle generator).
+    pub(crate) fn pseudo_no_castles_into(&self, out: &mut Vec<Move>) {
+        self.pseudo_into_with_castles(out, false);
+    }
+
+    /// Shared body of [`Position::pseudo_into`]; `standard_castles` controls
+    /// whether the standard castle generator runs.
+    fn pseudo_into_with_castles(&self, out: &mut Vec<Move>, standard_castles: bool) {
         let us = self.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -425,7 +456,7 @@ impl Position {
             // Castling, gated only by the not-in-check / clear-path / safe-walk
             // conditions intrinsic to the castling rule (the standard generator
             // enforces the same).
-            if self.attackers_to(king_sq, them, occupied).is_empty() {
+            if standard_castles && self.attackers_to(king_sq, them, occupied).is_empty() {
                 let occ_without_king = occupied.without(king_sq);
                 let king_danger = self.attacked_by(them, occ_without_king);
                 self.gen_castles(out, us, occupied, king_danger, king_sq);
@@ -878,6 +909,85 @@ impl Position {
         }
     }
 
+    /// Pushes the legal castling moves for an *arbitrary* king/rook placement
+    /// (Chess960) into `out`, using each side's destination files from `geom`
+    /// and the rook start files already stored in the castling rights.
+    ///
+    /// Generalizes [`Position::gen_castles`]: the king may sit on any file (its
+    /// actual square is read from the board), and the king or the castling rook
+    /// may already stand on its destination, or be adjacent. The path-must-be-
+    /// empty and king-walk-must-be-safe conditions are computed from the real
+    /// squares, excepting the castling king and rook from the empty test so a
+    /// rook the king passes over (or vice versa) does not block. The king is
+    /// removed from the occupancy when computing danger so it cannot shield
+    /// itself, matching [`Position::pseudo_into`]. King safety of the final
+    /// position is still left to the caller's filter.
+    ///
+    /// `geom(side)` returns `(king_dest_file, rook_dest_file)` for that side, or
+    /// `None` if the variant does not offer it.
+    pub(crate) fn gen_castles_960(
+        &self,
+        out: &mut Vec<Move>,
+        geom: impl Fn(CastleSide) -> Option<(File, File)>,
+    ) {
+        let us = self.turn;
+        let them = us.opposite();
+        let Some(king_sq) = self.board.king_of(us) else {
+            return;
+        };
+        let rank = back_rank(us);
+        if king_sq.rank() != rank {
+            return;
+        }
+        let occupied = self.board.occupied();
+        // Castling is illegal out of check.
+        if !self.attackers_to(king_sq, them, occupied).is_empty() {
+            return;
+        }
+        let occ_without_king = occupied.without(king_sq);
+        let king_danger = self.attacked_by(them, occ_without_king);
+
+        for side in [CastleSide::King, CastleSide::Queen] {
+            let Some(rook_file) = self.castling.rook_file(us, side) else {
+                continue;
+            };
+            let Some((king_dest_file, rook_dest_file)) = geom(side) else {
+                continue;
+            };
+            let rook_from = Square::from_file_rank(rook_file, rank);
+            // The rook named by the rights must actually be present.
+            if self.board.piece_at(rook_from) != Some(Piece::new(us, Role::Rook)) {
+                continue;
+            }
+            let king_dest = Square::from_file_rank(king_dest_file, rank);
+            let rook_dest = Square::from_file_rank(rook_dest_file, rank);
+
+            // Squares the king travels through (inclusive of start and end) and
+            // the rook travels through (inclusive of end) must be empty, except
+            // for the castling king and rook themselves.
+            let king_path = between(king_sq, king_dest).with(king_dest).with(king_sq);
+            let rook_path = between(rook_from, rook_dest)
+                .with(rook_dest)
+                .with(rook_from);
+            let must_be_empty = (king_path | rook_path).without(king_sq).without(rook_from);
+            if !(must_be_empty & occupied).is_empty() {
+                continue;
+            }
+
+            // The king must not pass through or land on an attacked square.
+            let king_walk = between(king_sq, king_dest).with(king_dest);
+            if !(king_walk & king_danger).is_empty() {
+                continue;
+            }
+
+            let kind = match side {
+                CastleSide::King => MoveKind::CastleKingside,
+                CastleSide::Queen => MoveKind::CastleQueenside,
+            };
+            out.push(Move::new(king_sq, king_dest, kind));
+        }
+    }
+
     // -- Make move ---------------------------------------------------------
 
     /// Applies `mv` to this position, returning the resulting position.
@@ -1295,11 +1405,18 @@ impl Position {
     /// shared by [`Position::to_fen`] and variant FEN writers that append extra
     /// fields afterward.
     pub(crate) fn write_core_fen(&self, out: &mut String) {
+        self.write_core_fen_with(&self.castling_field(), out);
+    }
+
+    /// Serializes the six standard FEN fields into `out`, but with a
+    /// caller-supplied castling field, so variant FEN writers can substitute a
+    /// 960 (X-FEN / Shredder) castling field while reusing every other field.
+    pub(crate) fn write_core_fen_with(&self, castling_field: &str, out: &mut String) {
         out.push_str(&self.board.to_fen_placement());
         out.push(' ');
         out.push(if self.turn.is_white() { 'w' } else { 'b' });
         out.push(' ');
-        out.push_str(&self.castling_field());
+        out.push_str(castling_field);
         out.push(' ');
         match self.ep_square {
             Some(sq) => out.push_str(&sq.to_string()),
@@ -1328,21 +1445,7 @@ impl Position {
     /// Renders the castling-rights FEN field (`KQkq`, a subset, or `-`).
     fn castling_field(&self) -> String {
         let mut s = String::new();
-        if self.castling.has(Color::White, CastleSide::King) {
-            s.push('K');
-        }
-        if self.castling.has(Color::White, CastleSide::Queen) {
-            s.push('Q');
-        }
-        if self.castling.has(Color::Black, CastleSide::King) {
-            s.push('k');
-        }
-        if self.castling.has(Color::Black, CastleSide::Queen) {
-            s.push('q');
-        }
-        if s.is_empty() {
-            s.push('-');
-        }
+        write_standard_castling_field(self.castling, &mut s);
         s
     }
 }
@@ -1398,6 +1501,28 @@ pub(crate) fn parse_clock(field: &str) -> Result<u32, FenError> {
 /// by [`Position::from_fen`] and variant FEN parsers.
 pub(crate) fn parse_castling_field(field: &str, board: &Board) -> Result<CastlingRights, FenError> {
     parse_castling(field, board)
+}
+
+/// Renders the standard (`KQkq`) castling field for the given rights, shared by
+/// [`Position::to_fen`] and variant FEN writers that fall back to the standard
+/// form when both rooks sit on the a-/h-files.
+pub(crate) fn write_standard_castling_field(rights: CastlingRights, out: &mut String) {
+    let start = out.len();
+    if rights.has(Color::White, CastleSide::King) {
+        out.push('K');
+    }
+    if rights.has(Color::White, CastleSide::Queen) {
+        out.push('Q');
+    }
+    if rights.has(Color::Black, CastleSide::King) {
+        out.push('k');
+    }
+    if rights.has(Color::Black, CastleSide::Queen) {
+        out.push('q');
+    }
+    if out.len() == start {
+        out.push('-');
+    }
 }
 
 /// Parses the castling-rights FEN field into [`CastlingRights`], validating the

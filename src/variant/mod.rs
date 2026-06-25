@@ -31,18 +31,20 @@
 //! forced-move filtering, and terminal detection apply.
 
 mod chess;
+mod chess960;
 mod three_check;
 
 use core::fmt;
 use core::hash::Hash;
 
 pub use chess::{Chess, ChessRules};
+pub use chess960::{Chess960, Chess960Rules};
 pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
 
 use crate::board::Board;
 use crate::position::{
-    parse_castling_field, parse_clock, parse_ep_field, CastlingRights, FenError, ParseUciError,
-    Position,
+    parse_castling_field, parse_clock, parse_ep_field, write_standard_castling_field,
+    CastlingRights, FenError, ParseUciError, Position,
 };
 use crate::{Color, EndReason, Move, Outcome, Role, Square, Zobrist};
 
@@ -244,6 +246,24 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         true
     }
 
+    /// Whether this variant supplies its own castle generation instead of the
+    /// core's standard one (the sentinel for [`Variant::generate_castles`]).
+    ///
+    /// `false` (the default) means the core [`Position`] generator emits the
+    /// standard castles. Chess960 sets this `true` (and overrides
+    /// [`Variant::generate_castles`] and [`Variant::USES_FAST_LEGALITY`]): the
+    /// pseudo-legal pass then omits the standard castles and the variant appends
+    /// its arbitrary-geometry castles before the make-move king-safety filter.
+    const VARIANT_CASTLING: bool = false;
+
+    /// Appends this variant's castling moves into the pre-filter pseudo-legal set
+    /// (only consulted when [`Variant::VARIANT_CASTLING`] is `true`).
+    ///
+    /// The moves are validated by the same make-move king-safety filter as every
+    /// other pseudo-legal move, so a castle that opens a line onto the king's
+    /// destination is correctly rejected. Default: no-op.
+    fn generate_castles(_core: &Position, _out: &mut Vec<Move>) {}
+
     /// The castling geometry: for the given side to move and castle side, the
     /// king's destination file and the rook's destination file (H10).
     ///
@@ -306,6 +326,31 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// Implementations should append a leading space before each field they emit.
     /// Default: write nothing.
     fn fen_extra_write(_state: &Self::State, _out: &mut String) {}
+
+    /// Parses the castling-rights FEN field (the third of the six standard
+    /// fields) into [`CastlingRights`] (H10 read).
+    ///
+    /// Default: the standard parser, which accepts `KQkq` (a subset, or `-`)
+    /// with the rooks on the a-/h-files. Chess960 overrides this to also accept
+    /// Shredder-FEN file letters (`AHah`) and X-FEN `KQkq` interpreted as the
+    /// outermost rooks, so its arbitrary rook files round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FenError`] if the field is malformed or inconsistent with the
+    /// placement.
+    fn read_castling_field(field: &str, board: &Board) -> Result<CastlingRights, FenError> {
+        parse_castling_field(field, board)
+    }
+
+    /// Writes the castling-rights FEN field for the given rights and placement
+    /// (H10 write).
+    ///
+    /// Default: the standard `KQkq` form. Chess960 overrides this to emit
+    /// Shredder file letters when a castling rook is off the a-/h-file.
+    fn write_castling_field(rights: CastlingRights, _board: &Board, out: &mut String) {
+        write_standard_castling_field(rights, out);
+    }
 }
 
 /// The destination files of a castling move: where the king and rook end up.
@@ -456,7 +501,15 @@ impl<V: Variant> VariantPosition<V> {
             self.core.legal_moves()
         } else {
             let mut pseudo = Vec::with_capacity(64);
-            self.core.pseudo_into(&mut pseudo);
+            if V::VARIANT_CASTLING {
+                // The variant generates castling itself (arbitrary geometry), so
+                // suppress the core's standard castles and append the variant's
+                // candidates into the same pre-filter set.
+                self.core.pseudo_no_castles_into(&mut pseudo);
+                V::generate_castles(&self.core, &mut pseudo);
+            } else {
+                self.core.pseudo_into(&mut pseudo);
+            }
             pseudo.retain(|mv| {
                 let child = self.core.play(mv);
                 V::is_legal_after(&self.core, mv, &child)
@@ -648,7 +701,7 @@ impl<V: Variant + Default> VariantPosition<V> {
         };
 
         let castling_field = fields.next().ok_or(FenError::MissingField)?;
-        let castling = parse_castling_field(castling_field, &board)?;
+        let castling = V::read_castling_field(castling_field, &board)?;
 
         let ep_field = fields.next().ok_or(FenError::MissingField)?;
         let ep_square = parse_ep_field(ep_field)?;
@@ -687,8 +740,14 @@ impl<V: Variant> VariantPosition<V> {
     /// extra fields from [`Variant::fen_extra_write`].
     #[must_use]
     pub fn to_fen(&self) -> String {
+        let mut castling = String::new();
+        V::write_castling_field(
+            self.core.castling_rights(),
+            self.core.board(),
+            &mut castling,
+        );
         let mut fen = String::new();
-        self.core.write_core_fen(&mut fen);
+        self.core.write_core_fen_with(&castling, &mut fen);
         V::fen_extra_write(&self.state, &mut fen);
         fen
     }
