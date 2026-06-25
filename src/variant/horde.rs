@@ -9,10 +9,12 @@
 //!   white's move legality never consults king safety. Black, by contrast, has a
 //!   normal royal king with ordinary check, checkmate, and pin rules. Because the
 //!   two sides need different legality treatment, horde leaves the fast-legality
-//!   sentinel ([`Variant::USES_FAST_LEGALITY`] is `false`) and supplies
-//!   [`Variant::is_legal_after`]: when white is to move there is no king to keep
-//!   safe (vacuously legal), and when black is to move the standard king-safety
-//!   filter applies.
+//!   sentinel ([`Variant::USES_FAST_LEGALITY`] is `false`) and supplies its own
+//!   [`Variant::slow_legal_into`]: when white is to move, every pseudo-legal white
+//!   move is already legal (no king to keep safe), so the horde pawn generator's
+//!   output is taken verbatim; when black is to move, black is a standard army, so
+//!   the core's fast pin/check-mask generator yields black's legal moves directly.
+//!   Neither side pays the per-move make-move filter.
 //! - **First-rank double pushes.** White's pawns may begin on the first rank, and
 //!   such a pawn may advance two squares just as a second-rank pawn would. Per the
 //!   horde convention, however, a *first-rank* double push does **not** create an
@@ -52,8 +54,9 @@ impl Variant for HordeRules {
     const ID: VariantId = VariantId::Horde;
 
     // White has no king, so white-to-move legality differs from standard chess
-    // (no king to keep safe). Run the pseudo-legal + make-move filter path and
-    // supply `is_legal_after`.
+    // (no king to keep safe). Leave the fast-legality sentinel off and supply a
+    // per-side `slow_legal_into`: no-filter pseudo-legal for kingless white, the
+    // fast core generator for the standard black army.
     const USES_FAST_LEGALITY: bool = false;
 
     /// H1: black wins the instant white has no material left.
@@ -72,7 +75,8 @@ impl Variant for HordeRules {
         }
     }
 
-    /// H2: king-safety legality.
+    /// H2: king-safety legality (used only as a fallback; horde's fast
+    /// [`Variant::slow_legal_into`] never invokes it).
     ///
     /// When white is to move there is no white king, so no move can leave it in
     /// check — every pseudo-legal white move is legal. When black is to move the
@@ -82,6 +86,34 @@ impl Variant for HordeRules {
     fn is_legal_after(parent: &Position, mv: &Move, child: &Position) -> bool {
         let _ = child;
         parent.move_keeps_king_safe(mv)
+    }
+
+    /// H_fast: horde legality without the per-move make-move filter.
+    ///
+    /// The two sides need different treatment and neither needs the slow
+    /// pseudo-legal + make-move filter:
+    ///
+    /// - **White to move (kingless).** White has no royal king, so no white move
+    ///   can leave a king in check: every pseudo-legal white move is already
+    ///   legal. Generate them via the horde pawn path (so first-rank pawns may
+    ///   double-push) and keep them all — no filtering.
+    /// - **Black to move (standard army).** Black has a normal king and white
+    ///   pieces give check in the ordinary way, so the core's fast pin/check-mask
+    ///   generator ([`Position::generate_into`]) produces exactly black's legal
+    ///   moves. White's first-rank double-push rule never applies to a black move,
+    ///   so the standard fast generator is correct as-is.
+    ///
+    /// This replaces the inherited make-move filter for both sides, which is the
+    /// whole point of the optimization; [`Variant::is_legal_after`] above is kept
+    /// only as a correct fallback and is no longer reached on this path.
+    fn slow_legal_into(core: &Position, out: &mut MoveList) {
+        if core.turn() == Color::White {
+            // Kingless white: pseudo-legal == legal, no king-safety filter.
+            core.pseudo_into_horde(out);
+        } else {
+            // Standard black army: the fast pin/check-mask legal generator.
+            core.generate_into(out);
+        }
     }
 
     /// H_pseudo: generate white's first-rank double pushes via the horde pawn
