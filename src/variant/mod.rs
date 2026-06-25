@@ -30,6 +30,7 @@
 //! pseudo-legal + make-move filter. Either way the same hooks for extra moves,
 //! forced-move filtering, and terminal detection apply.
 
+mod atomic;
 mod chess;
 mod chess960;
 mod horde;
@@ -40,6 +41,7 @@ mod three_check;
 use core::fmt;
 use core::hash::Hash;
 
+pub use atomic::{Atomic, AtomicRules};
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
 pub use horde::{Horde, HordeRules};
