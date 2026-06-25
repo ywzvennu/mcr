@@ -39,6 +39,7 @@
 //! crazyhouse FEN with no special casing at the call site.
 
 use super::{Variant, VariantId, VariantPosition, VariantState};
+use crate::movelist::MoveList;
 use crate::position::{FenError, Position};
 use crate::{Bitboard, Board, Color, Move, MoveKind, Piece, Role, SanError, Square};
 
@@ -260,7 +261,7 @@ impl Variant for CrazyhouseRules {
     /// blocked by a single drop, and a check from a knight or a pawn (no squares
     /// between it and the king) cannot be blocked at all; in both cases no drop is
     /// legal. When the mover is not in check, every empty square is a legal target.
-    fn extra_moves(core: &Position, state: &Self::State, out: &mut Vec<Move>) {
+    fn extra_moves(core: &Position, state: &Self::State, out: &mut MoveList) {
         let us = core.turn();
         let empty = !core.board().occupied();
 

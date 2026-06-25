@@ -30,6 +30,7 @@ use core::str::FromStr;
 use crate::attacks::{
     between, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
 };
+use crate::movelist::MoveList;
 use crate::{Bitboard, Board, Color, File, Move, MoveKind, Piece, Rank, Role, Square};
 
 /// Castling rights: which rooks each side may still castle with.
@@ -313,9 +314,9 @@ impl Position {
     /// Generates every legal move for the side to move.
     #[must_use]
     pub fn legal_moves(&self) -> Vec<Move> {
-        let mut moves = Vec::with_capacity(48);
+        let mut moves = MoveList::new();
         self.generate_into(&mut moves);
-        moves
+        moves.into_vec()
     }
 
     /// Returns `true` if `mv` is among this position's legal moves.
@@ -404,20 +405,20 @@ impl Position {
     /// the king does not pass through an attacked square (these are intrinsic to
     /// the castling rule, not king-safety of the destination); the caller's
     /// king-safety filter still validates the resulting position.
-    pub(crate) fn pseudo_into(&self, out: &mut Vec<Move>) {
+    pub(crate) fn pseudo_into(&self, out: &mut MoveList) {
         self.pseudo_into_with_castles(out, true);
     }
 
     /// Pushes the pseudo-legal moves of the side to move into `out` *excluding*
     /// castling, for variant layers that generate castling themselves (Chess960
     /// supplies its own arbitrary-geometry castle generator).
-    pub(crate) fn pseudo_no_castles_into(&self, out: &mut Vec<Move>) {
+    pub(crate) fn pseudo_no_castles_into(&self, out: &mut MoveList) {
         self.pseudo_into_with_castles(out, false);
     }
 
     /// Shared body of [`Position::pseudo_into`]; `standard_castles` controls
     /// whether the standard castle generator runs.
-    fn pseudo_into_with_castles(&self, out: &mut Vec<Move>, standard_castles: bool) {
+    fn pseudo_into_with_castles(&self, out: &mut MoveList, standard_castles: bool) {
         self.pseudo_into_with(out, standard_castles, false);
     }
 
@@ -426,7 +427,7 @@ impl Position {
     /// pawns as double-push eligible for the horde variant. Standard chess and
     /// every other variant call the wrappers above with the flag `false`, leaving
     /// their move sets identical.
-    pub(crate) fn pseudo_into_horde(&self, out: &mut Vec<Move>) {
+    pub(crate) fn pseudo_into_horde(&self, out: &mut MoveList) {
         self.pseudo_into_with(out, true, true);
     }
 
@@ -435,7 +436,7 @@ impl Position {
     /// admits horde's first-rank white double-pushes.
     fn pseudo_into_with(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         standard_castles: bool,
         white_first_rank_double: bool,
     ) {
@@ -522,15 +523,15 @@ impl Position {
     /// Invokes `f` once for each legal move, in generation order, without
     /// collecting them.
     fn for_each_legal(&self, mut f: impl FnMut(Move)) {
-        let mut buf = Vec::with_capacity(48);
+        let mut buf = MoveList::new();
         self.generate_into(&mut buf);
-        for mv in buf {
+        for &mv in buf.iter() {
             f(mv);
         }
     }
 
     /// Pushes all legal moves into `out`.
-    fn generate_into(&self, out: &mut Vec<Move>) {
+    pub(crate) fn generate_into(&self, out: &mut MoveList) {
         let us = self.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -689,7 +690,7 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     fn gen_pawn_moves(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         us: Color,
         occupied: Bitboard,
         their_pieces: Bitboard,
@@ -802,7 +803,7 @@ impl Position {
     /// mask and pin line.
     fn push_pawn_advance(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         from: Square,
         to: Square,
         promo_rank: Rank,
@@ -860,7 +861,7 @@ impl Position {
 
     fn gen_knight_moves(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         us: Color,
         our_pieces: Bitboard,
         their_pieces: Bitboard,
@@ -886,7 +887,7 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     fn gen_slider_moves(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         us: Color,
         occupied: Bitboard,
         our_pieces: Bitboard,
@@ -924,7 +925,7 @@ impl Position {
 
     fn gen_castles(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         us: Color,
         occupied: Bitboard,
         king_danger: Bitboard,
@@ -996,7 +997,7 @@ impl Position {
     /// `None` if the variant does not offer it.
     pub(crate) fn gen_castles_960(
         &self,
-        out: &mut Vec<Move>,
+        out: &mut MoveList,
         geom: impl Fn(CastleSide) -> Option<(File, File)>,
     ) {
         let us = self.turn;
@@ -1679,14 +1680,31 @@ pub fn perft(position: &Position, depth: u32) -> u64 {
     if depth == 0 {
         return 1;
     }
-    let moves = position.legal_moves();
+    // Allocate one reusable move buffer per interior ply once, up front, and
+    // thread them through the recursion. Each buffer is `clear`ed (not freshly
+    // value-initialized) before reuse at its ply, so perft touches the stack
+    // buffers exactly `depth - 1` times total rather than allocating a fresh
+    // `MoveList` per node. The leaf ply counts moves directly without filling a
+    // buffer.
+    let mut buffers: Vec<MoveList> = (0..depth).map(|_| MoveList::new()).collect();
+    perft_with(position, depth, &mut buffers)
+}
+
+/// Recursive core of [`perft`], reusing the caller-owned per-ply `buffers` so no
+/// move buffer is allocated per node. `buffers[0]` belongs to the current ply;
+/// each buffer is `clear`ed (not value-initialized) before reuse, so the buffers
+/// are filled in place rather than reallocated per node.
+fn perft_with(position: &Position, depth: u32, buffers: &mut [MoveList]) -> u64 {
+    let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
+    here.clear();
+    position.generate_into(here);
     if depth == 1 {
-        return moves.len() as u64;
+        return here.len() as u64;
     }
     let mut nodes = 0;
-    for mv in moves {
-        nodes += perft(&position.play(&mv), depth - 1);
-    }
+    here.for_each(|mv| {
+        nodes += perft_with(&position.play(&mv), depth - 1, rest);
+    });
     nodes
 }
 

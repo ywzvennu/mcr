@@ -56,6 +56,7 @@ pub use racing::{RacingKings, RacingKingsRules};
 pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
 
 use crate::board::Board;
+use crate::movelist::MoveList;
 use crate::position::{
     parse_castling_field, parse_clock, parse_ep_field, write_standard_castling_field,
     CastlingRights, FenError, ParseUciError, Position,
@@ -235,7 +236,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     ///
     /// Default: no-op. Crazyhouse uses this to emit pocket drops. The provided
     /// `core` and `state` describe the current position.
-    fn extra_moves(_core: &Position, _state: &Self::State, _out: &mut Vec<Move>) {}
+    fn extra_moves(_core: &Position, _state: &Self::State, _out: &mut MoveList) {}
 
     /// Applies a variant-only move kind (such as [`crate::MoveKind::Drop`]) to
     /// the `core` position and `state` (H6).
@@ -264,7 +265,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     ///
     /// Default: no-op. Antichess uses this to keep only captures when a capture
     /// is available.
-    fn filter_forced(_core: &Position, _state: &Self::State, _moves: &mut Vec<Move>) {}
+    fn filter_forced(_core: &Position, _state: &Self::State, _moves: &mut MoveList) {}
 
     /// The roles a pawn may promote to, in a stable order (H8).
     ///
@@ -299,7 +300,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// The moves are validated by the same make-move king-safety filter as every
     /// other pseudo-legal move, so a castle that opens a line onto the king's
     /// destination is correctly rejected. Default: no-op.
-    fn generate_castles(_core: &Position, _out: &mut Vec<Move>) {}
+    fn generate_castles(_core: &Position, _out: &mut MoveList) {}
 
     /// Appends the variant's full pseudo-legal move set (including the standard
     /// castles) into the pre-filter set, used on the slow path when this variant
@@ -311,7 +312,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// is standard. Horde overrides this so white's first-rank pawns may
     /// double-push; the override is purely additive (standard pawns are generated
     /// identically) and never touches the fast path.
-    fn gen_pseudo(core: &Position, out: &mut Vec<Move>) {
+    fn gen_pseudo(core: &Position, out: &mut MoveList) {
         core.pseudo_into(out);
     }
 
@@ -577,30 +578,43 @@ impl<V: Variant> VariantPosition<V> {
     /// [`Variant::extra_moves`] and [`Variant::filter_forced`].
     #[must_use]
     pub fn legal_moves(&self) -> Vec<Move> {
-        let mut moves = if V::USES_FAST_LEGALITY {
+        self.legal_move_list().into_vec()
+    }
+
+    /// Generates the legal moves into a stack-backed [`MoveList`], the
+    /// allocation-free core of [`VariantPosition::legal_moves`].
+    fn legal_move_list(&self) -> MoveList {
+        let mut moves = MoveList::new();
+        self.generate_legal_into(&mut moves);
+        moves
+    }
+
+    /// Fills `out` with the legal moves of the side to move under variant `V`,
+    /// clearing it first. Sharing this with [`perft_variant`] lets perft reuse a
+    /// single per-ply buffer rather than allocate one per node.
+    fn generate_legal_into(&self, out: &mut MoveList) {
+        out.clear();
+        if V::USES_FAST_LEGALITY {
             // Sentinel: standard king safety, so reuse the fast core generator.
-            self.core.legal_moves()
+            self.core.generate_into(out);
         } else {
-            let mut pseudo = Vec::with_capacity(64);
             if V::VARIANT_CASTLING {
                 // The variant generates castling itself (arbitrary geometry), so
                 // suppress the core's standard castles and append the variant's
                 // candidates into the same pre-filter set.
-                self.core.pseudo_no_castles_into(&mut pseudo);
-                V::generate_castles(&self.core, &mut pseudo);
+                self.core.pseudo_no_castles_into(out);
+                V::generate_castles(&self.core, out);
             } else {
-                V::gen_pseudo(&self.core, &mut pseudo);
+                V::gen_pseudo(&self.core, out);
             }
-            pseudo.retain(|mv| {
+            out.retain(|mv| {
                 let child = self.core.play(mv);
                 V::is_legal_after(&self.core, mv, &child)
             });
-            pseudo
-        };
+        }
 
-        V::extra_moves(&self.core, &self.state, &mut moves);
-        V::filter_forced(&self.core, &self.state, &mut moves);
-        moves
+        V::extra_moves(&self.core, &self.state, out);
+        V::filter_forced(&self.core, &self.state, out);
     }
 
     /// Whether `mv` is among this position's legal moves.
@@ -878,13 +892,28 @@ pub fn perft_variant<V: Variant>(position: &VariantPosition<V>, depth: u32) -> u
     if depth == 0 {
         return 1;
     }
-    let moves = position.legal_moves();
+    // One reusable move buffer per ply, allocated once and `clear`ed before each
+    // reuse, so the recursion fills the stack buffers in place rather than
+    // allocating a fresh `MoveList` per node — see [`crate::perft`].
+    let mut buffers: Vec<MoveList> = (0..depth).map(|_| MoveList::new()).collect();
+    perft_variant_with(position, depth, &mut buffers)
+}
+
+/// Recursive core of [`perft_variant`], reusing the caller-owned per-ply
+/// `buffers`. `buffers[0]` belongs to the current ply.
+fn perft_variant_with<V: Variant>(
+    position: &VariantPosition<V>,
+    depth: u32,
+    buffers: &mut [MoveList],
+) -> u64 {
+    let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
+    position.generate_legal_into(here);
     if depth == 1 {
-        return moves.len() as u64;
+        return here.len() as u64;
     }
     let mut nodes = 0;
-    for mv in moves {
-        nodes += perft_variant(&position.play(&mv), depth - 1);
-    }
+    here.for_each(|mv| {
+        nodes += perft_variant_with(&position.play(&mv), depth - 1, rest);
+    });
     nodes
 }

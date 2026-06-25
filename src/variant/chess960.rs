@@ -19,6 +19,7 @@
 //! files round-trip.
 
 use super::{Variant, VariantId, VariantPosition};
+use crate::movelist::MoveList;
 use crate::position::{write_standard_castling_field, CastleSide};
 use crate::{Board, CastlingRights, Color, FenError, File, Piece, Rank, Role, Square};
 
@@ -37,7 +38,7 @@ impl Variant for Chess960Rules {
     const USES_FAST_LEGALITY: bool = false;
     const VARIANT_CASTLING: bool = true;
 
-    fn generate_castles(core: &crate::Position, out: &mut Vec<crate::Move>) {
+    fn generate_castles(core: &crate::Position, out: &mut MoveList) {
         // King to the g-/c-file, rook to the f-/d-file, exactly as in standard
         // chess; only the start squares differ in Chess960.
         core.gen_castles_960(out, |side| match side {

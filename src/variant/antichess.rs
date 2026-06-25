@@ -56,6 +56,7 @@
 
 use super::{Variant, VariantId, VariantPosition};
 use crate::board::Board;
+use crate::movelist::MoveList;
 use crate::position::CastlingRights;
 use crate::{EndReason, Move, Position, Role};
 
@@ -115,7 +116,7 @@ impl Variant for AntichessRules {
 
     /// H7: captures are forced. If any pseudo-legal move is a capture (ordinary,
     /// en passant, or a capturing promotion), keep only the captures.
-    fn filter_forced(_core: &Position, _state: &Self::State, moves: &mut Vec<Move>) {
+    fn filter_forced(_core: &Position, _state: &Self::State, moves: &mut MoveList) {
         if moves.iter().any(|mv| mv.is_capture()) {
             moves.retain(|mv| mv.is_capture());
         }
@@ -135,7 +136,7 @@ impl Variant for AntichessRules {
     /// promoting from/to/capture combination) is mirrored to a king-promotion of
     /// the same shape. This is the only pseudo-legal difference from standard
     /// chess; the slow legality path (king safety is off) then accepts every one.
-    fn gen_pseudo(core: &Position, out: &mut Vec<Move>) {
+    fn gen_pseudo(core: &Position, out: &mut MoveList) {
         core.pseudo_into(out);
         let king_promos: Vec<Move> = out
             .iter()
@@ -194,7 +195,7 @@ impl Variant for AntichessRules {
 /// empty one. We therefore only need to know whether *any* pseudo-legal move
 /// exists.
 fn has_legal_move(core: &Position) -> bool {
-    let mut pseudo = Vec::with_capacity(64);
+    let mut pseudo = MoveList::new();
     core.pseudo_into(&mut pseudo);
     !pseudo.is_empty()
 }
