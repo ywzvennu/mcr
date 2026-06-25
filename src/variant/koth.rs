@@ -37,24 +37,24 @@ impl Variant for KingOfTheHillRules {
     /// the opponent of whoever just moved. A player wins by stepping their own
     /// king onto the hill, after which it is the opponent's turn, so in every
     /// position reachable by play the king on the hill belongs to the side *not*
-    /// to move. [`EndReason::Checkmate`] is the single-position reason whose
-    /// outcome, `Checkmate.outcome(turn) = Decisive { winner: turn.opposite() }`,
-    /// awards the win to exactly that side — the same convention three-check
-    /// uses. We therefore check the side-not-to-move's king first; a crafted FEN
-    /// in which only the side-to-move's king sits on the hill (unreachable by
-    /// legal play, since that game would already be over) is also reported
-    /// terminal so such positions are never treated as ongoing.
+    /// to move. [`EndReason::KingInTheHill`] is the variant reason whose outcome,
+    /// `KingInTheHill.outcome(turn) = Decisive { winner: turn.opposite() }`,
+    /// awards the win to exactly that side. We therefore check the
+    /// side-not-to-move's king first; a crafted FEN in which only the
+    /// side-to-move's king sits on the hill (unreachable by legal play, since
+    /// that game would already be over) is also reported terminal so such
+    /// positions are never treated as ongoing.
     fn extra_terminal(core: &Position, _state: &Self::State) -> Option<EndReason> {
         let mover = core.turn().opposite();
         if core.board().king_of(mover).is_some_and(is_hill) {
-            return Some(EndReason::Checkmate);
+            return Some(EndReason::KingInTheHill);
         }
         if core.board().king_of(core.turn()).is_some_and(is_hill) {
             // Unreachable by legal play; report terminal so a crafted position
             // with the side-to-move's king on the hill is not treated as live.
-            // The decisive side is the king's owner; `Checkmate` here would name
+            // The decisive side is the king's owner; `KingInTheHill` here names
             // the opponent, so this branch only guarantees terminality.
-            return Some(EndReason::Checkmate);
+            return Some(EndReason::KingInTheHill);
         }
         None
     }
@@ -113,7 +113,7 @@ mod tests {
                 winner: Color::White
             })
         );
-        assert_eq!(after.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(after.end_reason(), Some(EndReason::KingInTheHill));
     }
 
     #[test]
@@ -130,6 +130,7 @@ mod tests {
                 winner: Color::Black
             })
         );
+        assert_eq!(after.end_reason(), Some(EndReason::KingInTheHill));
     }
 
     #[test]
@@ -151,6 +152,11 @@ mod tests {
                 pos.outcome(),
                 Some(Outcome::Decisive { winner }),
                 "king on hill should win for {winner:?} in {fen}"
+            );
+            assert_eq!(
+                pos.end_reason(),
+                Some(EndReason::KingInTheHill),
+                "king on hill should report KingInTheHill in {fen}"
             );
         }
     }

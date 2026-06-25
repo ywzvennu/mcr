@@ -41,12 +41,11 @@
 //! the legal-move list, so a finished position is a leaf for movegen, outcome
 //! detection, and perft even though pieces could still physically move.
 //!
-//! The draw / decisive outcomes are encoded through the shared [`EndReason`],
-//! whose [`EndReason::outcome`] maps only [`EndReason::Checkmate`] to a decisive
-//! result (the side *not* to move wins) and every other reason to a draw. A lone
-//! king home is therefore reported as [`EndReason::Checkmate`] for that colour
-//! (which is always the side that just moved, so the win is awarded correctly),
-//! and the both-home case as [`EndReason::Stalemate`] (an automatic draw).
+//! The draw / decisive outcomes are encoded through the shared [`EndReason`].
+//! A lone king home is reported as [`EndReason::RaceFinished`], whose
+//! [`EndReason::outcome`] awards the win to the side *not* to move (always the
+//! side that just moved, so the win is awarded correctly), and the both-home
+//! case as [`EndReason::RaceDraw`] (an automatic draw).
 
 use super::{Variant, VariantId};
 use crate::board::Board;
@@ -87,15 +86,15 @@ impl Variant for RacingKingsRules {
     ///
     /// In every position reachable by legal play the home king belongs to the
     /// side that just moved — i.e. the side *not* to move — so a lone-king win is
-    /// reported as [`EndReason::Checkmate`], whose outcome awards the win to
+    /// reported as [`EndReason::RaceFinished`], whose outcome awards the win to
     /// exactly that side. The both-home case is reported as the draw
-    /// [`EndReason::Stalemate`].
+    /// [`EndReason::RaceDraw`].
     ///
     /// (A FEN can construct the degenerate "the winning king is home and it is
     /// that same side to move" position, which never arises from play because
-    /// racing onto rank 8 passes the move to the opponent; `Checkmate` would name
-    /// the wrong winner there. Such a position is not produced by [`race_over`]
-    /// during play and is documented as out of scope.)
+    /// racing onto rank 8 passes the move to the opponent; `RaceFinished` would
+    /// name the wrong winner there. Such a position is not produced by
+    /// [`race_over`] during play and is documented as out of scope.)
     fn extra_terminal(core: &Position, _state: &Self::State) -> Option<EndReason> {
         if !race_over(core) {
             return None;
@@ -103,11 +102,11 @@ impl Variant for RacingKingsRules {
         let both_home = king_on_goal(core, Color::White) && king_on_goal(core, Color::Black);
         Some(if both_home {
             // Both kings finished: a drawn race.
-            EndReason::Stalemate
+            EndReason::RaceDraw
         } else {
             // Exactly one king home, belonging to the side that just moved (the
             // side not to move): a decisive win for that side.
-            EndReason::Checkmate
+            EndReason::RaceFinished
         })
     }
 
@@ -360,7 +359,7 @@ mod tests {
                 winner: Color::White
             })
         );
-        assert_eq!(after.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(after.end_reason(), Some(EndReason::RaceFinished));
     }
 
     #[test]
@@ -376,7 +375,7 @@ mod tests {
                 winner: Color::Black
             })
         );
-        assert_eq!(after.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(after.end_reason(), Some(EndReason::RaceFinished));
     }
 
     #[test]
@@ -401,7 +400,7 @@ mod tests {
         assert!(king_on_goal(after.core(), Color::White));
         assert!(king_on_goal(after.core(), Color::Black));
         assert_eq!(after.outcome(), Some(Outcome::Draw));
-        assert_eq!(after.end_reason(), Some(EndReason::Stalemate));
+        assert_eq!(after.end_reason(), Some(EndReason::RaceDraw));
     }
 
     #[test]
@@ -415,6 +414,7 @@ mod tests {
                 winner: Color::White
             })
         );
+        assert_eq!(pos.end_reason(), Some(EndReason::RaceFinished));
     }
 
     #[test]

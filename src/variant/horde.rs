@@ -59,13 +59,13 @@ impl Variant for HordeRules {
     ///
     /// White's pieces can only ever be removed by black capturing them, so an
     /// empty horde is always reached on a black move and the resulting position is
-    /// white to move. [`EndReason::Checkmate`] maps through
-    /// `Checkmate.outcome(White) = Decisive { winner: Black }`, awarding the win to
-    /// black, the side that eliminated the horde — exactly the desired decisive
-    /// result, and the same single-position-reason idiom three-check uses.
+    /// white to move. [`EndReason::HordeDefeated`] maps through
+    /// `HordeDefeated.outcome(White) = Decisive { winner: Black }`, awarding the
+    /// win to black, the side that eliminated the horde — exactly the desired
+    /// decisive result.
     fn extra_terminal(core: &Position, _state: &Self::State) -> Option<EndReason> {
         if core.board().by_color(Color::White).is_empty() {
-            Some(EndReason::Checkmate)
+            Some(EndReason::HordeDefeated)
         } else {
             None
         }
@@ -252,7 +252,7 @@ mod tests {
                 winner: Color::Black
             })
         );
-        assert_eq!(after.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(after.end_reason(), Some(EndReason::HordeDefeated));
     }
 
     #[test]

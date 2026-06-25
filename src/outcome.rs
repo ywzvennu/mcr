@@ -42,12 +42,21 @@ pub enum Outcome {
 
 /// The specific rule under which a game ended (or could be claimed to end).
 ///
-/// The first five variants are *automatic* terminations; the last two are
-/// *claimable* and never end the game on their own (see the [module
-/// documentation](crate::outcome)).
+/// Every variant except the two trailing repetition/move-clock claims is an
+/// *automatic* termination; the last two are *claimable* and never end the game
+/// on their own (see the [module documentation](crate::outcome)).
+///
+/// Standard chess only ever produces [`EndReason::Checkmate`], [`EndReason::Stalemate`],
+/// [`EndReason::InsufficientMaterial`], [`EndReason::SeventyFiveMoveRule`],
+/// [`EndReason::FivefoldRepetition`], and the two claimable reasons. The
+/// remaining reasons are variant-specific terminations whose label records *how*
+/// a variant game ended; each preserves the winner (or draw) the variant
+/// produced when it formerly reused [`EndReason::Checkmate`] or
+/// [`EndReason::VariantWin`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EndReason {
-    /// The side to move is in check and has no legal move. Decisive.
+    /// The side to move is in check and has no legal move. Decisive for the side
+    /// *not* to move.
     Checkmate,
     /// A variant-specific decisive ending in which the side *to move* wins.
     /// Decisive.
@@ -58,6 +67,29 @@ pub enum EndReason {
     /// side with no move, or with no pieces left, *wins*, which is exactly this
     /// reason. Automatic.
     VariantWin,
+    /// King of the Hill: a king reached one of the four central squares
+    /// (d4/e4/d5/e5). The king's owner — the side *not* to move, since reaching
+    /// the hill passes the turn — wins. Automatic, decisive.
+    KingInTheHill,
+    /// Three-check: a side delivered its third check. The checking side — the
+    /// side that just moved, i.e. the side *not* to move — wins. Automatic,
+    /// decisive.
+    ThreeChecks,
+    /// Racing Kings: exactly one king reached the eighth rank. The racer — the
+    /// side that just moved, i.e. the side *not* to move — wins. Automatic,
+    /// decisive. The both-kings-home case is [`EndReason::RaceDraw`] instead.
+    RaceFinished,
+    /// Racing Kings: both kings finished on the eighth rank (Black having matched
+    /// White's home rank on the very next move). Automatic draw.
+    RaceDraw,
+    /// Atomic: a royal king was destroyed by the blast of an adjacent capture.
+    /// The surviving side — the side *not* to move, since the side to move is the
+    /// one whose king was just exploded — wins. Automatic, decisive.
+    KingExploded,
+    /// Horde: the pawn horde (White) has no pieces left, so Black has eliminated
+    /// it. Reached on a Black move, leaving White to move, so the winner is the
+    /// side *not* to move. Automatic, decisive.
+    HordeDefeated,
     /// The side to move is not in check but has no legal move. Draw.
     Stalemate,
     /// Neither side has the material to deliver checkmate. Draw.
@@ -76,8 +108,9 @@ pub enum EndReason {
 
 impl EndReason {
     /// Returns `true` for the reasons that end the game automatically (checkmate,
-    /// the variant win, stalemate, insufficient material, the seventy-five-move
-    /// rule, and fivefold repetition), and `false` for the two claimable ones.
+    /// the variant win, every variant-specific termination, stalemate,
+    /// insufficient material, the seventy-five-move rule, and fivefold
+    /// repetition), and `false` for the two claimable ones.
     #[must_use]
     #[inline]
     pub const fn is_automatic(self) -> bool {
@@ -85,6 +118,12 @@ impl EndReason {
             self,
             EndReason::Checkmate
                 | EndReason::VariantWin
+                | EndReason::KingInTheHill
+                | EndReason::ThreeChecks
+                | EndReason::RaceFinished
+                | EndReason::RaceDraw
+                | EndReason::KingExploded
+                | EndReason::HordeDefeated
                 | EndReason::Stalemate
                 | EndReason::InsufficientMaterial
                 | EndReason::SeventyFiveMoveRule
@@ -93,18 +132,38 @@ impl EndReason {
     }
 
     /// The [`Outcome`] this reason produces, given the side to move when it
-    /// applies. [`EndReason::Checkmate`] is decisive for the side *not* to move
-    /// and [`EndReason::VariantWin`] is decisive for the side *to* move; every
-    /// other reason is a draw.
+    /// applies.
+    ///
+    /// The decisive reasons split by which side wins:
+    ///
+    /// - the side *not* to move (the side that just moved) wins under
+    ///   [`EndReason::Checkmate`], [`EndReason::KingInTheHill`],
+    ///   [`EndReason::ThreeChecks`], [`EndReason::RaceFinished`],
+    ///   [`EndReason::KingExploded`], and [`EndReason::HordeDefeated`];
+    /// - the side *to* move wins under [`EndReason::VariantWin`] (antichess).
+    ///
+    /// Every other reason — including the [`EndReason::RaceDraw`] both-home case
+    /// — is a draw.
     #[must_use]
     #[inline]
     pub const fn outcome(self, turn: Color) -> Outcome {
         match self {
-            EndReason::Checkmate => Outcome::Decisive {
+            EndReason::Checkmate
+            | EndReason::KingInTheHill
+            | EndReason::ThreeChecks
+            | EndReason::RaceFinished
+            | EndReason::KingExploded
+            | EndReason::HordeDefeated => Outcome::Decisive {
                 winner: turn.opposite(),
             },
             EndReason::VariantWin => Outcome::Decisive { winner: turn },
-            _ => Outcome::Draw,
+            EndReason::RaceDraw
+            | EndReason::Stalemate
+            | EndReason::InsufficientMaterial
+            | EndReason::SeventyFiveMoveRule
+            | EndReason::FivefoldRepetition
+            | EndReason::FiftyMoveRule
+            | EndReason::ThreefoldRepetition => Outcome::Draw,
         }
     }
 }
@@ -578,6 +637,12 @@ mod tests {
         for r in [
             EndReason::Checkmate,
             EndReason::VariantWin,
+            EndReason::KingInTheHill,
+            EndReason::ThreeChecks,
+            EndReason::RaceFinished,
+            EndReason::RaceDraw,
+            EndReason::KingExploded,
+            EndReason::HordeDefeated,
             EndReason::Stalemate,
             EndReason::InsufficientMaterial,
             EndReason::SeventyFiveMoveRule,
@@ -588,5 +653,45 @@ mod tests {
         for r in [EndReason::FiftyMoveRule, EndReason::ThreefoldRepetition] {
             assert!(!r.is_automatic(), "{r:?} should be claimable");
         }
+    }
+
+    #[test]
+    fn variant_reasons_map_to_the_right_outcome() {
+        // The variant-specific decisive reasons all award the win to the side
+        // *not* to move (the side that just moved), like checkmate.
+        for r in [
+            EndReason::KingInTheHill,
+            EndReason::ThreeChecks,
+            EndReason::RaceFinished,
+            EndReason::KingExploded,
+            EndReason::HordeDefeated,
+        ] {
+            assert_eq!(
+                r.outcome(Color::White),
+                Outcome::Decisive {
+                    winner: Color::Black
+                },
+                "{r:?} should award the side not to move"
+            );
+            assert_eq!(
+                r.outcome(Color::Black),
+                Outcome::Decisive {
+                    winner: Color::White
+                },
+                "{r:?} should award the side not to move"
+            );
+        }
+
+        // Antichess's VariantWin awards the side *to* move.
+        assert_eq!(
+            EndReason::VariantWin.outcome(Color::White),
+            Outcome::Decisive {
+                winner: Color::White
+            }
+        );
+
+        // The racing both-home reason is a draw regardless of side to move.
+        assert_eq!(EndReason::RaceDraw.outcome(Color::White), Outcome::Draw);
+        assert_eq!(EndReason::RaceDraw.outcome(Color::Black), Outcome::Draw);
     }
 }
