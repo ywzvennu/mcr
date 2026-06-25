@@ -38,6 +38,7 @@
 //! [`VariantPosition::end_reason`] behaviour and is deliberately *not* overridden.
 
 use super::{Variant, VariantId, VariantPosition};
+use crate::movelist::MoveList;
 use crate::position::parse_castling_field;
 use crate::{Color, EndReason, Move, Position};
 
@@ -85,7 +86,7 @@ impl Variant for HordeRules {
 
     /// H_pseudo: generate white's first-rank double pushes via the horde pawn
     /// path. Standard piece movement (including black's) is unchanged.
-    fn gen_pseudo(core: &Position, out: &mut Vec<Move>) {
+    fn gen_pseudo(core: &Position, out: &mut MoveList) {
         core.pseudo_into_horde(out);
     }
 

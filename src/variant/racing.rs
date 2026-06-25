@@ -49,6 +49,7 @@
 
 use super::{Variant, VariantId};
 use crate::board::Board;
+use crate::movelist::MoveList;
 use crate::position::CastlingRights;
 use crate::{Color, EndReason, Move, Position, Rank, Role, Square};
 
@@ -114,7 +115,7 @@ impl Variant for RacingKingsRules {
     /// could still physically move. Emptying the list here makes the game-over
     /// position a leaf for movegen, outcome detection, and perft, matching the
     /// reference Racing Kings semantics.
-    fn filter_forced(core: &Position, _state: &Self::State, moves: &mut Vec<Move>) {
+    fn filter_forced(core: &Position, _state: &Self::State, moves: &mut MoveList) {
         if race_over(core) {
             moves.clear();
         }

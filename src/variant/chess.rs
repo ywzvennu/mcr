@@ -149,9 +149,10 @@ mod tests {
         ];
         for fen in fens {
             let core = Position::from_fen(fen).unwrap();
-            let mut pseudo = Vec::new();
-            core.pseudo_into(&mut pseudo);
-            pseudo.retain(|mv| core.move_keeps_king_safe(mv));
+            let mut pseudo_list = crate::movelist::MoveList::new();
+            core.pseudo_into(&mut pseudo_list);
+            pseudo_list.retain(|mv| core.move_keeps_king_safe(mv));
+            let mut pseudo = pseudo_list.into_vec();
             let mut fast = core.legal_moves();
             pseudo.sort_by_key(|m| (m.from().index(), m.to().index(), format!("{:?}", m.kind())));
             fast.sort_by_key(|m| (m.from().index(), m.to().index(), format!("{:?}", m.kind())));
