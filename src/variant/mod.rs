@@ -31,11 +31,13 @@
 //! forced-move filtering, and terminal detection apply.
 
 mod chess;
+mod three_check;
 
 use core::fmt;
 use core::hash::Hash;
 
 pub use chess::{Chess, ChessRules};
+pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
 
 use crate::board::Board;
 use crate::position::{
@@ -205,6 +207,18 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     fn apply_extra(_core: &mut Position, _state: &mut Self::State, mv: &Move) {
         unreachable!("variant emits no extra move kinds: {mv:?}");
     }
+
+    /// Updates the variant state after `mv` has been fully applied to `core`,
+    /// for every move kind (capture, quiet, or extra) (H14).
+    ///
+    /// This runs at the very end of [`VariantPosition::play`], once `core` is the
+    /// finished child position and any capture / extra-move side effects have
+    /// already been applied. Unlike [`Variant::capture_side_effects`] (captures
+    /// only) and [`Variant::apply_extra`] (extra move kinds only), this fires on
+    /// *every* move, which is what three-check needs to count quiet checking
+    /// moves. Default: no-op, so standard chess and every other variant are
+    /// unaffected.
+    fn post_apply(_core: &mut Position, _state: &mut Self::State, _mv: &Move) {}
 
     /// Filters the move list down to the forced subset, if the variant forces
     /// certain moves (H7).
@@ -408,9 +422,18 @@ impl<V: Variant> VariantPosition<V> {
 
     /// The Zobrist key of this position, including the variant state contribution
     /// from [`Variant::hash_state`].
+    ///
+    /// The core key is XOR-folded with the variant's [`Variant::hash_state`]
+    /// contribution so that stateful variants (three-check counters, crazyhouse
+    /// pockets) hash apart on otherwise-identical boards. For the unit state the
+    /// contribution is zero, so [`Chess`] reproduces the plain core key exactly.
     #[must_use]
     pub fn zobrist(&self) -> Zobrist {
-        self.core.zobrist()
+        let mut key = self.core.zobrist().get();
+        let mut extra = 0u64;
+        V::hash_state(&self.state, &mut extra);
+        key ^= extra;
+        Zobrist(key)
     }
 
     /// Whether the side to move is in check. Always `false` when the king is not
@@ -491,6 +514,11 @@ impl<V: Variant> VariantPosition<V> {
             }
             core
         };
+
+        // Per-move post-apply hook (H14): runs for every move kind once the child
+        // `core` is finished, before the state hash is rebalanced. The default is
+        // a no-op, so standard chess and other variants are unaffected.
+        V::post_apply(&mut core, &mut state, mv);
 
         // Rebalance the state-hash contribution: out with the parent's, in with
         // the child's.
