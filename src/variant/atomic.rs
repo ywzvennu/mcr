@@ -160,18 +160,18 @@ impl Variant for AtomicRules {
     /// H1: a missing king is decisive for the side whose king survives.
     ///
     /// Atomic positions reachable by play never have *both* kings missing, so
-    /// exactly one side is the winner. [`EndReason::Checkmate`] is the
-    /// single-position reason whose outcome,
-    /// `Checkmate.outcome(turn) = Decisive { winner: turn.opposite() }`, awards
+    /// exactly one side is the winner. [`EndReason::KingExploded`] is the variant
+    /// reason whose outcome,
+    /// `KingExploded.outcome(turn) = Decisive { winner: turn.opposite() }`, awards
     /// the win to the side *not* to move — which is the surviving side, since the
     /// side to move is the one whose king was just exploded.
     fn extra_terminal(core: &Position, _state: &Self::State) -> Option<EndReason> {
         // In any position reachable by legal play the only missing king is the
         // side-to-move's: the previous move exploded it, ending the game in the
         // mover's favour. The mover is the side *not* to move, which is exactly
-        // the winner `Checkmate` awards.
+        // the winner `KingExploded` awards.
         if core.board().king_of(core.turn()).is_none() {
-            return Some(EndReason::Checkmate);
+            return Some(EndReason::KingExploded);
         }
         None
     }
@@ -262,6 +262,7 @@ mod tests {
                 winner: Color::White
             })
         );
+        assert_eq!(after.end_reason(), Some(EndReason::KingExploded));
     }
 
     #[test]
@@ -310,6 +311,7 @@ mod tests {
                 winner: Color::White
             })
         );
+        assert_eq!(after.end_reason(), Some(EndReason::KingExploded));
     }
 
     #[test]

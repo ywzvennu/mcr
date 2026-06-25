@@ -143,15 +143,15 @@ impl Variant for ThreeCheckRules {
     /// The winning side is whichever counter is at the limit; this is the side
     /// that just moved (you reach three checks by *delivering* a check, after
     /// which it is the opponent's turn), so the winner is the side *not* to move
-    /// and [`EndReason::Checkmate`] yields exactly that decisive outcome.
+    /// and [`EndReason::ThreeChecks`] yields exactly that decisive outcome.
     fn extra_terminal(_core: &Position, state: &Self::State) -> Option<EndReason> {
         // In every position reachable by play the three-check winner is the side
         // that just moved, i.e. the side *not* to move, because you reach three
         // checks by delivering one (after which it is the opponent's turn).
-        // `EndReason::Checkmate` is the single-position reason whose outcome,
-        // `Checkmate.outcome(turn) = Decisive { winner: turn.opposite() }`,
+        // `EndReason::ThreeChecks` is the variant reason whose outcome,
+        // `ThreeChecks.outcome(turn) = Decisive { winner: turn.opposite() }`,
         // awards the win to exactly that side.
-        state.winner().map(|_| EndReason::Checkmate)
+        state.winner().map(|_| EndReason::ThreeChecks)
     }
 
     /// H14: after each move, if the move left the opponent in check, credit the
@@ -294,7 +294,7 @@ mod tests {
                 winner: Color::White
             })
         );
-        assert_eq!(p5.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(p5.end_reason(), Some(EndReason::ThreeChecks));
     }
 
     #[test]
@@ -314,6 +314,7 @@ mod tests {
                 winner: Color::Black
             })
         );
+        assert_eq!(p5.end_reason(), Some(EndReason::ThreeChecks));
     }
 
     #[test]
@@ -329,6 +330,7 @@ mod tests {
                 winner: Color::Black
             })
         );
+        assert_eq!(pos.end_reason(), Some(EndReason::Checkmate));
         assert!(pos.state().black < WIN_CHECKS);
     }
 
