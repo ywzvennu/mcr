@@ -34,6 +34,7 @@ mod antichess;
 mod atomic;
 mod chess;
 mod chess960;
+mod crazyhouse;
 mod horde;
 mod koth;
 mod racing;
@@ -46,6 +47,7 @@ pub use antichess::{Antichess, AntichessRules};
 pub use atomic::{Atomic, AtomicRules};
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
+pub use crazyhouse::{Crazyhouse, CrazyhouseRules, CrazyhouseState};
 pub use horde::{Horde, HordeRules};
 pub use koth::{KingOfTheHill, KingOfTheHillRules};
 pub use racing::{RacingKings, RacingKingsRules};
@@ -373,6 +375,36 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// Implementations should append a leading space before each field they emit.
     /// Default: write nothing.
     fn fen_extra_write(_state: &Self::State, _out: &mut String) {}
+
+    /// Parses the FEN placement field (the first of the six) into a [`Board`] and
+    /// any per-variant state encoded *on the placement itself* (H13b read).
+    ///
+    /// Default: the standard parser, which reads the board and yields the default
+    /// state. Crazyhouse overrides this because its pocket rides on the placement
+    /// as a bracketed suffix and its promoted pieces carry a trailing `~`; reading
+    /// those there (rather than in [`Variant::fen_extra_read`], which only sees
+    /// the *trailing* fields) keeps the core [`Board`] parser unaware of variant
+    /// markers. A variant that overrides this typically returns the default state
+    /// from [`Variant::fen_extra_read`] (there is nothing left to read), and
+    /// overrides [`Variant::write_placement`] symmetrically.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FenError`] if the placement (or its variant markers) is
+    /// malformed.
+    fn read_placement(token: &str) -> Result<(Board, Self::State), FenError> {
+        let board = Board::from_fen_placement(token).map_err(FenError::Placement)?;
+        Ok((board, Self::State::default()))
+    }
+
+    /// Writes the FEN placement field, re-emitting any per-variant markers that
+    /// [`Variant::read_placement`] consumes (H13b write).
+    ///
+    /// Default: the standard placement with no extra markers. Crazyhouse overrides
+    /// this to append its `[...]` pocket suffix and `~` promotion markers.
+    fn write_placement(board: &Board, _state: &Self::State, out: &mut String) {
+        out.push_str(&board.to_fen_placement());
+    }
 
     /// Parses the castling-rights FEN field (the third of the six standard
     /// fields) into [`CastlingRights`] (H10 read).
@@ -742,7 +774,7 @@ impl<V: Variant + Default> VariantPosition<V> {
         let mut fields = fen.split_whitespace();
 
         let placement = fields.next().ok_or(FenError::MissingField)?;
-        let board = Board::from_fen_placement(placement).map_err(FenError::Placement)?;
+        let (board, placement_state) = V::read_placement(placement)?;
 
         let turn = match fields.next().ok_or(FenError::MissingField)? {
             "w" => Color::White,
@@ -765,7 +797,18 @@ impl<V: Variant + Default> VariantPosition<V> {
             None => 1,
         };
 
-        let state = V::fen_extra_read(&mut fields)?;
+        // A variant encodes its extra state either *on the placement* (read by
+        // `read_placement`, e.g. crazyhouse pockets) or in *trailing fields* (read
+        // by `fen_extra_read`, e.g. three-check), never both. Whichever source is
+        // non-default is the real state; both default to `Default::default()`, so
+        // taking the non-default one composes correctly without either variant
+        // needing to know about the other.
+        let trailing_state = V::fen_extra_read(&mut fields)?;
+        let state = if placement_state == V::State::default() {
+            trailing_state
+        } else {
+            placement_state
+        };
 
         if fields.next().is_some() {
             return Err(FenError::TrailingData);
@@ -796,8 +839,11 @@ impl<V: Variant> VariantPosition<V> {
             self.core.board(),
             &mut castling,
         );
+        let mut placement = String::new();
+        V::write_placement(self.core.board(), &self.state, &mut placement);
         let mut fen = String::new();
-        self.core.write_core_fen_with(&castling, &mut fen);
+        self.core
+            .write_core_fen_with_placement(&placement, &castling, &mut fen);
         V::fen_extra_write(&self.state, &mut fen);
         fen
     }

@@ -1503,7 +1503,20 @@ impl Position {
     /// caller-supplied castling field, so variant FEN writers can substitute a
     /// 960 (X-FEN / Shredder) castling field while reusing every other field.
     pub(crate) fn write_core_fen_with(&self, castling_field: &str, out: &mut String) {
-        out.push_str(&self.board.to_fen_placement());
+        self.write_core_fen_with_placement(&self.board.to_fen_placement(), castling_field, out);
+    }
+
+    /// Serializes the six standard FEN fields into `out` with both a
+    /// caller-supplied placement field and castling field, so a variant whose
+    /// placement carries extra markers (crazyhouse pockets / `~`) can substitute
+    /// it while reusing every other field.
+    pub(crate) fn write_core_fen_with_placement(
+        &self,
+        placement_field: &str,
+        castling_field: &str,
+        out: &mut String,
+    ) {
+        out.push_str(placement_field);
         out.push(' ');
         out.push(if self.turn.is_white() { 'w' } else { 'b' });
         out.push(' ');
