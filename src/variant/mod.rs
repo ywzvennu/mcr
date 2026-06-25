@@ -33,6 +33,7 @@
 mod chess;
 mod chess960;
 mod koth;
+mod racing;
 mod three_check;
 
 use core::fmt;
@@ -41,6 +42,7 @@ use core::hash::Hash;
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
 pub use koth::{KingOfTheHill, KingOfTheHillRules};
+pub use racing::{RacingKings, RacingKingsRules};
 pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
 
 use crate::board::Board;
@@ -179,6 +181,18 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// piece with no check concept).
     #[must_use]
     fn king_is_royal() -> bool {
+        true
+    }
+
+    /// Whether a position with insufficient mating material is an automatic draw.
+    ///
+    /// Default: `true` (standard chess). Variants whose goal is not checkmate —
+    /// racing kings, where a lone king still races to the eighth rank — override
+    /// this to `false` so that sparse material never ends the game on its own. The
+    /// check is consulted by [`VariantPosition::end_reason`] only when the king is
+    /// royal, so non-royal variants are unaffected either way.
+    #[must_use]
+    fn insufficient_material_is_draw() -> bool {
         true
     }
 
@@ -614,7 +628,10 @@ impl<V: Variant> VariantPosition<V> {
         }
         // Material / clock draws only apply when the standard concepts do; the
         // core check is reused as the standard default.
-        if V::king_is_royal() && self.core.is_insufficient_material() {
+        if V::king_is_royal()
+            && V::insufficient_material_is_draw()
+            && self.core.is_insufficient_material()
+        {
             return Some(EndReason::InsufficientMaterial);
         }
         if self.core.halfmove_clock() >= SEVENTY_FIVE_MOVE_PLIES {
