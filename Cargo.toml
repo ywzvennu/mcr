@@ -1,0 +1,36 @@
+# mce — Modular Chess Engine
+#
+# A permissively licensed (MIT OR Apache-2.0), clean-room chess move-generation
+# and rules library covering standard chess, Chess960, and the major variants.
+# It is an original implementation built from public algorithms — it does not
+# derive from any copyleft engine.
+
+[package]
+name = "mce"
+description = "Modular Chess Engine — a permissively licensed chess move-generation and rules library covering standard chess and variants."
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.82"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ywzvennu/mce"
+homepage = "https://github.com/ywzvennu/mce"
+keywords = ["chess", "chess960", "move-generation", "variants", "bitboard"]
+categories = ["games", "game-development"]
+authors = ["MCE contributors"]
+
+[lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+todo = "warn"
+dbg_macro = "warn"
+
+[dependencies]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

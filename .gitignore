@@ -1,0 +1,28 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+*.pdb
+
+# Fuzzing
+/fuzz/target
+/fuzz/corpus
+/fuzz/artifacts
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# LLM / AI assistant material — NEVER commit.
+# ---------------------------------------------------------------------------
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+.cursorrules
+.cursor/
+.aider*
+.claude/
+*.plan.md
+/notes/
+/scratch/
