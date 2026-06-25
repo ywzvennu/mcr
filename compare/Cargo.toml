@@ -1,0 +1,41 @@
+# mce-compare — perft benchmark comparing mce against shakmaty.
+#
+# This is a separate, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build`/`cargo
+# test`; it depends on `mce` by path.
+#
+# LICENSING ISOLATION (hard requirement): this crate links `shakmaty`, which
+# is GPL-3.0+, for BENCHMARKING ONLY. It is `publish = false` and is never
+# published or distributed, so it imposes no copyleft obligation on the `mce`
+# library, which remains clean-room MIT OR Apache-2.0. The `mce` crate itself
+# does not depend on shakmaty (not even as a dev-dependency).
+
+[package]
+name = "mce-compare"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[dependencies]
+mce = { path = ".." }
+shakmaty = { version = "0.27", features = ["variant"] }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "mce-compare"
+path = "src/main.rs"
+test = false
+doc = false
+bench = false
+
+[[bench]]
+name = "perft_compare"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

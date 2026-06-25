@@ -8,6 +8,9 @@
 /fuzz/corpus
 /fuzz/artifacts
 
+# Benchmark comparison crate (links GPL shakmaty; never published)
+/compare/target
+
 # Editor / OS
 .idea/
 .vscode/
