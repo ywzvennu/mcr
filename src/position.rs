@@ -149,6 +149,8 @@ pub struct Position {
     ep_square: Option<Square>,
     halfmove_clock: u32,
     fullmove_number: u32,
+    /// The incrementally maintained Zobrist key (see [`crate::zobrist`]).
+    hash: u64,
 }
 
 impl Default for Position {
@@ -162,14 +164,17 @@ impl Position {
     /// The standard chess starting position.
     #[must_use]
     pub fn startpos() -> Position {
-        Position {
+        let mut pos = Position {
             board: Board::standard(),
             turn: Color::White,
             castling: CastlingRights::STANDARD,
             ep_square: None,
             halfmove_clock: 0,
             fullmove_number: 1,
-        }
+            hash: 0,
+        };
+        pos.hash = pos.compute_zobrist();
+        pos
     }
 
     /// The piece placement of this position.
@@ -205,6 +210,16 @@ impl Position {
     #[inline]
     pub const fn ep_square(&self) -> Option<Square> {
         self.ep_square
+    }
+
+    /// The incrementally maintained Zobrist key, as kept up to date by
+    /// [`Position::play`]. Always equal to [`Position::compute_zobrist`]; exposed
+    /// for the equality test between the two paths.
+    #[cfg(test)]
+    #[must_use]
+    #[inline]
+    pub(crate) fn incremental_zobrist(&self) -> u64 {
+        self.hash
     }
 
     /// The halfmove clock (plies since the last capture or pawn move), used for
@@ -803,22 +818,34 @@ impl Position {
         let is_pawn_move = moving.role == Role::Pawn;
         let mut reset_clock = is_pawn_move;
 
+        // Incremental Zobrist: XOR out the parent's en-passant and castling
+        // features now; piece moves are folded in as the board is edited, and the
+        // new ep/castling/side features are folded back in once they are settled
+        // at the end.
+        if let Some(file) = self.zobrist_ep_file() {
+            self.hash ^= crate::zobrist::ep_file_key(file);
+        }
+        self.hash ^= self.castling_hash();
+
         // Clear any prior en-passant target; set below only for a double push.
         let prev_ep = self.ep_square.take();
 
         match mv.kind() {
             MoveKind::Quiet => {
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                self.hash_remove(from, moving);
+                self.hash_set(to, moving);
             }
             MoveKind::Capture => {
                 reset_clock = true;
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                if let Some(captured) = self.board.piece_at(to) {
+                    self.hash_remove(to, captured);
+                }
+                self.hash_remove(from, moving);
+                self.hash_set(to, moving);
             }
             MoveKind::DoublePawnPush => {
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                self.hash_remove(from, moving);
+                self.hash_set(to, moving);
                 // The ep target is the square the pawn skipped over.
                 let mid_rank = from.rank().offset(if us.is_white() { 1 } else { -1 });
                 if let Some(mid_rank) = mid_rank {
@@ -827,12 +854,13 @@ impl Position {
             }
             MoveKind::EnPassant => {
                 reset_clock = true;
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                self.hash_remove(from, moving);
+                self.hash_set(to, moving);
                 // Remove the captured pawn, which is on `to`'s file and `from`'s
                 // rank.
                 let captured = Square::from_file_rank(to.file(), from.rank());
-                self.board.remove_piece(captured);
+                let captured_pawn = Piece::new(them, Role::Pawn);
+                self.hash_remove(captured, captured_pawn);
             }
             MoveKind::CastleKingside | MoveKind::CastleQueenside => {
                 let side = if matches!(mv.kind(), MoveKind::CastleKingside) {
@@ -850,17 +878,23 @@ impl Position {
                     CastleSide::Queen => File::D,
                 };
                 let rook_to = Square::from_file_rank(rook_dest_file, rank);
+                let rook = Piece::new(us, Role::Rook);
                 // Move king and rook. Remove both first to handle the case where
                 // a destination coincides with the other's origin.
-                self.board.remove_piece(from);
-                self.board.remove_piece(rook_from);
-                self.board.set_piece(to, moving);
-                self.board.set_piece(rook_to, Piece::new(us, Role::Rook));
+                self.hash_remove(from, moving);
+                self.hash_remove(rook_from, rook);
+                self.hash_set(to, moving);
+                self.hash_set(rook_to, rook);
             }
             MoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
-                self.board.remove_piece(from);
-                self.board.set_piece(to, Piece::new(us, role));
+                if capture {
+                    if let Some(captured) = self.board.piece_at(to) {
+                        self.hash_remove(to, captured);
+                    }
+                }
+                self.hash_remove(from, moving);
+                self.hash_set(to, Piece::new(us, role));
             }
         }
         let _ = prev_ep;
@@ -887,6 +921,44 @@ impl Position {
             self.fullmove_number += 1;
         }
         self.turn = them;
+
+        // Fold the settled castling and (capture-available) en-passant features,
+        // plus the new side-to-move toggle, back into the key.
+        self.hash ^= self.castling_hash();
+        if let Some(file) = self.zobrist_ep_file() {
+            self.hash ^= crate::zobrist::ep_file_key(file);
+        }
+        // Side to move flipped from `us` to `them`; toggle that feature.
+        self.hash ^= crate::zobrist::side_key(us);
+        self.hash ^= crate::zobrist::side_key(them);
+    }
+
+    /// Removes a known `piece` from `square`, keeping the Zobrist key in step.
+    #[inline]
+    fn hash_remove(&mut self, square: Square, piece: Piece) {
+        self.board.remove_piece(square);
+        self.hash ^= crate::zobrist::piece_square_key(piece, square);
+    }
+
+    /// Places a known `piece` on `square`, keeping the Zobrist key in step.
+    #[inline]
+    fn hash_set(&mut self, square: Square, piece: Piece) {
+        self.board.set_piece(square, piece);
+        self.hash ^= crate::zobrist::piece_square_key(piece, square);
+    }
+
+    /// The XOR of the keys for all castling rights currently held.
+    #[inline]
+    fn castling_hash(&self) -> u64 {
+        let mut h = 0;
+        for color in Color::ALL {
+            for side in [CastleSide::King, CastleSide::Queen] {
+                if self.castling.has(color, side) {
+                    h ^= crate::zobrist::castling_key(color, side);
+                }
+            }
+        }
+        h
     }
 
     /// If `square` is the home square of a castling rook of `color`, revoke that
@@ -1004,14 +1076,16 @@ impl Position {
             return Err(FenError::TrailingData);
         }
 
-        let position = Position {
+        let mut position = Position {
             board,
             turn,
             castling,
             ep_square,
             halfmove_clock,
             fullmove_number,
+            hash: 0,
         };
+        position.hash = position.compute_zobrist();
         position.validate()?;
         Ok(position)
     }
