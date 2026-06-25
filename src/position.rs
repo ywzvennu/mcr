@@ -418,6 +418,27 @@ impl Position {
     /// Shared body of [`Position::pseudo_into`]; `standard_castles` controls
     /// whether the standard castle generator runs.
     fn pseudo_into_with_castles(&self, out: &mut Vec<Move>, standard_castles: bool) {
+        self.pseudo_into_with(out, standard_castles, false);
+    }
+
+    /// Pushes the pseudo-legal moves of the side to move into `out`, exactly like
+    /// [`Position::pseudo_into`], but additionally treating white's first-rank
+    /// pawns as double-push eligible for the horde variant. Standard chess and
+    /// every other variant call the wrappers above with the flag `false`, leaving
+    /// their move sets identical.
+    pub(crate) fn pseudo_into_horde(&self, out: &mut Vec<Move>) {
+        self.pseudo_into_with(out, true, true);
+    }
+
+    /// Shared body of the pseudo-legal generators. `standard_castles` controls
+    /// whether the standard castle generator runs; `white_first_rank_double`
+    /// admits horde's first-rank white double-pushes.
+    fn pseudo_into_with(
+        &self,
+        out: &mut Vec<Move>,
+        standard_castles: bool,
+        white_first_rank_double: bool,
+    ) {
         let us = self.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -430,12 +451,30 @@ impl Position {
         // Pawns, knights, sliders: reuse the standard generators with an
         // all-allowing check mask and no pins, so every geometric move is kept.
         if let Some(king_sq) = board.king_of(us) {
-            self.gen_pawn_moves(out, us, occupied, their_pieces, full, &no_pins, king_sq);
+            self.gen_pawn_moves(
+                out,
+                us,
+                occupied,
+                their_pieces,
+                full,
+                &no_pins,
+                king_sq,
+                white_first_rank_double,
+            );
         } else {
             // Without a king there is no en-passant legality king to consult; the
             // generator only reads `king_sq` for that rare check, and a kingless
             // side cannot be in an ep pin, so any square is a safe placeholder.
-            self.gen_pawn_moves(out, us, occupied, their_pieces, full, &no_pins, Square::A1);
+            self.gen_pawn_moves(
+                out,
+                us,
+                occupied,
+                their_pieces,
+                full,
+                &no_pins,
+                Square::A1,
+                white_first_rank_double,
+            );
         }
         self.gen_knight_moves(out, us, our_pieces, their_pieces, full, &no_pins);
         self.gen_slider_moves(out, us, occupied, our_pieces, their_pieces, full, &no_pins);
@@ -550,6 +589,7 @@ impl Position {
             check_mask,
             &pin_lines,
             king_sq,
+            false,
         );
         self.gen_knight_moves(out, us, our_pieces, their_pieces, check_mask, &pin_lines);
         self.gen_slider_moves(
@@ -653,6 +693,7 @@ impl Position {
         check_mask: Bitboard,
         pins: &[(Square, Bitboard)],
         king_sq: Square,
+        white_first_rank_double: bool,
     ) {
         let board = &self.board;
         let pawns = board.pieces(us, Role::Pawn);
@@ -673,7 +714,14 @@ impl Position {
             if let Some(one) = from.offset(0, forward) {
                 if !occupied.contains(one) {
                     self.push_pawn_advance(out, from, one, promo_rank, check_mask, pin_line);
-                    // Double push only from the start rank, over an empty square.
+                    // A standard double push from the start rank creates an
+                    // en-passant target (`MoveKind::DoublePawnPush`). In horde,
+                    // white's first-rank pawns may *also* advance two squares, but
+                    // per the horde convention such a first-rank double push does
+                    // *not* create an en-passant target — so it is emitted as a
+                    // plain quiet two-square move. The `white_first_rank_double`
+                    // flag (false for standard chess and every other caller) gates
+                    // that extra, ep-less source rank.
                     if from.rank() == start_rank {
                         if let Some(two) = from.offset(0, 2 * forward) {
                             if !occupied.contains(two)
@@ -681,6 +729,20 @@ impl Position {
                                 && pin_line.contains(two)
                             {
                                 out.push(Move::new(from, two, MoveKind::DoublePawnPush));
+                            }
+                        }
+                    } else if white_first_rank_double
+                        && us == Color::White
+                        && from.rank() == Rank::First
+                    {
+                        if let Some(two) = from.offset(0, 2 * forward) {
+                            if !occupied.contains(two)
+                                && check_mask.contains(two)
+                                && pin_line.contains(two)
+                            {
+                                // No en-passant target for a first-rank double
+                                // push: a quiet two-square advance.
+                                out.push(Move::new(from, two, MoveKind::Quiet));
                             }
                         }
                     }
