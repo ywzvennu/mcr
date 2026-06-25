@@ -300,6 +300,12 @@ struct ParsedSan {
 /// Parses the "target" form of SAN (everything except castling) into a
 /// [`ParsedSan`]. The string must already have its trailing glyphs stripped.
 fn parse_target_san(core: &str) -> Result<ParsedSan, SanError> {
+    // SAN is an ASCII-only grammar; reject non-ASCII up front so the
+    // byte-indexed slicing below (`core[i..end]`, `body[..]`) can never split a
+    // multi-byte UTF-8 char and panic.
+    if !core.is_ascii() {
+        return Err(SanError::Malformed);
+    }
     let bytes = core.as_bytes();
     let mut i = 0;
 
@@ -583,6 +589,35 @@ mod tests {
         assert_eq!(amb.parse_san("Nd2").unwrap_err(), SanError::Ambiguous);
         // Wrong disambiguation hint -> illegal, not a panic.
         assert_eq!(amb.parse_san("Nhd2").unwrap_err(), SanError::Illegal);
+    }
+
+    #[test]
+    fn parse_san_rejects_non_ascii_without_panic() {
+        let p = Position::startpos();
+        // Multi-byte UTF-8 chars at various offsets must not split a slice and
+        // must be rejected rather than panic. After trimming/glyph-stripping
+        // these reach `parse_target_san`, which rejects non-ASCII as Malformed.
+        for s in [
+            "\u{e9}e4",       // leading multi-byte char (2 bytes)
+            "e\u{e9}4",       // multi-byte char at byte offset 1
+            "e4\u{e9}",       // trailing multi-byte char
+            "N\u{e9}f3",      // after a piece letter
+            "\u{1f600}",      // lone emoji (4 bytes)
+            "exd8=\u{e9}",    // multi-byte promotion role
+            "e4\u{301}",      // combining acute accent
+            "\u{301}\u{301}", // combining marks only
+            "Bb5\u{e9}",      // non-ASCII trailing glyph position
+        ] {
+            assert_eq!(
+                p.parse_san(s).unwrap_err(),
+                SanError::Malformed,
+                "{s:?} should be rejected as malformed"
+            );
+        }
+        // Short inputs must be rejected, not panic.
+        assert_eq!(p.parse_san("").unwrap_err(), SanError::Empty);
+        assert_eq!(p.parse_san(" ").unwrap_err(), SanError::Empty);
+        assert_eq!(p.parse_san("e").unwrap_err(), SanError::Malformed);
     }
 
     #[test]

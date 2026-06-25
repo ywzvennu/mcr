@@ -720,6 +720,12 @@ impl<V: Variant> VariantPosition<V> {
     /// move in this position.
     pub fn parse_uci(&self, uci: &str) -> Result<Move, ParseUciError> {
         let bytes = uci.as_bytes();
+        // UCI (including the crazyhouse drop form `X@e4`) is ASCII-only; reject
+        // non-ASCII up front so the byte-indexed slicing below can never split a
+        // multi-byte UTF-8 char.
+        if !uci.is_ascii() {
+            return Err(ParseUciError::Malformed);
+        }
 
         // Drop form: `{ROLE}@{square}`.
         if bytes.len() == 4 && bytes[1] == b'@' {
