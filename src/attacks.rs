@@ -11,7 +11,7 @@
 //!   square, the blocker-aware attack set is obtained from
 //!   `(o - 2s) ^ reverse(reverse(o) - 2 reverse(s))` restricted to the line
 //!   mask, where `o` is the occupancy on the line and `s` is the slider square.
-//! * **Geometry** — [`between`] and [`line`] expose precomputed
+//! * **Geometry** — [`between`] and [`line()`] expose precomputed
 //!   square-to-square ray tables used by pin and check detection.
 //!
 //! The whole module is `safe` Rust: steppers are computed with edge-masked bit

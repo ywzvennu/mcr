@@ -76,7 +76,7 @@ impl Variant for RacingKingsRules {
         !either_king_in_check(child)
     }
 
-    /// H1: report the race outcome once the race has ended (see [`race_over`] for
+    /// H1: report the race outcome once the race has ended (see `race_over` for
     /// when that is, including the both-reach draw subtlety).
     ///
     /// The mapping mirrors the standard Racing Kings outcome:
@@ -94,7 +94,7 @@ impl Variant for RacingKingsRules {
     /// that same side to move" position, which never arises from play because
     /// racing onto rank 8 passes the move to the opponent; `RaceFinished` would
     /// name the wrong winner there. Such a position is not produced by
-    /// [`race_over`] during play and is documented as out of scope.)
+    /// `race_over` during play and is documented as out of scope.)
     fn extra_terminal(core: &Position, _state: &Self::State) -> Option<EndReason> {
         if !race_over(core) {
             return None;

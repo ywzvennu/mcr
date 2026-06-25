@@ -8,15 +8,17 @@
 [package]
 name = "mce"
 description = "Modular Chess Engine — a permissively licensed chess move-generation and rules library covering standard chess and variants."
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ywzvennu/mce"
 homepage = "https://github.com/ywzvennu/mce"
+readme = "README.md"
 keywords = ["chess", "chess960", "move-generation", "variants", "bitboard"]
 categories = ["games", "game-development"]
 authors = ["MCE contributors"]
+exclude = ["/fuzz", "/.github"]
 
 [lints.rust]
 unsafe_code = "deny"

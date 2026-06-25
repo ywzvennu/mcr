@@ -29,7 +29,7 @@ const WIN_CHECKS: u8 = 3;
 /// The count of checks *given* by each side in a three-check game.
 ///
 /// Each counter is the number of times that color has delivered check, clamped
-/// at [`WIN_CHECKS`]. The startpos value is `0`/`0`; reaching `WIN_CHECKS` is an
+/// at `WIN_CHECKS`. The startpos value is `0`/`0`; reaching `WIN_CHECKS` is an
 /// immediate win for that side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CheckCounters {
@@ -138,7 +138,7 @@ impl Variant for ThreeCheckRules {
     type State = CheckCounters;
     const ID: VariantId = VariantId::ThreeCheck;
 
-    /// H1: the first side to reach [`WIN_CHECKS`] checks wins immediately.
+    /// H1: the first side to reach `WIN_CHECKS` checks wins immediately.
     ///
     /// The winning side is whichever counter is at the limit; this is the side
     /// that just moved (you reach three checks by *delivering* a check, after

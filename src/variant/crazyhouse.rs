@@ -82,14 +82,14 @@ const fn color_index(color: Color) -> usize {
 /// holding a promoted piece.
 ///
 /// `pockets[color][role]` is the count of pieces of that `role` the `color` holds
-/// in hand, indexed by [`pocket_index`] over the five droppable roles
+/// in hand, indexed by `pocket_index` over the five droppable roles
 /// (pawn, knight, bishop, rook, queen). `promoted` marks every square whose
 /// occupant arrived there by promotion, so that capturing it returns a pawn —
 /// not the promoted role — to the pocket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CrazyhouseState {
     /// Per-color, per-role counts of pocketed pieces, indexed
-    /// `[color][role]` via [`color_index`] / [`pocket_index`].
+    /// `[color][role]` via `color_index` / `pocket_index`.
     pub pockets: [[u8; POCKET_ROLES]; 2],
     /// The squares occupied by a piece that arrived there through promotion.
     pub promoted: Bitboard,

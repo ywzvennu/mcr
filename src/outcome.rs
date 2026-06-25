@@ -44,7 +44,7 @@ pub enum Outcome {
 ///
 /// Every variant except the two trailing repetition/move-clock claims is an
 /// *automatic* termination; the last two are *claimable* and never end the game
-/// on their own (see the [module documentation](crate::outcome)).
+/// on their own (see [`EndReason::is_automatic`]).
 ///
 /// Standard chess only ever produces [`EndReason::Checkmate`], [`EndReason::Stalemate`],
 /// [`EndReason::InsufficientMaterial`], [`EndReason::SeventyFiveMoveRule`],

@@ -228,7 +228,7 @@ impl Position {
     ///
     /// The key combines piece placement, the side to move, castling rights, and
     /// the en-passant file when an en-passant capture is actually available (see
-    /// the [module documentation](crate::zobrist) for the exact contract). Two
+    /// the [`Zobrist`] documentation for the exact contract). Two
     /// positions reached by different move orders but identical in all of these
     /// features hash equal.
     ///
