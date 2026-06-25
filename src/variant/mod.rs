@@ -31,6 +31,7 @@
 //! forced-move filtering, and terminal detection apply.
 
 mod antichess;
+mod any;
 mod atomic;
 mod chess;
 mod chess960;
@@ -44,6 +45,7 @@ use core::fmt;
 use core::hash::Hash;
 
 pub use antichess::{Antichess, AntichessRules};
+pub use any::{AnyVariant, UnknownVariant};
 pub use atomic::{Atomic, AtomicRules};
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
