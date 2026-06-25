@@ -11,16 +11,20 @@
 //!
 //! This release provides the board-geometry primitives — [`Color`], [`Role`],
 //! [`Piece`], [`File`], [`Rank`], [`Square`] — a [`Bitboard`] set type with the
-//! usual bitwise operators and edge-masked directional shifts, and a [`Board`]
-//! piece-placement type with FEN piece-field parsing and serialization.
+//! usual bitwise operators and edge-masked directional shifts, a [`Board`]
+//! piece-placement type with FEN piece-field parsing and serialization, and a
+//! full standard-chess [`Position`] with legal [`Move`] generation, make-move,
+//! six-field FEN and UCI parsing/serialization, and a [`perft`] node counter.
 #![doc(html_root_url = "https://docs.rs/mce")]
 
 pub mod attacks;
 mod bitboard;
 mod board;
+mod chess_move;
 mod color;
 mod file;
 mod piece;
+mod position;
 mod rank;
 mod square;
 
@@ -30,8 +34,12 @@ pub use crate::attacks::{
 };
 pub use crate::bitboard::{Bitboard, Squares};
 pub use crate::board::{Board, ParseBoardError};
+pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::file::File;
 pub use crate::piece::{Piece, Role};
+pub use crate::position::{
+    perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position,
+};
 pub use crate::rank::Rank;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
