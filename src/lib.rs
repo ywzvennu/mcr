@@ -27,6 +27,7 @@ mod piece;
 mod position;
 mod rank;
 mod square;
+mod zobrist;
 
 pub use crate::attacks::{
     between, bishop_attacks, king_attacks, knight_attacks, line, pawn_attacks, queen_attacks,
@@ -43,3 +44,4 @@ pub use crate::position::{
 };
 pub use crate::rank::Rank;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
+pub use crate::zobrist::Zobrist;
