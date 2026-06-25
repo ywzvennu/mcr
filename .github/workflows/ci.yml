@@ -38,3 +38,8 @@ jobs:
 
       - name: Build
         run: cargo build --all-features
+
+      # Compile the criterion benches so they cannot bit-rot, without paying for
+      # an actual (slow) bench run in CI.
+      - name: Benches (compile only)
+        run: cargo bench --all-features --no-run
