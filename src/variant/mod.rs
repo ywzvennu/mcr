@@ -30,6 +30,7 @@
 //! pseudo-legal + make-move filter. Either way the same hooks for extra moves,
 //! forced-move filtering, and terminal detection apply.
 
+mod antichess;
 mod atomic;
 mod chess;
 mod chess960;
@@ -41,6 +42,7 @@ mod three_check;
 use core::fmt;
 use core::hash::Hash;
 
+pub use antichess::{Antichess, AntichessRules};
 pub use atomic::{Atomic, AtomicRules};
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
@@ -777,7 +779,7 @@ impl<V: Variant + Default> VariantPosition<V> {
             halfmove_clock,
             fullmove_number,
         );
-        core.validate_core(V::requires_two_kings())?;
+        core.validate_core(V::requires_two_kings(), V::king_is_royal())?;
 
         Ok(Self::from_parts(core, state, V::default()))
     }

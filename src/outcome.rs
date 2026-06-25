@@ -49,6 +49,15 @@ pub enum Outcome {
 pub enum EndReason {
     /// The side to move is in check and has no legal move. Decisive.
     Checkmate,
+    /// A variant-specific decisive ending in which the side *to move* wins.
+    /// Decisive.
+    ///
+    /// Standard chess never produces this — its only decisive single-position
+    /// reason is [`EndReason::Checkmate`], where the side that just moved (the
+    /// side *not* to move) wins. Antichess inverts the no-legal-move result: a
+    /// side with no move, or with no pieces left, *wins*, which is exactly this
+    /// reason. Automatic.
+    VariantWin,
     /// The side to move is not in check but has no legal move. Draw.
     Stalemate,
     /// Neither side has the material to deliver checkmate. Draw.
@@ -67,14 +76,15 @@ pub enum EndReason {
 
 impl EndReason {
     /// Returns `true` for the reasons that end the game automatically (checkmate,
-    /// stalemate, insufficient material, the seventy-five-move rule, and fivefold
-    /// repetition), and `false` for the two claimable ones.
+    /// the variant win, stalemate, insufficient material, the seventy-five-move
+    /// rule, and fivefold repetition), and `false` for the two claimable ones.
     #[must_use]
     #[inline]
     pub const fn is_automatic(self) -> bool {
         matches!(
             self,
             EndReason::Checkmate
+                | EndReason::VariantWin
                 | EndReason::Stalemate
                 | EndReason::InsufficientMaterial
                 | EndReason::SeventyFiveMoveRule
@@ -83,7 +93,8 @@ impl EndReason {
     }
 
     /// The [`Outcome`] this reason produces, given the side to move when it
-    /// applies. Only checkmate is decisive (the side *not* to move wins); every
+    /// applies. [`EndReason::Checkmate`] is decisive for the side *not* to move
+    /// and [`EndReason::VariantWin`] is decisive for the side *to* move; every
     /// other reason is a draw.
     #[must_use]
     #[inline]
@@ -92,6 +103,7 @@ impl EndReason {
             EndReason::Checkmate => Outcome::Decisive {
                 winner: turn.opposite(),
             },
+            EndReason::VariantWin => Outcome::Decisive { winner: turn },
             _ => Outcome::Draw,
         }
     }
@@ -565,6 +577,7 @@ mod tests {
     fn end_reason_is_automatic_classification() {
         for r in [
             EndReason::Checkmate,
+            EndReason::VariantWin,
             EndReason::Stalemate,
             EndReason::InsufficientMaterial,
             EndReason::SeventyFiveMoveRule,
