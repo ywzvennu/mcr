@@ -1459,15 +1459,21 @@ impl Position {
         position
     }
 
-    /// Validates the core position with a relaxed king requirement, for variant
+    /// Validates the core position with relaxed king requirements, for variant
     /// reuse.
     ///
-    /// With `require_two_kings` true this is exactly the standard check (one king
-    /// per side, and the side not to move not left in check). Kingless variants
-    /// (horde) and non-royal-king variants (antichess) pass `false` to skip the
-    /// king-count requirement; the opposite-king-in-check rule is only applied
-    /// when both kings are present.
-    pub(crate) fn validate_core(&self, require_two_kings: bool) -> Result<(), FenError> {
+    /// With `require_two_kings` and `king_is_royal` both true this is exactly the
+    /// standard check: one king per side, and the side not to move not left in
+    /// check. Kingless variants (horde) pass `require_two_kings = false` to skip
+    /// the king-count requirement. Non-royal-king variants (antichess) pass
+    /// `king_is_royal = false` as well, which also drops the
+    /// opposite-king-in-check rule: a king may be left under attack ("en prise")
+    /// when there is no concept of check.
+    pub(crate) fn validate_core(
+        &self,
+        require_two_kings: bool,
+        king_is_royal: bool,
+    ) -> Result<(), FenError> {
         if require_two_kings {
             for color in Color::ALL {
                 if self.board.pieces(color, Role::King).count() != 1 {
@@ -1475,10 +1481,12 @@ impl Position {
                 }
             }
         }
-        let them = self.turn.opposite();
-        if let Some(their_king) = self.board.king_of(them) {
-            if self.is_attacked(their_king, self.turn) {
-                return Err(FenError::OppositeKingInCheck);
+        if king_is_royal {
+            let them = self.turn.opposite();
+            if let Some(their_king) = self.board.king_of(them) {
+                if self.is_attacked(their_king, self.turn) {
+                    return Err(FenError::OppositeKingInCheck);
+                }
             }
         }
         Ok(())
@@ -1514,7 +1522,7 @@ impl Position {
     /// Basic sanity checks: each side has exactly one king, and the side *not*
     /// to move is not in check (which would mean the previous move was illegal).
     fn validate(&self) -> Result<(), FenError> {
-        self.validate_core(true)
+        self.validate_core(true, true)
     }
 
     /// Serializes this position as a full six-field FEN string.
