@@ -12,6 +12,9 @@ impl Variant for ChessRules {
     type State = ();
     const ID: VariantId = VariantId::Standard;
     // Every hook is the provided standard-chess default; nothing is overridden.
+    // Standard chess is the canonical bulk-countable variant: its legal-move set
+    // is exactly the core fast generator's, so perft leaves count directly.
+    const BULK_COUNTABLE: bool = true;
 }
 
 /// Standard chess as a [`VariantPosition`].
