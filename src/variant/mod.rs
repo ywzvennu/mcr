@@ -32,6 +32,7 @@
 
 mod chess;
 mod chess960;
+mod horde;
 mod koth;
 mod racing;
 mod three_check;
@@ -41,6 +42,7 @@ use core::hash::Hash;
 
 pub use chess::{Chess, ChessRules};
 pub use chess960::{Chess960, Chess960Rules};
+pub use horde::{Horde, HordeRules};
 pub use koth::{KingOfTheHill, KingOfTheHillRules};
 pub use racing::{RacingKings, RacingKingsRules};
 pub use three_check::{CheckCounters, ThreeCheck, ThreeCheckRules};
@@ -196,6 +198,17 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         true
     }
 
+    /// Whether FEN validation requires exactly one king for *each* side.
+    ///
+    /// Default: `true` (standard chess: both sides have one king). Horde overrides
+    /// this to `false` because white is a kingless pawn horde — black still has a
+    /// royal king ([`Variant::king_is_royal`] stays `true`), so this is an
+    /// independent knob: it relaxes only the king *count*, not the check rules.
+    #[must_use]
+    fn requires_two_kings() -> bool {
+        true
+    }
+
     /// Applies variant side effects of a capture to the just-produced `core`
     /// position and `state` (H4).
     ///
@@ -279,6 +292,20 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// other pseudo-legal move, so a castle that opens a line onto the king's
     /// destination is correctly rejected. Default: no-op.
     fn generate_castles(_core: &Position, _out: &mut Vec<Move>) {}
+
+    /// Appends the variant's full pseudo-legal move set (including the standard
+    /// castles) into the pre-filter set, used on the slow path when this variant
+    /// supplies the standard castles itself (i.e. [`Variant::VARIANT_CASTLING`]
+    /// is `false`) and [`Variant::USES_FAST_LEGALITY`] is `false`.
+    ///
+    /// Default: the standard pseudo-legal generator
+    /// ([`Position::pseudo_into`]), which suits every variant whose piece movement
+    /// is standard. Horde overrides this so white's first-rank pawns may
+    /// double-push; the override is purely additive (standard pawns are generated
+    /// identically) and never touches the fast path.
+    fn gen_pseudo(core: &Position, out: &mut Vec<Move>) {
+        core.pseudo_into(out);
+    }
 
     /// The castling geometry: for the given side to move and castle side, the
     /// king's destination file and the rook's destination file (H10).
@@ -524,7 +551,7 @@ impl<V: Variant> VariantPosition<V> {
                 self.core.pseudo_no_castles_into(&mut pseudo);
                 V::generate_castles(&self.core, &mut pseudo);
             } else {
-                self.core.pseudo_into(&mut pseudo);
+                V::gen_pseudo(&self.core, &mut pseudo);
             }
             pseudo.retain(|mv| {
                 let child = self.core.play(mv);
@@ -748,7 +775,7 @@ impl<V: Variant + Default> VariantPosition<V> {
             halfmove_clock,
             fullmove_number,
         );
-        core.validate_core(V::king_is_royal())?;
+        core.validate_core(V::requires_two_kings())?;
 
         Ok(Self::from_parts(core, state, V::default()))
     }
