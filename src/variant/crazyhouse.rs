@@ -485,12 +485,15 @@ fn split_placement(token: &str) -> Result<(String, CrazyhouseState), FenError> {
             clean.push('/');
         }
         let rank = 7u8.checked_sub(rank_from_top);
-        let mut file = 0u8;
+        // Accumulate in `usize` and saturate so an adversarial digit run cannot
+        // overflow before the cleaned placement reaches the core board parser,
+        // which performs the authoritative width validation.
+        let mut file: usize = 0;
         let mut chars = rank_str.chars().peekable();
         while let Some(ch) = chars.next() {
             if let Some(skip) = ch.to_digit(10) {
                 clean.push(ch);
-                file += skip as u8;
+                file = file.saturating_add(skip as usize);
                 continue;
             }
             // A piece letter. A following `~` marks it as promoted.
@@ -500,7 +503,7 @@ fn split_placement(token: &str) -> Result<(String, CrazyhouseState), FenError> {
                 chars.next();
                 if let (Some(rank), true) = (rank, file < 8) {
                     if let (Some(rank_obj), Some(file_obj)) =
-                        (crate::Rank::new(rank), crate::File::new(file))
+                        (crate::Rank::new(rank), crate::File::new(file as u8))
                     {
                         state
                             .promoted
@@ -508,9 +511,13 @@ fn split_placement(token: &str) -> Result<(String, CrazyhouseState), FenError> {
                     }
                 }
             }
-            file += 1;
+            file = file.saturating_add(1);
         }
-        rank_from_top += 1;
+        // Saturate the rank counter too: a placement with hundreds of `/`
+        // separators must not overflow this `u8`. Once it pins at 7 the core
+        // parser rejects the malformed rank count, so the exact value past the
+        // eighth rank is immaterial.
+        rank_from_top = rank_from_top.saturating_add(1);
     }
 
     Ok((clean, state))
@@ -786,6 +793,31 @@ mod tests {
         let pos: Crazyhouse = "4k3/1Q~6/8/8/8/8/8/4K3[] w - - 0 1".parse().unwrap();
         assert!(pos.state().promoted.contains(sq("b7")));
         assert_eq!(pos.to_fen(), "4k3/1Q~6/8/8/8/8/8/4K3[] w - - 0 1");
+    }
+
+    #[test]
+    fn rejects_oversized_skip_run_without_panicking() {
+        // Regression for issue #47: the crazyhouse placement reader strips the
+        // `[...]`/`~` markers and accumulates a file counter before delegating
+        // to the core board parser. An adversarial digit run must saturate
+        // rather than overflow the counter and panic.
+        let long = format!("{}/8/8/8/8/8/8/8[] w - - 0 1", "9".repeat(10_000));
+        let parsed: Result<Crazyhouse, _> = long.parse();
+        assert!(parsed.is_err());
+
+        // The same on the bare placement field, plus a `~` after the run.
+        let mut split = String::from("9");
+        split.push_str(&"9".repeat(300));
+        split.push_str("Q~/8/8/8/8/8/8/8[]");
+        let parsed: Result<Crazyhouse, _> = format!("{split} w - - 0 1").parse();
+        assert!(parsed.is_err());
+
+        // Hundreds of `/` separators must not overflow the per-rank counter
+        // (a `u8`) as the reader walks every segment. Surfaced by the #39
+        // fen_roundtrip fuzz target.
+        let many_ranks = format!("{}[] w - - 0 1", "8/".repeat(400));
+        let parsed: Result<Crazyhouse, _> = many_ranks.parse();
+        assert!(parsed.is_err());
     }
 
     #[test]

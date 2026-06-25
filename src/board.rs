@@ -294,18 +294,22 @@ impl Board {
             let rank_str = ranks.next().ok_or(ParseBoardError::TooFewRanks)?;
             let rank = 7 - rank_from_top;
 
-            let mut file = 0u8;
+            // Accumulate in `usize` so an adversarial digit run (e.g. a long
+            // string of `9`s) can never overflow the counter and panic. The
+            // running total is reported back through `RankWrongWidth`, saturated
+            // into the `u8` field so even an enormous overrun stays well-defined.
+            let mut file: usize = 0;
             for ch in rank_str.chars() {
                 if let Some(skip) = ch.to_digit(10) {
                     if skip == 0 {
                         return Err(ParseBoardError::InvalidChar(ch));
                     }
-                    file += skip as u8;
+                    file += skip as usize;
                 } else if let Some(piece) = Piece::from_char(ch) {
                     if file >= 8 {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
                     }
-                    board.set_piece(Square::new(rank * 8 + file), piece);
+                    board.set_piece(Square::new(rank * 8 + file as u8), piece);
                     file += 1;
                 } else {
                     return Err(ParseBoardError::InvalidChar(ch));
@@ -315,7 +319,7 @@ impl Board {
             if file != 8 {
                 return Err(ParseBoardError::RankWrongWidth {
                     rank: rank + 1,
-                    files: file,
+                    files: u8::try_from(file).unwrap_or(u8::MAX),
                 });
             }
         }
@@ -640,6 +644,50 @@ mod tests {
         // A zero digit is not allowed.
         let err = Board::from_fen_placement("08/8/8/8/8/8/8/8").unwrap_err();
         assert_eq!(err, ParseBoardError::InvalidChar('0'));
+    }
+
+    #[test]
+    fn rejects_oversized_skip_run_without_panicking() {
+        // Regression for issue #47: a rank built from a run of digits must not
+        // overflow the `u8` file counter (which panicked in debug builds via
+        // `file += skip`). Each of these returns `Err`, never panics.
+
+        // The exact case named in the issue: eight nines (sum 72).
+        let err = Board::from_fen_placement("99999999/8/8/8/8/8/8/8").unwrap_err();
+        assert_eq!(err, ParseBoardError::RankWrongWidth { rank: 8, files: 72 });
+
+        // "71" itself sums to exactly 8 (a valid empty rank); appending a piece
+        // overruns the h-file and is rejected.
+        let err = Board::from_fen_placement("71p/8/8/8/8/8/8/8").unwrap_err();
+        assert_eq!(err, ParseBoardError::RankTooLong(8));
+
+        // A digit run long enough to overflow a `u8` if accumulated naively
+        // (29 nines = 261 > 255). Must saturate the reported width, not panic.
+        let long_run = format!("{}/8/8/8/8/8/8/8", "9".repeat(29));
+        let err = Board::from_fen_placement(&long_run).unwrap_err();
+        assert_eq!(
+            err,
+            ParseBoardError::RankWrongWidth {
+                rank: 8,
+                files: 255
+            }
+        );
+
+        // A pathologically long run cannot panic regardless of length.
+        let huge = format!("{}/8/8/8/8/8/8/8", "9".repeat(10_000));
+        assert!(matches!(
+            Board::from_fen_placement(&huge),
+            Err(ParseBoardError::RankWrongWidth { rank: 8, .. })
+        ));
+    }
+
+    #[test]
+    fn position_from_fen_rejects_oversized_skip_run() {
+        use crate::Position;
+        // The full-FEN entry point must also reject without panicking.
+        assert!(Position::from_fen("99999999/8/8/8/8/8/8/8 w - - 0 1").is_err());
+        let huge = format!("{} w - - 0 1", "9".repeat(10_000));
+        assert!(Position::from_fen(&huge).is_err());
     }
 
     #[test]
