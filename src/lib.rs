@@ -26,6 +26,7 @@ mod file;
 mod piece;
 mod position;
 mod rank;
+mod san;
 mod square;
 mod zobrist;
 
@@ -43,5 +44,6 @@ pub use crate::position::{
     perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position,
 };
 pub use crate::rank::Rank;
+pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
 pub use crate::zobrist::Zobrist;
