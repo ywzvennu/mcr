@@ -371,6 +371,82 @@ impl Position {
         }
     }
 
+    /// Pushes the *pseudo-legal* moves of the side to move into `out`, without
+    /// the king-safety filter.
+    ///
+    /// A pseudo-legal move follows the moving piece's geometry and the
+    /// capture/occupancy rules, but may leave the moving side's king in check.
+    /// Standard chess uses the fast pin/check-aware [`Position::legal_moves`];
+    /// this slower, fully general generator exists so variant rule layers that
+    /// need a different king-safety rule (or none at all) can start from the raw
+    /// candidate set and filter it themselves. It does not depend on a king being
+    /// present.
+    ///
+    /// Castling moves are emitted only when the side to move is not in check and
+    /// the king does not pass through an attacked square (these are intrinsic to
+    /// the castling rule, not king-safety of the destination); the caller's
+    /// king-safety filter still validates the resulting position.
+    pub(crate) fn pseudo_into(&self, out: &mut Vec<Move>) {
+        let us = self.turn;
+        let them = us.opposite();
+        let board = &self.board;
+        let occupied = board.occupied();
+        let our_pieces = board.by_color(us);
+        let their_pieces = board.by_color(them);
+        let full = Bitboard::FULL;
+        let no_pins: [(Square, Bitboard); 0] = [];
+
+        // Pawns, knights, sliders: reuse the standard generators with an
+        // all-allowing check mask and no pins, so every geometric move is kept.
+        if let Some(king_sq) = board.king_of(us) {
+            self.gen_pawn_moves(out, us, occupied, their_pieces, full, &no_pins, king_sq);
+        } else {
+            // Without a king there is no en-passant legality king to consult; the
+            // generator only reads `king_sq` for that rare check, and a kingless
+            // side cannot be in an ep pin, so any square is a safe placeholder.
+            self.gen_pawn_moves(out, us, occupied, their_pieces, full, &no_pins, Square::A1);
+        }
+        self.gen_knight_moves(out, us, our_pieces, their_pieces, full, &no_pins);
+        self.gen_slider_moves(out, us, occupied, our_pieces, their_pieces, full, &no_pins);
+
+        // King steps to any non-friendly square (king-safety is left to the
+        // caller's filter).
+        if let Some(king_sq) = board.king_of(us) {
+            let king_targets = king_attacks(king_sq) & !our_pieces;
+            for to in king_targets {
+                let kind = if their_pieces.contains(to) {
+                    MoveKind::Capture
+                } else {
+                    MoveKind::Quiet
+                };
+                out.push(Move::new(king_sq, to, kind));
+            }
+
+            // Castling, gated only by the not-in-check / clear-path / safe-walk
+            // conditions intrinsic to the castling rule (the standard generator
+            // enforces the same).
+            if self.attackers_to(king_sq, them, occupied).is_empty() {
+                let occ_without_king = occupied.without(king_sq);
+                let king_danger = self.attacked_by(them, occ_without_king);
+                self.gen_castles(out, us, occupied, king_danger, king_sq);
+            }
+        }
+    }
+
+    /// Returns `true` if `mv`, applied to this position via [`Position::play`],
+    /// leaves the moving side's king un-attacked — the standard king-safety
+    /// predicate, expressed as a make-move filter for the pseudo-legal path.
+    ///
+    /// For positions with no king of the moving side this is vacuously `true`.
+    pub(crate) fn move_keeps_king_safe(&self, mv: &Move) -> bool {
+        let us = self.turn;
+        let child = self.play(mv);
+        match child.board.king_of(us) {
+            Some(king) => !child.is_attacked(king, us.opposite()),
+            None => true,
+        }
+    }
+
     /// Invokes `f` once for each legal move, in generation order, without
     /// collecting them.
     fn for_each_legal(&self, mut f: impl FnMut(Move)) {
@@ -816,6 +892,71 @@ impl Position {
         next
     }
 
+    /// Applies `mv` to a clone of this position, returning the successor and the
+    /// piece captured by the move (if any), for variant capture side-effects.
+    ///
+    /// The captured piece is the one that stood on the square the move removed an
+    /// enemy from — the destination for ordinary captures and capturing
+    /// promotions, the en-passant pawn's square for en passant. Quiet moves,
+    /// castling, and drops capture nothing.
+    #[must_use]
+    pub(crate) fn play_tracking_capture(&self, mv: &Move) -> (Position, Option<(Piece, Square)>) {
+        let captured = self.captured_piece(mv);
+        (self.play(mv), captured)
+    }
+
+    /// The enemy piece (and its square) a move removes from the board, if any.
+    fn captured_piece(&self, mv: &Move) -> Option<(Piece, Square)> {
+        match mv.kind() {
+            MoveKind::Capture | MoveKind::Promotion { capture: true, .. } => {
+                self.board.piece_at(mv.to()).map(|p| (p, mv.to()))
+            }
+            MoveKind::EnPassant => {
+                let captured = Square::from_file_rank(mv.to().file(), mv.from().rank());
+                self.board.piece_at(captured).map(|p| (p, captured))
+            }
+            _ => None,
+        }
+    }
+
+    /// Drops a `role` piece of the side to move onto the empty square `to`,
+    /// flipping the side to move and maintaining the incremental Zobrist key and
+    /// clocks — the core edit behind a crazyhouse drop, exposed for the variant
+    /// layer's `apply_extra` hook.
+    ///
+    /// A drop clears any en-passant target, never resets the halfmove clock by
+    /// itself (it is neither a capture nor a pawn *move*), and increments the
+    /// fullmove number after a black move, exactly like a quiet move.
+    // Forward-looking plumbing for the crazyhouse variant's drop apply path; no
+    // variant in this crate emits drops yet, so it is unused outside its test.
+    #[allow(dead_code)]
+    pub(crate) fn apply_drop_core(&mut self, role: Role, to: Square) {
+        let us = self.turn;
+        let them = us.opposite();
+
+        if let Some(file) = self.zobrist_ep_file() {
+            self.hash ^= crate::zobrist::ep_file_key(file);
+        }
+        self.ep_square = None;
+
+        self.hash_set(to, Piece::new(us, role));
+
+        self.halfmove_clock += 1;
+        if us.is_black() {
+            self.fullmove_number += 1;
+        }
+        self.turn = them;
+        self.hash ^= crate::zobrist::side_key(us);
+        self.hash ^= crate::zobrist::side_key(them);
+    }
+
+    /// Folds an opaque extra-state contribution into the incremental Zobrist key,
+    /// for variants that hash pocket / counter state. Idempotent under XOR, so a
+    /// variant toggles its old contribution out and the new one in.
+    pub(crate) fn xor_hash(&mut self, key: u64) {
+        self.hash ^= key;
+    }
+
     /// In-place application of a move (see [`Position::play`]).
     fn apply(&mut self, mv: &Move) {
         let us = self.turn;
@@ -909,6 +1050,12 @@ impl Position {
                 }
                 self.hash_remove(from, moving);
                 self.hash_set(to, Piece::new(us, role));
+            }
+            MoveKind::Drop { .. } => {
+                // Drops are a variant-only move kind; the core never generates
+                // them and applies them through `apply_drop_core` instead, so
+                // they never reach the standard make-move path.
+                unreachable!("drop moves are applied via apply_drop_core");
             }
         }
         let _ = prev_ep;
@@ -1060,29 +1207,14 @@ impl Position {
         let castling = parse_castling(castling_field, &board)?;
 
         let ep_field = fields.next().ok_or(FenError::MissingField)?;
-        let ep_square = if ep_field == "-" {
-            None
-        } else {
-            let sq = ep_field
-                .parse::<Square>()
-                .map_err(|_| FenError::BadEnPassant(ep_field.to_owned()))?;
-            // En-passant target must be on the 3rd or 6th rank.
-            match sq.rank() {
-                Rank::Third | Rank::Sixth => Some(sq),
-                _ => return Err(FenError::BadEnPassant(ep_field.to_owned())),
-            }
-        };
+        let ep_square = parse_ep_field(ep_field)?;
 
         let halfmove_clock = match fields.next() {
-            Some(s) => s
-                .parse::<u32>()
-                .map_err(|_| FenError::BadNumber(s.to_owned()))?,
+            Some(s) => parse_clock(s)?,
             None => 0,
         };
         let fullmove_number = match fields.next() {
-            Some(s) => s
-                .parse::<u32>()
-                .map_err(|_| FenError::BadNumber(s.to_owned()))?,
+            Some(s) => parse_clock(s)?,
             None => 1,
         };
 
@@ -1104,15 +1236,52 @@ impl Position {
         Ok(position)
     }
 
-    /// Basic sanity checks: each side has exactly one king, and the side *not*
-    /// to move is not in check (which would mean the previous move was illegal).
-    fn validate(&self) -> Result<(), FenError> {
-        for color in Color::ALL {
-            if self.board.pieces(color, Role::King).count() != 1 {
-                return Err(FenError::BadKings);
+    /// Assembles a [`Position`] from already-parsed component fields and computes
+    /// its Zobrist key, *without* the standard two-kings / opposite-king-in-check
+    /// validation.
+    ///
+    /// Variant FEN parsers reuse the [`Position`] FEN sub-parsers
+    /// ([`parse_castling_field`], [`parse_ep_field`], [`parse_clock`]) and then
+    /// build the core through this constructor, applying their own validation via
+    /// [`Position::validate_core`].
+    #[must_use]
+    pub(crate) fn from_fields(
+        board: Board,
+        turn: Color,
+        castling: CastlingRights,
+        ep_square: Option<Square>,
+        halfmove_clock: u32,
+        fullmove_number: u32,
+    ) -> Position {
+        let mut position = Position {
+            board,
+            turn,
+            castling,
+            ep_square,
+            halfmove_clock,
+            fullmove_number,
+            hash: 0,
+        };
+        position.hash = position.compute_zobrist();
+        position
+    }
+
+    /// Validates the core position with a relaxed king requirement, for variant
+    /// reuse.
+    ///
+    /// With `require_two_kings` true this is exactly the standard check (one king
+    /// per side, and the side not to move not left in check). Kingless variants
+    /// (horde) and non-royal-king variants (antichess) pass `false` to skip the
+    /// king-count requirement; the opposite-king-in-check rule is only applied
+    /// when both kings are present.
+    pub(crate) fn validate_core(&self, require_two_kings: bool) -> Result<(), FenError> {
+        if require_two_kings {
+            for color in Color::ALL {
+                if self.board.pieces(color, Role::King).count() != 1 {
+                    return Err(FenError::BadKings);
+                }
             }
         }
-        // The side that just moved cannot be left in check.
         let them = self.turn.opposite();
         if let Some(their_king) = self.board.king_of(them) {
             if self.is_attacked(their_king, self.turn) {
@@ -1122,23 +1291,37 @@ impl Position {
         Ok(())
     }
 
+    /// Serializes the six standard FEN fields into `out` (no trailing space),
+    /// shared by [`Position::to_fen`] and variant FEN writers that append extra
+    /// fields afterward.
+    pub(crate) fn write_core_fen(&self, out: &mut String) {
+        out.push_str(&self.board.to_fen_placement());
+        out.push(' ');
+        out.push(if self.turn.is_white() { 'w' } else { 'b' });
+        out.push(' ');
+        out.push_str(&self.castling_field());
+        out.push(' ');
+        match self.ep_square {
+            Some(sq) => out.push_str(&sq.to_string()),
+            None => out.push('-'),
+        }
+        out.push(' ');
+        out.push_str(&self.halfmove_clock.to_string());
+        out.push(' ');
+        out.push_str(&self.fullmove_number.to_string());
+    }
+
+    /// Basic sanity checks: each side has exactly one king, and the side *not*
+    /// to move is not in check (which would mean the previous move was illegal).
+    fn validate(&self) -> Result<(), FenError> {
+        self.validate_core(true)
+    }
+
     /// Serializes this position as a full six-field FEN string.
     #[must_use]
     pub fn to_fen(&self) -> String {
-        let mut fen = self.board.to_fen_placement();
-        fen.push(' ');
-        fen.push(if self.turn.is_white() { 'w' } else { 'b' });
-        fen.push(' ');
-        fen.push_str(&self.castling_field());
-        fen.push(' ');
-        match self.ep_square {
-            Some(sq) => fen.push_str(&sq.to_string()),
-            None => fen.push('-'),
-        }
-        fen.push(' ');
-        fen.push_str(&self.halfmove_clock.to_string());
-        fen.push(' ');
-        fen.push_str(&self.fullmove_number.to_string());
+        let mut fen = String::new();
+        self.write_core_fen(&mut fen);
         fen
     }
 
@@ -1184,6 +1367,38 @@ const LIGHT_SQUARES: u64 = 0x55AA_55AA_55AA_55AA;
 
 /// The roles a pawn may promote to, in a stable order.
 const PROMOTION_ROLES: [Role; 4] = [Role::Knight, Role::Bishop, Role::Rook, Role::Queen];
+
+/// Parses the en-passant FEN field (`-` or a target square on the 3rd/6th rank)
+/// into an optional target square. Shared by [`Position::from_fen`] and variant
+/// FEN parsers.
+pub(crate) fn parse_ep_field(field: &str) -> Result<Option<Square>, FenError> {
+    if field == "-" {
+        return Ok(None);
+    }
+    let sq = field
+        .parse::<Square>()
+        .map_err(|_| FenError::BadEnPassant(field.to_owned()))?;
+    // En-passant target must be on the 3rd or 6th rank.
+    match sq.rank() {
+        Rank::Third | Rank::Sixth => Ok(Some(sq)),
+        _ => Err(FenError::BadEnPassant(field.to_owned())),
+    }
+}
+
+/// Parses a non-negative move-clock FEN field. Shared by [`Position::from_fen`]
+/// and variant FEN parsers.
+pub(crate) fn parse_clock(field: &str) -> Result<u32, FenError> {
+    field
+        .parse::<u32>()
+        .map_err(|_| FenError::BadNumber(field.to_owned()))
+}
+
+/// Parses the castling-rights FEN field into [`CastlingRights`], validating the
+/// rook squares against the placement so impossible fields are rejected. Shared
+/// by [`Position::from_fen`] and variant FEN parsers.
+pub(crate) fn parse_castling_field(field: &str, board: &Board) -> Result<CastlingRights, FenError> {
+    parse_castling(field, board)
+}
 
 /// Parses the castling-rights FEN field into [`CastlingRights`], validating the
 /// rook squares against the placement so impossible fields are rejected.
@@ -1574,6 +1789,25 @@ mod tests {
         assert_eq!(perft(&pos, 1), 20);
         assert_eq!(perft(&pos, 2), 400);
         assert_eq!(perft(&pos, 3), 8902);
+    }
+
+    #[test]
+    fn apply_drop_core_places_piece_and_keeps_hash() {
+        // Drop plumbing for crazyhouse: placing a pocketed piece on an empty
+        // square flips the side, leaves clocks/ep correct, and keeps the
+        // incremental Zobrist key in step with a from-scratch computation.
+        let mut pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 5 9").unwrap();
+        pos.apply_drop_core(Role::Knight, Square::E4);
+        assert_eq!(
+            pos.board().piece_at(Square::E4),
+            Some(Piece::new(Color::White, Role::Knight))
+        );
+        assert_eq!(pos.turn(), Color::Black);
+        // A drop is neither a capture nor a pawn move, so the clock advances.
+        assert_eq!(pos.halfmove_clock(), 6);
+        assert_eq!(pos.fullmove_number(), 9);
+        assert_eq!(pos.ep_square(), None);
+        assert_eq!(pos.incremental_zobrist(), pos.compute_zobrist());
     }
 
     #[test]
