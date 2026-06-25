@@ -1,0 +1,64 @@
+# mce-fuzz — fuzz targets for the mce chess engine.
+#
+# This is a separate, nested cargo-fuzz crate. It is NOT part of the published
+# `mce` library, the workspace, or the normal `cargo build`/`cargo test` of the
+# parent crate; it depends on `mce` by path. Fuzzing requires a nightly
+# toolchain and the `cargo-fuzz` subcommand:
+#
+#     cargo install cargo-fuzz
+#     cargo +nightly fuzz build           # build all targets
+#     cargo +nightly fuzz run fen_roundtrip
+#
+# Corpora and crash artifacts (fuzz/corpus, fuzz/artifacts, fuzz/target) are
+# gitignored and must never be committed.
+
+[package]
+name = "mce-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.mce]
+path = ".."
+
+# Keep release-ish optimization for fuzzing throughput while preserving
+# overflow checks and debug assertions so invariant violations surface.
+[profile.release]
+debug = 1
+debug-assertions = true
+overflow-checks = true
+
+[[bin]]
+name = "fen_roundtrip"
+path = "fuzz_targets/fen_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "uci_parse"
+path = "fuzz_targets/uci_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "movegen_play"
+path = "fuzz_targets/movegen_play.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "san_roundtrip"
+path = "fuzz_targets/san_roundtrip.rs"
+test = false
+doc = false
+bench = false
