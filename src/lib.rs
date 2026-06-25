@@ -8,4 +8,22 @@
 //!
 //! The public API is built up incrementally; see the repository's milestones and
 //! issues for the current surface.
+//!
+//! This release provides the board-geometry primitives — [`Color`], [`Role`],
+//! [`Piece`], [`File`], [`Rank`], [`Square`] — and a [`Bitboard`] set type with
+//! the usual bitwise operators and edge-masked directional shifts.
 #![doc(html_root_url = "https://docs.rs/mce")]
+
+mod bitboard;
+mod color;
+mod file;
+mod piece;
+mod rank;
+mod square;
+
+pub use crate::bitboard::{Bitboard, Squares};
+pub use crate::color::Color;
+pub use crate::file::File;
+pub use crate::piece::{Piece, Role};
+pub use crate::rank::Rank;
+pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
