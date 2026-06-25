@@ -1348,6 +1348,11 @@ impl Position {
     /// legal move in this position.
     pub fn parse_uci(&self, uci: &str) -> Result<Move, ParseUciError> {
         let bytes = uci.as_bytes();
+        // UCI is an ASCII-only grammar; reject non-ASCII up front so the
+        // byte-indexed slicing below can never split a multi-byte UTF-8 char.
+        if !uci.is_ascii() {
+            return Err(ParseUciError::Malformed);
+        }
         if bytes.len() != 4 && bytes.len() != 5 {
             return Err(ParseUciError::Malformed);
         }
@@ -1989,6 +1994,32 @@ mod tests {
         assert_eq!(pos.parse_uci("e2e4q").unwrap_err(), ParseUciError::Illegal);
         // e2e5 is not legal.
         assert_eq!(pos.parse_uci("e2e5").unwrap_err(), ParseUciError::Illegal);
+    }
+
+    #[test]
+    fn parse_uci_rejects_non_ascii_without_panic() {
+        let pos = Position::startpos();
+        // Multi-byte UTF-8 chars at various offsets must not split a slice.
+        for s in [
+            "\u{e9}e2e4",     // leading multi-byte char (2 bytes)
+            "e\u{e9}e2e4",    // multi-byte char at byte offset 1
+            "e2\u{e9}e4",     // multi-byte char straddling the from/to boundary
+            "e2e\u{e9}4",     // multi-byte char at offset 3
+            "e2e4\u{e9}",     // multi-byte promotion suffix
+            "\u{1f600}e2e4",  // emoji (4 bytes)
+            "e2e4\u{301}",    // combining acute accent
+            "\u{301}\u{301}", // combining marks only
+        ] {
+            assert_eq!(
+                pos.parse_uci(s).unwrap_err(),
+                ParseUciError::Malformed,
+                "{s:?} should be rejected as malformed"
+            );
+        }
+        // Short / odd byte lengths must also be rejected, not panic.
+        for s in ["", "e", "e2", "e2e", "e2e4e5"] {
+            assert_eq!(pos.parse_uci(s).unwrap_err(), ParseUciError::Malformed);
+        }
     }
 
     #[test]

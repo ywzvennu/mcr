@@ -595,7 +595,7 @@ impl Crazyhouse {
 mod tests {
     use super::*;
     use crate::variant::perft_variant;
-    use crate::{Color, Outcome, Role};
+    use crate::{Color, Outcome, ParseUciError, Role};
 
     fn play_line(mut pos: Crazyhouse, ucis: &[&str]) -> Crazyhouse {
         for uci in ucis {
@@ -748,6 +748,24 @@ mod tests {
         assert_eq!(pos.san(&pawn), "@e4");
         // UCI form is also accepted.
         assert_eq!(pos.parse_uci("N@e4").unwrap(), knight);
+    }
+
+    #[test]
+    fn parse_rejects_non_ascii_without_panic() {
+        let pos: Crazyhouse = "4k3/8/8/8/8/8/8/4K3[NP] w - - 0 1".parse().unwrap();
+        // Non-ASCII in the UCI drop form and the standard UCI form must be
+        // rejected, never panic on a split UTF-8 boundary.
+        for s in [
+            "N@e\u{e9}",    // multi-byte char in the drop square
+            "\u{e9}@e4",    // multi-byte role marker
+            "e2e\u{e9}",    // multi-byte char straddling a square boundary
+            "\u{1f600}@e4", // emoji role
+            "N@\u{301}e4",  // combining mark
+        ] {
+            assert_eq!(pos.parse_uci(s).unwrap_err(), ParseUciError::Malformed);
+            // SAN drop path must likewise not panic.
+            assert!(pos.parse_san(s).is_err(), "{s:?} should be an error");
+        }
     }
 
     #[test]
