@@ -31,6 +31,21 @@ dbg_macro = "warn"
 
 [dependencies]
 
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "movegen"
+harness = false
+
+[[bench]]
+name = "perft"
+harness = false
+
+[[bench]]
+name = "variants"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
