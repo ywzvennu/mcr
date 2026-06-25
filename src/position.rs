@@ -329,9 +329,23 @@ impl Position {
     }
 
     /// Whether neither side has the material to deliver checkmate by any
-    /// sequence of legal moves: king vs king, king and a single minor vs king,
-    /// or king and bishop(s) vs king and bishop(s) with all bishops on one
-    /// color complex.
+    /// sequence of legal moves (FIDE "insufficient material").
+    ///
+    /// The exact rule set treated as a draw is:
+    ///
+    /// - **King vs king.**
+    /// - **King and a single minor** (one bishop or one knight, either side) **vs
+    ///   king.**
+    /// - **Bishops only, all on one color complex:** any number of bishops on
+    ///   either side, provided every bishop on the board stands on the same color
+    ///   square (so none can ever guard a square of the other color, and mate is
+    ///   impossible).
+    ///
+    /// Everything else is treated as *sufficient* — notably any pawn, rook, or
+    /// queen, bishops on both colors, and any position containing a knight
+    /// alongside another minor. In particular **K+N+N vs K is reported as
+    /// sufficient**: although it cannot be *forced*, it is not insufficient
+    /// material under FIDE (a helpmate exists), so it is not an automatic draw.
     #[must_use]
     pub fn is_insufficient_material(&self) -> bool {
         let b = &self.board;
