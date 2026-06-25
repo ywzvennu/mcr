@@ -10,12 +10,14 @@
 //! issues for the current surface.
 //!
 //! This release provides the board-geometry primitives — [`Color`], [`Role`],
-//! [`Piece`], [`File`], [`Rank`], [`Square`] — and a [`Bitboard`] set type with
-//! the usual bitwise operators and edge-masked directional shifts.
+//! [`Piece`], [`File`], [`Rank`], [`Square`] — a [`Bitboard`] set type with the
+//! usual bitwise operators and edge-masked directional shifts, and a [`Board`]
+//! piece-placement type with FEN piece-field parsing and serialization.
 #![doc(html_root_url = "https://docs.rs/mce")]
 
 pub mod attacks;
 mod bitboard;
+mod board;
 mod color;
 mod file;
 mod piece;
@@ -27,6 +29,7 @@ pub use crate::attacks::{
     rook_attacks,
 };
 pub use crate::bitboard::{Bitboard, Squares};
+pub use crate::board::{Board, ParseBoardError};
 pub use crate::color::Color;
 pub use crate::file::File;
 pub use crate::piece::{Piece, Role};
