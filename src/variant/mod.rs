@@ -316,6 +316,37 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         core.pseudo_into(out);
     }
 
+    /// Generates the variant's legal moves on the slow (non-sentinel) path —
+    /// consulted only when [`Variant::USES_FAST_LEGALITY`] is `false`.
+    ///
+    /// The default is the general pseudo-legal + make-move king-safety filter: it
+    /// gathers the variant's pseudo-legal candidates (its own arbitrary-geometry
+    /// castles when [`Variant::VARIANT_CASTLING`] is set, otherwise
+    /// [`Variant::gen_pseudo`]) and keeps those that pass
+    /// [`Variant::is_legal_after`]. This reproduces the original slow path exactly,
+    /// so every variant that does not override it is unaffected.
+    ///
+    /// Horde overrides this to avoid the make-move filter entirely: white is
+    /// kingless (every pseudo-legal white move is legal, so no filter runs) and
+    /// black is a standard army that can use the fast core pin/check generator.
+    /// The hook fires after `out` has been cleared and before
+    /// [`Variant::extra_moves`] / [`Variant::filter_forced`].
+    fn slow_legal_into(core: &Position, out: &mut MoveList) {
+        if Self::VARIANT_CASTLING {
+            // The variant generates castling itself (arbitrary geometry), so
+            // suppress the core's standard castles and append the variant's
+            // candidates into the same pre-filter set.
+            core.pseudo_no_castles_into(out);
+            Self::generate_castles(core, out);
+        } else {
+            Self::gen_pseudo(core, out);
+        }
+        out.retain(|mv| {
+            let child = core.play(mv);
+            Self::is_legal_after(core, mv, &child)
+        });
+    }
+
     /// The castling geometry: for the given side to move and castle side, the
     /// king's destination file and the rook's destination file (H10).
     ///
@@ -598,19 +629,9 @@ impl<V: Variant> VariantPosition<V> {
             // Sentinel: standard king safety, so reuse the fast core generator.
             self.core.generate_into(out);
         } else {
-            if V::VARIANT_CASTLING {
-                // The variant generates castling itself (arbitrary geometry), so
-                // suppress the core's standard castles and append the variant's
-                // candidates into the same pre-filter set.
-                self.core.pseudo_no_castles_into(out);
-                V::generate_castles(&self.core, out);
-            } else {
-                V::gen_pseudo(&self.core, out);
-            }
-            out.retain(|mv| {
-                let child = self.core.play(mv);
-                V::is_legal_after(&self.core, mv, &child)
-            });
+            // Slow path: the variant's own legal generation (by default the
+            // pseudo-legal + make-move filter; horde routes by side instead).
+            V::slow_legal_into(&self.core, out);
         }
 
         V::extra_moves(&self.core, &self.state, out);
