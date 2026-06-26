@@ -1999,14 +1999,24 @@ impl Position {
     /// shared by [`Position::to_fen`] and variant FEN writers that append extra
     /// fields afterward.
     pub(crate) fn write_core_fen(&self, out: &mut String) {
-        self.write_core_fen_with(&self.castling_field(), out);
-    }
-
-    /// Serializes the six standard FEN fields into `out`, but with a
-    /// caller-supplied castling field, so variant FEN writers can substitute a
-    /// 960 (X-FEN / Shredder) castling field while reusing every other field.
-    pub(crate) fn write_core_fen_with(&self, castling_field: &str, out: &mut String) {
-        self.write_core_fen_with_placement(&self.board.to_fen_placement(), castling_field, out);
+        // The standard path writes the placement and castling fields straight
+        // into `out`, avoiding the two intermediate `String`s that
+        // `write_core_fen_with`/`write_core_fen_with_placement` allocate for the
+        // variant writers that need owned `&str` fields.
+        self.board.write_fen_placement(out);
+        out.push(' ');
+        out.push(if self.turn.is_white() { 'w' } else { 'b' });
+        out.push(' ');
+        write_standard_castling_field(self.castling, out);
+        out.push(' ');
+        match self.ep_square {
+            Some(sq) => write_square(sq, out),
+            None => out.push('-'),
+        }
+        out.push(' ');
+        write_u32(self.halfmove_clock, out);
+        out.push(' ');
+        write_u32(self.fullmove_number, out);
     }
 
     /// Serializes the six standard FEN fields into `out` with both a
@@ -2026,13 +2036,13 @@ impl Position {
         out.push_str(castling_field);
         out.push(' ');
         match self.ep_square {
-            Some(sq) => out.push_str(&sq.to_string()),
+            Some(sq) => write_square(sq, out),
             None => out.push('-'),
         }
         out.push(' ');
-        out.push_str(&self.halfmove_clock.to_string());
+        write_u32(self.halfmove_clock, out);
         out.push(' ');
-        out.push_str(&self.fullmove_number.to_string());
+        write_u32(self.fullmove_number, out);
     }
 
     /// Basic sanity checks: each side has exactly one king, and the side *not*
@@ -2044,16 +2054,12 @@ impl Position {
     /// Serializes this position as a full six-field FEN string.
     #[must_use]
     pub fn to_fen(&self) -> String {
-        let mut fen = String::new();
+        // A standard FEN fits comfortably here: 71-byte placement worst case,
+        // plus the turn, castling, en-passant, and two clock fields with their
+        // separating spaces. Pre-sizing avoids reallocation during the writes.
+        let mut fen = String::with_capacity(90);
         self.write_core_fen(&mut fen);
         fen
-    }
-
-    /// Renders the castling-rights FEN field (`KQkq`, a subset, or `-`).
-    fn castling_field(&self) -> String {
-        let mut s = String::new();
-        write_standard_castling_field(self.castling, &mut s);
-        s
     }
 }
 
@@ -2130,6 +2136,37 @@ pub(crate) fn write_standard_castling_field(rights: CastlingRights, out: &mut St
     if out.len() == start {
         out.push('-');
     }
+}
+
+/// Appends a square's two-character algebraic name (e.g. `e3`) to `out` via
+/// direct ASCII byte pushes, avoiding the intermediate `String` that
+/// [`fmt::Display`] would allocate.
+#[inline]
+fn write_square(sq: Square, out: &mut String) {
+    let idx = sq.index();
+    out.push((b'a' + idx % 8) as char);
+    out.push((b'1' + idx / 8) as char);
+}
+
+/// Appends the decimal digits of `value` to `out` without allocating an
+/// intermediate `String`. FEN move clocks are small, so a fixed stack buffer
+/// (10 bytes covers all of `u32`) holds the digits while they are reversed.
+#[inline]
+fn write_u32(value: u32, out: &mut String) {
+    if value < 10 {
+        out.push((b'0' + value as u8) as char);
+        return;
+    }
+    let mut buf = [0u8; 10];
+    let mut i = buf.len();
+    let mut v = value;
+    while v > 0 {
+        i -= 1;
+        buf[i] = b'0' + (v % 10) as u8;
+        v /= 10;
+    }
+    // SAFETY-free: the buffer holds only ASCII digits, valid UTF-8.
+    out.push_str(core::str::from_utf8(&buf[i..]).unwrap_or("0"));
 }
 
 /// Parses the castling-rights FEN field into [`CastlingRights`], validating the
