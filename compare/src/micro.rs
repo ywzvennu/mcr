@@ -137,7 +137,9 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         let mce_t = time_throughput(ops_per_batch, || {
             for _ in 0..INNER {
                 for (p, mv) in mce_pos.iter().zip(&mce_moves) {
-                    black_box(p.play(mv));
+                    let mut q = p.clone();
+                    q.play_unchecked(mv);
+                    black_box(q.turn());
                 }
             }
         });
