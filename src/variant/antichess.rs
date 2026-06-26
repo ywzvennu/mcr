@@ -82,8 +82,10 @@ impl Variant for AntichessRules {
 
     /// King safety does not apply at all (the king is not royal), so the fast
     /// core generator — which filters out moves that leave the king attacked —
-    /// must not be used. Generation runs the pseudo-legal pass and the
-    /// always-true [`AntichessRules::is_legal_after`] filter instead.
+    /// must not be used. Generation instead runs the pseudo-legal pass directly
+    /// via the [`AntichessRules::legal_into`] override (no make-move filter),
+    /// which keeps this sentinel `false` so that any code consulting it — and the
+    /// always-true [`AntichessRules::is_legal_after`] fallback — stays correct.
     const USES_FAST_LEGALITY: bool = false;
 
     /// H2: there is no king-safety constraint in antichess, so every
@@ -158,6 +160,22 @@ impl Variant for AntichessRules {
         out.extend(king_promos);
     }
 
+    /// Antichess legal-move generation skips king safety entirely: the king is
+    /// not royal ([`AntichessRules::king_is_royal`] is `false`) and
+    /// [`AntichessRules::is_legal_after`] is a constant `true`, so every
+    /// pseudo-legal move is already legal. Emitting the antichess pseudo-legal
+    /// set directly — [`AntichessRules::gen_pseudo`], which already injects the
+    /// king-promotions — and running no make-move filter therefore produces the
+    /// exact same base set as the inherited
+    /// [`Variant::slow_legal_into`]/[`Variant::is_legal_after`] path, but without
+    /// the make-move per candidate that path performs only to build the unused
+    /// `child` position. The forced-capture narrowing still runs afterwards in
+    /// [`AntichessRules::filter_forced`] (via
+    /// [`VariantPosition::generate_legal_into`](super::VariantPosition)).
+    fn legal_into(core: &Position, out: &mut MoveList) {
+        Self::gen_pseudo(core, out);
+    }
+
     /// H9: antichess has no castling.
     fn castling_allowed() -> bool {
         false
@@ -202,10 +220,10 @@ fn has_legal_move(core: &Position) -> bool {
 
 /// Antichess as a [`VariantPosition`].
 ///
-/// Movegen runs the slow pseudo-legal + (always-true) make-move filter, then
-/// narrows to forced captures; there is no king safety, no castling, and pawns
-/// may promote to a king. The inverted win — a side with no move or no pieces
-/// wins — is reported through
+/// Movegen emits the pseudo-legal set directly (king safety never applies — see
+/// [`AntichessRules::legal_into`]), then narrows to forced captures; there is no
+/// king safety, no castling, and pawns may promote to a king. The inverted win —
+/// a side with no move or no pieces wins — is reported through
 /// [`VariantPosition::outcome`](super::VariantPosition::outcome).
 pub type Antichess = VariantPosition<AntichessRules>;
 
