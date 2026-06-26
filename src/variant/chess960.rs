@@ -47,12 +47,15 @@ impl Variant for Chess960Rules {
     const VARIANT_CASTLING: bool = true;
 
     fn generate_castles(core: &crate::Position, out: &mut MoveList) {
-        // King to the g-/c-file, rook to the f-/d-file, exactly as in standard
-        // chess; only the start squares differ in Chess960.
-        core.gen_castles_960(out, |side| match side {
-            CastleSide::King => Some((File::G, File::F)),
-            CastleSide::Queen => Some((File::C, File::D)),
-        });
+        core.gen_castles_960(out, castle_dest_files);
+    }
+
+    fn bulk_count_leaf(core: &crate::Position, _state: &Self::State) -> Option<u64> {
+        // Count the fast non-castling legal moves and the 960 castles through a
+        // population-count sink, exactly mirroring `legal_into`'s
+        // `generate_no_castles_into` + `generate_castles` pair, so the leaf count
+        // stays byte-identical while skipping move construction.
+        Some(core.count_legal_960(castle_dest_files))
     }
 
     fn starting_board() -> (Board, CastlingRights, Self::State) {
@@ -66,6 +69,17 @@ impl Variant for Chess960Rules {
 
     fn write_castling_field(rights: CastlingRights, _board: &Board, out: &mut String) {
         write_castling_960(rights, out);
+    }
+}
+
+/// The Chess960 castle destination files for a side: king to the g-/c-file,
+/// rook to the f-/d-file, exactly as in standard chess — only the start squares
+/// differ in Chess960. Shared by the move-emitting and bulk-counting castle
+/// paths so both generate the identical castle set.
+fn castle_dest_files(side: CastleSide) -> Option<(File, File)> {
+    match side {
+        CastleSide::King => Some((File::G, File::F)),
+        CastleSide::Queen => Some((File::C, File::D)),
     }
 }
 

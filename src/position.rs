@@ -139,6 +139,19 @@ impl CastlingRights {
     fn is_empty(self) -> bool {
         self == CastlingRights::NONE
     }
+
+    /// Returns `true` if `color` holds *either* castling right. A cheap bit-test
+    /// used by the Chess960 castle generator to skip all castle work — including
+    /// the expensive king-danger map — on the dominant midgame node where the
+    /// side to move has already forfeited castling.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn has_any(self, color: Color) -> bool {
+        match color {
+            Color::White => self.white_king.is_some() || self.white_queen.is_some(),
+            Color::Black => self.black_king.is_some() || self.black_queen.is_some(),
+        }
+    }
 }
 
 /// The home rank of `color` (rank 1 for white, rank 8 for black).
@@ -1399,12 +1412,18 @@ impl Position {
     ///
     /// `geom(side)` returns `(king_dest_file, rook_dest_file)` for that side, or
     /// `None` if the variant does not offer it.
-    pub(crate) fn gen_castles_960(
+    pub(crate) fn gen_castles_960<S: MoveSink>(
         &self,
-        out: &mut MoveList,
+        out: &mut S,
         geom: impl Fn(CastleSide) -> Option<(File, File)>,
     ) {
         let us = self.turn;
+        // Dominant midgame node: the side to move holds no castling right, so
+        // there is nothing to generate. A single bit-test settles it before any
+        // occupancy, check, or king-danger work — the expensive parts below.
+        if !self.castling.has_any(us) {
+            return;
+        }
         let them = us.opposite();
         let Some(king_sq) = self.board.king_of(us) else {
             return;
@@ -1418,8 +1437,14 @@ impl Position {
         if !self.attackers_to(king_sq, them, occupied).is_empty() {
             return;
         }
+
+        // The king-danger map (enemy attacks with our king lifted out of the
+        // occupancy) is the costly query here, so it is computed lazily: only
+        // once a castle candidate has cleared the cheap rook-present and
+        // empty-path gates is it needed. Most nodes that still hold rights are
+        // blocked before that point, so they never pay for it.
         let occ_without_king = occupied.without(king_sq);
-        let king_danger = self.attacked_by(them, occ_without_king);
+        let mut king_danger: Option<Bitboard> = None;
 
         for side in [CastleSide::King, CastleSide::Queen] {
             let Some(rook_file) = self.castling.rook_file(us, side) else {
@@ -1449,9 +1474,13 @@ impl Position {
             }
 
             // The king must not pass through or land on a square attacked under
-            // the pre-castle occupancy (forbids castling through check).
+            // the pre-castle occupancy (forbids castling through check). The
+            // king-danger map is computed on first need and cached for the
+            // second castle side.
             let king_walk = between(king_sq, king_dest).with(king_dest);
-            if !(king_walk & king_danger).is_empty() {
+            let danger =
+                *king_danger.get_or_insert_with(|| self.attacked_by(them, occ_without_king));
+            if !(king_walk & danger).is_empty() {
                 continue;
             }
 
@@ -1469,8 +1498,29 @@ impl Position {
                 CastleSide::King => MoveKind::CastleKingside,
                 CastleSide::Queen => MoveKind::CastleQueenside,
             };
-            out.push(Move::new(king_sq, king_dest, kind));
+            out.emit(king_sq, king_dest, kind);
         }
+    }
+
+    /// Tallies the Chess960 legal-move count of the side to move without
+    /// materializing any move — the bulk leaf-counting analogue of the fast
+    /// `generate_no_castles_into` + [`Position::gen_castles_960`] pair that the
+    /// Chess960 variant runs at every node.
+    ///
+    /// At a perft leaf the variant needs only the *number* of legal moves, so
+    /// this drives the same generation as the materializing path through a
+    /// [`CountSink`]: the non-castling fast generator counts its moves via
+    /// population counts, then the 960 castle generator tallies its (zero, one,
+    /// or two) self-validating castles. The result is exactly the length of the
+    /// list `generate_no_castles_into` + `gen_castles_960` would build, so every
+    /// Chess960 perft count stays byte-identical while skipping move
+    /// construction at the leaves — the same speedup standard chess gets from
+    /// [`Position::count_legal`].
+    pub(crate) fn count_legal_960(&self, geom: impl Fn(CastleSide) -> Option<(File, File)>) -> u64 {
+        let mut sink = CountSink::default();
+        self.generate_into_with_castles(&mut sink, false);
+        self.gen_castles_960(&mut sink, geom);
+        sink.count()
     }
 
     // -- Make move ---------------------------------------------------------

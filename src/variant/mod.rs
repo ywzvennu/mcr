@@ -182,6 +182,26 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// `false`, so their leaf counts come from the full materialized list.
     const BULK_COUNTABLE: bool = false;
 
+    /// A variant's own bulk leaf-count of the side-to-move's legal moves, used by
+    /// [`perft_variant`] at the last ply when [`Variant::BULK_COUNTABLE`] is
+    /// `false` but the variant can still tally its leaf count without
+    /// materializing each move.
+    ///
+    /// Returning `Some(n)` must yield exactly `generate_legal_into(..).len()` for
+    /// this position, so the perft count stays byte-identical while the move
+    /// construction at the leaf is skipped. Returning `None` (the default) falls
+    /// back to materializing the full list, which is always correct.
+    ///
+    /// Chess960 overrides this: its legal set is the fast non-castling generator
+    /// plus its own arbitrary-geometry castles, both of which the core can count
+    /// through a population-count sink ([`Position::count_legal_960`]), so it gets
+    /// the same leaf speedup standard chess gets from [`Variant::BULK_COUNTABLE`]
+    /// — even though its castle geometry keeps it off the standard bulk path.
+    #[must_use]
+    fn bulk_count_leaf(_core: &Position, _state: &Self::State) -> Option<u64> {
+        None
+    }
+
     /// A variant-specific terminal condition derivable from a single position,
     /// consulted before the standard checkmate/stalemate/material/clock rules.
     ///
@@ -1010,6 +1030,16 @@ fn perft_variant_inner<V: Variant>(
     // count byte-identical while skipping the move construction at the leaves.
     if depth == 1 && V::BULK_COUNTABLE {
         return position.core().count_legal();
+    }
+    // Variant-supplied bulk leaf count: a variant whose move set is not the
+    // standard generator's (so it cannot use [`Variant::BULK_COUNTABLE`]) may
+    // still tally its leaf count without materializing each move. Chess960 uses
+    // this to count its non-castling moves and its own castles through a
+    // population-count sink.
+    if depth == 1 {
+        if let Some(count) = V::bulk_count_leaf(position.core(), position.state()) {
+            return count;
+        }
     }
     buf.clear();
     position.generate_legal_into(buf);
