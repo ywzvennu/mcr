@@ -572,6 +572,13 @@ pub struct CastleGeometry {
 pub struct VariantPosition<V: Variant> {
     core: Position,
     state: V::State,
+    // The stored variant instance. Variant behavior dispatches through the type
+    // `V` (its associated functions and `V::ID`), not this value, so the field is
+    // a forward-looking store for a future non-zero-sized variant carrying runtime
+    // configuration. It is constructed (`startpos`, `from_parts`) and cloned with
+    // the position, but never read on its own — derived `Clone` does not count as
+    // a read for dead-code analysis.
+    #[allow(dead_code)]
     variant: V,
 }
 
@@ -741,20 +748,40 @@ impl<V: Variant> VariantPosition<V> {
     /// ([`Variant::capture_side_effects`]) and the state hash are folded in.
     #[must_use]
     pub fn play(&self, mv: &Move) -> Self {
-        let mut state = self.state.clone();
+        let mut next = self.clone();
+        next.play_unchecked(mv);
+        next
+    }
 
+    /// Applies `mv` to this position **in place**, mutating both the core and the
+    /// variant state without copying — the in-place counterpart of
+    /// [`VariantPosition::play`].
+    ///
+    /// A standard move kind goes through the core in-place make-move; a
+    /// variant-only kind (drop) goes through [`Variant::apply_extra`]. After the
+    /// core edit, capture side effects ([`Variant::capture_side_effects`]) and the
+    /// per-move [`Variant::post_apply`] hook fire, then the variant state hash
+    /// contribution is rebalanced into the incremental Zobrist key.
+    ///
+    /// # Contract
+    ///
+    /// The move **must be legal** for this position; like
+    /// [`Position::play_unchecked`] this method does not re-validate legality.
+    /// Pass only moves obtained from this position's legal-move generation. The
+    /// safe, checked default is [`VariantPosition::play`].
+    pub fn play_unchecked(&mut self, mv: &Move) {
         // Remove the parent's state hash contribution; the child's is folded in
         // at the end. (For the unit state both are zero.)
         let mut parent_extra = 0u64;
         V::hash_state(&self.state, &mut parent_extra);
 
-        let mut core = if mv.is_drop() {
-            let mut core = self.core.clone();
-            V::apply_extra(&mut core, &mut state, mv);
-            core
+        let core = &mut self.core;
+        let state = &mut self.state;
+
+        if mv.is_drop() {
+            V::apply_extra(core, state, mv);
         } else {
-            let (core, captured) = self.core.play_tracking_capture(mv);
-            let mut core = core;
+            let captured = core.play_unchecked_tracking_capture(mv);
             if let Some((piece, _sq)) = captured {
                 let sq = match mv.kind() {
                     crate::MoveKind::EnPassant => {
@@ -762,28 +789,21 @@ impl<V: Variant> VariantPosition<V> {
                     }
                     _ => mv.to(),
                 };
-                V::capture_side_effects(&mut core, &mut state, mv, (piece, sq));
+                V::capture_side_effects(core, state, mv, (piece, sq));
             }
-            core
-        };
+        }
 
         // Per-move post-apply hook (H14): runs for every move kind once the child
         // `core` is finished, before the state hash is rebalanced. The default is
         // a no-op, so standard chess and other variants are unaffected.
-        V::post_apply(&mut core, &mut state, mv);
+        V::post_apply(core, state, mv);
 
         // Rebalance the state-hash contribution: out with the parent's, in with
         // the child's.
         core.xor_hash(parent_extra);
         let mut child_extra = 0u64;
-        V::hash_state(&state, &mut child_extra);
+        V::hash_state(state, &mut child_extra);
         core.xor_hash(child_extra);
-
-        VariantPosition {
-            core,
-            state,
-            variant: self.variant.clone(),
-        }
     }
 
     /// The variant-aware game result derivable from this position, or `None`.

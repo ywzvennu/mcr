@@ -1530,24 +1530,56 @@ impl Position {
     /// The move must be legal for this position. `play` does not re-validate
     /// legality; pass only moves obtained from [`Position::legal_moves`] (or
     /// validate with [`Position::is_legal`] first).
+    ///
+    /// This is the ergonomic immutable make-move: it clones the position and
+    /// applies the move to the clone. A search engine that makes and unmakes
+    /// millions of moves should reach for the in-place [`Position::play_unchecked`]
+    /// instead, which mutates the position directly and so avoids the per-move
+    /// copy.
     #[must_use]
     pub fn play(&self, mv: &Move) -> Position {
         let mut next = self.clone();
-        next.apply(mv);
+        next.play_unchecked(mv);
         next
     }
 
-    /// Applies `mv` to a clone of this position, returning the successor and the
-    /// piece captured by the move (if any), for variant capture side-effects.
+    /// Applies `mv` to this position **in place**, mutating it into the successor
+    /// position without copying.
+    ///
+    /// This is the make/unmake hot path: it edits the board, updates castling
+    /// rights, the en-passant target, the move clocks, the side to move, and the
+    /// incrementally maintained Zobrist key directly on `self`, producing exactly
+    /// the position [`Position::play`] would return but with no allocation or
+    /// clone. A search engine that descends the tree should snapshot the small
+    /// amount of state it needs to undo (or clone once before a subtree) and call
+    /// this on each step.
+    ///
+    /// # Contract
+    ///
+    /// The move **must be legal** for this position. Like shakmaty's
+    /// `play_unchecked`, this method does *not* validate legality: passing an
+    /// illegal or ill-formed move (one whose `from` square is empty, or a move
+    /// kind inconsistent with the board) leaves the position in an unspecified
+    /// state. Pass only moves obtained from [`Position::legal_moves`] (or first
+    /// checked with [`Position::is_legal`]). The safe, checked default remains
+    /// [`Position::play`].
+    pub fn play_unchecked(&mut self, mv: &Move) {
+        self.apply(mv);
+    }
+
+    /// Applies `mv` to this position **in place**, returning the piece captured
+    /// by the move (if any) — the in-place make-move used by the variant layer to
+    /// run its capture side-effect hook against the post-move core.
     ///
     /// The captured piece is the one that stood on the square the move removed an
     /// enemy from — the destination for ordinary captures and capturing
     /// promotions, the en-passant pawn's square for en passant. Quiet moves,
-    /// castling, and drops capture nothing.
-    #[must_use]
-    pub(crate) fn play_tracking_capture(&self, mv: &Move) -> (Position, Option<(Piece, Square)>) {
+    /// castling, and drops capture nothing. The piece is read off the board
+    /// *before* the move edits it.
+    pub(crate) fn play_unchecked_tracking_capture(&mut self, mv: &Move) -> Option<(Piece, Square)> {
         let captured = self.captured_piece(mv);
-        (self.play(mv), captured)
+        self.play_unchecked(mv);
+        captured
     }
 
     /// The enemy piece (and its square) a move removes from the board, if any.
