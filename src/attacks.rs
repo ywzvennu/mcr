@@ -69,20 +69,62 @@ pub fn king_attacks(sq: Square) -> Bitboard {
 /// A ray stops at the first occupied square in each diagonal direction; that
 /// blocking square is included in the result (it may be a capturable enemy
 /// piece — masking out friendly pieces is the caller's job).
+///
+/// With the `magic` feature this dispatches to a magic-bitboard lookup; the
+/// default build uses hyperbola quintessence. Both return identical sets.
 #[must_use]
 #[inline]
 pub fn bishop_attacks(sq: Square, occupied: Bitboard) -> Bitboard {
-    sliding(sq, occupied, DIAG[sq.index() as usize])
-        | sliding(sq, occupied, ANTI_DIAG[sq.index() as usize])
+    #[cfg(feature = "magic")]
+    {
+        crate::magic::bishop_attacks(sq, occupied)
+    }
+    #[cfg(not(feature = "magic"))]
+    {
+        bishop_attacks_hyperbola(sq, occupied)
+    }
 }
 
 /// Returns the squares a rook on `sq` attacks given the `occupied` set.
 ///
 /// A ray stops at the first occupied square along its file or rank; that
 /// blocking square is included in the result.
+///
+/// With the `magic` feature this dispatches to a magic-bitboard lookup; the
+/// default build uses hyperbola quintessence. Both return identical sets.
 #[must_use]
 #[inline]
 pub fn rook_attacks(sq: Square, occupied: Bitboard) -> Bitboard {
+    #[cfg(feature = "magic")]
+    {
+        crate::magic::rook_attacks(sq, occupied)
+    }
+    #[cfg(not(feature = "magic"))]
+    {
+        rook_attacks_hyperbola(sq, occupied)
+    }
+}
+
+/// Hyperbola-quintessence bishop attacks — the default slider implementation
+/// and the reference the magic cross-check test compares against.
+///
+/// Compiled for the default build and for any test build (the magic cross-check
+/// uses it as ground truth); a non-test `--features magic` build dispatches
+/// straight to the magic lookup and never references it.
+#[cfg(any(not(feature = "magic"), test))]
+#[must_use]
+#[inline]
+pub(crate) fn bishop_attacks_hyperbola(sq: Square, occupied: Bitboard) -> Bitboard {
+    sliding(sq, occupied, DIAG[sq.index() as usize])
+        | sliding(sq, occupied, ANTI_DIAG[sq.index() as usize])
+}
+
+/// Hyperbola-quintessence rook attacks — the default slider implementation and
+/// the reference the magic cross-check test compares against.
+#[cfg(any(not(feature = "magic"), test))]
+#[must_use]
+#[inline]
+pub(crate) fn rook_attacks_hyperbola(sq: Square, occupied: Bitboard) -> Bitboard {
     sliding(sq, occupied, file_mask(sq)) | sliding(sq, occupied, rank_mask(sq))
 }
 
@@ -139,6 +181,7 @@ pub fn line(a: Square, b: Square) -> Bitboard {
 /// file, diagonal, or anti-diagonal that passes through `sq`).
 ///
 /// The result excludes `sq` itself and includes the first blocker on each side.
+#[cfg(any(not(feature = "magic"), test))]
 fn sliding(sq: Square, occupied: Bitboard, mask: Bitboard) -> Bitboard {
     let s = 1u64 << sq.index();
     let o = occupied.0 & mask.0;
@@ -157,12 +200,14 @@ fn sliding(sq: Square, occupied: Bitboard, mask: Bitboard) -> Bitboard {
 }
 
 /// Returns the file mask through `sq` (the whole file, all eight squares).
+#[cfg(any(not(feature = "magic"), test))]
 #[inline]
 fn file_mask(sq: Square) -> Bitboard {
     Bitboard(Bitboard::FILE_A.0 << (sq.index() % 8))
 }
 
 /// Returns the rank mask through `sq` (the whole rank, all eight squares).
+#[cfg(any(not(feature = "magic"), test))]
 #[inline]
 fn rank_mask(sq: Square) -> Bitboard {
     Bitboard(Bitboard::RANK_1.0 << (sq.index() & 56))
@@ -261,6 +306,7 @@ static PAWN_ATTACKS: [[Bitboard; 64]; 2] = [
 /// Builds the diagonal (a1–h8 direction) mask through every square.
 ///
 /// The diagonal is the set of squares with the same `rank - file`.
+#[cfg(any(not(feature = "magic"), test))]
 const fn build_diag() -> [Bitboard; 64] {
     let mut table = [Bitboard::EMPTY; 64];
     let mut sq = 0i32;
@@ -284,6 +330,7 @@ const fn build_diag() -> [Bitboard; 64] {
 /// Builds the anti-diagonal (a8–h1 direction) mask through every square.
 ///
 /// The anti-diagonal is the set of squares with the same `rank + file`.
+#[cfg(any(not(feature = "magic"), test))]
 const fn build_anti_diag() -> [Bitboard; 64] {
     let mut table = [Bitboard::EMPTY; 64];
     let mut sq = 0i32;
@@ -305,8 +352,10 @@ const fn build_anti_diag() -> [Bitboard; 64] {
 }
 
 /// Diagonal masks (a1–h8 direction) indexed by square.
+#[cfg(any(not(feature = "magic"), test))]
 static DIAG: [Bitboard; 64] = build_diag();
 /// Anti-diagonal masks (a8–h1 direction) indexed by square.
+#[cfg(any(not(feature = "magic"), test))]
 static ANTI_DIAG: [Bitboard; 64] = build_anti_diag();
 
 // ---------------------------------------------------------------------------
@@ -722,6 +771,52 @@ mod tests {
                     bishop_attacks(sq, occ),
                     scan_rays(sq, occ, &[(1, 1), (1, -1), (-1, 1), (-1, -1)]),
                     "bishop mismatch at {sq} occ {occ:?}"
+                );
+            }
+        }
+    }
+
+    /// Cross-check: under the `magic` feature the public sliders MUST return
+    /// exactly the hyperbola-quintessence results for every square over many
+    /// random occupancies. This is the correctness guarantee that makes the
+    /// magic feature a transparent drop-in.
+    #[cfg(feature = "magic")]
+    #[test]
+    fn magic_matches_hyperbola_every_square() {
+        // Small deterministic xorshift so the test needs no external crate.
+        let mut state = 0x1234_5678_9abc_def0u64;
+        let mut rand = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+
+        for index in 0..64u8 {
+            let sq = Square::new(index);
+            // Always check the empty and full boards explicitly.
+            for occ in [Bitboard::EMPTY, Bitboard::FULL] {
+                assert_eq!(
+                    super::rook_attacks(sq, occ),
+                    rook_attacks_hyperbola(sq, occ)
+                );
+                assert_eq!(
+                    super::bishop_attacks(sq, occ),
+                    bishop_attacks_hyperbola(sq, occ)
+                );
+            }
+            // Then 256 random occupancies per square (16384 cases total).
+            for _ in 0..256 {
+                let occ = Bitboard(rand());
+                assert_eq!(
+                    super::rook_attacks(sq, occ),
+                    rook_attacks_hyperbola(sq, occ),
+                    "magic rook mismatch at {sq} occ {occ:?}"
+                );
+                assert_eq!(
+                    super::bishop_attacks(sq, occ),
+                    bishop_attacks_hyperbola(sq, occ),
+                    "magic bishop mismatch at {sq} occ {occ:?}"
                 );
             }
         }

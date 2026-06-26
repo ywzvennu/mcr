@@ -17,8 +17,14 @@ edition = "2021"
 publish = false
 license = "GPL-3.0-or-later"
 
+[features]
+# Forward to the mce dependency's `magic` feature so the same benchmark binary
+# can measure magic-on vs magic-off sliders. Run the magic build with:
+#   cargo run --release --features magic --bin mce-compare
+magic = ["mce/magic"]
+
 [dependencies]
-mce = { path = ".." }
+mce = { path = "..", default-features = false }
 shakmaty = { version = "0.27", features = ["variant"] }
 
 [dev-dependencies]
