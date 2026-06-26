@@ -598,6 +598,14 @@ impl Position {
                 white_first_rank_double,
                 false,
             );
+        } else if white_first_rank_double && us == Color::White {
+            // Horde's kingless white side: no king, no pins, all-allowing check
+            // mask. Generate every white pawn move in bulk with bitboard shifts
+            // rather than one pin-line lookup + per-pawn loop iteration each. This
+            // is the horde perft hot path (white has thirty-six pawns); the
+            // per-pawn `gen_pawn_moves` below stays the source of truth for every
+            // other caller.
+            self.gen_horde_white_pawn_moves(out, occupied, their_pieces);
         } else {
             // Without a king there is no en-passant legality king to consult; the
             // generator only reads `king_sq` for that rare check, and a kingless
@@ -979,6 +987,113 @@ impl Position {
             }
         }
         pins
+    }
+
+    /// Generates every pseudo-legal white pawn move for the kingless horde white
+    /// side, in bulk, with bitboard shifts.
+    ///
+    /// This is the horde perft hot path: white is a thirty-six-pawn horde with no
+    /// king, so there are no pins and no king-safety filter — every pseudo-legal
+    /// white pawn move is already legal. Rather than loop over each pawn (one pin
+    /// lookup, one offset computation, one attack lookup apiece), this computes
+    /// each *class* of move for all pawns at once via a single shift and mask:
+    /// single pushes, the two double-push source ranks (rank 2 with an
+    /// en-passant target, and horde's rank 1 without one), the two capture
+    /// directions, and en passant. Promotions on the eighth rank are expanded per
+    /// target. The reconstructed `from` square is the target shifted back by the
+    /// fixed delta of its class, which is always on the board because the target
+    /// was produced by shifting a real pawn forward.
+    ///
+    /// Only horde's kingless white side reaches this; [`Position::gen_pawn_moves`]
+    /// remains the source of truth for every other caller and every other side.
+    fn gen_horde_white_pawn_moves<S: MoveSink>(
+        &self,
+        out: &mut S,
+        occupied: Bitboard,
+        their_pieces: Bitboard,
+    ) {
+        let pawns = self.board.pieces(Color::White, Role::Pawn);
+        if pawns.is_empty() {
+            return;
+        }
+        let empty = !occupied;
+
+        // Single pushes (and the eighth-rank promotions they reach).
+        let single = pawns.north() & empty;
+        for to in single & !Bitboard::RANK_8 {
+            let from = Square::new(to.index() - 8);
+            out.emit(from, to, MoveKind::Quiet);
+        }
+        for to in single & Bitboard::RANK_8 {
+            let from = Square::new(to.index() - 8);
+            for role in PROMOTION_ROLES {
+                out.emit(
+                    from,
+                    to,
+                    MoveKind::Promotion {
+                        role,
+                        capture: false,
+                    },
+                );
+            }
+        }
+
+        // Double pushes from the second rank create an en-passant target.
+        let rank2_step = (pawns & Bitboard::RANK_2).north() & empty;
+        for to in rank2_step.north() & empty {
+            let from = Square::new(to.index() - 16);
+            out.emit(from, to, MoveKind::DoublePawnPush);
+        }
+
+        // Horde's first-rank pawns may double-push too, but per the horde
+        // convention this sets no en-passant target — a plain quiet two-square
+        // advance over an empty intermediate square.
+        let rank1_step = (pawns & Bitboard::RANK_1).north() & empty;
+        for to in rank1_step.north() & empty {
+            let from = Square::new(to.index() - 16);
+            out.emit(from, to, MoveKind::Quiet);
+        }
+
+        // Captures, north-east then north-west; eighth-rank targets are capturing
+        // promotions.
+        let cap_ne = pawns.north_east() & their_pieces;
+        self.emit_horde_white_captures(out, cap_ne, 9);
+        let cap_nw = pawns.north_west() & their_pieces;
+        self.emit_horde_white_captures(out, cap_nw, 7);
+
+        // En passant: white is kingless, so the discovered-check ep pin can never
+        // apply — any white pawn that attacks the en-passant square may take.
+        if let Some(ep) = self.ep_square {
+            let takers = pawn_attacks(Color::Black, ep) & pawns;
+            for from in takers {
+                out.emit(from, ep, MoveKind::EnPassant);
+            }
+        }
+    }
+
+    /// Emits the white horde capture moves whose targets are `targets`, each
+    /// reached from the square `delta` indices lower (the fixed back-shift of the
+    /// capture direction). Eighth-rank targets expand to the four capturing
+    /// promotions.
+    #[inline]
+    fn emit_horde_white_captures<S: MoveSink>(&self, out: &mut S, targets: Bitboard, delta: u8) {
+        for to in targets & !Bitboard::RANK_8 {
+            let from = Square::new(to.index() - delta);
+            out.emit(from, to, MoveKind::Capture);
+        }
+        for to in targets & Bitboard::RANK_8 {
+            let from = Square::new(to.index() - delta);
+            for role in PROMOTION_ROLES {
+                out.emit(
+                    from,
+                    to,
+                    MoveKind::Promotion {
+                        role,
+                        capture: true,
+                    },
+                );
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
