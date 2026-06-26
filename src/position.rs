@@ -150,6 +150,53 @@ const fn back_rank(color: Color) -> Rank {
     }
 }
 
+/// The pinned friendly pieces of the side to move: which squares are pinned,
+/// and the king the pins radiate from.
+///
+/// A pinned piece is confined to the full line through the king and the pinning
+/// slider. The representation is deliberately tiny — a single `pinned` bitboard
+/// plus the king square — so it costs nothing to construct or copy on every
+/// node (the previous design heap-allocated a `Vec` of per-piece lines). The
+/// confining line is recovered on demand as `line(king, piece)` only for the
+/// rare piece that is actually pinned, so no per-piece line table is built, and
+/// the common unpinned piece is settled by a single bitboard membership test in
+/// [`Pins::line_of`].
+#[derive(Clone, Copy)]
+struct Pins {
+    /// The set of pinned friendly squares.
+    pinned: Bitboard,
+    /// The king the pins radiate from, used to recover a pinned piece's line.
+    king_sq: Square,
+}
+
+impl Pins {
+    /// No pinned pieces — the placeholder for the fully general pseudo-legal
+    /// path, which applies no pin restriction. `line_of` short-circuits to
+    /// [`Bitboard::FULL`] for every square because `pinned` is empty, so the
+    /// king square is never consulted.
+    const EMPTY: Pins = Pins {
+        pinned: Bitboard::EMPTY,
+        king_sq: Square::A1,
+    };
+
+    /// Records that `sq` is pinned.
+    #[inline]
+    fn add(&mut self, sq: Square) {
+        self.pinned = self.pinned.with(sq);
+    }
+
+    /// The line restricting `sq`, or [`Bitboard::FULL`] if `sq` is unpinned.
+    #[inline]
+    fn line_of(&self, sq: Square) -> Bitboard {
+        // The common case is an unpinned piece: a single bitboard test settles
+        // it. When there are no pins at all this is taken for every piece.
+        if !self.pinned.contains(sq) {
+            return Bitboard::FULL;
+        }
+        crate::attacks::line(self.king_sq, sq)
+    }
+}
+
 /// The destination for the generators' emitted moves.
 ///
 /// The standard move-generation routines push each candidate into a sink rather
@@ -535,7 +582,7 @@ impl Position {
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
         let full = Bitboard::FULL;
-        let no_pins: [(Square, Bitboard); 0] = [];
+        let no_pins = Pins::EMPTY;
 
         // Pawns, knights, sliders: reuse the standard generators with an
         // all-allowing check mask and no pins, so every geometric move is kept.
@@ -670,7 +717,7 @@ impl Position {
         // Pinned pieces: friendly pieces on a line between the king and an enemy
         // slider, with no other piece between. They may move only along that
         // line. We compute, per pinned piece, the line it is restricted to.
-        let pin_lines = self.pin_lines(king_sq, us, them, occupied);
+        let pins = self.compute_pins(king_sq, us, them, occupied);
 
         self.gen_pawn_moves(
             out,
@@ -678,12 +725,12 @@ impl Position {
             occupied,
             their_pieces,
             check_mask,
-            &pin_lines,
+            &pins,
             king_sq,
             false,
             true,
         );
-        self.gen_knight_moves(out, us, our_pieces, their_pieces, check_mask, &pin_lines);
+        self.gen_knight_moves(out, us, our_pieces, their_pieces, check_mask, &pins);
         self.gen_slider_moves(
             out,
             us,
@@ -691,7 +738,7 @@ impl Position {
             our_pieces,
             their_pieces,
             check_mask,
-            &pin_lines,
+            &pins,
         );
 
         // Castling is only possible when not in check. A variant that supplies
@@ -730,17 +777,16 @@ impl Position {
         attacked
     }
 
-    /// For each pinned friendly piece, the full line (through the king and the
-    /// pinning slider) it is confined to. Returned as `(square, line)` pairs.
-    fn pin_lines(
-        &self,
-        king_sq: Square,
-        us: Color,
-        them: Color,
-        occupied: Bitboard,
-    ) -> Vec<(Square, Bitboard)> {
+    /// The pinned friendly pieces of the side to move, as an inline [`Pins`]
+    /// (no heap allocation per node). Each pinned piece's confining line is
+    /// recovered on demand from the king square, so only the pinned *set* is
+    /// recorded here.
+    fn compute_pins(&self, king_sq: Square, us: Color, them: Color, occupied: Bitboard) -> Pins {
         let b = &self.board;
-        let mut pins = Vec::new();
+        let mut pins = Pins {
+            pinned: Bitboard::EMPTY,
+            king_sq,
+        };
         let our_pieces = b.by_color(us);
 
         // Enemy sliders that could pin along a rank/file (rooks, queens) or a
@@ -759,23 +805,11 @@ impl Position {
             if blockers.count() == 1 {
                 let pinned = blockers.lsb().expect("one blocker");
                 if our_pieces.contains(pinned) {
-                    let l = crate::attacks::line(king_sq, slider);
-                    pins.push((pinned, l));
+                    pins.add(pinned);
                 }
             }
         }
         pins
-    }
-
-    /// Returns the pin line restricting `sq`, or `Bitboard::FULL` if unpinned.
-    #[inline]
-    fn pin_line_of(pins: &[(Square, Bitboard)], sq: Square) -> Bitboard {
-        for &(p, line) in pins {
-            if p == sq {
-                return line;
-            }
-        }
-        Bitboard::FULL
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -786,7 +820,7 @@ impl Position {
         occupied: Bitboard,
         their_pieces: Bitboard,
         check_mask: Bitboard,
-        pins: &[(Square, Bitboard)],
+        pins: &Pins,
         king_sq: Square,
         white_first_rank_double: bool,
         filter_ep_pin: bool,
@@ -804,7 +838,7 @@ impl Position {
         let forward: i8 = if us.is_white() { 1 } else { -1 };
 
         for from in pawns {
-            let pin_line = Self::pin_line_of(pins, from);
+            let pin_line = pins.line_of(from);
 
             // Single and double pushes.
             if let Some(one) = from.offset(0, forward) {
@@ -957,12 +991,12 @@ impl Position {
         our_pieces: Bitboard,
         their_pieces: Bitboard,
         check_mask: Bitboard,
-        pins: &[(Square, Bitboard)],
+        pins: &Pins,
     ) {
         for from in self.board.pieces(us, Role::Knight) {
             // A pinned knight can never move (its line is a straight ray and a
             // knight cannot stay on it).
-            let pin_line = Self::pin_line_of(pins, from);
+            let pin_line = pins.line_of(from);
             let targets = knight_attacks(from) & !our_pieces & check_mask & pin_line;
             out.emit_targets(from, targets, their_pieces);
         }
@@ -977,7 +1011,7 @@ impl Position {
         our_pieces: Bitboard,
         their_pieces: Bitboard,
         check_mask: Bitboard,
-        pins: &[(Square, Bitboard)],
+        pins: &Pins,
     ) {
         let board = &self.board;
         for (role, diagonal, straight) in [
@@ -986,7 +1020,7 @@ impl Position {
             (Role::Queen, true, true),
         ] {
             for from in board.pieces(us, role) {
-                let pin_line = Self::pin_line_of(pins, from);
+                let pin_line = pins.line_of(from);
                 let mut attacks = Bitboard::EMPTY;
                 if diagonal {
                     attacks |= bishop_attacks(from, occupied);
