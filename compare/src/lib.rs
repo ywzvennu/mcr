@@ -26,6 +26,21 @@ use shakmaty::variant::{
 };
 use shakmaty::{CastlingMode, Chess as ShChess};
 
+// Memory / timing infrastructure (shared by the binary and the expanded suite).
+pub mod alloc;
+pub mod footprint;
+pub mod rss;
+pub mod stats;
+
+// The expanded benchmark suite (issue #86): EPD corpus, seeded generator,
+// runtime dispatch, chess960 ids, and non-perft micro-benchmarks.
+pub mod chess960;
+pub mod epd;
+pub mod gen;
+pub mod micro;
+pub mod prng;
+pub mod runtime;
+
 /// A single benchmark position: its variant, a short human label, the FEN, and
 /// the perft depth to run.
 pub struct Case {
