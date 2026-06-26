@@ -43,6 +43,30 @@ const fn role_index(role: Role) -> usize {
     }
 }
 
+/// Maps a single FEN piece byte to its [`Piece`], matching [`Piece::from_char`]
+/// for ASCII input: uppercase letters are white, lowercase are black. Returns
+/// `None` for any byte that is not a piece letter, letting the placement parser
+/// stay on the byte fast path while preserving the exact accept/reject set.
+#[inline]
+fn piece_from_ascii(b: u8) -> Option<Piece> {
+    let (color, role) = match b {
+        b'P' => (Color::White, Role::Pawn),
+        b'N' => (Color::White, Role::Knight),
+        b'B' => (Color::White, Role::Bishop),
+        b'R' => (Color::White, Role::Rook),
+        b'Q' => (Color::White, Role::Queen),
+        b'K' => (Color::White, Role::King),
+        b'p' => (Color::Black, Role::Pawn),
+        b'n' => (Color::Black, Role::Knight),
+        b'b' => (Color::Black, Role::Bishop),
+        b'r' => (Color::Black, Role::Rook),
+        b'q' => (Color::Black, Role::Queen),
+        b'k' => (Color::Black, Role::King),
+        _ => return None,
+    };
+    Some(Piece::new(color, role))
+}
+
 /// The piece placement of a chess board: which [`Piece`], if any, occupies each
 /// of the 64 squares.
 ///
@@ -299,19 +323,33 @@ impl Board {
             // running total is reported back through `RankWrongWidth`, saturated
             // into the `u8` field so even an enormous overrun stays well-defined.
             let mut file: usize = 0;
-            for ch in rank_str.chars() {
-                if let Some(skip) = ch.to_digit(10) {
-                    if skip == 0 {
-                        return Err(ParseBoardError::InvalidChar(ch));
+            let bytes = rank_str.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                let b = bytes[i];
+                if b.is_ascii_digit() {
+                    if b == b'0' {
+                        return Err(ParseBoardError::InvalidChar('0'));
                     }
-                    file += skip as usize;
-                } else if let Some(piece) = Piece::from_char(ch) {
+                    file += (b - b'0') as usize;
+                    i += 1;
+                } else if let Some(piece) = piece_from_ascii(b) {
                     if file >= 8 {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
                     }
                     board.set_piece(Square::new(rank * 8 + file as u8), piece);
                     file += 1;
+                    i += 1;
                 } else {
+                    // Not a digit or piece letter: report the offending character
+                    // exactly as the char-based parser did. ASCII bytes are a
+                    // single char; otherwise decode the UTF-8 codepoint starting
+                    // here so a multibyte char is reported intact (preserving the
+                    // non-ASCII handling fixed in #44/#47).
+                    let ch = rank_str[i..]
+                        .chars()
+                        .next()
+                        .unwrap_or(char::REPLACEMENT_CHARACTER);
                     return Err(ParseBoardError::InvalidChar(ch));
                 }
             }
@@ -348,30 +386,35 @@ impl Board {
     pub fn to_fen_placement(self) -> String {
         // Each rank is at most eight cells; eight ranks plus seven separators.
         let mut fen = String::with_capacity(8 * 8 + 7);
+        self.write_fen_placement(&mut fen);
+        fen
+    }
 
+    /// Appends the FEN piece-placement field to `out` without allocating an
+    /// intermediate `String`, so callers serializing a full FEN can write
+    /// straight into their output buffer. See [`Board::to_fen_placement`].
+    pub(crate) fn write_fen_placement(self, out: &mut String) {
         for rank in (0..8u8).rev() {
             let mut empty = 0u8;
             for file in 0..8u8 {
                 match self.piece_at(Square::new(rank * 8 + file)) {
                     Some(piece) => {
                         if empty > 0 {
-                            fen.push((b'0' + empty) as char);
+                            out.push((b'0' + empty) as char);
                             empty = 0;
                         }
-                        fen.push(piece.char());
+                        out.push(piece.char());
                     }
                     None => empty += 1,
                 }
             }
             if empty > 0 {
-                fen.push((b'0' + empty) as char);
+                out.push((b'0' + empty) as char);
             }
             if rank > 0 {
-                fen.push('/');
+                out.push('/');
             }
         }
-
-        fen
     }
 }
 
@@ -644,6 +687,11 @@ mod tests {
         // A zero digit is not allowed.
         let err = Board::from_fen_placement("08/8/8/8/8/8/8/8").unwrap_err();
         assert_eq!(err, ParseBoardError::InvalidChar('0'));
+        // A non-ASCII (multibyte) character must be reported as its full
+        // codepoint, not a lone UTF-8 byte: the byte-level scanner decodes the
+        // offending char before reporting it.
+        let err = Board::from_fen_placement("é7/8/8/8/8/8/8/8").unwrap_err();
+        assert_eq!(err, ParseBoardError::InvalidChar('é'));
     }
 
     #[test]
