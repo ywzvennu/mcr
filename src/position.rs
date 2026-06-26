@@ -1980,21 +1980,26 @@ pub fn perft(position: &Position, depth: u32) -> u64 {
     if depth == 0 {
         return 1;
     }
-    // Allocate one reusable move buffer per *interior* ply once, up front, and
-    // thread them through the recursion. Each buffer is `clear`ed (not freshly
-    // value-initialized) before reuse at its ply, so perft touches the stack
-    // buffers exactly `depth - 1` times total rather than allocating a fresh
-    // `MoveList` per node. The leaf ply (`depth == 1`) bulk-counts its moves
-    // directly and never fills a buffer, so only `depth - 1` are needed.
-    let mut buffers: Vec<MoveList> = (0..depth - 1).map(|_| MoveList::new()).collect();
-    perft_with(position, depth, &mut buffers)
+    // The whole recursion runs allocation-free. Each interior ply's move buffer
+    // lives on a *stack* frame: a frame fills its own caller-provided `buf`, then
+    // creates exactly one child buffer on its stack and reuses it (clearing, not
+    // re-zeroing) across every child node it visits. Perft therefore pays the
+    // `MoveList` value-init once per ply per parent node rather than once per
+    // node — and never allocates a heap `Vec<MoveList>` or per-node `MoveList`,
+    // since the inline array stays on the stack and standard positions never
+    // spill. The leaf ply (`depth == 1`) bulk-counts directly and the
+    // second-to-last ply bulk-counts its leaf children, so no buffer is needed
+    // below the third-from-last ply.
+    let mut buf = MoveList::new();
+    perft_inner(position, depth, &mut buf)
 }
 
-/// Recursive core of [`perft`], reusing the caller-owned per-ply `buffers` so no
-/// move buffer is allocated per node. `buffers[0]` belongs to the current ply;
-/// each buffer is `clear`ed (not value-initialized) before reuse, so the buffers
-/// are filled in place rather than reallocated per node.
-fn perft_with(position: &Position, depth: u32, buffers: &mut [MoveList]) -> u64 {
+/// Recursive core of [`perft`]. The caller owns `buf` (this ply's move buffer)
+/// and reuses it across sibling nodes; each frame creates one child buffer on its
+/// own stack frame and threads it down. Every buffer lives on a stack frame and
+/// standard positions never spill, so the recursion performs zero heap
+/// allocations.
+fn perft_inner(position: &Position, depth: u32, buf: &mut MoveList) -> u64 {
     // Bulk leaf counting: at the last ply the only thing perft wants is *how
     // many* legal moves there are, so count them directly (population counts over
     // the generators' target masks) instead of materializing each move into a
@@ -2003,12 +2008,19 @@ fn perft_with(position: &Position, depth: u32, buffers: &mut [MoveList]) -> u64 
     if depth == 1 {
         return position.count_legal();
     }
-    let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
-    here.clear();
-    position.generate_into(here);
+    buf.clear();
+    position.generate_into(buf);
+    if depth == 2 {
+        // Every child is a leaf: bulk-count it directly, no child buffer needed.
+        let mut nodes = 0;
+        buf.for_each(|mv| nodes += position.play(&mv).count_legal());
+        return nodes;
+    }
+    // One child buffer on this frame's stack, reused for every child node.
+    let mut child = MoveList::new();
     let mut nodes = 0;
-    here.for_each(|mv| {
-        nodes += perft_with(&position.play(&mv), depth - 1, rest);
+    buf.for_each(|mv| {
+        nodes += perft_inner(&position.play(&mv), depth - 1, &mut child);
     });
     nodes
 }
