@@ -367,6 +367,52 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         });
     }
 
+    /// Fills `out` with the variant's king-safety-filtered move set — every move
+    /// that is legal *before* the variant's [`Variant::extra_moves`] and
+    /// [`Variant::filter_forced`] stages run on top of it. This is the single
+    /// seam through which [`VariantPosition::generate_legal_into`] obtains its
+    /// base move set, so a variant can replace the entire king-safety stage at
+    /// once rather than only its slow-path inner loop.
+    ///
+    /// The default reproduces the original dispatch exactly: the fast core
+    /// pin/check-mask generator when [`Variant::USES_FAST_LEGALITY`] is set
+    /// (emitting the variant's own castles via [`Variant::generate_castles`] when
+    /// [`Variant::VARIANT_CASTLING`] is set, otherwise the core's standard
+    /// castles), and [`Variant::slow_legal_into`] otherwise. Every variant that
+    /// does not override this is therefore byte-for-byte unaffected.
+    ///
+    /// Antichess overrides this to skip king safety entirely: with a non-royal
+    /// king every pseudo-legal move is legal, so it emits the variant pseudo-legal
+    /// set ([`Variant::gen_pseudo`], which already injects king-promotions) and
+    /// runs no make-move filter at all — the per-candidate make-move that
+    /// [`Variant::slow_legal_into`] performs only to satisfy the
+    /// [`Variant::is_legal_after`] signature is pure waste when that hook is a
+    /// constant `true`. The forced-capture narrowing still happens afterwards in
+    /// [`Variant::filter_forced`].
+    fn legal_into(core: &Position, out: &mut MoveList) {
+        if Self::USES_FAST_LEGALITY {
+            if Self::VARIANT_CASTLING {
+                // Sentinel: standard king safety on the fast pin/check-mask path,
+                // but the variant supplies its own arbitrary-geometry castles
+                // (Chess960). The fast generator emits every fully-legal
+                // non-castling move without the standard castles, then the
+                // variant appends its self-validating castles. No make-move
+                // filter runs, so `generate_castles` must itself enforce king
+                // safety of the castle (the core 960 helper does).
+                core.generate_no_castles_into(out);
+                Self::generate_castles(core, out);
+            } else {
+                // Standard king safety and standard castles: reuse the fast core
+                // generator wholesale.
+                core.generate_into(out);
+            }
+        } else {
+            // Slow path: the variant's own legal generation (by default the
+            // pseudo-legal + make-move filter; horde routes by side instead).
+            Self::slow_legal_into(core, out);
+        }
+    }
+
     /// The castling geometry: for the given side to move and castle side, the
     /// king's destination file and the rook's destination file (H10).
     ///
@@ -645,27 +691,11 @@ impl<V: Variant> VariantPosition<V> {
     /// single per-ply buffer rather than allocate one per node.
     fn generate_legal_into(&self, out: &mut MoveList) {
         out.clear();
-        if V::USES_FAST_LEGALITY {
-            if V::VARIANT_CASTLING {
-                // Sentinel: standard king safety on the fast pin/check-mask path,
-                // but the variant supplies its own arbitrary-geometry castles
-                // (Chess960). The fast generator emits every fully-legal
-                // non-castling move without the standard castles, then the
-                // variant appends its self-validating castles. No make-move
-                // filter runs, so `generate_castles` must itself enforce king
-                // safety of the castle (the core 960 helper does).
-                self.core.generate_no_castles_into(out);
-                V::generate_castles(&self.core, out);
-            } else {
-                // Standard king safety and standard castles: reuse the fast core
-                // generator wholesale.
-                self.core.generate_into(out);
-            }
-        } else {
-            // Slow path: the variant's own legal generation (by default the
-            // pseudo-legal + make-move filter; horde routes by side instead).
-            V::slow_legal_into(&self.core, out);
-        }
+        // The variant's king-safety stage: by default the fast pin/check-mask
+        // generator or the slow make-move filter (see [`Variant::legal_into`]).
+        // Antichess overrides it to emit pseudo-legal moves with no make-move
+        // filter at all (its king is not royal).
+        V::legal_into(&self.core, out);
 
         V::extra_moves(&self.core, &self.state, out);
         V::filter_forced(&self.core, &self.state, out);
