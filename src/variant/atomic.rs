@@ -39,6 +39,7 @@
 
 use super::{Variant, VariantId, VariantPosition};
 use crate::attacks::king_attacks;
+use crate::movelist::MoveList;
 use crate::{EndReason, Move, MoveKind, Piece, Position, Role, Square};
 
 /// The atomic rule layer: standard chess movement plus capture explosions and a
@@ -83,6 +84,39 @@ fn detonate(core: &mut Position, mv: &Move) {
             }
         }
     }
+}
+
+/// Whether the capturing move `mv` is legal in atomic chess from `parent`.
+///
+/// The move is applied (the core make-move plus the explosion) and judged on the
+/// fully-exploded position with the same rule as [`AtomicRules::is_legal_after`]:
+/// the mover's king must survive, and either the enemy king is gone (a win, legal
+/// even out of check) or the mover's king is not attacked by a non-king piece.
+///
+/// `mv` must be a capturing move; non-captures never detonate and are handled by
+/// the fast non-capture generator instead.
+fn capture_is_legal(parent: &Position, mv: &Move) -> bool {
+    let mut after = parent.play(mv);
+    detonate(&mut after, mv);
+
+    let mover = parent.turn();
+    let opponent = mover.opposite();
+
+    let Some(my_king) = after.board().king_of(mover) else {
+        // The blast (or capture) removed the mover's own king: never legal.
+        return false;
+    };
+
+    let Some(enemy_king) = after.board().king_of(opponent) else {
+        // The enemy king is gone: the mover wins, legal even while in check.
+        return true;
+    };
+
+    // Both kings stand: ordinary king safety, but the enemy king never gives
+    // check, so exclude it from the attacker set.
+    let mut attackers = after.attackers_to(my_king, opponent, after.board().occupied());
+    attackers.clear(enemy_king);
+    attackers.is_empty()
 }
 
 impl Variant for AtomicRules {
@@ -155,6 +189,36 @@ impl Variant for AtomicRules {
         let mut attackers = after.attackers_to(my_king, opponent, after.board().occupied());
         attackers.clear(enemy_king);
         attackers.is_empty()
+    }
+
+    /// Atomic legal-move generation split by capture status.
+    ///
+    /// A non-capturing atomic move triggers no explosion, so it has ordinary
+    /// chess legality (with the atomic twist that the enemy king gives no check
+    /// and the kings may stand adjacent). Those moves therefore come straight
+    /// from the fast pin/check-mask generator via
+    /// [`Position::atomic_noncapture_legal_into`], skipping the per-candidate
+    /// make-move filter entirely. Only *captures* — which detonate — need the
+    /// explosion-aware legality test, so they alone go through the
+    /// pseudo-legal + make-move-and-explode filter.
+    ///
+    /// This reproduces the slow path's legal-move set exactly: the union of the
+    /// fast generator's non-capturing moves (which equal the non-capturing moves
+    /// that [`AtomicRules::is_legal_after`] accepts) and the explosion-filtered
+    /// captures.
+    fn legal_into(core: &Position, out: &mut MoveList) {
+        // Non-captures (and castles): fast pin/check-mask path, no make-move.
+        core.atomic_noncapture_legal_into(out);
+
+        // Captures: gather the pseudo-legal capturing moves and keep those that
+        // survive the explosion-aware legality test.
+        let mut caps = MoveList::new();
+        core.pseudo_into(&mut caps);
+        caps.for_each(|mv| {
+            if is_capture(&mv) && capture_is_legal(core, &mv) {
+                out.push(mv);
+            }
+        });
     }
 
     /// H1: a missing king is decisive for the side whose king survives.
