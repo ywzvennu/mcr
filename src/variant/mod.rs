@@ -976,19 +976,31 @@ pub fn perft_variant<V: Variant>(position: &VariantPosition<V>, depth: u32) -> u
     if depth == 0 {
         return 1;
     }
-    // One reusable move buffer per ply, allocated once and `clear`ed before each
-    // reuse, so the recursion fills the stack buffers in place rather than
-    // allocating a fresh `MoveList` per node — see [`crate::perft`].
-    let mut buffers: Vec<MoveList> = (0..depth).map(|_| MoveList::new()).collect();
-    perft_variant_with(position, depth, &mut buffers)
+    // Allocation-free recursion: each interior ply's move buffer lives on a stack
+    // frame, and a frame reuses one child buffer (clearing, not re-zeroing) across
+    // every child node it visits — so perft pays the `MoveList` value-init once
+    // per ply per parent node, with the inline array on the stack and no heap
+    // `Vec<MoveList>` or per-node `MoveList`. For every non-crazyhouse variant the
+    // inline array never spills, so zero heap allocations occur. Crazyhouse is the
+    // one variant whose drops can push a position past the inline bound; such a
+    // position spills its overflow to the heap (see [`crate::movelist`]), which is
+    // why crazyhouse may still report a small, position-dependent allocation count
+    // — see [`perft_variant_inner`].
+    let mut buf = MoveList::new();
+    perft_variant_inner(position, depth, &mut buf)
 }
 
-/// Recursive core of [`perft_variant`], reusing the caller-owned per-ply
-/// `buffers`. `buffers[0]` belongs to the current ply.
-fn perft_variant_with<V: Variant>(
+/// Recursive core of [`perft_variant`]. The caller owns `buf` (this ply's move
+/// buffer) and reuses it across sibling nodes; each frame creates one child
+/// buffer on its own stack frame and threads it down. Every buffer lives on a
+/// stack frame, so for every non-crazyhouse variant the recursion performs zero
+/// heap allocations. For crazyhouse a node whose move count exceeds the inline
+/// capacity spills to the heap — correctness never depends on the bound, only the
+/// alloc count does.
+fn perft_variant_inner<V: Variant>(
     position: &VariantPosition<V>,
     depth: u32,
-    buffers: &mut [MoveList],
+    buf: &mut MoveList,
 ) -> u64 {
     // Bulk leaf counting: at the last ply, variants whose legal-move set is the
     // core standard generator's set unchanged ([`Variant::BULK_COUNTABLE`]) tally
@@ -999,14 +1011,16 @@ fn perft_variant_with<V: Variant>(
     if depth == 1 && V::BULK_COUNTABLE {
         return position.core().count_legal();
     }
-    let (here, rest) = buffers.split_first_mut().expect("a buffer per ply");
-    position.generate_legal_into(here);
+    buf.clear();
+    position.generate_legal_into(buf);
     if depth == 1 {
-        return here.len() as u64;
+        return buf.len() as u64;
     }
+    // One child buffer on this frame's stack, reused for every child node.
+    let mut child = MoveList::new();
     let mut nodes = 0;
-    here.for_each(|mv| {
-        nodes += perft_variant_with(&position.play(&mv), depth - 1, rest);
+    buf.for_each(|mv| {
+        nodes += perft_variant_inner(&position.play(&mv), depth - 1, &mut child);
     });
     nodes
 }
