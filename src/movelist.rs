@@ -8,7 +8,10 @@
 //! variants. [`MoveList`] replaces that with an inline `[Move; N]` buffer plus a
 //! length cursor: pushes land in the array with no allocation until the rare
 //! case that a position produces more than `N` moves, at which point the buffer
-//! *spills* the overflow to a heap `Vec`. The spill keeps the type total and
+//! *spills* the overflow to a heap `Vec`. Because a [`Move`] is a packed `u16`
+//! (two bytes), the inline `[Move; 256]` buffer is 512 bytes — half the size it
+//! would be with a four-byte move — so the whole list lives in fewer cache lines
+//! and copies faster. The spill keeps the type total and
 //! safe for any position (notably crazyhouse, whose pocket drops can in
 //! adversarial placements exceed any fixed bound) while the common path stays
 //! allocation-free.
