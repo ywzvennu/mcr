@@ -749,6 +749,175 @@ impl Position {
         }
     }
 
+    /// Fills `out` with every *non-capturing* legal move for the side to move
+    /// under **atomic** king-safety, using the fast pin/check-mask path.
+    ///
+    /// A non-capturing atomic move triggers no explosion, so it has ordinary
+    /// chess legality with a single twist: the enemy king never gives check (a
+    /// king that captures detonates itself, so it can threaten nothing), and the
+    /// two kings may stand adjacent. This routine therefore reproduces the fast
+    /// standard generator but **excludes the enemy king** from both the checker
+    /// set and the king-danger set, and emits only quiet moves and castles
+    /// (captures are handled separately by the explosion-aware filter). The enemy
+    /// king is still part of the occupancy, so it continues to block slider rays.
+    ///
+    /// The emitted set is exactly the non-capturing moves `mv` for which
+    /// `attackers_to(my_king, them, occ_after) \ {enemy_king}` is empty after
+    /// `mv` — i.e. precisely the non-capturing moves that atomic's make-move
+    /// legality test accepts, so substituting this for that test on the
+    /// non-capturing moves leaves the legal-move set unchanged.
+    pub(crate) fn atomic_noncapture_legal_into(&self, out: &mut MoveList) {
+        let us = self.turn;
+        let them = us.opposite();
+        let board = &self.board;
+        let occupied = board.occupied();
+
+        let king_sq = match board.king_of(us) {
+            Some(sq) => sq,
+            None => return,
+        };
+
+        // The enemy king is not a real attacker in atomic (it cannot execute a
+        // capture without exploding itself), so exclude it from the checker and
+        // king-danger sets. It remains in `occupied` and so still blocks rays.
+        let enemy_king = board.king_of(them);
+
+        let mut checkers = self.attackers_to(king_sq, them, occupied);
+        if let Some(ek) = enemy_king {
+            checkers.clear(ek);
+        }
+        let num_checkers = checkers.count();
+
+        // Squares the king may not step onto: those attacked by a non-king enemy
+        // piece with our king removed from the occupancy (so it cannot shield
+        // itself). The enemy king's own attacks are deliberately omitted, so our
+        // king may walk adjacent to it.
+        let occ_without_king = occupied.without(king_sq);
+        let king_danger = self.attacked_by_nonking(them, occ_without_king);
+
+        // King moves: only to empty squares (captures detonate and are handled
+        // elsewhere) that are not in the non-king danger set.
+        let king_targets = king_attacks(king_sq) & !occupied & !king_danger;
+        out.emit_targets(king_sq, king_targets, Bitboard::EMPTY);
+
+        if num_checkers >= 2 {
+            // Double check from two non-king pieces: only king moves are legal.
+            return;
+        }
+
+        let check_mask = if num_checkers == 1 {
+            let checker = checkers.lsb().expect("one checker");
+            checkers | between(king_sq, checker)
+        } else {
+            Bitboard::FULL
+        };
+
+        let pins = self.compute_pins(king_sq, us, them, occupied);
+
+        // Pawn pushes only (no captures, no en passant — those detonate).
+        self.gen_pawn_pushes(out, us, occupied, check_mask, &pins);
+
+        // Knight and slider quiet moves: restrict targets to empty squares so no
+        // capture is ever emitted from this path.
+        let empty = !occupied;
+        for from in board.pieces(us, Role::Knight) {
+            let pin_line = pins.line_of(from);
+            let targets = knight_attacks(from) & empty & check_mask & pin_line;
+            out.emit_targets(from, targets, Bitboard::EMPTY);
+        }
+        for (role, diagonal, straight) in [
+            (Role::Bishop, true, false),
+            (Role::Rook, false, true),
+            (Role::Queen, true, true),
+        ] {
+            for from in board.pieces(us, role) {
+                let pin_line = pins.line_of(from);
+                let mut attacks = Bitboard::EMPTY;
+                if diagonal {
+                    attacks |= bishop_attacks(from, occupied);
+                }
+                if straight {
+                    attacks |= rook_attacks(from, occupied);
+                }
+                let targets = attacks & empty & check_mask & pin_line;
+                out.emit_targets(from, targets, Bitboard::EMPTY);
+            }
+        }
+
+        // Castling (a non-capturing king move) when not in check by a non-king
+        // piece, with the king-walk safety judged against the non-king danger.
+        if num_checkers == 0 {
+            self.gen_castles(out, us, occupied, king_danger, king_sq);
+        }
+    }
+
+    /// Emits the side-to-move's pawn single and double *advances* (no captures,
+    /// no en passant), subject to the check mask and pins — the non-capturing
+    /// pawn moves the atomic fast path needs.
+    fn gen_pawn_pushes(
+        &self,
+        out: &mut MoveList,
+        us: Color,
+        occupied: Bitboard,
+        check_mask: Bitboard,
+        pins: &Pins,
+    ) {
+        let board = &self.board;
+        let promo_rank = match us {
+            Color::White => Rank::Eighth,
+            Color::Black => Rank::First,
+        };
+        let start_rank = match us {
+            Color::White => Rank::Second,
+            Color::Black => Rank::Seventh,
+        };
+        let forward: i8 = if us.is_white() { 1 } else { -1 };
+
+        for from in board.pieces(us, Role::Pawn) {
+            let pin_line = pins.line_of(from);
+            if let Some(one) = from.offset(0, forward) {
+                if !occupied.contains(one) {
+                    self.push_pawn_advance(out, from, one, promo_rank, check_mask, pin_line);
+                    if from.rank() == start_rank {
+                        if let Some(two) = from.offset(0, 2 * forward) {
+                            if !occupied.contains(two)
+                                && check_mask.contains(two)
+                                && pin_line.contains(two)
+                            {
+                                out.emit(from, two, MoveKind::DoublePawnPush);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Like [`Position::attacked_by`] but excluding color `by`'s king attacks —
+    /// the danger set under atomic non-capture rules, where the enemy king
+    /// threatens nothing (it cannot capture without detonating itself).
+    fn attacked_by_nonking(&self, by: Color, occupied: Bitboard) -> Bitboard {
+        let b = &self.board;
+        let mut attacked = Bitboard::EMPTY;
+
+        for from in b.pieces(by, Role::Pawn) {
+            attacked |= pawn_attacks(by, from);
+        }
+        for from in b.pieces(by, Role::Knight) {
+            attacked |= knight_attacks(from);
+        }
+        for from in b.pieces(by, Role::Bishop) {
+            attacked |= bishop_attacks(from, occupied);
+        }
+        for from in b.pieces(by, Role::Rook) {
+            attacked |= rook_attacks(from, occupied);
+        }
+        for from in b.pieces(by, Role::Queen) {
+            attacked |= bishop_attacks(from, occupied) | rook_attacks(from, occupied);
+        }
+        attacked
+    }
+
     /// Returns the set of squares attacked by color `by` under `occupied`,
     /// using pawn-attack patterns for pawns (the squares a king of the other
     /// color may not move to).
