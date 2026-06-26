@@ -85,6 +85,8 @@ mod board;
 mod chess_move;
 mod color;
 mod file;
+#[cfg(feature = "magic")]
+mod magic;
 mod movelist;
 mod outcome;
 mod piece;
@@ -104,6 +106,8 @@ pub use crate::board::{Board, ParseBoardError};
 pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::file::File;
+#[cfg(feature = "magic")]
+pub use crate::magic::attack_table_len;
 pub use crate::movelist::MoveList;
 pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, IllegalMove, Outcome};
 pub use crate::piece::{Piece, Role};

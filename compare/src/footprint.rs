@@ -19,6 +19,11 @@ struct Table {
 /// mce's lookup tables (from `src/attacks.rs` and `src/zobrist.rs`).
 ///
 /// Sizes are derived from the array shapes; `Bitboard` is a `u64` (8 bytes).
+///
+/// The default build uses hyperbola-quintessence sliders (the `DIAG` /
+/// `ANTI_DIAG` masks below, ~73 KiB total). When this benchmark is built with
+/// `--features magic` the slider tables are replaced by a magic attack array
+/// reported separately in [`report`]; the rest of the tables are unchanged.
 const MCE_TABLES: &[Table] = &[
     // src/attacks.rs — move-generation attack/ray tables.
     Table {
@@ -104,17 +109,53 @@ fn total(tables: &[Table]) -> usize {
 pub fn report() {
     println!("static lookup-table footprint (computed from known table shapes):");
 
-    println!("  mce (hyperbola-quintessence sliders — no magic attack array):");
-    for t in MCE_TABLES {
-        println!("    {:<34} {:>9} B", t.name, t.bytes);
+    #[cfg(not(feature = "magic"))]
+    {
+        println!("  mce (hyperbola-quintessence sliders — no magic attack array):");
+        for t in MCE_TABLES {
+            println!("    {:<34} {:>9} B", t.name, t.bytes);
+        }
+        let mce_total = total(MCE_TABLES);
+        println!(
+            "    {:<34} {:>9} B  ({:.1} KiB)",
+            "TOTAL",
+            mce_total,
+            mce_total as f64 / 1024.0,
+        );
     }
-    let mce_total = total(MCE_TABLES);
-    println!(
-        "    {:<34} {:>9} B  ({:.1} KiB)",
-        "TOTAL",
-        mce_total,
-        mce_total as f64 / 1024.0,
-    );
+
+    #[cfg(feature = "magic")]
+    {
+        // The hyperbola slider masks (DIAG / ANTI_DIAG) are gone under `magic`;
+        // in their place is the runtime-built magic attack array, whose exact
+        // length the library reports via `attack_table_len()`.
+        let magic_bytes = mce::attack_table_len() * 8;
+        // Non-slider tables shared with the default build (everything except the
+        // two slider masks, which are not compiled under `magic`).
+        let shared: usize = MCE_TABLES
+            .iter()
+            .filter(|t| !t.name.starts_with("DIAG") && !t.name.starts_with("ANTI_DIAG"))
+            .map(|t| t.bytes)
+            .sum();
+        println!("  mce (magic-bitboard sliders — fancy magics, per-square exact sizing):");
+        println!(
+            "    {:<34} {:>9} B  ({:.1} KiB)",
+            "magic ATTACKS [u64; runtime]",
+            magic_bytes,
+            magic_bytes as f64 / 1024.0,
+        );
+        println!(
+            "    {:<34} {:>9} B  (steppers + BETWEEN/LINE + Zobrist, slider masks dropped)",
+            "other static tables", shared,
+        );
+        let mce_total = magic_bytes + shared;
+        println!(
+            "    {:<34} {:>9} B  ({:.1} KiB)",
+            "TOTAL",
+            mce_total,
+            mce_total as f64 / 1024.0,
+        );
+    }
 
     println!("  shakmaty 0.27 (fixed-shift magic bitboards):");
     for t in SHAKMATY_TABLES {
