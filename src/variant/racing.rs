@@ -11,8 +11,12 @@
 //! Both sides share one over-riding restriction: **no move may leave either king
 //! in check.** A side may not move into check (standard) *and* may not give
 //! check to the opponent either. This is the only king-safety departure from
-//! standard chess, so the variant turns off the fast-legality sentinel and
-//! filters pseudo-legal moves through [`Variant::is_legal_after`] (H2).
+//! standard chess. The "own king not left in check" half is exactly standard king
+//! safety, so [`RacingKingsRules::legal_into`] (H2) runs the fast core pin/check
+//! generator for it and then drops the moves that *give check* to the opponent
+//! using a cheap attack-table test ([`gives_check`]) — no per-move make-move. The
+//! equivalent make-move predicate [`Variant::is_legal_after`] is retained as the
+//! reference semantics.
 //!
 //! # Winning, and the both-reach draw
 //!
@@ -48,10 +52,11 @@
 //! case as [`EndReason::RaceDraw`] (an automatic draw).
 
 use super::{Variant, VariantId};
+use crate::attacks::{bishop_attacks, knight_attacks, rook_attacks};
 use crate::board::Board;
 use crate::movelist::MoveList;
 use crate::position::CastlingRights;
-use crate::{Color, EndReason, Move, Position, Rank, Role, Square};
+use crate::{Bitboard, Color, EndReason, Move, Position, Rank, Role, Square};
 
 /// The rank a king must reach to finish the race.
 const GOAL_RANK: Rank = Rank::Eighth;
@@ -65,14 +70,51 @@ impl Variant for RacingKingsRules {
     type State = ();
     const ID: VariantId = VariantId::RacingKings;
 
-    /// King safety differs from standard chess (neither king may be checked), so
-    /// the fast core generator cannot be used; generation runs the pseudo-legal +
-    /// [`Variant::is_legal_after`] make-move filter instead.
+    /// King safety differs from standard chess (neither king may be checked).
+    /// The "own king not left in check" half is exactly standard king safety, so
+    /// the fast core pin/check-mask generator handles it; the extra "must not give
+    /// check to the opponent" half is applied on top in [`legal_into`] via a cheap
+    /// attack-table gives-check test, with no per-move make-move. The sentinel
+    /// stays `false` so the generic dispatch routes through that override (and the
+    /// retained [`Variant::is_legal_after`]) rather than the bulk fast path.
+    ///
+    /// [`legal_into`]: RacingKingsRules::legal_into
     const USES_FAST_LEGALITY: bool = false;
+
+    /// Generate the legal moves with the fast core generator (which already drops
+    /// any move that would leave the mover's own king in check, exactly standard
+    /// king safety), then remove the moves that **give check** to the opponent —
+    /// the one extra Racing Kings restriction. The gives-check test uses attack
+    /// tables over the post-move occupancy ([`gives_check`]) instead of a full
+    /// make-move per candidate.
+    ///
+    /// This produces an identical move set to the original pseudo-legal +
+    /// make-move filter: the fast generator's set is precisely the moves that keep
+    /// the mover's king safe, and [`gives_check`] removes exactly those among them
+    /// that attack the enemy king afterwards — i.e. the moves the old
+    /// [`Variant::is_legal_after`] (`!either_king_in_check(child)`) rejected for the
+    /// opponent-check reason. Racing Kings has no pawns, castling, en passant, or
+    /// promotion, so every move is a single piece stepping from one square to
+    /// another, which keeps the post-move occupancy a plain `from`→`to` edit.
+    ///
+    /// [`gives_check`]: gives_check
+    fn legal_into(core: &Position, out: &mut MoveList) {
+        // Standard king safety (own king not left in check), fast path. There is
+        // no castling in Racing Kings, so the no-castles fast generator is exact.
+        core.generate_no_castles_into(out);
+        // Drop the moves that would give check to the opponent.
+        out.retain(|mv| !gives_check(core, mv));
+    }
 
     /// H2: a move is legal iff, in the resulting position, **neither** king is in
     /// check — the mover is not left in check (standard) *and* the opponent is not
     /// put in check (the Racing Kings restriction).
+    ///
+    /// Retained for documentation and as the reference semantics; legal-move
+    /// generation now goes through the faster [`RacingKingsRules::legal_into`]
+    /// override, which never calls this hook. It still matches that override move
+    /// for move: the override's fast generator enforces the mover-king half and
+    /// [`gives_check`] enforces the opponent half.
     fn is_legal_after(_parent: &Position, _mv: &Move, child: &Position) -> bool {
         !either_king_in_check(child)
     }
@@ -201,6 +243,82 @@ fn king_on_goal(core: &Position, color: Color) -> bool {
         .is_some_and(|sq| sq.rank() >= GOAL_RANK)
 }
 
+/// Whether playing `mv` in `core` would leave the opponent's king attacked, i.e.
+/// **give check** — the move the Racing Kings rule additionally forbids.
+///
+/// This is computed with attack tables over the post-move occupancy rather than a
+/// full make-move. The mover is `core.turn()`; let `from`/`to` be the moved
+/// piece's squares and `king` the opponent king's square. Post-move occupancy is
+/// the current occupancy with `from` cleared and `to` filled (`occ'`). Two
+/// disjoint ways the move can attack `king`:
+///
+/// - **Direct check:** the moved piece, *from its destination `to`*, attacks
+///   `king` under `occ'`. Sliders are evaluated through `occ'` so an intervening
+///   piece blocks; steppers (knight, king) ignore occupancy. A king cannot itself
+///   give a direct check (a king never attacks the enemy king, since the kings can
+///   never be adjacent legally), so its destination attack set is not consulted —
+///   but a king move can still expose a discovered check, handled below.
+/// - **Discovered check:** vacating `from` opens a line from one of the mover's
+///   own sliders (queen, rook, bishop) onto `king`. This can only happen when
+///   `from` lay on the ray between that slider and `king`; we look for a mover
+///   slider that attacks `king` through `occ'` from a square other than `to`
+///   (the moved piece's own direct attack is the case above, not a discovery).
+///
+/// Racing Kings has no pawns / promotions / en passant / castling, so `mv` is
+/// always a single piece moving `from`→`to`, the post-move occupancy is exactly
+/// the `from`→`to` edit, and the moved piece keeps its role on `to`.
+fn gives_check(core: &Position, mv: &Move) -> bool {
+    let board = core.board();
+    let mover = core.turn();
+    let Some(king) = board.king_of(mover.opposite()) else {
+        // No enemy king to check (only reachable from non-standard FENs).
+        return false;
+    };
+
+    let from = mv.from();
+    let to = mv.to();
+    // Post-move occupancy: the moved piece leaves `from` and lands on `to`. A
+    // capture already had a piece on `to`, so `.with(to)` is idempotent there.
+    let occ = board.occupied().without(from).with(to);
+
+    // Direct check: the moved piece, from `to`, attacks the enemy king. The role
+    // is whatever stood on `from` (no promotions in Racing Kings). The king is
+    // skipped — it can never directly attack the enemy king.
+    let role = board.role_at(from).expect("a piece moves from `from`");
+    let direct = match role {
+        Role::Knight => knight_attacks(to).contains(king),
+        Role::Bishop => bishop_attacks(to, occ).contains(king),
+        Role::Rook => rook_attacks(to, occ).contains(king),
+        Role::Queen => (bishop_attacks(to, occ) | rook_attacks(to, occ)).contains(king),
+        // A pawn never exists in Racing Kings; a king cannot check a king.
+        Role::Pawn | Role::King => false,
+    };
+    if direct {
+        return true;
+    }
+
+    // Discovered check: a mover slider (other than the piece now on `to`) attacks
+    // the enemy king through the post-move occupancy. `attackers_to` reads piece
+    // bitboards from `board`, which still shows the moved piece on `from`; that is
+    // fine here because we exclude any attacker on `from`/`to` — the moved piece
+    // is the direct case, never a discovery — and every *other* slider sits on its
+    // true square in both `board` and the post-move position. Knights/kings/pawns
+    // cannot be unblocked into a new attack, so only sliders matter.
+    let sliders = (board.pieces(mover, Role::Bishop)
+        | board.pieces(mover, Role::Rook)
+        | board.pieces(mover, Role::Queen))
+        & !Bitboard::from_square(from)
+        & !Bitboard::from_square(to);
+    let bishops = board.pieces(mover, Role::Bishop) | board.pieces(mover, Role::Queen);
+    let rooks = board.pieces(mover, Role::Rook) | board.pieces(mover, Role::Queen);
+    let diag_attackers = bishop_attacks(king, occ) & bishops & sliders;
+    if !diag_attackers.is_empty() {
+        return true;
+    }
+    let line_attackers = rook_attacks(king, occ) & rooks & sliders;
+    !line_attackers.is_empty()
+}
+
 /// Whether either king is currently in check in `pos` — the Racing Kings legality
 /// predicate. A king is "in check" if it is attacked by the opposing side.
 fn either_king_in_check(pos: &Position) -> bool {
@@ -268,9 +386,10 @@ fn race_over(core: &Position) -> bool {
 
 /// Racing Kings as a [`VariantPosition`](super::VariantPosition).
 ///
-/// Movegen runs the slow pseudo-legal + make-move filter (king safety differs:
-/// neither king may be checked), there is no castling, and the race-to-rank-8 win
-/// — including the both-reach draw — is reported through
+/// Movegen runs the fast core pin/check-mask generator and then drops the moves
+/// that give check to the opponent (king safety differs: neither king may be
+/// checked), there is no castling, and the race-to-rank-8 win — including the
+/// both-reach draw — is reported through
 /// [`VariantPosition::outcome`](super::VariantPosition::outcome).
 pub type RacingKings = super::VariantPosition<RacingKingsRules>;
 
