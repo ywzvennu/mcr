@@ -35,19 +35,79 @@ use crate::{Bitboard, Board, Color, File, Move, MoveKind, Piece, Rank, Role, Squ
 
 /// Castling rights: which rooks each side may still castle with.
 ///
-/// Each entry is the [`File`] of the rook involved, or `None` if that castling
-/// is no longer available. In standard chess the king-side rook is on the
-/// h-file and the queen-side rook on the a-file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+/// Each of the four rights is the [`File`] of the rook involved, or `None` if
+/// that castling is no longer available. In standard chess the king-side rook
+/// is on the h-file and the queen-side rook on the a-file; storing the file
+/// rather than a bare boolean leaves room for arbitrary Chess960 rook files.
+///
+/// The four `Option<File>` are packed into a single `u16`, one 4-bit nibble per
+/// right: `0` means the right is absent, `1..=8` encode files `A..=H` (the file
+/// index plus one). This is a lossless re-encoding of the previous four
+/// `Option<File>` bytes — every file and the absent state still round-trips —
+/// but it costs 2 bytes instead of 4, shrinking [`Position`] by exposing more
+/// of its loose state to padding reuse. The public API is unchanged: every
+/// accessor still speaks in `Option<File>`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CastlingRights {
-    /// White king-side rook file, if white may still castle king-side.
-    white_king: Option<File>,
-    /// White queen-side rook file, if white may still castle queen-side.
-    white_queen: Option<File>,
-    /// Black king-side rook file, if black may still castle king-side.
-    black_king: Option<File>,
-    /// Black queen-side rook file, if black may still castle queen-side.
-    black_queen: Option<File>,
+    /// Four 4-bit nibbles, low to high: white-king, white-queen, black-king,
+    /// black-queen. Each nibble is `0` (no right) or `file as u16 + 1`.
+    bits: u16,
+}
+
+impl fmt::Debug for CastlingRights {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CastlingRights")
+            .field(
+                "white_king",
+                &self.rook_file(Color::White, CastleSide::King),
+            )
+            .field(
+                "white_queen",
+                &self.rook_file(Color::White, CastleSide::Queen),
+            )
+            .field(
+                "black_king",
+                &self.rook_file(Color::Black, CastleSide::King),
+            )
+            .field(
+                "black_queen",
+                &self.rook_file(Color::Black, CastleSide::Queen),
+            )
+            .finish()
+    }
+}
+
+/// The nibble shift for a given color/side in [`CastlingRights::bits`].
+#[inline]
+const fn castling_shift(color: Color, side: CastleSide) -> u32 {
+    let idx = match (color, side) {
+        (Color::White, CastleSide::King) => 0,
+        (Color::White, CastleSide::Queen) => 1,
+        (Color::Black, CastleSide::King) => 2,
+        (Color::Black, CastleSide::Queen) => 3,
+    };
+    idx * 4
+}
+
+/// Encodes an optional rook file into its 4-bit nibble value (`0` for absent,
+/// `file as u16 + 1` otherwise).
+#[inline]
+const fn encode_castle_nibble(file: Option<File>) -> u16 {
+    match file {
+        None => 0,
+        Some(f) => f as u16 + 1,
+    }
+}
+
+/// Decodes a 4-bit nibble value back into an optional rook file.
+#[inline]
+const fn decode_castle_nibble(nibble: u16) -> Option<File> {
+    match nibble {
+        // 1..=8 -> File::A..=File::H. `0` (no right) and any other value (never
+        // produced by the constructors) map to `None`.
+        n @ 1..=8 => Some(File::ALL[(n - 1) as usize]),
+        _ => None,
+    }
 }
 
 /// The two sides a castling move can be toward.
@@ -61,21 +121,12 @@ pub enum CastleSide {
 
 impl CastlingRights {
     /// No castling rights for either side.
-    pub const NONE: CastlingRights = CastlingRights {
-        white_king: None,
-        white_queen: None,
-        black_king: None,
-        black_queen: None,
-    };
+    pub const NONE: CastlingRights = CastlingRights { bits: 0 };
 
     /// The standard starting rights: both sides may castle both ways, with rooks
     /// on the a- and h-files.
-    pub const STANDARD: CastlingRights = CastlingRights {
-        white_king: Some(File::H),
-        white_queen: Some(File::A),
-        black_king: Some(File::H),
-        black_queen: Some(File::A),
-    };
+    pub const STANDARD: CastlingRights =
+        CastlingRights::from_rook_files(Some(File::H), Some(File::A), Some(File::H), Some(File::A));
 
     /// Builds castling rights directly from each side's rook file (or `None`),
     /// for variants whose castling rooks are not on the a-/h-files (Chess960).
@@ -87,12 +138,11 @@ impl CastlingRights {
         black_king: Option<File>,
         black_queen: Option<File>,
     ) -> CastlingRights {
-        CastlingRights {
-            white_king,
-            white_queen,
-            black_king,
-            black_queen,
-        }
+        let bits = encode_castle_nibble(white_king)
+            | (encode_castle_nibble(white_queen) << 4)
+            | (encode_castle_nibble(black_king) << 8)
+            | (encode_castle_nibble(black_queen) << 12);
+        CastlingRights { bits }
     }
 
     /// Returns the rook file for `color` castling toward `side`, if that right is
@@ -100,12 +150,8 @@ impl CastlingRights {
     #[must_use]
     #[inline]
     pub const fn rook_file(self, color: Color, side: CastleSide) -> Option<File> {
-        match (color, side) {
-            (Color::White, CastleSide::King) => self.white_king,
-            (Color::White, CastleSide::Queen) => self.white_queen,
-            (Color::Black, CastleSide::King) => self.black_king,
-            (Color::Black, CastleSide::Queen) => self.black_queen,
-        }
+        let nibble = (self.bits >> castling_shift(color, side)) & 0xF;
+        decode_castle_nibble(nibble)
     }
 
     /// Returns `true` if `color` may still castle toward `side`.
@@ -118,12 +164,8 @@ impl CastlingRights {
     /// Sets or clears the rook file for `color`/`side`.
     #[inline]
     fn set(&mut self, color: Color, side: CastleSide, file: Option<File>) {
-        match (color, side) {
-            (Color::White, CastleSide::King) => self.white_king = file,
-            (Color::White, CastleSide::Queen) => self.white_queen = file,
-            (Color::Black, CastleSide::King) => self.black_king = file,
-            (Color::Black, CastleSide::Queen) => self.black_queen = file,
-        }
+        let shift = castling_shift(color, side);
+        self.bits = (self.bits & !(0xF << shift)) | (encode_castle_nibble(file) << shift);
     }
 
     /// Removes both of `color`'s castling rights (used when its king moves).
@@ -147,9 +189,12 @@ impl CastlingRights {
     #[must_use]
     #[inline]
     pub(crate) const fn has_any(self, color: Color) -> bool {
+        // Each color occupies one byte of `bits` (two nibbles): white in the low
+        // byte, black in the high byte. A non-zero byte means at least one of
+        // that color's rook files is set.
         match color {
-            Color::White => self.white_king.is_some() || self.white_queen.is_some(),
-            Color::Black => self.black_king.is_some() || self.black_queen.is_some(),
+            Color::White => self.bits & 0x00FF != 0,
+            Color::Black => self.bits & 0xFF00 != 0,
         }
     }
 }
@@ -296,15 +341,23 @@ impl MoveSink for CountSink {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     board: Board,
-    turn: Color,
+    /// The incrementally maintained Zobrist key (see [`crate::zobrist`]).
+    hash: u64,
+    /// Packed castling rights (2 bytes; see [`CastlingRights`]).
     castling: CastlingRights,
     /// The square a pawn could move *to* in an en-passant capture, set the move
     /// after a double pawn push.
     ep_square: Option<Square>,
-    halfmove_clock: u32,
-    fullmove_number: u32,
-    /// The incrementally maintained Zobrist key (see [`crate::zobrist`]).
-    hash: u64,
+    /// The fullmove number, starting at 1. Stored as `u16`: realistic games stay
+    /// well under 1000 and the field saturates at [`u16::MAX`] on FEN parse, so
+    /// it never wraps. Widened to `u32` by [`Position::fullmove_number`].
+    fullmove_number: u16,
+    /// The halfmove clock (plies since the last capture or pawn move). Stored as
+    /// `u8`: the draw rules cap interest at 150 (< 255) and the field saturates
+    /// at [`u8::MAX`] rather than wrapping, so the 50-/75-move comparisons are
+    /// unaffected. Widened to `u32` by [`Position::halfmove_clock`].
+    halfmove_clock: u8,
+    turn: Color,
 }
 
 impl Default for Position {
@@ -378,17 +431,25 @@ impl Position {
 
     /// The halfmove clock (plies since the last capture or pawn move), used for
     /// the fifty-move rule.
+    ///
+    /// Stored internally as a `u8` (the draw rules never look past 150) and
+    /// widened here, so the public type is unchanged. A pathological FEN with a
+    /// larger clock is saturated to 255 on parse, which leaves every 50-/75-move
+    /// comparison identical.
     #[must_use]
     #[inline]
     pub const fn halfmove_clock(&self) -> u32 {
-        self.halfmove_clock
+        self.halfmove_clock as u32
     }
 
     /// The fullmove number, starting at 1 and incremented after each black move.
+    ///
+    /// Stored internally as a `u16` (saturating at 65535 on parse) and widened
+    /// here, so the public type is unchanged.
     #[must_use]
     #[inline]
     pub const fn fullmove_number(&self) -> u32 {
-        self.fullmove_number
+        self.fullmove_number as u32
     }
 
     // -- Attack queries ----------------------------------------------------
@@ -1618,9 +1679,11 @@ impl Position {
 
         self.hash_set(to, Piece::new(us, role));
 
-        self.halfmove_clock += 1;
+        // Saturating so the narrowed clocks never wrap; the draw rules only look
+        // at small halfmove values and games never approach the fullmove cap.
+        self.halfmove_clock = self.halfmove_clock.saturating_add(1);
         if us.is_black() {
-            self.fullmove_number += 1;
+            self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.turn = them;
         self.hash ^= crate::zobrist::side_key(us);
@@ -1767,10 +1830,13 @@ impl Position {
         if reset_clock {
             self.halfmove_clock = 0;
         } else {
-            self.halfmove_clock += 1;
+            // Saturating so the narrowed `u8` clock never wraps; the 50-/75-move
+            // comparisons only care about values up to 150 (< 255).
+            self.halfmove_clock = self.halfmove_clock.saturating_add(1);
         }
         if us.is_black() {
-            self.fullmove_number += 1;
+            // Saturating `u16`; realistic games stay far below the cap.
+            self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.turn = them;
 
@@ -1918,16 +1984,14 @@ impl Position {
             return Err(FenError::TrailingData);
         }
 
-        let mut position = Position {
+        let position = Position::from_fields(
             board,
             turn,
             castling,
             ep_square,
             halfmove_clock,
             fullmove_number,
-            hash: 0,
-        };
-        position.hash = position.compute_zobrist();
+        );
         position.validate()?;
         Ok(position)
     }
@@ -1940,6 +2004,13 @@ impl Position {
     /// ([`parse_castling_field`], [`parse_ep_field`], [`parse_clock`]) and then
     /// build the core through this constructor, applying their own validation via
     /// [`Position::validate_core`].
+    ///
+    /// The two move clocks are accepted as `u32` (the natural FEN-parse type) but
+    /// stored narrowed: `halfmove_clock` saturates into a `u8` and
+    /// `fullmove_number` into a `u16`. Saturation is semantically harmless — the
+    /// halfmove clock only matters up to the 75-move limit (150 < 255) and a
+    /// fullmove number never approaches 65535 in a real game — and lets a clone
+    /// of [`Position`] copy fewer bytes.
     #[must_use]
     pub(crate) fn from_fields(
         board: Board,
@@ -1954,8 +2025,8 @@ impl Position {
             turn,
             castling,
             ep_square,
-            halfmove_clock,
-            fullmove_number,
+            halfmove_clock: halfmove_clock.min(u32::from(u8::MAX)) as u8,
+            fullmove_number: fullmove_number.min(u32::from(u16::MAX)) as u16,
             hash: 0,
         };
         position.hash = position.compute_zobrist();
@@ -2014,9 +2085,9 @@ impl Position {
             None => out.push('-'),
         }
         out.push(' ');
-        write_u32(self.halfmove_clock, out);
+        write_u32(u32::from(self.halfmove_clock), out);
         out.push(' ');
-        write_u32(self.fullmove_number, out);
+        write_u32(u32::from(self.fullmove_number), out);
     }
 
     /// Serializes the six standard FEN fields into `out` with both a
@@ -2040,9 +2111,9 @@ impl Position {
             None => out.push('-'),
         }
         out.push(' ');
-        write_u32(self.halfmove_clock, out);
+        write_u32(u32::from(self.halfmove_clock), out);
         out.push(' ');
-        write_u32(self.fullmove_number, out);
+        write_u32(u32::from(self.fullmove_number), out);
     }
 
     /// Basic sanity checks: each side has exactly one king, and the side *not*
@@ -2360,6 +2431,96 @@ mod tests {
     const POS4: &str = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
     const POS5: &str = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
     const POS6: &str = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+
+    #[test]
+    fn position_is_compact() {
+        // The Position layout is Board (64) + hash (8) + a tightly packed loose
+        // state that fits in the 8-byte alignment slot the u64 hash forces, for
+        // a total of 80 bytes. A regression here means the loose state grew past
+        // that slot and every clone copies more — the cost this issue removes.
+        assert_eq!(
+            core::mem::size_of::<Position>(),
+            80,
+            "Position size regressed: loose state no longer fits the hash's 8-byte slot"
+        );
+        // Packed castling rights are two bytes (four 4-bit nibbles), not four.
+        assert_eq!(core::mem::size_of::<CastlingRights>(), 2);
+    }
+
+    #[test]
+    fn castling_rights_round_trip_every_file() {
+        // Every Option<File> (including the arbitrary Chess960 rook files) must
+        // survive the packed nibble encoding unchanged, for each color/side.
+        for color in Color::ALL {
+            for side in [CastleSide::King, CastleSide::Queen] {
+                let mut rights = CastlingRights::NONE;
+                rights.set(color, side, None);
+                assert_eq!(rights.rook_file(color, side), None);
+                for file in File::ALL {
+                    rights.set(color, side, Some(file));
+                    assert_eq!(rights.rook_file(color, side), Some(file));
+                    // Setting one slot must not disturb the others.
+                    for other_color in Color::ALL {
+                        for other_side in [CastleSide::King, CastleSide::Queen] {
+                            if (other_color, other_side) == (color, side) {
+                                continue;
+                            }
+                            assert_eq!(rights.rook_file(other_color, other_side), None);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn castling_rights_standard_files() {
+        let r = CastlingRights::STANDARD;
+        assert_eq!(r.rook_file(Color::White, CastleSide::King), Some(File::H));
+        assert_eq!(r.rook_file(Color::White, CastleSide::Queen), Some(File::A));
+        assert_eq!(r.rook_file(Color::Black, CastleSide::King), Some(File::H));
+        assert_eq!(r.rook_file(Color::Black, CastleSide::Queen), Some(File::A));
+        assert!(r.has_any(Color::White) && r.has_any(Color::Black));
+        assert!(!CastlingRights::NONE.has_any(Color::White));
+        assert!(!CastlingRights::NONE.has_any(Color::Black));
+    }
+
+    #[test]
+    fn halfmove_clock_saturates_on_parse() {
+        // A pathological halfmove clock larger than the u8 store saturates to 255
+        // rather than wrapping; this never changes a draw-rule decision because
+        // the rules only test values up to 150.
+        let pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 9999 1").unwrap();
+        assert_eq!(pos.halfmove_clock(), 255);
+        // A normal in-range clock round-trips exactly.
+        let pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 137 1").unwrap();
+        assert_eq!(pos.halfmove_clock(), 137);
+    }
+
+    #[test]
+    fn fullmove_number_saturates_on_parse() {
+        let pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 70000").unwrap();
+        assert_eq!(pos.fullmove_number(), 65535);
+        let pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 4321").unwrap();
+        assert_eq!(pos.fullmove_number(), 4321);
+        assert_eq!(pos.to_fen(), "4k3/8/8/8/8/8/8/4K3 w - - 0 4321");
+    }
+
+    #[test]
+    fn halfmove_clock_saturating_increment_does_not_wrap() {
+        // Drive the clock to its u8 ceiling via repeated quiet moves; it must
+        // pin at 255 instead of panicking or wrapping to 0.
+        let mut pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 250 1").unwrap();
+        for _ in 0..20 {
+            let mv = pos
+                .legal_moves()
+                .into_iter()
+                .find(|m| m.kind() == MoveKind::Quiet)
+                .expect("a quiet king move exists");
+            pos.play_unchecked(&mv);
+        }
+        assert_eq!(pos.halfmove_clock(), 255);
+    }
 
     #[test]
     fn startpos_fen_round_trip() {
