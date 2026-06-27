@@ -31,6 +31,13 @@
 //! * **`kind`** (bits 21..26): the [`WideMoveKind`] tag. Five bits leave ample
 //!   room for the future fairy kinds (gating, duck-placement, palace moves)
 //!   beyond the codes used today.
+//! * **`gate`** (bits 26..29): the Seirawan gating addendum. Bits 26..28 carry a
+//!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 28
+//!   selects, for a castling base move, whether the reserve gates onto the
+//!   **rook's** vacated square (`1`) rather than the king's (`0`). For a
+//!   non-castling base move the gated square is always the move's origin, so
+//!   bit 28 is `0`. These bits are `0` for every non-gating move, so a variant
+//!   without gating produces byte-identical words to before this field existed.
 
 use alloc::string::String;
 use core::fmt;
@@ -139,10 +146,72 @@ const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
 const ROLE_SHIFT: u32 = 16;
 const KIND_SHIFT: u32 = 21;
+const GATE_ROLE_SHIFT: u32 = 26;
+const GATE_ON_ROOK_SHIFT: u32 = 28;
 
 const SQ_MASK: u32 = 0xff;
 const ROLE_MASK: u32 = 0x1f;
 const KIND_MASK: u32 = 0x1f;
+const GATE_ROLE_MASK: u32 = 0x3;
+
+// Gated-reserve codes occupying bits 26..28. `0` means no gate.
+const GATE_NONE: u32 = 0;
+const GATE_HAWK: u32 = 1;
+const GATE_ELEPHANT: u32 = 2;
+
+/// The Seirawan reserve piece a [`WideMove`] gates in as the second half of a
+/// back-rank piece's first move: a Hawk (Bishop + Knight) or an Elephant
+/// (Rook + Knight). See [`WideMove::with_gate`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GateRole {
+    /// Gate the Hawk ([`WideRole::Hawk`]).
+    Hawk,
+    /// Gate the Elephant ([`WideRole::Elephant`]).
+    Elephant,
+}
+
+impl GateRole {
+    /// The [`WideRole`] this reserve places on the board.
+    #[must_use]
+    #[inline]
+    pub const fn role(self) -> WideRole {
+        match self {
+            GateRole::Hawk => WideRole::Hawk,
+            GateRole::Elephant => WideRole::Elephant,
+        }
+    }
+
+    /// Builds a [`GateRole`] from a placed [`WideRole`], or `None` if the role is
+    /// neither reserve piece.
+    #[must_use]
+    #[inline]
+    pub const fn from_role(role: WideRole) -> Option<GateRole> {
+        match role {
+            WideRole::Hawk => Some(GateRole::Hawk),
+            WideRole::Elephant => Some(GateRole::Elephant),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    const fn code(self) -> u32 {
+        match self {
+            GateRole::Hawk => GATE_HAWK,
+            GateRole::Elephant => GATE_ELEPHANT,
+        }
+    }
+}
+
+/// Where a gating move places its reserve piece: on the moved piece's origin
+/// square, or — for a castling base move — on the castling rook's vacated
+/// square. A non-castling gate always targets the origin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GateSquare {
+    /// Gate onto the square the moving piece (or king) vacated — its origin.
+    Origin,
+    /// Gate onto the square the castling rook vacated (castling moves only).
+    RookOrigin,
+}
 
 /// A wide chess move over the generic large-board layer: an 8-bit `from`, an
 /// 8-bit `to` (covering `0..128`), and a [`WideMoveKind`] carrying a
@@ -345,6 +414,60 @@ impl WideMove {
         }
     }
 
+    /// Returns a copy of this move that, in addition to its base effect, gates a
+    /// Seirawan reserve piece (`gate`) onto the square selected by `square`.
+    ///
+    /// The base move's kind, origin, destination, and any promotion role are
+    /// preserved; only the gating addendum is added. For a non-castling base move
+    /// `square` must be [`GateSquare::Origin`] (the gate lands on the vacated
+    /// origin); [`GateSquare::RookOrigin`] is meaningful only for a castling base
+    /// move, where it places the reserve on the castling rook's start square
+    /// instead of the king's.
+    #[must_use]
+    #[inline]
+    pub const fn with_gate(self, gate: GateRole, square: GateSquare) -> WideMove {
+        let on_rook = match square {
+            GateSquare::Origin => 0,
+            GateSquare::RookOrigin => 1,
+        };
+        WideMove(
+            (self.0 & !((GATE_ROLE_MASK << GATE_ROLE_SHIFT) | (1 << GATE_ON_ROOK_SHIFT)))
+                | (gate.code() << GATE_ROLE_SHIFT)
+                | (on_rook << GATE_ON_ROOK_SHIFT),
+        )
+    }
+
+    /// Returns the gated reserve piece if this move gates one, otherwise `None`.
+    #[must_use]
+    #[inline]
+    pub fn gate(self) -> Option<GateRole> {
+        match (self.0 >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK {
+            GATE_HAWK => Some(GateRole::Hawk),
+            GATE_ELEPHANT => Some(GateRole::Elephant),
+            _ => None,
+        }
+    }
+
+    /// Returns which vacated square this move gates onto: the origin, or — for a
+    /// castling base move — the rook's start square. Returns
+    /// [`GateSquare::Origin`] for a move with no gate.
+    #[must_use]
+    #[inline]
+    pub const fn gate_square(self) -> GateSquare {
+        if (self.0 >> GATE_ON_ROOK_SHIFT) & 1 == 1 {
+            GateSquare::RookOrigin
+        } else {
+            GateSquare::Origin
+        }
+    }
+
+    /// Returns `true` if this move gates a Seirawan reserve piece.
+    #[must_use]
+    #[inline]
+    pub const fn is_gating(self) -> bool {
+        (self.0 >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK != GATE_NONE
+    }
+
     /// Renders a square index as a UCI-ish coordinate for a board of geometry
     /// `G`: the file as a letter (`a`, `b`, ...) and the rank as a 1-based
     /// number.
@@ -397,6 +520,18 @@ impl WideMove {
         Self::render_square::<G>(&mut s, self.to_index());
         if let Some(role) = self.promotion() {
             s.push(role.char());
+        }
+        // A Seirawan gate is rendered FSF-style as `/<PIECE>` appended to the base
+        // move (e.g. `b1c3/H`); a gate onto the castling rook's square instead of
+        // the king's origin appends the rook square (e.g. `e1g1/H@h1`).
+        if let Some(gate) = self.gate() {
+            s.push('/');
+            s.push(gate.role().upper_char());
+            if matches!(self.gate_square(), GateSquare::RookOrigin) {
+                // Distinguish a castling gate onto the rook's vacated square.
+                s.push('@');
+                s.push('r');
+            }
         }
         s
     }

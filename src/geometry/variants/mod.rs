@@ -10,6 +10,8 @@
 
 pub mod capablanca;
 pub mod makruk;
+pub mod seirawan;
 
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use makruk::{Makruk, MakrukRules};
+pub use seirawan::{Seirawan, SeirawanRules};

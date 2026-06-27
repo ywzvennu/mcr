@@ -26,6 +26,7 @@ mod capablanca;
 mod corpus;
 mod locate;
 mod makruk;
+mod seirawan;
 mod uci;
 mod variants;
 
@@ -155,15 +156,16 @@ fn main() {
     println!();
     print_summary(&rows, mismatches, skipped);
 
-    // Makruk and Capablanca ride the generic engine (not the `AnyVariant` corpus
-    // above), so each has its own comparison loop. Fold their mismatches into the
-    // exit status.
+    // Makruk, Capablanca, and Seirawan ride the generic engine (not the
+    // `AnyVariant` corpus above), so each has its own comparison loop. Fold their
+    // mismatches into the exit status.
     let makruk_mismatches = makruk::run(&mut engine, opts.full);
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
+    let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
 
     engine.quit();
 
-    if mismatches + makruk_mismatches + capablanca_mismatches > 0 {
+    if mismatches + makruk_mismatches + capablanca_mismatches + seirawan_mismatches > 0 {
         std::process::exit(1);
     }
 }
