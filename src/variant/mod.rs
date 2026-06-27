@@ -726,13 +726,11 @@ impl<V: Variant + Default> VariantPosition<V> {
     pub fn startpos() -> Self {
         let (board, castling, state) = V::starting_board();
         let core = Position::from_fields(board, Color::White, castling, None, 0, 1);
-        let mut pos = VariantPosition {
+        VariantPosition {
             core,
             state,
             variant: V::default(),
-        };
-        pos.fold_state_hash();
-        pos
+        }
     }
 }
 
@@ -740,13 +738,11 @@ impl<V: Variant> VariantPosition<V> {
     /// Wraps an existing core [`Position`] and `state` under variant `V`.
     #[must_use]
     pub fn from_parts(core: Position, state: V::State, variant: V) -> Self {
-        let mut pos = VariantPosition {
+        VariantPosition {
             core,
             state,
             variant,
-        };
-        pos.fold_state_hash();
-        pos
+        }
     }
 
     /// The standard-chess core of this position.
@@ -775,14 +771,6 @@ impl<V: Variant> VariantPosition<V> {
     #[inline]
     pub const fn variant_id(&self) -> VariantId {
         V::ID
-    }
-
-    /// Folds the variant state contribution into the core's incremental hash so
-    /// [`VariantPosition::zobrist`] reflects pockets / counters.
-    fn fold_state_hash(&mut self) {
-        let mut extra = 0u64;
-        V::hash_state(&self.state, &mut extra);
-        self.core.xor_hash(extra);
     }
 
     /// The Zobrist key of this position, including the variant state contribution
@@ -891,7 +879,7 @@ impl<V: Variant> VariantPosition<V> {
     /// The move must be legal. A standard move kind goes through the core
     /// make-move; a variant-only kind (drop) goes through
     /// [`Variant::apply_extra`]. After the core edit, capture side effects
-    /// ([`Variant::capture_side_effects`]) and the state hash are folded in.
+    /// ([`Variant::capture_side_effects`]) fire.
     #[must_use]
     pub fn play(&self, mv: &Move) -> Self {
         let mut next = self.clone();
@@ -906,8 +894,7 @@ impl<V: Variant> VariantPosition<V> {
     /// A standard move kind goes through the core in-place make-move; a
     /// variant-only kind (drop) goes through [`Variant::apply_extra`]. After the
     /// core edit, capture side effects ([`Variant::capture_side_effects`]) and the
-    /// per-move [`Variant::post_apply`] hook fire, then the variant state hash
-    /// contribution is rebalanced into the incremental Zobrist key.
+    /// per-move [`Variant::post_apply`] hook fire.
     ///
     /// # Contract
     ///
@@ -916,11 +903,6 @@ impl<V: Variant> VariantPosition<V> {
     /// Pass only moves obtained from this position's legal-move generation. The
     /// safe, checked default is [`VariantPosition::play`].
     pub fn play_unchecked(&mut self, mv: &Move) {
-        // Remove the parent's state hash contribution; the child's is folded in
-        // at the end. (For the unit state both are zero.)
-        let mut parent_extra = 0u64;
-        V::hash_state(&self.state, &mut parent_extra);
-
         let core = &mut self.core;
         let state = &mut self.state;
 
@@ -943,23 +925,16 @@ impl<V: Variant> VariantPosition<V> {
         }
 
         // Per-move post-apply hook (H14): runs for every move kind once the child
-        // `core` is finished, before the state hash is rebalanced. The default is
-        // a no-op, so standard chess and other variants are unaffected.
+        // `core` is finished. The default is a no-op, so standard chess and other
+        // variants are unaffected.
         V::post_apply(core, state, mv);
-
-        // Rebalance the state-hash contribution: out with the parent's, in with
-        // the child's.
-        core.xor_hash(parent_extra);
-        let mut child_extra = 0u64;
-        V::hash_state(state, &mut child_extra);
-        core.xor_hash(child_extra);
     }
 
     /// Applies `mv` **in place** and returns a [`VariantUndo`] reversing it, the
     /// zero-copy make half of make/unmake search for variant `V`.
     ///
     /// This produces exactly the position [`VariantPosition::play_unchecked`]
-    /// would — the same core board, variant state, and Zobrist key — while
+    /// would — the same core board and variant state — while
     /// recording the small amount of information [`VariantPosition::unmake`] needs
     /// to restore the prior position: the core [`Undo`], a snapshot of the variant
     /// state, and any pieces a variant hook removed (atomic's blast).
@@ -971,15 +946,8 @@ impl<V: Variant> VariantPosition<V> {
     /// *this* move, and make/unmake pairs must nest (last made is first unmade).
     pub fn make(&mut self, mv: &Move) -> VariantUndo<V::State> {
         // Snapshot the variant state before any mutation; unmake restores it
-        // verbatim. The core hash currently folds in this same parent state, so the
-        // core undo's hash (captured below) is the full parent key — restoring it
-        // on unmake needs no rebalancing.
+        // verbatim.
         let state_before = self.state.clone();
-
-        // Mirror `play_unchecked`'s hash rebalance so the produced child is
-        // byte-identical to it.
-        let mut parent_extra = 0u64;
-        V::hash_state(&self.state, &mut parent_extra);
 
         let mut removed = heapless_removals::Removals::new();
         let core_undo;
@@ -1003,11 +971,6 @@ impl<V: Variant> VariantPosition<V> {
             }
 
             V::post_apply(core, state, mv);
-
-            core.xor_hash(parent_extra);
-            let mut child_extra = 0u64;
-            V::hash_state(state, &mut child_extra);
-            core.xor_hash(child_extra);
         }
 
         VariantUndo {
@@ -1018,8 +981,8 @@ impl<V: Variant> VariantPosition<V> {
     }
 
     /// Reverses a [`VariantPosition::make`] **in place**, restoring the position
-    /// to exactly what it was before `mv` — core board and state, variant state,
-    /// and Zobrist key all byte-identical.
+    /// to exactly what it was before `mv` — core board and state and variant state
+    /// all byte-identical.
     ///
     /// # Contract
     ///

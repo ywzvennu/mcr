@@ -415,8 +415,6 @@ impl MoveSink for FilterSink<'_> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     board: Board,
-    /// The incrementally maintained Zobrist key (see [`crate::zobrist`]).
-    hash: u64,
     /// Packed castling rights (2 bytes; see [`CastlingRights`]).
     castling: CastlingRights,
     /// The square a pawn could move *to* in an en-passant capture, set the move
@@ -443,8 +441,8 @@ pub struct Position {
 /// `make` mutates the position in place and records only the handful of fields a
 /// move cannot reconstruct from the board alone — the captured piece (with its
 /// square, which differs from the move's destination for en passant), and the
-/// prior castling rights, en-passant target, move clocks, and Zobrist key, each
-/// of which a move can clear or change irreversibly.
+/// prior castling rights, en-passant target, and move clocks, each of which a
+/// move can clear or change irreversibly.
 ///
 /// An `Undo` is opaque and only meaningful when paired with the exact move and
 /// position it came from; see [`Position::unmake`] for the contract.
@@ -465,9 +463,6 @@ pub struct Undo {
     halfmove_clock: u8,
     /// Fullmove number before the move (incremented after a black move).
     fullmove_number: u16,
-    /// Incremental Zobrist key before the move, restored verbatim so the key is
-    /// byte-identical after the unmake rather than re-derived.
-    hash: u64,
 }
 
 impl Undo {
@@ -492,17 +487,14 @@ impl Position {
     /// The standard chess starting position.
     #[must_use]
     pub fn startpos() -> Position {
-        let mut pos = Position {
+        Position {
             board: Board::standard(),
             turn: Color::White,
             castling: CastlingRights::STANDARD,
             ep_square: None,
             halfmove_clock: 0,
             fullmove_number: 1,
-            hash: 0,
-        };
-        pos.hash = pos.compute_zobrist();
-        pos
+        }
     }
 
     /// The piece placement of this position.
@@ -538,16 +530,6 @@ impl Position {
     #[inline]
     pub const fn ep_square(&self) -> Option<Square> {
         self.ep_square
-    }
-
-    /// The incrementally maintained Zobrist key, as kept up to date by
-    /// [`Position::play`]. Always equal to [`Position::compute_zobrist`]; exposed
-    /// for the equality test between the two paths.
-    #[cfg(test)]
-    #[must_use]
-    #[inline]
-    pub(crate) fn incremental_zobrist(&self) -> u64 {
-        self.hash
     }
 
     /// The halfmove clock (plies since the last capture or pawn move), used for
@@ -2234,9 +2216,9 @@ impl Position {
     /// position without copying.
     ///
     /// This is the make/unmake hot path: it edits the board, updates castling
-    /// rights, the en-passant target, the move clocks, the side to move, and the
-    /// incrementally maintained Zobrist key directly on `self`, producing exactly
-    /// the position [`Position::play`] would return but with no allocation or
+    /// rights, the en-passant target, the move clocks, and the side to move
+    /// directly on `self`, producing exactly the position [`Position::play`] would
+    /// return but with no allocation or
     /// clone. A search engine that descends the tree should snapshot the small
     /// amount of state it needs to undo (or clone once before a subtree) and call
     /// this on each step.
@@ -2293,7 +2275,6 @@ impl Position {
             ep_square: self.ep_square,
             halfmove_clock: self.halfmove_clock,
             fullmove_number: self.fullmove_number,
-            hash: self.hash,
         };
         self.apply(mv);
         undo
@@ -2301,8 +2282,7 @@ impl Position {
 
     /// Reverses a [`Position::make`] **in place**, restoring the position to
     /// exactly what it was before `mv` was made — board, side to move, castling
-    /// rights, en-passant target, both move clocks, and the Zobrist key all
-    /// byte-identical.
+    /// rights, en-passant target, and both move clocks all byte-identical.
     ///
     /// # Contract
     ///
@@ -2382,12 +2362,11 @@ impl Position {
             self.board.set_piece(sq, piece);
         }
 
-        // Restore the scalar state and the incremental hash verbatim.
+        // Restore the scalar state verbatim.
         self.castling = undo.castling;
         self.ep_square = undo.ep_square;
         self.halfmove_clock = undo.halfmove_clock;
         self.fullmove_number = undo.fullmove_number;
-        self.hash = undo.hash;
     }
 
     /// The enemy piece (and its square) a move removes from the board, if any.
@@ -2405,9 +2384,8 @@ impl Position {
     }
 
     /// Drops a `role` piece of the side to move onto the empty square `to`,
-    /// flipping the side to move and maintaining the incremental Zobrist key and
-    /// clocks — the core edit behind a crazyhouse drop, exposed for the variant
-    /// layer's `apply_extra` hook.
+    /// flipping the side to move and advancing the clocks — the core edit behind a
+    /// crazyhouse drop, exposed for the variant layer's `apply_extra` hook.
     ///
     /// A drop clears any en-passant target, never resets the halfmove clock by
     /// itself (it is neither a capture nor a pawn *move*), and increments the
@@ -2419,12 +2397,9 @@ impl Position {
         let us = self.turn;
         let them = us.opposite();
 
-        if let Some(file) = self.zobrist_ep_file() {
-            self.hash ^= crate::zobrist::ep_file_key(file);
-        }
         self.ep_square = None;
 
-        self.hash_set(to, Piece::new(us, role));
+        self.board.set_piece(to, Piece::new(us, role));
 
         // Saturating so the narrowed clocks never wrap; the draw rules only look
         // at small halfmove values and games never approach the fullmove cap.
@@ -2433,8 +2408,6 @@ impl Position {
             self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.turn = them;
-        self.hash ^= crate::zobrist::side_key(us);
-        self.hash ^= crate::zobrist::side_key(them);
     }
 
     /// Captures the current reversible scalar state into an [`Undo`] *without*
@@ -2442,7 +2415,7 @@ impl Position {
     /// edit (a crazyhouse drop) it applies itself.
     ///
     /// The returned token records no captured piece and the prior castling /
-    /// en-passant / clock / hash state, exactly as a [`Position::make`] of a
+    /// en-passant / clock state, exactly as a [`Position::make`] of a
     /// non-capturing move would for those fields.
     pub(crate) fn snapshot_undo(&self) -> Undo {
         Undo {
@@ -2451,13 +2424,12 @@ impl Position {
             ep_square: self.ep_square,
             halfmove_clock: self.halfmove_clock,
             fullmove_number: self.fullmove_number,
-            hash: self.hash,
         }
     }
 
     /// Reverses a crazyhouse drop wrapped by [`Position::snapshot_undo`]: removes
     /// the dropped piece from `to`, flips the side back, and restores the scalar
-    /// state and Zobrist key from `undo`.
+    /// state from `undo`.
     pub(crate) fn unmake_drop(&mut self, to: Square, undo: Undo) {
         self.board.remove_piece(to);
         self.turn = self.turn.opposite();
@@ -2465,42 +2437,25 @@ impl Position {
         self.ep_square = undo.ep_square;
         self.halfmove_clock = undo.halfmove_clock;
         self.fullmove_number = undo.fullmove_number;
-        self.hash = undo.hash;
     }
 
     /// Restores a `piece` onto `square`, the board edit [`VariantPosition::unmake`]
     /// uses to put back a piece a variant hook removed (atomic's blast) before
-    /// reversing the core move. The hash is *not* touched here — the verbatim hash
-    /// restore in the core unmake (or the variant state restore) covers it.
+    /// reversing the core move.
     pub(crate) fn restore_piece(&mut self, square: Square, piece: Piece) {
         self.board.set_piece(square, piece);
     }
 
-    /// Folds an opaque extra-state contribution into the incremental Zobrist key,
-    /// for variants that hash pocket / counter state. Idempotent under XOR, so a
-    /// variant toggles its old contribution out and the new one in.
-    pub(crate) fn xor_hash(&mut self, key: u64) {
-        self.hash ^= key;
-    }
-
-    /// Removes whatever piece sits on `square` (if any), keeping the incremental
-    /// Zobrist key consistent and revoking any castling right anchored on a rook
-    /// that is removed. Exposed for the atomic variant's explosion side effect.
+    /// Removes whatever piece sits on `square` (if any), revoking any castling
+    /// right anchored on a rook that is removed. Exposed for the atomic variant's
+    /// explosion side effect.
     ///
     /// Returns the removed piece, or `None` if the square was empty.
     pub(crate) fn remove_piece_tracked(&mut self, square: Square) -> Option<Piece> {
         let piece = self.board.piece_at(square)?;
-        self.hash_remove(square, piece);
+        self.board.remove_piece(square);
         if piece.role == Role::Rook {
-            // Bracket the castling-rights change with the castling-key XORs so the
-            // incremental Zobrist key tracks any revoked right exactly like the
-            // from-scratch computation. Unlike the standard make-move path (which
-            // already brackets `castling_hash` around its whole rights update),
-            // an explosion-driven removal has no such bracketing, so it must fold
-            // the delta here. The XOR is self-cancelling when no right changes.
-            self.hash ^= self.castling_hash();
             self.revoke_rights_for_square(square, piece.color);
-            self.hash ^= self.castling_hash();
         }
         Some(piece)
     }
@@ -2521,34 +2476,22 @@ impl Position {
         let is_pawn_move = moving.role == Role::Pawn;
         let mut reset_clock = is_pawn_move;
 
-        // Incremental Zobrist: XOR out the parent's en-passant and castling
-        // features now; piece moves are folded in as the board is edited, and the
-        // new ep/castling/side features are folded back in once they are settled
-        // at the end.
-        if let Some(file) = self.zobrist_ep_file() {
-            self.hash ^= crate::zobrist::ep_file_key(file);
-        }
-        self.hash ^= self.castling_hash();
-
         // Clear any prior en-passant target; set below only for a double push.
-        let prev_ep = self.ep_square.take();
+        self.ep_square = None;
 
         match mv.kind() {
             MoveKind::Quiet => {
-                self.hash_remove(from, moving);
-                self.hash_set(to, moving);
+                self.board.remove_piece(from);
+                self.board.set_piece(to, moving);
             }
             MoveKind::Capture => {
                 reset_clock = true;
-                if let Some(captured) = self.board.piece_at(to) {
-                    self.hash_remove(to, captured);
-                }
-                self.hash_remove(from, moving);
-                self.hash_set(to, moving);
+                self.board.remove_piece(from);
+                self.board.set_piece(to, moving);
             }
             MoveKind::DoublePawnPush => {
-                self.hash_remove(from, moving);
-                self.hash_set(to, moving);
+                self.board.remove_piece(from);
+                self.board.set_piece(to, moving);
                 // The ep target is the square the pawn skipped over.
                 let mid_rank = from.rank().offset(if us.is_white() { 1 } else { -1 });
                 if let Some(mid_rank) = mid_rank {
@@ -2557,13 +2500,12 @@ impl Position {
             }
             MoveKind::EnPassant => {
                 reset_clock = true;
-                self.hash_remove(from, moving);
-                self.hash_set(to, moving);
+                self.board.remove_piece(from);
+                self.board.set_piece(to, moving);
                 // Remove the captured pawn, which is on `to`'s file and `from`'s
                 // rank.
                 let captured = Square::from_file_rank(to.file(), from.rank());
-                let captured_pawn = Piece::new(them, Role::Pawn);
-                self.hash_remove(captured, captured_pawn);
+                self.board.remove_piece(captured);
             }
             MoveKind::CastleKingside | MoveKind::CastleQueenside => {
                 let side = if matches!(mv.kind(), MoveKind::CastleKingside) {
@@ -2584,20 +2526,15 @@ impl Position {
                 let rook = Piece::new(us, Role::Rook);
                 // Move king and rook. Remove both first to handle the case where
                 // a destination coincides with the other's origin.
-                self.hash_remove(from, moving);
-                self.hash_remove(rook_from, rook);
-                self.hash_set(to, moving);
-                self.hash_set(rook_to, rook);
+                self.board.remove_piece(from);
+                self.board.remove_piece(rook_from);
+                self.board.set_piece(to, moving);
+                self.board.set_piece(rook_to, rook);
             }
             MoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
-                if capture {
-                    if let Some(captured) = self.board.piece_at(to) {
-                        self.hash_remove(to, captured);
-                    }
-                }
-                self.hash_remove(from, moving);
-                self.hash_set(to, Piece::new(us, role));
+                self.board.remove_piece(from);
+                self.board.set_piece(to, Piece::new(us, role));
             }
             MoveKind::Drop { .. } => {
                 // Drops are a variant-only move kind; the core never generates
@@ -2606,7 +2543,6 @@ impl Position {
                 unreachable!("drop moves are applied via apply_drop_core");
             }
         }
-        let _ = prev_ep;
 
         // Update castling rights: a king move revokes both, a rook move from its
         // home square revokes that side, capturing a rook on its home square
@@ -2633,44 +2569,6 @@ impl Position {
             self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.turn = them;
-
-        // Fold the settled castling and (capture-available) en-passant features,
-        // plus the new side-to-move toggle, back into the key.
-        self.hash ^= self.castling_hash();
-        if let Some(file) = self.zobrist_ep_file() {
-            self.hash ^= crate::zobrist::ep_file_key(file);
-        }
-        // Side to move flipped from `us` to `them`; toggle that feature.
-        self.hash ^= crate::zobrist::side_key(us);
-        self.hash ^= crate::zobrist::side_key(them);
-    }
-
-    /// Removes a known `piece` from `square`, keeping the Zobrist key in step.
-    #[inline]
-    fn hash_remove(&mut self, square: Square, piece: Piece) {
-        self.board.remove_piece(square);
-        self.hash ^= crate::zobrist::piece_square_key(piece, square);
-    }
-
-    /// Places a known `piece` on `square`, keeping the Zobrist key in step.
-    #[inline]
-    fn hash_set(&mut self, square: Square, piece: Piece) {
-        self.board.set_piece(square, piece);
-        self.hash ^= crate::zobrist::piece_square_key(piece, square);
-    }
-
-    /// The XOR of the keys for all castling rights currently held.
-    #[inline]
-    fn castling_hash(&self) -> u64 {
-        let mut h = 0;
-        for color in Color::ALL {
-            for side in [CastleSide::King, CastleSide::Queen] {
-                if self.castling.has(color, side) {
-                    h ^= crate::zobrist::castling_key(color, side);
-                }
-            }
-        }
-        h
     }
 
     /// If `square` is the home square of a castling rook of `color`, revoke that
@@ -2814,17 +2712,14 @@ impl Position {
         halfmove_clock: u32,
         fullmove_number: u32,
     ) -> Position {
-        let mut position = Position {
+        Position {
             board,
             turn,
             castling,
             ep_square,
             halfmove_clock: halfmove_clock.min(u32::from(u8::MAX)) as u8,
             fullmove_number: fullmove_number.min(u32::from(u16::MAX)) as u16,
-            hash: 0,
-        };
-        position.hash = position.compute_zobrist();
-        position
+        }
     }
 
     /// Validates the core position with relaxed king requirements, for variant
@@ -3341,14 +3236,16 @@ mod tests {
 
     #[test]
     fn position_is_compact() {
-        // The Position layout is Board (64) + hash (8) + a tightly packed loose
-        // state that fits in the 8-byte alignment slot the u64 hash forces, for
-        // a total of 80 bytes. A regression here means the loose state grew past
-        // that slot and every clone copies more — the cost this issue removes.
+        // The Position layout is Board (64) + a tightly packed loose state
+        // (castling rights, ep square, both move clocks, side to move), for a
+        // total of 72 bytes. Issue #115 dropped the 8-byte incrementally-stored
+        // Zobrist key, which nothing read (`zobrist()` recomputes from scratch),
+        // shrinking every clone by a `u64`. A regression above 72 means the loose
+        // state grew and copy-make pays for it again.
         assert_eq!(
             core::mem::size_of::<Position>(),
-            80,
-            "Position size regressed: loose state no longer fits the hash's 8-byte slot"
+            72,
+            "Position size regressed: loose state grew past the compact 72-byte layout"
         );
         // Packed castling rights are two bytes (four 4-bit nibbles), not four.
         assert_eq!(core::mem::size_of::<CastlingRights>(), 2);
@@ -3721,10 +3618,9 @@ mod tests {
     }
 
     #[test]
-    fn apply_drop_core_places_piece_and_keeps_hash() {
+    fn apply_drop_core_places_piece_and_advances_state() {
         // Drop plumbing for crazyhouse: placing a pocketed piece on an empty
-        // square flips the side, leaves clocks/ep correct, and keeps the
-        // incremental Zobrist key in step with a from-scratch computation.
+        // square flips the side and leaves clocks/ep correct.
         let mut pos = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 5 9").unwrap();
         pos.apply_drop_core(Role::Knight, Square::E4);
         assert_eq!(
@@ -3736,7 +3632,13 @@ mod tests {
         assert_eq!(pos.halfmove_clock(), 6);
         assert_eq!(pos.fullmove_number(), 9);
         assert_eq!(pos.ep_square(), None);
-        assert_eq!(pos.incremental_zobrist(), pos.compute_zobrist());
+        // The Zobrist key still reflects the dropped piece (recomputed on demand).
+        assert_ne!(
+            pos.zobrist(),
+            Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 5 9")
+                .unwrap()
+                .zobrist()
+        );
     }
 
     #[test]

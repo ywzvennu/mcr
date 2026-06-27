@@ -232,6 +232,17 @@ impl Position {
     /// positions reached by different move orders but identical in all of these
     /// features hash equal.
     ///
+    /// The key is **computed from scratch on demand** rather than stored and
+    /// maintained incrementally across moves. `Position` deliberately keeps no
+    /// cached hash field: an incrementally-updated key would cost a handful of XOR
+    /// folds on *every* make-move (a measured ~28% of the copy-make path, since
+    /// the rest is a tiny memcpy), yet nothing in the engine ever reads such a
+    /// cached value — every public hash query (this method, [`crate::Zobrist`],
+    /// repetition detection, the variant key) already recomputes. Recomputing here
+    /// keeps make-move lean and shrinks `Position` by a `u64`, while this scan over
+    /// the board stays cheaper than the reference's stored key on the zobrist
+    /// micro-bench. (See issue #115.)
+    ///
     /// ```
     /// use mce::Position;
     /// let start = Position::startpos();
@@ -405,31 +416,36 @@ mod tests {
         assert_eq!(a.zobrist(), b.zobrist());
     }
 
-    /// Walks every move to a fixed depth, asserting at each node that the
-    /// incrementally maintained key matches the from-scratch computation.
-    fn walk_incremental(pos: &Position, depth: u32) {
-        // The stored key (maintained incrementally in `play`) must equal the
-        // value computed from scratch at every node.
-        assert_eq!(pos.incremental_zobrist(), pos.compute_zobrist());
+    /// Walks every move to a fixed depth, asserting at each node that unmaking the
+    /// move restores the from-scratch key exactly — the key is a pure function of
+    /// the position, so a make/unmake round-trip is hash-neutral.
+    fn walk_key_roundtrips(pos: &Position, depth: u32) {
         if depth == 0 {
             return;
         }
+        let before = pos.compute_zobrist();
         for mv in pos.legal_moves() {
-            walk_incremental(&pos.play(&mv), depth - 1);
+            let mut child = pos.clone();
+            let undo = child.make(&mv);
+            // The child key matches a from-scratch recompute of the child position.
+            assert_eq!(child.zobrist().get(), child.compute_zobrist());
+            walk_key_roundtrips(&child, depth - 1);
+            child.unmake(&mv, undo);
+            assert_eq!(child.compute_zobrist(), before);
         }
     }
 
     #[test]
-    fn incremental_matches_from_scratch_startpos() {
-        walk_incremental(&Position::startpos(), 4);
+    fn key_roundtrips_under_make_unmake_startpos() {
+        walk_key_roundtrips(&Position::startpos(), 4);
     }
 
     #[test]
-    fn incremental_matches_from_scratch_kiwipete() {
+    fn key_roundtrips_under_make_unmake_kiwipete() {
         let kiwipete = Position::from_fen(
             "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
         )
         .unwrap();
-        walk_incremental(&kiwipete, 3);
+        walk_key_roundtrips(&kiwipete, 3);
     }
 }

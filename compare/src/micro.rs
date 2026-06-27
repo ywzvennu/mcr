@@ -169,7 +169,7 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         // make/unmake vs copy-make comparison for one search ply.
         //
         // For mce's compact `Position` (a handful of bitboards plus a few scalar
-        // fields, ~80 bytes) a clone is a cheap memcpy, so copy-make stays
+        // fields, ~72 bytes) a clone is a cheap memcpy, so copy-make stays
         // competitive: make/unmake pays the board edits twice (down then up) where
         // copy-make pays one memcpy plus one make. The numbers below report that
         // honestly rather than assume a win; perft is therefore left on copy-make.

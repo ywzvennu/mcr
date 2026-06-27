@@ -847,9 +847,9 @@ mod tests {
     }
 
     #[test]
-    fn incremental_hash_matches_after_drop_and_capture() {
+    fn hash_matches_after_drop_and_capture() {
         // Capture (fills pocket), then drop: reparsing the FEN must reproduce the
-        // incrementally maintained key and state.
+        // same key (recomputed from scratch, including the pocket hash) and state.
         let pos: Crazyhouse = "4k3/8/8/8/8/8/8/n2RK3[] w - - 0 1".parse().unwrap();
         let after = play_line(pos, &["d1a1", "e8d8", "N@e4"]);
         let reparsed: Crazyhouse = after.to_fen().parse().unwrap();
