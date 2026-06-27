@@ -25,30 +25,22 @@
 //! cargo run --release --bin difftest -- --full       # a much larger budget
 //! cargo run --release --bin difftest -- --count 500  # explicit per-variant target
 //! cargo run --release --bin difftest -- --depth 3    # override the shallow perft depth
-//! cargo run --release --bin difftest -- --all        # ALSO run the two skipped variants
+//! cargo run --release --bin difftest -- --all        # accepted for compatibility; now a no-op
 //! ```
 //!
-//! ## Temporarily skipped variants — atomic and antichess (issues #121, #122)
+//! ## All nine variants run by default
 //!
-//! This harness has already found two REAL mce move-generation bugs, now filed:
+//! Every variant — including atomic and antichess — runs by default and is
+//! expected to report **0 divergences**. The two move-generation bugs this
+//! harness originally found (atomic king-adjacency legality, issue **#121**;
+//! antichess multi-king move generation, issue **#122**) and the atomic
+//! FEN-validation / check bug (adjacent kings wrongly rejected / reported in
+//! check, issue **#134**) are all fixed and merged, so there is no longer a
+//! default-skip allowlist. The legacy `--all` (alias `--include-known-bugs`)
+//! flag is still accepted for script compatibility but is a no-op.
 //!
-//! * **atomic** — a king may legally move adjacent to the enemy king (capturing
-//!   the enemy king is impossible in atomic, it would self-explode, so the enemy
-//!   king delivers no executable check). mce wrongly rejects these moves. Tracked
-//!   in **issue #121**.
-//! * **antichess** — when a side has more than one king (legal: antichess allows
-//!   promotion to king), mce generates moves for only one of them. Tracked in
-//!   **issue #122**.
-//!
-//! Until those fixes land, the `atomic` and `antichess` variants are **skipped by
-//! default** so the harness exits 0 on the seven clean variants (0 divergences).
-//! This skip is **loud, not silent**: it is printed with a count and the issue
-//! references. Passing `--all` (alias `--include-known-bugs`) runs them anyway;
-//! that run will exit non-zero until #121 and #122 are fixed, so the net can
-//! verify the fixes the moment they land.
-//!
-//! **This skip is TEMPORARY.** Once #121 and #122 are fixed, remove [`KNOWN_BUGGY`]
-//! (and this note) so atomic/antichess run by default again.
+//! If a genuine new divergence appears, it must be filed and fixed — never
+//! masked by re-introducing a silent skip.
 //!
 //! ## GPL isolation
 //!
@@ -87,50 +79,24 @@ const DEFAULT_DEPTH: u32 = 3;
 /// Max plies per seeded game; snapshots spread across the game (opening→endgame).
 const GEN_MAX_PLIES: u32 = 120;
 
-/// Variants temporarily SKIPPED by default because this harness already found a
-/// real mce move-generation bug in each, now filed and pending a fix:
-///
-/// * `atomic` — king-adjacency legality (issue **#121**);
-/// * `antichess` — multi-king move generation (issue **#122**).
-///
-/// Skipping them keeps the default run green (exit 0) on the seven clean variants
-/// while the fixes are in flight. The skip is announced loudly with a count, and
-/// `--all` runs these anyway (and will exit non-zero until the fixes land, so the
-/// harness can confirm them).
-///
-/// TEMPORARY: once #121 and #122 are fixed, delete this constant and the skip
-/// logic so atomic/antichess run by default again.
-const KNOWN_BUGGY: &[&str] = &["atomic", "antichess"];
-
-/// The tracking issue for each [`KNOWN_BUGGY`] variant, for the printed note.
-fn known_bug_issue(variant: &str) -> &'static str {
-    match variant {
-        "atomic" => "#121",
-        "antichess" => "#122",
-        _ => "?",
-    }
-}
-
 /// Parsed command line.
 struct Opts {
     /// Per-variant distinct-position target.
     count: usize,
     /// Shallow perft depth.
     depth: u32,
-    /// Include the [`KNOWN_BUGGY`] variants (`--all` / `--include-known-bugs`).
-    /// Off by default; when set the run will fail until #121/#122 are fixed.
-    include_known_bugs: bool,
 }
 
 fn parse_args() -> Opts {
     let mut count = DEFAULT_COUNT;
     let mut depth = DEFAULT_DEPTH;
-    let mut include_known_bugs = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--full" => count = FULL_COUNT,
-            "--all" | "--include-known-bugs" => include_known_bugs = true,
+            // Legacy flags: all variants now run by default (see #121/#122/#134).
+            // Accepted for script compatibility, but a no-op.
+            "--all" | "--include-known-bugs" => {}
             "--count" => {
                 count = args
                     .next()
@@ -152,24 +118,15 @@ fn parse_args() -> Opts {
                 );
                 println!("  --depth D    shallow perft depth (default {DEFAULT_DEPTH})");
                 println!(
-                    "  --all        ALSO run the variants skipped by default \
-({}); alias --include-known-bugs.",
-                    KNOWN_BUGGY.join(", ")
+                    "  --all        no-op (alias --include-known-bugs); all 9 variants now \
+run by default."
                 );
-                println!(
-                    "               These have known mce bugs (atomic #121, antichess #122) and"
-                );
-                println!("               will make the run exit non-zero until those fixes land.");
                 std::process::exit(0);
             }
             other => eprintln!("warning: ignoring unknown argument {other:?}"),
         }
     }
-    Opts {
-        count,
-        depth,
-        include_known_bugs,
-    }
+    Opts { count, depth }
 }
 
 fn fail_usage(msg: &str) -> ! {
@@ -184,11 +141,11 @@ enum Check {
     /// shakmaty would not represent this position (rejected on parse); skipped.
     SkippedShakmaty,
     /// A perft mismatch reconciled as the documented terminal divergence: a
-    /// variant terminal (king on the hill, third check, completed race) is
-    /// reachable within the shallow perft tree, so shakmaty prunes the decided
-    /// line while mce keeps counting. Not a bug — counted and skipped, exactly as
-    /// the perft-parity harness does. (atomic/antichess are also terminal-
-    /// divergent but are in [`KNOWN_BUGGY`]; see `terminal_divergent`.)
+    /// variant terminal (king on the hill, third check, completed race, an
+    /// exploded king in atomic, a captured side in antichess) is reachable within
+    /// the shallow perft tree, so shakmaty prunes the decided line while mce keeps
+    /// counting. Not a bug — counted and skipped, exactly as the perft-parity
+    /// harness does. See `terminal_divergent`.
     SkippedTerminalDivergence,
     /// At least one property diverged; the message is the full reproducer.
     Divergence(String),
@@ -201,12 +158,14 @@ enum Check {
 /// actually reachable within the tree* — never silently. Mirrors the same list in
 /// the perft-parity harness (`main.rs`).
 fn terminal_divergent(variant: &str) -> bool {
-    matches!(variant, "king-of-the-hill" | "three-check" | "racing-kings")
-    // NOTE: atomic and antichess are also genuinely terminal-divergent, but they
-    // are currently in [`KNOWN_BUGGY`] and skipped by default. Under `--all` we
-    // deliberately do NOT reconcile their perft mismatches as terminal skips, so
-    // the real bugs (#121 / #122) surface as divergences instead of being masked.
-    // When those fixes land and the variants leave KNOWN_BUGGY, add them back here.
+    // atomic (king exploded) and antichess (a side has no pieces) are likewise
+    // path-dependent terminals now that their move-gen / validation bugs
+    // (#121 / #122 / #134) are fixed, so their in-tree terminals are reconciled
+    // here too rather than reported as divergences.
+    matches!(
+        variant,
+        "king-of-the-hill" | "three-check" | "racing-kings" | "atomic" | "antichess"
+    )
 }
 
 /// The per-variant running tally.
@@ -236,41 +195,15 @@ fn main() -> ExitCode {
     println!("seed: fixed per-variant (splitmix64) — this run is fully reproducible");
     println!();
 
-    // TEMPORARY skip of the known-buggy variants (see KNOWN_BUGGY / #121 / #122).
-    // Loud, never silent: announce exactly what is skipped and why, with a count
-    // and the tracking issues, plus how to override.
-    let mut skipped_variants: Vec<&str> = Vec::new();
-    if !opts.include_known_bugs {
-        for &v in KNOWN_BUGGY {
-            skipped_variants.push(v);
-        }
-        let detail: Vec<String> = skipped_variants
-            .iter()
-            .map(|v| format!("{v} ({})", known_bug_issue(v)))
-            .collect();
-        println!(
-            "NOTE: {} variant(s) SKIPPED pending bug fixes: {}.",
-            skipped_variants.len(),
-            detail.join(", ")
-        );
-        println!(
-            "      atomic/antichess skipped pending bug fixes #121 / #122 \
-(this harness found them)."
-        );
-        println!(
-            "      Re-run with --all (alias --include-known-bugs) to include them \
-(will fail until fixed)."
-        );
-        println!();
-    } else {
-        println!(
-            "NOTE: --all set — running ALL variants, INCLUDING the known-buggy {} \
-(atomic #121, antichess #122).",
-            KNOWN_BUGGY.join(", ")
-        );
-        println!("      This run is EXPECTED to report divergences until those fixes land.");
-        println!();
-    }
+    // All nine variants run, every time. The atomic/antichess move-gen and
+    // FEN-validation bugs (#121 / #122 / #134) are fixed, so there is no longer a
+    // default-skip allowlist; this harness must report 0 divergences across all
+    // variants. A genuine new divergence is filed and fixed, never re-masked.
+    println!(
+        "running ALL {} variants (no skip allowlist).",
+        VARIANTS.len()
+    );
+    println!();
 
     let mut total = Tally::default();
     let mut first_failure: Option<String> = None;
@@ -283,17 +216,6 @@ fn main() -> ExitCode {
     println!("{}", "-".repeat(head.len()));
 
     for &variant in VARIANTS {
-        if !opts.include_known_bugs && KNOWN_BUGGY.contains(&variant) {
-            println!(
-                "{:<16} {:>10} {:>9} {:>10} {:>12}",
-                variant,
-                format!("SKIP {}", known_bug_issue(variant)),
-                "-",
-                "-",
-                "-"
-            );
-            continue;
-        }
         let positions = generate_for(variant, opts.count);
         let mut t = Tally::default();
         for g in &positions {
@@ -327,8 +249,6 @@ fn main() -> ExitCode {
     );
     println!();
 
-    let ran_variants = VARIANTS.len() - skipped_variants.len();
-
     if total.divergences == 0 {
         println!(
             "OK: {} positions checked across {} variants — \
@@ -336,20 +256,12 @@ mce agrees with shakmaty on legal moves, perft (d{}), check/terminal status, \
 and FEN round-trip. {} skipped (shakmaty rejected the FEN); {} perft mismatches \
 reconciled as the documented variant-terminal divergence (a terminal fires inside \
 the perft tree — shakmaty prunes, mce counts on).",
-            total.checked, ran_variants, opts.depth, total.skipped, total.terminal,
+            total.checked,
+            VARIANTS.len(),
+            opts.depth,
+            total.skipped,
+            total.terminal,
         );
-        if !skipped_variants.is_empty() {
-            let detail: Vec<String> = skipped_variants
-                .iter()
-                .map(|v| format!("{v} ({})", known_bug_issue(v)))
-                .collect();
-            println!(
-                "NOTE: {} variant(s) were SKIPPED pending bug fixes: {}. \
-Re-run with --all to include them once #121 / #122 land.",
-                skipped_variants.len(),
-                detail.join(", ")
-            );
-        }
         ExitCode::SUCCESS
     } else {
         eprintln!(

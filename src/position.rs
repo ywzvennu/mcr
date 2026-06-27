@@ -2725,10 +2725,36 @@ impl Position {
     /// `king_is_royal = false` as well, which also drops the
     /// opposite-king-in-check rule: a king may be left under attack ("en prise")
     /// when there is no concept of check.
+    ///
+    /// The royal opposite-king check uses the **standard** notion of attack
+    /// ([`Position::is_attacked`]). Variants whose king safety differs (atomic,
+    /// where the enemy king gives no executable check and a king adjacent to the
+    /// enemy king is immune) must not rely on this and instead use
+    /// [`Position::validate_core_with`] with their own predicate.
     pub(crate) fn validate_core(
         &self,
         require_two_kings: bool,
         king_is_royal: bool,
+    ) -> Result<(), FenError> {
+        self.validate_core_with(require_two_kings, king_is_royal, |pos, their_king, them| {
+            pos.is_attacked(their_king, them.opposite())
+        })
+    }
+
+    /// Like [`Position::validate_core`], but with a variant-supplied predicate
+    /// deciding whether the side *not* to move is in check.
+    ///
+    /// `opposite_king_in_check(self, their_king, them)` returns `true` when the
+    /// king of `them` (the side not to move) on `their_king` is under an
+    /// executable attack by the side to move. Standard chess passes
+    /// `is_attacked`; atomic passes its own rule so that legal atomic positions
+    /// with the two kings adjacent — which the standard `is_attacked` wrongly
+    /// flags, because a king "attacks" its neighbour — round-trip through FEN.
+    pub(crate) fn validate_core_with(
+        &self,
+        require_two_kings: bool,
+        king_is_royal: bool,
+        opposite_king_in_check: impl Fn(&Position, Square, Color) -> bool,
     ) -> Result<(), FenError> {
         if require_two_kings {
             for color in Color::ALL {
@@ -2740,7 +2766,7 @@ impl Position {
         if king_is_royal {
             let them = self.turn.opposite();
             if let Some(their_king) = self.board.king_of(them) {
-                if self.is_attacked(their_king, self.turn) {
+                if opposite_king_in_check(self, their_king, them) {
                     return Err(FenError::OppositeKingInCheck);
                 }
             }
