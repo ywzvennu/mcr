@@ -185,6 +185,20 @@ impl AnyVariant {
         dispatch!(self, p => p.legal_moves())
     }
 
+    /// The legal moves of the side to move in staged move-ordering order: an
+    /// optional priority (TT/hash) move first, then captures ordered by victim
+    /// value, then quiets.
+    ///
+    /// The concrete [`VariantPosition::staged_moves`](super::VariantPosition::staged_moves)
+    /// returns a lazy iterator whose type depends on the variant, which runtime
+    /// dispatch cannot name; this [`AnyVariant`] surface therefore collects the
+    /// staged sequence into a `Vec<Move>` (still in stage order). As a set it
+    /// equals [`AnyVariant::legal_moves`].
+    #[must_use]
+    pub fn staged_moves(&self, tt_move: Option<Move>) -> Vec<Move> {
+        dispatch!(self, p => p.staged_moves(tt_move).collect())
+    }
+
     /// Applies `mv`, returning the successor position in the same variant arm.
     ///
     /// The move must be legal (as for [`VariantPosition::play`](super::VariantPosition::play)).

@@ -123,6 +123,18 @@ impl MoveList {
         }
     }
 
+    /// Overwrites the move at `index` (inline then spill), panicking if out of
+    /// bounds — the in-place write the staged generator's MVV insertion sort uses
+    /// to reorder a stage's moves without allocating.
+    #[inline]
+    pub(crate) fn set(&mut self, index: usize, mv: Move) {
+        if index < self.inline_len {
+            self.inline[index] = mv;
+        } else {
+            self.spill[index - self.inline_len] = mv;
+        }
+    }
+
     /// Iterates over the moves in push order.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &Move> {
