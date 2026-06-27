@@ -16,9 +16,27 @@
 
 use shakmaty::fen::Fen;
 use shakmaty::variant::{Variant as ShVariant, VariantPosition as ShVariantPos};
-use shakmaty::{CastlingMode, Chess as ShChess};
+use shakmaty::{CastlingMode, Chess as ShChess, EnPassantMode, Position as _};
 
 use mce::{AnyVariant, VariantId};
+
+/// A side-agnostic, engine-agnostic game result for the differential check.
+///
+/// Both engines model an over game as either a decisive result (with a winner)
+/// or a draw; an ongoing game is `None`. We compare the two engines' verdicts
+/// on this small, shared shape so the difftest does not depend on either
+/// engine's richer `EndReason`/`variant_outcome` taxonomy. `White`/`Black` are
+/// encoded as a `bool` (`true` = white won) to avoid leaking either crate's
+/// `Color` type across the comparison boundary.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TermStatus {
+    /// The game is ongoing (no single-position termination).
+    Ongoing,
+    /// The game is over and decisive; `white_won` is the winner.
+    Decisive { white_won: bool },
+    /// The game is over and drawn.
+    Draw,
+}
 
 /// The nine variant keys used throughout the suite, matching [`crate::VARIANTS`].
 ///
@@ -86,6 +104,57 @@ impl McePos {
         &self.inner
     }
 
+    /// The legal-move set as sorted UCI strings.
+    ///
+    /// mce renders castling as king→king-destination-square (the lichess/UCI
+    /// "standard" form, e.g. `e1g1`), so to compare against shakmaty the
+    /// shakmaty side must render with [`CastlingMode::Standard`] too (see
+    /// [`ShakPos::legal_ucis`]).
+    pub fn legal_ucis(&self) -> Vec<String> {
+        let mut v: Vec<String> = self
+            .inner
+            .legal_moves()
+            .iter()
+            .map(|m| self.inner.to_uci(m))
+            .collect();
+        v.sort();
+        v
+    }
+
+    /// Whether the side to move is in check.
+    pub fn is_check(&self) -> bool {
+        self.inner.is_check()
+    }
+
+    /// The single-position termination verdict (no repetition / move-clock
+    /// claims, to match shakmaty's history-free `outcome()`).
+    pub fn term_status(&self) -> TermStatus {
+        match self.inner.outcome() {
+            None => TermStatus::Ongoing,
+            Some(mce::Outcome::Decisive { winner }) => TermStatus::Decisive {
+                white_won: winner.is_white(),
+            },
+            Some(mce::Outcome::Draw) => TermStatus::Draw,
+        }
+    }
+
+    /// This position serialized to FEN.
+    pub fn to_fen(&self) -> String {
+        self.inner.to_fen()
+    }
+
+    /// FEN round-trip: parse `self.to_fen()` back in the same variant and return
+    /// the re-serialized FEN. A correct round-trip yields the original FEN.
+    /// Returns `None` if the emitted FEN fails to re-parse.
+    pub fn fen_roundtrip(&self, variant: &str) -> Option<String> {
+        let id = keys(variant)?;
+        Some(
+            AnyVariant::from_fen(id, &self.inner.to_fen())
+                .ok()?
+                .to_fen(),
+        )
+    }
+
     /// Whether any node within `depth` plies of this position is variant-
     /// terminal (an mce-reported [`mce::Outcome`]). Used to confirm that a
     /// mismatch against shakmaty is the documented terminal-divergence case
@@ -150,10 +219,58 @@ impl ShakPos {
 
     /// Number of legal moves in this position.
     pub fn legal_move_count(&self) -> usize {
-        use shakmaty::Position;
         match self {
             ShakPos::Variant(p) => p.legal_moves().len(),
             ShakPos::Chess960(p) => p.legal_moves().len(),
+        }
+    }
+
+    /// The legal-move set as sorted UCI strings.
+    ///
+    /// Rendered with [`CastlingMode::Standard`] for **all** variants — including
+    /// chess960 — so castling is emitted as king→king-destination-square
+    /// (`e1g1`), matching mce. (`CastlingMode::Chess960` would emit the
+    /// king→rook form `e1h1` and spuriously diverge.)
+    pub fn legal_ucis(&self) -> Vec<String> {
+        let render = |m: &shakmaty::Move| m.to_uci(CastlingMode::Standard).to_string();
+        let mut v: Vec<String> = match self {
+            ShakPos::Variant(p) => p.legal_moves().iter().map(render).collect(),
+            ShakPos::Chess960(p) => p.legal_moves().iter().map(render).collect(),
+        };
+        v.sort();
+        v
+    }
+
+    /// Whether the side to move is in check.
+    pub fn is_check(&self) -> bool {
+        match self {
+            ShakPos::Variant(p) => p.is_check(),
+            ShakPos::Chess960(p) => p.is_check(),
+        }
+    }
+
+    /// The single-position termination verdict (shakmaty's history-free
+    /// `outcome()`: variant terminal, checkmate, stalemate, or insufficient
+    /// material).
+    pub fn term_status(&self) -> TermStatus {
+        let oc = match self {
+            ShakPos::Variant(p) => p.outcome(),
+            ShakPos::Chess960(p) => p.outcome(),
+        };
+        match oc {
+            None => TermStatus::Ongoing,
+            Some(shakmaty::Outcome::Decisive { winner }) => TermStatus::Decisive {
+                white_won: winner.is_white(),
+            },
+            Some(shakmaty::Outcome::Draw) => TermStatus::Draw,
+        }
+    }
+
+    /// This position serialized to FEN (Shredder/X-FEN castling for chess960).
+    pub fn to_fen(&self) -> String {
+        match self {
+            ShakPos::Variant(p) => Fen::from_position(p.clone(), EnPassantMode::Legal).to_string(),
+            ShakPos::Chess960(p) => Fen::from_position(p.clone(), EnPassantMode::Legal).to_string(),
         }
     }
 }

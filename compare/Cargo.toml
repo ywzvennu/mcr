@@ -37,6 +37,16 @@ test = false
 doc = false
 bench = false
 
+# Differential fuzzing harness (issue #109): seeded mce-vs-shakmaty cross-check
+# of legal moves / perft / check+terminal status / FEN round-trip over random
+# positions. Run with: cargo run --release --bin difftest [-- --full]
+[[bin]]
+name = "difftest"
+path = "src/bin/difftest.rs"
+test = false
+doc = false
+bench = false
+
 [[bench]]
 name = "perft_compare"
 harness = false
