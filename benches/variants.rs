@@ -7,8 +7,9 @@
 //!
 //! Run with `cargo bench --bench variants`.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use mce::{Atomic, Crazyhouse};
+use std::hint::black_box;
 
 // A middlegame atomic position with live capture/explosion interactions.
 const ATOMIC_MIDGAME: &str = "rn2kb1r/1pp1p2p/p2q1pp1/3P4/2P3b1/4PN2/PP3PPP/R2QKB1R b KQkq - 0 1";
