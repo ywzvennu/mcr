@@ -17,6 +17,14 @@
 /bindings/wasm/pkg
 # C FFI binding crate (separate nested crate; never published)
 /bindings/c/target
+# Python bindings crate (pyo3): cargo target + Python build artifacts.
+/bindings/python/target
+/bindings/python/dist
+**/__pycache__/
+*.so
+*.pyd
+.pytest_cache/
+*.egg-info/
 
 # proptest failure-replay seeds: regenerated on demand, not part of the suite.
 proptest-regressions/

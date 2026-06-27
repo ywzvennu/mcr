@@ -1,0 +1,45 @@
+# mce-python — pyo3 Python bindings for the mce chess engine.
+#
+# This is a separate, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build`/`cargo
+# test`; it depends on `mce` by path. It is `publish = false` and is never
+# published from here — distribution happens as a Python wheel built by
+# `maturin` (see pyproject.toml), not via `cargo publish`.
+#
+# Build (preferred, produces an importable `mce` module / wheel):
+#     pip install maturin
+#     cd bindings/python
+#     maturin develop            # build + install into the active venv
+#     maturin build --release    # build a wheel into target/wheels/
+#
+# Plain `cargo build` here compiles the cdylib too, which is handy as a
+# compile check when maturin is unavailable.
+
+[package]
+name = "mce-python"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[lib]
+# The Python extension module is a C dynamic library. `name = "mce"` makes the
+# produced artifact `mce.so` / `mce.pyd`, i.e. `import mce`.
+name = "mce"
+crate-type = ["cdylib"]
+
+[dependencies]
+# `extension-module` tells pyo3 not to link libpython (the wheel resolves it at
+# import time). `abi3-py38` builds a single stable-ABI wheel that runs on
+# CPython 3.8+ instead of one wheel per minor version.
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py38"] }
+
+# Path dependency on the parent mce library. Default features (std) are fine —
+# the binding is a host-side wheel, not a no_std target.
+mce = { path = "../.." }
+
+[lints.rust]
+# The core mce library is unsafe-free; keep this binding's own code safe too.
+# (pyo3's macro expansion contains its own audited unsafe, which this lint does
+# not reach — it only governs unsafe written directly in this crate.)
+unsafe_code = "deny"
