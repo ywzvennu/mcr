@@ -675,7 +675,7 @@ impl Position {
     /// Shared body of [`Position::pseudo_into`]; `standard_castles` controls
     /// whether the standard castle generator runs.
     fn pseudo_into_with_castles(&self, out: &mut MoveList, standard_castles: bool) {
-        self.pseudo_into_with(out, standard_castles, false);
+        self.pseudo_into_with(out, standard_castles, false, false);
     }
 
     /// Pushes the pseudo-legal moves of the side to move into `out`, exactly like
@@ -684,7 +684,17 @@ impl Position {
     /// every other variant call the wrappers above with the flag `false`, leaving
     /// their move sets identical.
     pub(crate) fn pseudo_into_horde(&self, out: &mut MoveList) {
-        self.pseudo_into_with(out, true, true);
+        self.pseudo_into_with(out, true, true, false);
+    }
+
+    /// Pushes the pseudo-legal moves of the side to move into `out`, exactly like
+    /// [`Position::pseudo_into`], but emitting king steps for *every* king of the
+    /// side to move rather than just one. Antichess allows promotion to a king, so
+    /// a side may have several kings and each must generate its moves; standard
+    /// chess (exactly one king) keeps the faster single-king [`Position::pseudo_into`].
+    /// Castling is never emitted here (antichess has no castling).
+    pub(crate) fn pseudo_into_all_kings(&self, out: &mut MoveList) {
+        self.pseudo_into_with(out, false, false, true);
     }
 
     /// Shared body of the pseudo-legal generators. `standard_castles` controls
@@ -695,6 +705,7 @@ impl Position {
         out: &mut MoveList,
         standard_castles: bool,
         white_first_rank_double: bool,
+        all_kings: bool,
     ) {
         let us = self.turn;
         let them = us.opposite();
@@ -747,8 +758,26 @@ impl Position {
         self.gen_slider_moves(out, us, occupied, our_pieces, their_pieces, full, &no_pins);
 
         // King steps to any non-friendly square (king-safety is left to the
-        // caller's filter).
-        if let Some(king_sq) = board.king_of(us) {
+        // caller's filter). In standard chess a side has exactly one king, so the
+        // single `king_of` square suffices and stays the fast path. Antichess can
+        // have several kings (pawns may promote to a king), so `all_kings` makes
+        // every king of the side emit its steps by iterating the king bitboard.
+        if all_kings {
+            for king_sq in board.pieces(us, Role::King) {
+                let king_targets = king_attacks(king_sq) & !our_pieces;
+                for to in king_targets {
+                    let kind = if their_pieces.contains(to) {
+                        MoveKind::Capture
+                    } else {
+                        MoveKind::Quiet
+                    };
+                    out.push(Move::new(king_sq, to, kind));
+                }
+            }
+            // No castling: `all_kings` is only used by antichess, which has no
+            // castling, and "the king" for castling is ambiguous with several
+            // kings anyway. (`standard_castles` is already `false` for this path.)
+        } else if let Some(king_sq) = board.king_of(us) {
             let king_targets = king_attacks(king_sq) & !our_pieces;
             for to in king_targets {
                 let kind = if their_pieces.contains(to) {
