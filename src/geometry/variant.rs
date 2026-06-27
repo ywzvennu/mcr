@@ -17,7 +17,7 @@
 use alloc::vec::Vec;
 
 use super::attacks;
-use super::position::{GenericCastling, GenericState};
+use super::position::{GenericCastling, GenericGating, GenericState};
 use super::role::WideRole;
 use super::{Bitboard, Board, Geometry, Square};
 use crate::Color;
@@ -210,6 +210,33 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// Reserved no-op hook for drop generation (Shogi / crazyhouse). Standard
     /// chess emits no drops, so the default does nothing.
     fn emit_drops(_board: &Board<G>, _state: &GenericState<G>, _out: &mut Vec<super::WideMove>) {}
+
+    // --- Seirawan gating (default OFF) ------------------------------------
+
+    /// Returns `true` if this variant supports Seirawan gating: a back-rank piece
+    /// making its first move (including the king and rook of a castling move) may
+    /// optionally gate a reserve piece (Hawk or Elephant) onto the vacated
+    /// square.
+    ///
+    /// The default is `false`. While it is `false` the generic engine skips every
+    /// gating code path — move generation, application, and state never consult
+    /// the [`GenericGating`] field — so a variant that does not gate produces
+    /// byte-identical moves and state to a build without the gating feature. Only
+    /// Seirawan overrides this to `true`.
+    fn supports_gating() -> bool {
+        false
+    }
+
+    /// The initial gating state for a fresh game: the gating-eligible squares
+    /// (the original back-rank squares whose first move may gate) and each side's
+    /// reserve pieces in hand.
+    ///
+    /// The default is [`GenericGating::NONE`] (no eligible squares, no reserves),
+    /// matching `supports_gating() == false`. Seirawan overrides
+    /// [`WideVariant::starting_position`] to seed a populated value.
+    fn initial_gating() -> GenericGating<G> {
+        GenericGating::NONE
+    }
 }
 
 /// The reason a wide game ended, the generic analogue of
@@ -249,6 +276,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             turn: Color::White,
             castling: GenericCastling::standard::<G>(),
             ep_square: None,
+            gating: GenericGating::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

@@ -27,7 +27,9 @@ use core::marker::PhantomData;
 use super::attacks::{between, line};
 use super::role::WideRole;
 use super::variant::{WideEndReason, WideVariant};
-use super::{Bitboard, Board, Geometry, Square, WideMove, WideMoveKind, WidePiece};
+use super::{
+    Bitboard, Board, GateRole, GateSquare, Geometry, Square, WideMove, WideMoveKind, WidePiece,
+};
 use crate::Color;
 
 /// The castling rights of a generic position: per color and side, the file the
@@ -113,6 +115,147 @@ impl GenericCastling {
     }
 }
 
+/// Bit `0` = Hawk available, bit `1` = Elephant available, in a per-color reserve
+/// mask. Matches the [`GateRole`](super::GateRole) order.
+const RESERVE_HAWK: u8 = 0b01;
+const RESERVE_ELEPHANT: u8 = 0b10;
+
+/// The Seirawan gating state of a generic position: the reserve pieces each side
+/// still holds in hand and the squares from which a piece may still gate one in.
+///
+/// This is the one piece of variant state the generic engine threads through
+/// move generation and [`apply`](GenericPosition::apply). For every non-gating
+/// variant it is [`GenericGating::NONE`] — an empty eligible set and no reserves —
+/// so the gating code paths, all guarded behind
+/// [`WideVariant::supports_gating`], never fire and the produced moves and state
+/// stay byte-identical to a build without gating.
+pub struct GenericGating<G: Geometry> {
+    /// The squares a piece may still gate from: a back-rank square holding a
+    /// piece that has not yet moved, for a side that still has a reserve.
+    eligible: Bitboard<G>,
+    /// Per-color reserve mask: `[white, black]`, each a combination of
+    /// [`RESERVE_HAWK`] / [`RESERVE_ELEPHANT`].
+    reserves: [u8; 2],
+}
+
+// Manual trait impls so the geometry marker `G` need not implement these; the
+// bounds rest on `Bitboard<G>` (which carries them only over `G::Bits`), exactly
+// as `Board<G>` does.
+impl<G: Geometry> Clone for GenericGating<G> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<G: Geometry> Copy for GenericGating<G> {}
+
+impl<G: Geometry> PartialEq for GenericGating<G> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.eligible == other.eligible && self.reserves == other.reserves
+    }
+}
+
+impl<G: Geometry> Eq for GenericGating<G> {}
+
+impl<G: Geometry> core::hash::Hash for GenericGating<G> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        // Hash the eligible set by its square indices so the impl is
+        // unconditional in `G::Bits` (mirroring `Square`'s unconditional `Hash`),
+        // keeping `GenericState`'s derived `Hash` free of a `G::Bits: Hash` bound.
+        for sq in self.eligible {
+            sq.index().hash(state);
+        }
+        self.reserves.hash(state);
+    }
+}
+
+impl<G: Geometry> Default for GenericGating<G> {
+    #[inline]
+    fn default() -> Self {
+        GenericGating::NONE
+    }
+}
+
+impl<G: Geometry> core::fmt::Debug for GenericGating<G> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("GenericGating")
+            .field("eligible", &self.eligible.count())
+            .field("reserves", &self.reserves)
+            .finish()
+    }
+}
+
+impl<G: Geometry> GenericGating<G> {
+    /// No gating: an empty eligible set and no reserves. The value every
+    /// non-Seirawan variant carries.
+    pub const NONE: GenericGating<G> = GenericGating {
+        eligible: Bitboard::EMPTY,
+        reserves: [0, 0],
+    };
+
+    /// Builds a gating state from an eligible square set and per-color reserve
+    /// availability for the Hawk and Elephant.
+    #[must_use]
+    #[inline]
+    pub fn new(eligible: Bitboard<G>, white: [bool; 2], black: [bool; 2]) -> GenericGating<G> {
+        GenericGating {
+            eligible,
+            reserves: [reserve_mask(white), reserve_mask(black)],
+        }
+    }
+
+    /// The set of squares `color` may still gate from.
+    #[must_use]
+    #[inline]
+    pub fn eligible(self) -> Bitboard<G> {
+        self.eligible
+    }
+
+    /// Returns `true` if `color` still holds the given reserve piece.
+    #[must_use]
+    #[inline]
+    pub fn has_reserve(self, color: Color, gate: super::GateRole) -> bool {
+        self.reserves[color_ix(color)] & gate_bit(gate) != 0
+    }
+
+    /// Returns `true` if `color` holds at least one reserve piece.
+    #[must_use]
+    #[inline]
+    pub fn any_reserve(self, color: Color) -> bool {
+        self.reserves[color_ix(color)] != 0
+    }
+
+    /// Consumes `color`'s reserve `gate` (it has been gated in).
+    #[inline]
+    fn take_reserve(&mut self, color: Color, gate: super::GateRole) {
+        self.reserves[color_ix(color)] &= !gate_bit(gate);
+    }
+
+    /// Clears `square` from the eligible set (its piece has moved or been
+    /// captured), a no-op if it was not eligible.
+    #[inline]
+    fn vacate(&mut self, square: Square<G>) {
+        self.eligible = self.eligible.without(square);
+    }
+}
+
+/// Packs a `[hawk, elephant]` availability pair into a reserve mask.
+#[inline]
+fn reserve_mask(avail: [bool; 2]) -> u8 {
+    (if avail[0] { RESERVE_HAWK } else { 0 }) | (if avail[1] { RESERVE_ELEPHANT } else { 0 })
+}
+
+/// The reserve-mask bit for a [`GateRole`](super::GateRole).
+#[inline]
+const fn gate_bit(gate: super::GateRole) -> u8 {
+    match gate {
+        super::GateRole::Hawk => RESERVE_HAWK,
+        super::GateRole::Elephant => RESERVE_ELEPHANT,
+    }
+}
+
 /// The non-board state of a generic position: side to move, castling rights,
 /// en-passant target square, and the two move clocks.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -123,6 +266,9 @@ pub struct GenericState<G: Geometry> {
     pub castling: GenericCastling,
     /// The en-passant target square (the square a pawn skipped), if any.
     pub ep_square: Option<Square<G>>,
+    /// The Seirawan gating state (reserves in hand + gating-eligible squares).
+    /// [`GenericGating::NONE`] for every non-gating variant.
+    pub gating: GenericGating<G>,
     /// The halfmove clock (plies since the last capture or pawn move).
     pub halfmove_clock: u16,
     /// The fullmove number (incremented after a black move).
@@ -135,6 +281,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("turn", &self.turn)
             .field("castling", &self.castling)
             .field("ep_square", &self.ep_square.map(|s| s.index()))
+            .field("gating", &self.gating)
             .field("halfmove_clock", &self.halfmove_clock)
             .field("fullmove_number", &self.fullmove_number)
             .finish()
@@ -434,11 +581,82 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
 
         self.append_drops(out);
+
+        // Seirawan gating: a back-rank piece's first move (and the king/rook of a
+        // castle) may optionally gate a reserve onto the vacated square. Each base
+        // move generated above is independently legal, so the gate — a friendly
+        // piece dropped on an evacuated square — never changes legality (it can
+        // neither expose nor shield our own king). Default-off: skipped entirely
+        // unless the variant supports gating.
+        if V::supports_gating() {
+            self.append_gating_moves(out, us);
+        }
     }
 
     /// Appends any variant drop moves (reserved; standard chess emits none).
     fn append_drops(&self, out: &mut Vec<WideMove>) {
         V::emit_drops(&self.board, &self.state, out);
+    }
+
+    /// For every base move already in `out` that vacates a gating-eligible
+    /// square, appends the gated variants (one per available reserve piece). A
+    /// castling move vacates two eligible squares (the king's origin and the
+    /// castling rook's origin); each may host a gate, but never both at once.
+    ///
+    /// The base moves stay in the list (gating is optional), so this only *adds*
+    /// the gated alternatives. It reads only the eligible set and the reserves
+    /// from the gating state.
+    fn append_gating_moves(&self, out: &mut Vec<WideMove>, us: Color) {
+        let gating = self.state.gating;
+        if !gating.any_reserve(us) {
+            return;
+        }
+        let eligible = gating.eligible();
+        if eligible.is_empty() {
+            return;
+        }
+        let reserves: Vec<GateRole> = [GateRole::Hawk, GateRole::Elephant]
+            .into_iter()
+            .filter(|&r| gating.has_reserve(us, r))
+            .collect();
+
+        // Snapshot the base-move count: only the moves present before this pass
+        // are gating candidates (we must not gate an already-gated move).
+        let base_len = out.len();
+        for i in 0..base_len {
+            let mv = out[i];
+            if mv.is_castle() {
+                // Castling vacates the king origin (mv.from) and the rook origin.
+                let king_from = mv.from::<G>();
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                let rook_from = self
+                    .state
+                    .castling
+                    .rook_file(us, side)
+                    .and_then(|f| Square::<G>::from_file_rank(f, back_rank::<G>(us)));
+                for &r in &reserves {
+                    if eligible.contains(king_from) {
+                        out.push(mv.with_gate(r, GateSquare::Origin));
+                    }
+                    if let Some(rook_from) = rook_from {
+                        if eligible.contains(rook_from) {
+                            out.push(mv.with_gate(r, GateSquare::RookOrigin));
+                        }
+                    }
+                }
+            } else {
+                let from = mv.from::<G>();
+                if eligible.contains(from) {
+                    for &r in &reserves {
+                        out.push(mv.with_gate(r, GateSquare::Origin));
+                    }
+                }
+            }
+        }
     }
 
     /// Generates the side-to-move's pawn moves: single and double pushes,
@@ -671,6 +889,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         self.state.ep_square = None;
 
+        // The castling rook's origin, captured for the gating update below (a
+        // castle vacates both the king's and the rook's squares).
+        let mut castle_rook_from: Option<Square<G>> = None;
+
         match mv.kind() {
             WideMoveKind::Quiet => {
                 self.board.remove_piece(from);
@@ -724,6 +946,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 self.board.remove_piece(rook_from);
                 self.board.set_piece(to, moving);
                 self.board.set_piece(rook_to, rook);
+                castle_rook_from = Some(rook_from);
             }
             WideMoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
@@ -745,6 +968,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.revoke_rights_for_square(to, them);
         }
 
+        // Seirawan gating-state update (default-off). A piece leaving a
+        // gating-eligible square (its origin, plus a castling rook's origin)
+        // clears that square; a captured enemy piece on an eligible square clears
+        // it too; and the gate itself places the reserve and consumes it.
+        if V::supports_gating() {
+            self.update_gating(mv, from, to, us, castle_rook_from);
+        }
+
         if reset_clock {
             self.state.halfmove_clock = 0;
         } else {
@@ -754,6 +985,61 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.state.fullmove_number = self.state.fullmove_number.saturating_add(1);
         }
         self.state.turn = them;
+    }
+
+    /// Updates the Seirawan gating state after a move (gating variants only):
+    /// vacated eligible squares are cleared, a captured enemy piece on an
+    /// eligible square is cleared, and a gate places its reserve piece (consuming
+    /// it from hand) on the chosen vacated square.
+    fn update_gating(
+        &mut self,
+        mv: &WideMove,
+        from: Square<G>,
+        to: Square<G>,
+        us: Color,
+        castle_rook_from: Option<Square<G>>,
+    ) {
+        // A square stays gating-eligible only while it holds its *original*,
+        // never-moved piece. Any piece moving off a square (`from`) or onto it
+        // (`to`) ends that: the origin's piece has left, and a destination now
+        // holds a foreign piece (or, on a capture, the original occupant is
+        // gone). So both the origin and the destination are cleared. This keeps
+        // the eligible set exactly "virgin back-rank squares", matching FSF's
+        // per-square gating rights.
+        self.state.gating.vacate(from);
+        self.state.gating.vacate(to);
+        // A castle also moves the rook: its origin and destination are no longer
+        // virgin either.
+        if let Some(rook_from) = castle_rook_from {
+            self.state.gating.vacate(rook_from);
+            // The rook's destination square is `to`-adjacent; clear it too so a
+            // rook parked on a back-rank square never re-gates.
+            let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                KINGSIDE
+            } else {
+                QUEENSIDE
+            };
+            let (_k, rook_dest_file) = V::castle_dest_files(side);
+            if let Some(rook_to) = Square::<G>::from_file_rank(rook_dest_file, from.rank()) {
+                self.state.gating.vacate(rook_to);
+            }
+        }
+
+        // Apply the gate itself: drop the reserve on the chosen vacated square.
+        if let Some(gate) = mv.gate() {
+            let square = match mv.gate_square() {
+                GateSquare::Origin => Some(from),
+                GateSquare::RookOrigin => castle_rook_from,
+            };
+            if let Some(square) = square {
+                self.board
+                    .set_piece(square, WidePiece::new(us, gate.role()));
+                self.state.gating.take_reserve(us, gate);
+                // The freshly gated piece sits on a back-rank square but is a new
+                // piece that has itself just "moved" in — it is not gating-
+                // eligible, and `vacate(from)` above already cleared the square.
+            }
+        }
     }
 
     /// If `square` is a castling rook's home square for `color`, revokes that
@@ -831,7 +1117,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     pub fn from_fen(fen: &str) -> Result<Self, WideFenError> {
         let mut fields = fen.split_whitespace();
 
-        let placement = fields.next().ok_or(WideFenError::MissingField)?;
+        let placement_field = fields.next().ok_or(WideFenError::MissingField)?;
+        // Gating variants append the reserves in hand as a `[HEhe]`-style bracket
+        // after the board placement (the crazyhouse holdings convention). Split it
+        // off before parsing the board.
+        let (placement, holdings) = split_holdings(placement_field);
         let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
         let turn = match fields.next().ok_or(WideFenError::MissingField)? {
@@ -841,7 +1131,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
 
         let castling_field = fields.next().ok_or(WideFenError::MissingField)?;
-        let castling = parse_castling::<G>(castling_field, &board)?;
+        // A gating variant folds gating-square rights into the castling field
+        // (e.g. `KQBCDFGkqbcdfg`): the `KQkq` letters are castling rights and the
+        // file letters mark gating-eligible squares. Non-gating variants reject
+        // any non-`KQkq` letter, exactly as before.
+        let (castling, gating) = if V::supports_gating() {
+            parse_castling_and_gating::<G>(castling_field, holdings, &board)?
+        } else {
+            (
+                parse_castling::<G>(castling_field, &board)?,
+                GenericGating::NONE,
+            )
+        };
 
         let ep_field = fields.next().ok_or(WideFenError::MissingField)?;
         let ep_square = parse_ep::<G>(ep_field)?;
@@ -863,6 +1164,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             turn,
             castling,
             ep_square,
+            gating,
             halfmove_clock,
             fullmove_number,
         };
@@ -870,13 +1172,29 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     }
 
     /// Serializes this position as a six-field FEN string over `G`.
+    ///
+    /// A gating variant appends the reserves in hand to the placement field as a
+    /// `[..]` bracket and folds the gating-eligible squares into the castling
+    /// field (`KQBCDFGkqbcdfg`-style), matching the Fairy-Stockfish S-Chess
+    /// dialect. A non-gating variant produces the plain six-field FEN unchanged.
     #[must_use]
     pub fn to_fen(&self) -> String {
         let mut out = self.board.to_fen_placement();
+        if V::supports_gating() {
+            write_holdings(self.state.gating, &mut out);
+        }
         out.push(' ');
         out.push(if self.state.turn.is_white() { 'w' } else { 'b' });
         out.push(' ');
-        write_castling(self.state.castling, &mut out);
+        if V::supports_gating() {
+            let kings = [
+                self.board.king_of(Color::White),
+                self.board.king_of(Color::Black),
+            ];
+            write_castling_and_gating::<G>(self.state.castling, self.state.gating, kings, &mut out);
+        } else {
+            write_castling(self.state.castling, &mut out);
+        }
         out.push(' ');
         match self.state.ep_square {
             Some(sq) => write_square::<G>(&mut out, sq),
@@ -1121,6 +1439,209 @@ fn write_castling(castling: GenericCastling, out: &mut String) {
     if castling.rook_file(Color::Black, QUEENSIDE).is_some() {
         out.push('q');
     }
+    if out.len() == before {
+        out.push('-');
+    }
+}
+
+// -- Gating (Seirawan) FEN helpers ------------------------------------------
+
+/// Splits a `[..]`-bracketed holdings suffix off a placement field, returning the
+/// bare placement and the holdings string (empty if there was no bracket).
+///
+/// Seirawan (and crazyhouse) append the reserves in hand after the board as
+/// `rnbqkbnr/.../RNBQKBNR[HEhe]`. The board parser cannot see the bracket, so it
+/// is split here.
+fn split_holdings(placement_field: &str) -> (&str, &str) {
+    match placement_field.split_once('[') {
+        Some((board, rest)) => (board, rest.strip_suffix(']').unwrap_or(rest)),
+        None => (placement_field, ""),
+    }
+}
+
+/// Parses a combined castling-and-gating field for a gating variant, together
+/// with the holdings string, into the castling rights and the gating state.
+///
+/// The field interleaves `KQkq` castling letters with gating-square file letters
+/// (uppercase = white's back rank, lowercase = black's): e.g.
+/// `KQBCDFGkqbcdfg`. A castling letter additionally makes its rook square (and,
+/// since the king is then unmoved, the king square) gating-eligible — these
+/// redundancies are not spelled out explicitly, matching the FSF dialect.
+fn parse_castling_and_gating<G: Geometry>(
+    field: &str,
+    holdings: &str,
+    board: &Board<G>,
+) -> Result<(GenericCastling, GenericGating<G>), WideFenError> {
+    let mut castling = GenericCastling::NONE;
+    let mut eligible = Bitboard::<G>::EMPTY;
+
+    if field != "-" {
+        for ch in field.chars() {
+            match ch {
+                'K' | 'Q' | 'k' | 'q' => {
+                    let (color, side) = match ch {
+                        'K' => (Color::White, KINGSIDE),
+                        'Q' => (Color::White, QUEENSIDE),
+                        'k' => (Color::Black, KINGSIDE),
+                        _ => (Color::Black, QUEENSIDE),
+                    };
+                    let rank = back_rank::<G>(color);
+                    let rook_file = outermost_rook_file::<G>(board, color, side, rank)
+                        .ok_or(WideFenError::BadCastling)?;
+                    castling.set(color, side, Some(rook_file));
+                    // The rook and (unmoved) king squares are gating-eligible.
+                    if let Some(sq) = Square::<G>::from_file_rank(rook_file, rank) {
+                        eligible.set(sq);
+                    }
+                    if let Some(king) = board.king_of(color) {
+                        if king.rank() == rank {
+                            eligible.set(king);
+                        }
+                    }
+                }
+                // An explicit file letter marks a gating-eligible back-rank
+                // square: uppercase for white (rank 0), lowercase for black.
+                'A'..='Z' => mark_gating_file::<G>(&mut eligible, ch, Color::White)?,
+                'a'..='z' => mark_gating_file::<G>(&mut eligible, ch, Color::Black)?,
+                _ => return Err(WideFenError::BadCastling),
+            }
+        }
+    }
+
+    let (white, black) = parse_holdings(holdings)?;
+    Ok((castling, GenericGating::new(eligible, white, black)))
+}
+
+/// Marks the gating-eligible back-rank square named by a file letter (`a`..`z`,
+/// case already classified to `color`) in `eligible`.
+fn mark_gating_file<G: Geometry>(
+    eligible: &mut Bitboard<G>,
+    ch: char,
+    color: Color,
+) -> Result<(), WideFenError> {
+    let file = (ch.to_ascii_lowercase() as u8).wrapping_sub(b'a');
+    if file >= G::WIDTH {
+        return Err(WideFenError::BadCastling);
+    }
+    let rank = back_rank::<G>(color);
+    if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+        eligible.set(sq);
+    }
+    Ok(())
+}
+
+/// The outermost rook file for a color/side on `rank`: the rightmost rook for the
+/// kingside, the leftmost for the queenside.
+fn outermost_rook_file<G: Geometry>(
+    board: &Board<G>,
+    color: Color,
+    side: usize,
+    rank: u8,
+) -> Option<u8> {
+    let rooks = board.pieces(color, WideRole::Rook);
+    let mut chosen: Option<u8> = None;
+    for file in 0..G::WIDTH {
+        if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+            if rooks.contains(sq) {
+                match side {
+                    KINGSIDE => chosen = Some(file),
+                    _ => {
+                        if chosen.is_none() {
+                            chosen = Some(file);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    chosen
+}
+
+/// Parses the `[HEhe]`-style holdings string into per-color `[hawk, elephant]`
+/// reserve availability. Uppercase letters are white's reserves, lowercase
+/// black's; the Hawk is `H`/`h` and the Elephant `E`/`e` (the FSF S-Chess
+/// dialect). Any other letter is rejected.
+fn parse_holdings(holdings: &str) -> Result<([bool; 2], [bool; 2]), WideFenError> {
+    let mut white = [false; 2];
+    let mut black = [false; 2];
+    for ch in holdings.chars() {
+        match ch {
+            'H' => white[0] = true,
+            'E' => white[1] = true,
+            'h' => black[0] = true,
+            'e' => black[1] = true,
+            _ => return Err(WideFenError::BadCastling),
+        }
+    }
+    Ok((white, black))
+}
+
+/// Writes the `[..]` holdings bracket for a gating variant: the white reserves
+/// (uppercase) then the black reserves (lowercase), Hawk before Elephant. An
+/// empty hand emits `[]`.
+fn write_holdings<G: Geometry>(gating: GenericGating<G>, out: &mut String) {
+    out.push('[');
+    for (color, hawk, eleph) in [(Color::White, 'H', 'E'), (Color::Black, 'h', 'e')] {
+        if gating.has_reserve(color, GateRole::Hawk) {
+            out.push(hawk);
+        }
+        if gating.has_reserve(color, GateRole::Elephant) {
+            out.push(eleph);
+        }
+    }
+    out.push(']');
+}
+
+/// Writes the combined castling-and-gating field for a gating variant: the
+/// `KQkq` castling letters followed by the explicit gating-square file letters
+/// not already implied by a castling right (the rook square it names, and the
+/// king square — since a castling right means the king is unmoved). `kings` is
+/// `[white_king, black_king]`. Emits `-` if there is neither a castling right nor
+/// an eligible square.
+fn write_castling_and_gating<G: Geometry>(
+    castling: GenericCastling,
+    gating: GenericGating<G>,
+    kings: [Option<Square<G>>; 2],
+    out: &mut String,
+) {
+    let before = out.len();
+    write_castling(castling, out);
+    // `write_castling` writes `-` for no rights; strip it so we can append gating
+    // letters (and re-add `-` only if nothing at all is written below).
+    if out.ends_with('-') {
+        out.pop();
+    }
+
+    let eligible = gating.eligible();
+    for (color, king, upper) in [
+        (Color::White, kings[0], true),
+        (Color::Black, kings[1], false),
+    ] {
+        let rank = back_rank::<G>(color);
+        // Squares already implied by a castling right (rook squares named, and
+        // the king square since the king is then unmoved) are not re-listed.
+        let mut implied = Bitboard::<G>::EMPTY;
+        for side in [KINGSIDE, QUEENSIDE] {
+            if let Some(file) = castling.rook_file(color, side) {
+                if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+                    implied.set(sq);
+                }
+            }
+        }
+        if castling.has_any(color) {
+            if let Some(king) = king {
+                implied.set(king);
+            }
+        }
+        for sq in eligible {
+            if sq.rank() != rank || implied.contains(sq) {
+                continue;
+            }
+            let ch = (b'a' + sq.file()) as char;
+            out.push(if upper { ch.to_ascii_uppercase() } else { ch });
+        }
+    }
+
     if out.len() == before {
         out.push('-');
     }

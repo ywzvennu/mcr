@@ -47,13 +47,14 @@ pub use backing::BitboardBacking;
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
 pub use position::{
-    perft, perft_divide, GenericCastling, GenericPosition, GenericState, WideFenError, WideOutcome,
+    perft, perft_divide, GenericCastling, GenericGating, GenericPosition, GenericState,
+    WideFenError, WideOutcome,
 };
 pub use role::WideRole;
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
-pub use variants::{Capablanca, CapablancaRules, Makruk, MakrukRules};
-pub use wide_move::{WideMove, WideMoveKind};
+pub use variants::{Capablanca, CapablancaRules, Makruk, MakrukRules, Seirawan, SeirawanRules};
+pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
 /// A compile-time board geometry.
 ///
