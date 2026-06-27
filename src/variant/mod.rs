@@ -831,6 +831,34 @@ impl<V: Variant> VariantPosition<V> {
         moves
     }
 
+    /// A staged, lazy iterator over this variant position's legal moves for move
+    /// ordering: an optional priority (TT/hash) move first, then captures ordered
+    /// by victim value, then quiets. The yielded set equals
+    /// [`VariantPosition::legal_moves`] for every variant.
+    ///
+    /// Unlike the standard-chess [`Position::staged_moves`], which masks the fast
+    /// generator per stage, the variant path reuses the variant's single legal
+    /// generator (which already folds in forced captures, drops, and the
+    /// variant's king-safety rules) and partitions its output into captures and
+    /// quiets — so the set invariant holds by construction. The partition is built
+    /// once, the first time a non-TT move is pulled; a search that cuts off on the
+    /// TT move pays nothing for it.
+    ///
+    /// ```
+    /// use mce::Atomic;
+    /// use std::collections::BTreeSet;
+    ///
+    /// // `Atomic` is the `VariantPosition<AtomicRules>` alias.
+    /// let pos = Atomic::startpos();
+    /// let staged: BTreeSet<_> = pos.staged_moves(None).collect();
+    /// let legal: BTreeSet<_> = pos.legal_moves().into_iter().collect();
+    /// assert_eq!(staged, legal);
+    /// ```
+    #[must_use]
+    pub fn staged_moves(&self, tt_move: Option<Move>) -> VariantMoveGenerator<'_, V> {
+        VariantMoveGenerator::new(self, tt_move)
+    }
+
     /// Fills `out` with the legal moves of the side to move under variant `V`,
     /// clearing it first. Sharing this with [`perft_variant`] lets perft reuse a
     /// single per-ply buffer rather than allocate one per node.
@@ -1227,6 +1255,102 @@ impl<V: Variant + Default> core::str::FromStr for VariantPosition<V> {
 /// The halfmove-clock value (in plies) at which the seventy-five-move rule ends
 /// the game automatically. Kept in step with [`crate::outcome`].
 const SEVENTY_FIVE_MOVE_PLIES: u32 = 150;
+
+/// A staged, lazy iterator over a [`VariantPosition`]'s legal moves for move
+/// ordering — the variant-generic analogue of [`crate::MoveGenerator`].
+///
+/// Built by [`VariantPosition::staged_moves`]. It yields an optional priority
+/// (TT) move first, then captures ordered most-valuable-victim first, then
+/// quiets, and the union of all stages equals [`VariantPosition::legal_moves`].
+/// See that method for the design and the set guarantee.
+#[derive(Debug)]
+pub struct VariantMoveGenerator<'a, V: Variant> {
+    pos: &'a VariantPosition<V>,
+    /// The supplied priority move, taken once handled so it is emitted at most
+    /// once.
+    tt_move: Option<Move>,
+    /// The TT move actually yielded, excluded from the later stages by equality.
+    tt_yielded: Option<Move>,
+    /// `false` until the capture/quiet partition has been materialized.
+    loaded: bool,
+    /// Legal captures, ordered by victim value; then legal quiets. Filled once on
+    /// the first non-TT pull.
+    captures: MoveList,
+    quiets: MoveList,
+    /// Read cursor: indexes `captures` first, then `quiets`.
+    cursor: usize,
+}
+
+impl<'a, V: Variant> VariantMoveGenerator<'a, V> {
+    fn new(pos: &'a VariantPosition<V>, tt_move: Option<Move>) -> VariantMoveGenerator<'a, V> {
+        VariantMoveGenerator {
+            pos,
+            tt_move,
+            tt_yielded: None,
+            loaded: false,
+            captures: MoveList::new(),
+            quiets: MoveList::new(),
+            cursor: 0,
+        }
+    }
+
+    /// Materializes the variant's legal moves once and partitions them into a
+    /// victim-ordered captures list and a quiets list. Reusing the variant's own
+    /// `generate_legal_into` (forced captures, drops, variant king-safety already
+    /// folded in) makes the staged set equal to `legal_moves` by construction.
+    fn load(&mut self) {
+        let mut all = MoveList::new();
+        self.pos.generate_legal_into(&mut all);
+        for mv in &all {
+            if mv.is_capture() {
+                self.captures.push(*mv);
+            } else {
+                self.quiets.push(*mv);
+            }
+        }
+        crate::staged::sort_by_victim(&self.pos.core, &mut self.captures);
+        self.loaded = true;
+    }
+
+    /// Pulls the next legal move in staged order, or `None` when exhausted.
+    pub fn next_move(&mut self) -> Option<Move> {
+        // Stage 1: the TT move, if legal.
+        if let Some(mv) = self.tt_move.take() {
+            if self.pos.is_legal(&mv) {
+                self.tt_yielded = Some(mv);
+                return Some(mv);
+            }
+        }
+        if !self.loaded {
+            self.load();
+        }
+        // Stages 2 and 3: captures then quiets, skipping an already-yielded TT
+        // move so it is not repeated.
+        let total = self.captures.len() + self.quiets.len();
+        while self.cursor < total {
+            let i = self.cursor;
+            self.cursor += 1;
+            let mv = if i < self.captures.len() {
+                self.captures[i]
+            } else {
+                self.quiets[i - self.captures.len()]
+            };
+            if self.tt_yielded != Some(mv) {
+                return Some(mv);
+            }
+        }
+        None
+    }
+}
+
+impl<V: Variant> Iterator for VariantMoveGenerator<'_, V> {
+    type Item = Move;
+
+    #[inline]
+    fn next(&mut self) -> Option<Move> {
+        self.next_move()
+    }
+}
 
 /// Counts the leaf nodes reachable in exactly `depth` plies from a
 /// [`VariantPosition`], the variant-generic analogue of [`crate::perft`].

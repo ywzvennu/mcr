@@ -330,6 +330,80 @@ impl MoveSink for CountSink {
     }
 }
 
+/// A [`MoveSink`] that forwards into a [`MoveList`] only those moves matching a
+/// capture/quiet predicate, the per-stage destination of the staged
+/// (lazy) move generator. Running the *same* legal generator
+/// ([`Position::generate_into_with_castles`]) through this filter twice — once
+/// keeping captures, once keeping non-captures — partitions the legal move set
+/// into a captures stage and a quiets stage with no change to which moves are
+/// produced. The split is purely an output filter: it never alters generation,
+/// so the two stages together reproduce `generate_into(..)` exactly.
+///
+/// "Capture" here is [`Move::is_capture`] — ordinary captures, en passant, and
+/// capturing promotions — which is the same predicate the staged generator uses
+/// to order captures before quiets. Non-capturing promotions, double pushes, and
+/// castles fall into the quiets stage.
+pub(crate) struct FilterSink<'a> {
+    out: &'a mut MoveList,
+    /// When `true` keep captures (and capturing promotions); when `false` keep
+    /// everything else.
+    want_captures: bool,
+}
+
+impl<'a> FilterSink<'a> {
+    /// A sink that keeps only capturing moves.
+    #[inline]
+    fn captures(out: &'a mut MoveList) -> FilterSink<'a> {
+        FilterSink {
+            out,
+            want_captures: true,
+        }
+    }
+
+    /// A sink that keeps only non-capturing moves.
+    #[inline]
+    fn quiets(out: &'a mut MoveList) -> FilterSink<'a> {
+        FilterSink {
+            out,
+            want_captures: false,
+        }
+    }
+
+    #[inline]
+    fn keep(&mut self, mv: Move) {
+        if mv.is_capture() == self.want_captures {
+            self.out.push(mv);
+        }
+    }
+}
+
+impl MoveSink for FilterSink<'_> {
+    #[inline]
+    fn emit(&mut self, from: Square, to: Square, kind: MoveKind) {
+        self.keep(Move::new(from, to, kind));
+    }
+
+    #[inline]
+    fn emit_targets(&mut self, from: Square, targets: Bitboard, their_pieces: Bitboard) {
+        // A target landing on an enemy piece is a capture, every other target a
+        // quiet — the same split `MoveList::emit_targets` records. Pre-masking the
+        // target bitboard keeps only the wanted half before the per-bit loop.
+        let wanted = if self.want_captures {
+            targets & their_pieces
+        } else {
+            targets & !their_pieces
+        };
+        for to in wanted {
+            let kind = if their_pieces.contains(to) {
+                MoveKind::Capture
+            } else {
+                MoveKind::Quiet
+            };
+            self.out.push(Move::new(from, to, kind));
+        }
+    }
+}
+
 /// A full standard-chess game position.
 ///
 /// ```
@@ -802,6 +876,44 @@ impl Position {
         let mut sink = CountSink::default();
         self.generate_into_with_castles(&mut sink, true);
         sink.count()
+    }
+
+    /// Appends only the legal *capturing* moves (ordinary captures, en passant,
+    /// and capturing promotions) of the side to move into `out`, the captures
+    /// stage of the staged generator. Runs the fast legal generator through a
+    /// capture-only [`FilterSink`], so the produced moves are exactly the
+    /// capturing subset of [`Position::generate_into`] — same legality, same
+    /// pins/check handling, nothing extra.
+    pub(crate) fn legal_captures_into(&self, out: &mut MoveList) {
+        let mut sink = FilterSink::captures(out);
+        self.generate_into_with_castles(&mut sink, true);
+    }
+
+    /// Appends only the legal *non-capturing* moves (quiets, double pushes,
+    /// non-capturing promotions, and castles) of the side to move into `out`, the
+    /// quiets stage of the staged generator. The complement of
+    /// [`Position::legal_captures_into`]: together they reproduce
+    /// [`Position::generate_into`] exactly.
+    pub(crate) fn legal_quiets_into(&self, out: &mut MoveList) {
+        let mut sink = FilterSink::quiets(out);
+        self.generate_into_with_castles(&mut sink, true);
+    }
+
+    /// The static victim value used to order this position's captures
+    /// (most-valuable-victim first). For an ordinary capture or capturing
+    /// promotion it is the value of the piece standing on the destination; for en
+    /// passant it is a pawn. A non-capturing move scores `0`. This is the cheap
+    /// MVV key the staged captures stage sorts by; richer SEE/MVV-LVA ordering is
+    /// available via [`Position::see`] and noted as a refinement.
+    #[must_use]
+    pub(crate) fn victim_value(&self, mv: &Move) -> i32 {
+        if mv.kind() == MoveKind::EnPassant {
+            return see_value(Role::Pawn);
+        }
+        match self.board.role_at(mv.to()) {
+            Some(role) => see_value(role),
+            None => 0,
+        }
     }
 
     /// Whether the side to move has been checkmated (in check with no legal

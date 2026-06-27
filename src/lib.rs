@@ -99,6 +99,7 @@ mod san;
 #[cfg(feature = "serde")]
 mod serde_impls;
 mod square;
+mod staged;
 mod variant;
 mod zobrist;
 
@@ -127,6 +128,7 @@ pub use crate::position::{
 pub use crate::rank::Rank;
 pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
+pub use crate::staged::MoveGenerator;
 #[cfg(feature = "parallel")]
 pub use crate::variant::perft_variant_parallel;
 pub use crate::variant::{
@@ -134,6 +136,6 @@ pub use crate::variant::{
     CheckCounters, Chess, Chess960, Chess960Rules, ChessRules, Crazyhouse, CrazyhouseRules,
     CrazyhouseState, Horde, HordeRules, KingOfTheHill, KingOfTheHillRules, RacingKings,
     RacingKingsRules, ThreeCheck, ThreeCheckRules, UnknownVariant, Variant, VariantId,
-    VariantPosition, VariantState, VariantUndo,
+    VariantMoveGenerator, VariantPosition, VariantState, VariantUndo,
 };
 pub use crate::zobrist::Zobrist;
