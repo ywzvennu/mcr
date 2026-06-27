@@ -1,0 +1,42 @@
+# mce-wasm — WebAssembly bindings for the mce chess engine.
+#
+# This is a separate, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build`/`cargo
+# test`; it depends on `mce` by path. It compiles to a `cdylib` for the
+# `wasm32-unknown-unknown` target and exposes a JS-friendly surface over the
+# mce public API through `wasm-bindgen`.
+#
+# Build (preferred, produces a ready-to-import JS package in ./pkg):
+#     cargo install wasm-pack      # one-time, if not present
+#     wasm-pack build bindings/wasm --target web
+#
+# Build (no wasm-pack needed, produces a raw .wasm in target/):
+#     rustup target add wasm32-unknown-unknown
+#     cargo build --manifest-path bindings/wasm/Cargo.toml --target wasm32-unknown-unknown
+#
+# Neither `pkg/` nor `target/` is ever committed.
+
+[package]
+name = "mce-wasm"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "WebAssembly bindings for the mce chess engine."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The core engine, by path. Default (std) build — wasm32-unknown-unknown ships
+# std, so the on-by-default `std` feature is fine and needs no change.
+mce = { path = "../.." }
+
+# The JS/wasm boundary. `wasm-bindgen` generates the glue and the JS shim.
+wasm-bindgen = "0.2"
+
+[profile.release]
+# Small, fast wasm: thin LTO and a single codegen unit, optimize for size.
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
