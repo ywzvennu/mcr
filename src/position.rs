@@ -2166,7 +2166,15 @@ impl Position {
         let piece = self.board.piece_at(square)?;
         self.hash_remove(square, piece);
         if piece.role == Role::Rook {
+            // Bracket the castling-rights change with the castling-key XORs so the
+            // incremental Zobrist key tracks any revoked right exactly like the
+            // from-scratch computation. Unlike the standard make-move path (which
+            // already brackets `castling_hash` around its whole rights update),
+            // an explosion-driven removal has no such bracketing, so it must fold
+            // the delta here. The XOR is self-cancelling when no right changes.
+            self.hash ^= self.castling_hash();
             self.revoke_rights_for_square(square, piece.color);
+            self.hash ^= self.castling_hash();
         }
         Some(piece)
     }
