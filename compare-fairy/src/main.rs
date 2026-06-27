@@ -24,6 +24,7 @@
 
 mod corpus;
 mod locate;
+mod makruk;
 mod uci;
 mod variants;
 
@@ -153,9 +154,13 @@ fn main() {
     println!();
     print_summary(&rows, mismatches, skipped);
 
+    // Makruk rides the generic engine (not the `AnyVariant` corpus above), so it
+    // has its own comparison loop. Fold its mismatches into the exit status.
+    let makruk_mismatches = makruk::run(&mut engine, opts.full);
+
     engine.quit();
 
-    if mismatches > 0 {
+    if mismatches + makruk_mismatches > 0 {
         std::process::exit(1);
     }
 }
