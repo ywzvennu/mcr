@@ -47,6 +47,23 @@
 //! The descriptors are two `[Magic; 64]` arrays (`mask`, `factor`, `offset` =
 //! 24 bytes each → `64 * 24 * 2 = 3072` bytes).
 //!
+//! ## On eliding the read's bounds check
+//!
+//! The single read above is bounds-checked. That check *can* be removed in safe
+//! Rust by reading through a fixed-length per-square window — form
+//! `&attacks[offset..offset + size]` (`size = 1 << (64 - shift)`) and index it
+//! with the in-window hash, which the fixed shift makes provably `< size`; the
+//! compiler then drops the per-read check (verified in the emitted assembly: no
+//! `panic_bounds_check` on the hot load). It was tried and measured. It is *not*
+//! used here because it did not pay off: across paired perft runs throughput was
+//! flat-to-slightly-worse (≈1% slower), since the original check sits on a
+//! never-taken, perfectly predicted branch (effectively free) while the window
+//! form adds a slice-creation bound on `offset` and — because the largest rook
+//! `offset + size` runs one window past the packed table — needs a small dead
+//! tail on the backing buffer that grows its cache footprint. The slider read is
+//! not the movegen bottleneck, so trading one free check for another is a wash.
+//! The lookup is therefore kept as the plain `attacks[index]` read.
+//!
 //! ## Constants and clean-room status
 //!
 //! The `mask` / `factor` / `offset` triples are public-domain magic constants.
