@@ -1,0 +1,53 @@
+# mce-cli — the unified `mce` command-line tool.
+#
+# This is a separate, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build`/`cargo
+# test`; it depends on `mce` by path and is a pure CONSUMER of the public API.
+# It is `publish = false` and is never published from here.
+#
+# It consolidates the repo's example tools (perft / fen_inspect / random_game)
+# into a single `mce` binary, plus FEN/PGN conversion and validation helpers.
+#
+# Build:                         cargo build              (in this directory)
+# With parallel perft:           cargo build --features parallel
+# Run:                           cargo run -- perft startpos 5
+[package]
+name = "mce-cli"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Unified `mce` command-line tool over the mce chess library."
+
+# The binary is named `mce` regardless of the crate name.
+[[bin]]
+name = "mce"
+path = "src/main.rs"
+
+[features]
+# Off by default. Forwards to the mce `parallel` feature so `mce perft
+# --parallel` uses the rayon-backed root split. With it off, `--parallel` falls
+# back to the serial counter (and says so). Build with `--features parallel` to
+# enable, e.g. `cargo build --features parallel`.
+parallel = ["mce/parallel"]
+
+[dependencies]
+# The argument parser. `clap` is a dependency of THIS separate crate only; the
+# core mce library's dependency graph is unaffected (`cargo tree -e normal` for
+# mce is unchanged).
+clap = { version = "4", features = ["derive"] }
+
+# Path dependency on the parent mce crate. This tool is a CONSUMER of mce; it is
+# never a dependency of mce, so the mce package stays clean.
+mce = { path = ".." }
+
+[lints.rust]
+# The core mce library is unsafe-free; keep this tool's own code safe too.
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
