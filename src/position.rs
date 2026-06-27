@@ -938,20 +938,36 @@ impl Position {
         // The enemy king is not a real attacker in atomic (it cannot execute a
         // capture without exploding itself), so exclude it from the checker and
         // king-danger sets. It remains in `occupied` and so still blocks rays.
+        //
+        // The atomic immunity goes further: our king can never be captured while
+        // it stands **adjacent to the enemy king**, because any enemy capture
+        // there detonates a blast that also catches the enemy's own king — an
+        // illegal self-explosion the enemy can never play. So every square
+        // adjacent to the enemy king is immune to *all* enemy attackers and is a
+        // safe destination for our king. The set of such squares,
+        // `king_attacks(enemy_king)`, is removed from the danger set, and if our
+        // king already stands on one of them it is not in check and is unpinning.
         let enemy_king = board.king_of(them);
+        let king_immunity = enemy_king.map_or(Bitboard::EMPTY, king_attacks);
+        let king_adjacent_to_enemy = king_immunity.contains(king_sq);
 
         let mut checkers = self.attackers_to(king_sq, them, occupied);
         if let Some(ek) = enemy_king {
             checkers.clear(ek);
         }
+        // While adjacent to the enemy king our king is immune, so it is never in
+        // check and no piece is pinned to it: clear the checker set entirely.
+        if king_adjacent_to_enemy {
+            checkers = Bitboard::EMPTY;
+        }
         let num_checkers = checkers.count();
 
         // Squares the king may not step onto: those attacked by a non-king enemy
         // piece with our king removed from the occupancy (so it cannot shield
-        // itself). The enemy king's own attacks are deliberately omitted, so our
-        // king may walk adjacent to it.
+        // itself), minus the enemy-king-adjacency immunity zone. The enemy king's
+        // own attacks are also omitted, so our king may walk adjacent to it.
         let occ_without_king = occupied.without(king_sq);
-        let king_danger = self.attacked_by_nonking(them, occ_without_king);
+        let king_danger = self.attacked_by_nonking(them, occ_without_king) & !king_immunity;
 
         // King moves: only to empty squares (captures detonate and are handled
         // elsewhere) that are not in the non-king danger set.
@@ -970,7 +986,13 @@ impl Position {
             Bitboard::FULL
         };
 
-        let pins = self.compute_pins(king_sq, us, them, occupied);
+        // While the king is immune (adjacent to the enemy king) it cannot be
+        // exposed by any move, so no piece is pinned to it.
+        let pins = if king_adjacent_to_enemy {
+            Pins::EMPTY
+        } else {
+            self.compute_pins(king_sq, us, them, occupied)
+        };
 
         // Pawn pushes only (no captures, no en passant — those detonate).
         self.gen_pawn_pushes(out, us, occupied, check_mask, &pins);

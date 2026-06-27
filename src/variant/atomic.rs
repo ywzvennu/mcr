@@ -41,7 +41,7 @@ use super::heapless_removals::Removals;
 use super::{Variant, VariantId, VariantPosition};
 use crate::attacks::king_attacks;
 use crate::movelist::MoveList;
-use crate::{EndReason, Move, MoveKind, Piece, Position, Role, Square};
+use crate::{Color, EndReason, Move, MoveKind, Piece, Position, Role, Square};
 
 /// The atomic rule layer: standard chess movement plus capture explosions and a
 /// king-explosion win condition. A zero-sized marker.
@@ -116,8 +116,28 @@ fn capture_is_legal(parent: &Position, mv: &Move) -> bool {
         return true;
     };
 
-    // Both kings stand: ordinary king safety, but the enemy king never gives
-    // check, so exclude it from the attacker set.
+    // Both kings stand: ordinary king safety, but the mover's king is immune to
+    // capture whenever it stands adjacent to the enemy king.
+    king_is_safe(&after, my_king, opponent, enemy_king)
+}
+
+/// Whether the mover's king on `my_king` is safe in atomic chess, given the
+/// enemy king stands on `enemy_king`.
+///
+/// In atomic a king can never be captured while it stands **adjacent to the
+/// enemy king**: any enemy piece capturing it there detonates a blast that also
+/// catches the enemy's own king, and a move that destroys the mover's own king
+/// is illegal — so the capture can never be executed, and the square is immune
+/// to every enemy attacker (sliders, knights, pawns, and the enemy king alike).
+///
+/// Otherwise ordinary king safety applies, with the single twist that the enemy
+/// king itself never gives an executable check (it would explode itself), so it
+/// is excluded from the attacker set.
+fn king_is_safe(after: &Position, my_king: Square, opponent: Color, enemy_king: Square) -> bool {
+    // Adjacent to the enemy king: immune to every attacker.
+    if king_attacks(my_king).contains(enemy_king) {
+        return true;
+    }
     let mut attackers = after.attackers_to(my_king, opponent, after.board().occupied());
     attackers.clear(enemy_king);
     attackers.is_empty()
@@ -188,14 +208,10 @@ impl Variant for AtomicRules {
             return true;
         };
 
-        // Both kings stand: ordinary king safety applies to the mover, with one
-        // atomic twist — the enemy king never gives check (a king capturing
-        // explodes itself, so it cannot threaten capture). Two kings may stand
-        // adjacent. Exclude the enemy king from the attacker set so a move that
-        // merely walks next to it is not wrongly rejected.
-        let mut attackers = after.attackers_to(my_king, opponent, after.board().occupied());
-        attackers.clear(enemy_king);
-        attackers.is_empty()
+        // Both kings stand: ordinary king safety applies to the mover, with the
+        // atomic twist that the mover's king is immune to capture whenever it
+        // stands adjacent to the enemy king.
+        king_is_safe(after, my_king, opponent, enemy_king)
     }
 
     /// Atomic legal-move generation split by capture status.
@@ -405,6 +421,146 @@ mod tests {
             Some(Role::Knight),
             "piece adjacent only to the captured pawn (d5) survives"
         );
+    }
+
+    /// The legal UCI strings of `pos`, sorted, for set comparisons.
+    fn legal_ucis(pos: &Atomic) -> Vec<String> {
+        let mut ucis: Vec<String> = pos.legal_moves().iter().map(|m| pos.to_uci(m)).collect();
+        ucis.sort();
+        ucis
+    }
+
+    #[test]
+    fn king_may_move_adjacent_to_enemy_king_issue_121() {
+        // Issue #121 repro found by the differential fuzzer (#109). The white king
+        // on a2 may step to b3, adjacent to the black king on c4: the bishop on d1
+        // "attacks" b3, but it could never capture the king there without the blast
+        // also catching the adjacent black king, so b3 is immune. mce previously
+        // omitted a2b3.
+        let pos: Atomic = "8/8/8/3p4/2k2pp1/8/K7/3b4 w - - 0 1".parse().unwrap();
+        assert!(
+            pos.legal_moves()
+                .iter()
+                .any(|m| m.from() == sq("a2") && m.to() == sq("b3")),
+            "a2b3 (king step adjacent to the enemy king) must be legal"
+        );
+    }
+
+    #[test]
+    fn king_step_adjacent_to_enemy_king_immune_to_every_attacker() {
+        // The destination b3 is adjacent to the black king on c4 and is therefore
+        // immune to every kind of attacker. A king step onto it stays legal whether
+        // the attacker is a slider, a knight, or a pawn.
+        for attacker_fen in [
+            "8/8/8/8/2k5/8/K7/3b4 w - - 0 1", // bishop d1 hits b3
+            "8/8/8/8/2k5/8/K7/1r6 w - - 0 1", // rook b1 hits b3
+            "8/8/8/8/2k5/8/K7/3n4 w - - 0 1", // knight d1 hits b3
+            "8/8/8/8/p1k5/8/K7/8 w - - 0 1",  // pawn a4 hits b3
+        ] {
+            let pos: Atomic = attacker_fen.parse().unwrap();
+            assert!(
+                pos.legal_moves()
+                    .iter()
+                    .any(|m| m.from() == sq("a2") && m.to() == sq("b3")),
+                "a2b3 must be legal (immune via enemy-king adjacency) in {attacker_fen}"
+            );
+        }
+    }
+
+    #[test]
+    fn king_step_to_attacked_square_not_adjacent_to_enemy_king_is_illegal() {
+        // Same bishop on d1 hitting b3, but the enemy king is far away, so b3 is
+        // NOT immune: the king step a2b3 must be rejected. This is the control case
+        // that keeps the fix from over-allowing.
+        let pos: Atomic = "7k/8/8/8/8/8/K7/3b4 w - - 0 1".parse().unwrap();
+        assert!(
+            !pos.legal_moves()
+                .iter()
+                .any(|m| m.from() == sq("a2") && m.to() == sq("b3")),
+            "a2b3 must be illegal when b3 is attacked and not adjacent to the enemy king"
+        );
+    }
+
+    #[test]
+    fn king_already_adjacent_to_enemy_king_keeps_full_move_set() {
+        // Reach a position where the white king on a2 already stands adjacent to
+        // the black king on a3 and is "attacked" by a rook on the 2nd rank. (Two
+        // kings can never be placed adjacent in a parseable FEN, so the position is
+        // built by play.) In atomic this is not check — the rook could not capture
+        // without exploding the adjacent black king — so the king keeps its normal
+        // moves and no piece is treated as pinned.
+        // The legal-move set proves the generator does not treat the king as in
+        // check: a rook "attacks" a2, yet the king keeps its full quiet-move set
+        // (it is not forced into check-evasion only). (Whether `is_check()` itself
+        // should report `false` here is a separate concern — it routes through the
+        // shared core check test — and is intentionally left to its own change.)
+        let start: Atomic = "8/8/8/8/8/k7/7r/K7 w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["a1a2", "h2g2"]);
+        assert_eq!(legal_ucis(&pos), ["a2a1", "a2b1", "a2b2", "a2b3"]);
+    }
+
+    #[test]
+    fn no_pin_while_king_adjacent_to_enemy_king() {
+        // Built by play (adjacent kings are unparseable): the white king on a2
+        // stands adjacent to the black king on a3, and a black rook on the 2nd rank
+        // would "pin" the white rook on c2 under ordinary rules. But the white king
+        // is immune, so the rook is not pinned and may leave the rank.
+        let start: Atomic = "8/8/8/8/8/k7/2R4r/K7 w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["a1a2", "h2g2"]);
+        assert!(
+            pos.legal_moves()
+                .iter()
+                .any(|m| m.from() == sq("c2") && m.to() == sq("c3")),
+            "the rook is not pinned while our king is immune (adjacent to enemy king)"
+        );
+    }
+
+    #[test]
+    fn fast_and_slow_legal_paths_agree_over_random_atomic_games() {
+        // The fast atomic generator (`AtomicRules::legal_into` via
+        // `atomic_noncapture_legal_into`) must produce exactly the same legal set as
+        // the make-move reference filter (`slow_legal_into` driven by
+        // `is_legal_after`) — including for the king-adjacency immunity this fix
+        // adds. Walk a deterministic random tree of atomic positions and compare the
+        // two sets at every node.
+        let mut rng: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            rng
+        };
+
+        for _ in 0..400 {
+            let mut pos = Atomic::startpos();
+            for _ in 0..40 {
+                let core = pos.core();
+
+                let mut fast = MoveList::new();
+                AtomicRules::legal_into(core, &mut fast);
+                let mut fast_ucis: Vec<String> = fast.iter().map(|m| pos.to_uci(m)).collect();
+                fast_ucis.sort();
+
+                let mut slow = MoveList::new();
+                AtomicRules::slow_legal_into(core, &mut slow);
+                let mut slow_ucis: Vec<String> = slow.iter().map(|m| pos.to_uci(m)).collect();
+                slow_ucis.sort();
+
+                assert_eq!(
+                    fast_ucis,
+                    slow_ucis,
+                    "fast/slow legal-move divergence at {}",
+                    pos.to_fen()
+                );
+
+                let moves = pos.legal_moves();
+                if moves.is_empty() {
+                    break;
+                }
+                let mv = moves[(next() as usize) % moves.len()];
+                pos = pos.play(&mv);
+            }
+        }
     }
 
     #[test]
