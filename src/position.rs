@@ -552,6 +552,220 @@ impl Position {
         !self.checkers().is_empty()
     }
 
+    /// Returns the absolutely-pinned pieces of `color`: friendly pieces standing
+    /// on a line between their own king and an enemy slider, with no other piece
+    /// between, so that moving them off that line would expose the king to check.
+    ///
+    /// A pinned piece may legally move only along the line through its king and
+    /// the pinning slider (and only as far as capturing that pinner). If `color`
+    /// has no king, the result is empty: with no king there is nothing to pin to.
+    ///
+    /// This is the standard *absolute* pin (pinned to the king); it does not
+    /// report relative pins to other pieces.
+    #[must_use]
+    pub fn pinned(&self, color: Color) -> Bitboard {
+        match self.board.king_of(color) {
+            Some(king) => {
+                let occupied = self.board.occupied();
+                self.compute_pins(king, color, color.opposite(), occupied)
+                    .pinned
+            }
+            None => Bitboard::EMPTY,
+        }
+    }
+
+    /// Returns the pseudo-attacks of the piece currently standing on `sq`, given
+    /// the current board occupancy, or the empty set if `sq` is empty.
+    ///
+    /// "Pseudo-attacks" are the squares the piece attacks by its movement
+    /// geometry under the present occupancy: sliders are blocked by intervening
+    /// pieces (the first blocker on each ray is included), and pawns attack only
+    /// their two forward diagonals. The result is *not* masked by friendly
+    /// occupancy — a square defended by a friendly piece is still reported as
+    /// attacked — and it ignores pins and check, so it is a raw attack set rather
+    /// than a legal-move set. A pawn on its last rank attacks nothing.
+    #[must_use]
+    pub fn attacks_from(&self, sq: Square) -> Bitboard {
+        let piece = match self.board.piece_at(sq) {
+            Some(p) => p,
+            None => return Bitboard::EMPTY,
+        };
+        let occupied = self.board.occupied();
+        match piece.role {
+            Role::Pawn => pawn_attacks(piece.color, sq),
+            Role::Knight => knight_attacks(sq),
+            Role::King => king_attacks(sq),
+            Role::Bishop => bishop_attacks(sq, occupied),
+            Role::Rook => rook_attacks(sq, occupied),
+            Role::Queen => bishop_attacks(sq, occupied) | rook_attacks(sq, occupied),
+        }
+    }
+
+    /// Static Exchange Evaluation (SEE) of the capture sequence on `mv`'s
+    /// destination square, in centipawns from the moving side's point of view.
+    ///
+    /// SEE answers "if I initiate a capture on `to` and both sides keep
+    /// recapturing on that square with their least valuable available attacker,
+    /// what is the net material result?" It uses the standard swap-off algorithm:
+    /// the initiating piece captures the occupant of `to`, then the two sides
+    /// alternately bring on their cheapest remaining attacker of `to`,
+    /// recomputing the attacker set as each piece is removed — including x-ray
+    /// attackers (a rook or queen behind the first slider) that are *uncovered*
+    /// when a piece in front of them leaves the line. A standard min-max back-pass
+    /// over the gain list yields the value, since either side will decline a
+    /// continuation that loses material.
+    ///
+    /// # Value scale
+    ///
+    /// Material is scored on the conventional centipawn scale (a pawn = 100):
+    ///
+    /// | role   | value |
+    /// |--------|-------|
+    /// | pawn   | 100   |
+    /// | knight | 320   |
+    /// | bishop | 330   |
+    /// | rook   | 500   |
+    /// | queen  | 900   |
+    /// | king   | 10000 |
+    ///
+    /// The king's value is a large sentinel: a king may recapture, but no side
+    /// will ever allow its king to be captured in return, so the sentinel simply
+    /// ensures a king recapture is never "answered". A positive result means the
+    /// initiating side comes out ahead by that many centipawns, a negative one
+    /// means it loses material, and zero is an even trade.
+    ///
+    /// # Non-captures
+    ///
+    /// For a move that does not capture, the destination has no occupant to win,
+    /// so the score of *initiating* an exchange there is the value the moving
+    /// piece stands to lose if the square is defended. This returns `0` when the
+    /// destination is undefended (the piece sits safely) and the negative of the
+    /// moving piece's value when it is defended (the piece can be taken for
+    /// nothing in return at the head of the swap-off). Promotions are scored on
+    /// the pawn that initiates; the promotion gain itself is not modeled.
+    ///
+    /// En-passant captures are scored as winning a pawn on the en-passant target.
+    #[must_use]
+    pub fn see(&self, mv: &Move) -> i32 {
+        let to = mv.to();
+        let from = mv.from();
+        let us = self.turn;
+        let them = us.opposite();
+        let board = &self.board;
+
+        // The piece initiating the exchange and its value (what is risked once it
+        // sits on `to`). A move with no piece on `from` is meaningless for SEE.
+        let mover = match board.role_at(from) {
+            Some(role) => role,
+            None => return 0,
+        };
+
+        // Material standing on `to` to be captured first. For en passant the
+        // captured pawn is not on `to` but on the mover's rank; either way the
+        // first gain is a pawn.
+        let captured_value = if mv.kind() == MoveKind::EnPassant {
+            see_value(Role::Pawn)
+        } else {
+            match board.role_at(to) {
+                Some(role) => see_value(role),
+                None => 0,
+            }
+        };
+
+        // Occupancy with the initiating piece lifted off `from` (and, for en
+        // passant, the captured pawn removed from its square). The captured piece
+        // on `to`, if any, is simply overwritten by the mover and so need not be
+        // cleared from `occ`: it is no longer an attacker once `to` is recomputed
+        // from the surviving sets below.
+        let mut occ = board.occupied().without(from);
+        if mv.kind() == MoveKind::EnPassant {
+            // The en-passant victim sits on `to`'s file, `from`'s rank.
+            let victim = Square::from_file_rank(to.file(), from.rank());
+            occ = occ.without(victim);
+        }
+
+        // The swap-off gain list. `gain[0]` is the value just won by the first
+        // capture; each later entry is the value the side to move at that ply
+        // stands to win if it recaptures.
+        let mut gain = [0i32; 32];
+        gain[0] = captured_value;
+        let mut depth = 0usize;
+
+        // The piece now standing on `to` (whose value is at stake for the *next*
+        // recapture) and the side about to recapture.
+        let mut on_square = mover;
+        let mut side = them;
+
+        // Attackers of `to` from both sides, recomputed lazily as pieces leave
+        // `occ`. We seed it once and then subtract the chosen attacker each ply,
+        // re-adding any slider x-rayed in behind it.
+        let mut attackers = self.see_attackers(to, occ);
+
+        loop {
+            // Restrict to the side about to move and stop if it has none.
+            let side_attackers = attackers & board.by_color(side) & occ;
+            let attacker_sq = match see_least_valuable(board, side_attackers) {
+                Some(sq) => sq,
+                None => break,
+            };
+
+            depth += 1;
+            // The value won at this ply is the piece currently on `to`, minus the
+            // best the opponent could already secure (filled in by the back-pass).
+            gain[depth] = see_value(on_square) - gain[depth - 1];
+
+            // Pruning: if even by winning `on_square` this side cannot reach a
+            // non-losing position, it will simply decline — but the standard
+            // formulation defers that to the back-pass, so we keep collecting.
+
+            // The recapturing piece moves onto `to`; it becomes the new stake.
+            on_square = board
+                .role_at(attacker_sq)
+                .expect("attacker square is occupied");
+            occ = occ.without(attacker_sq);
+            attackers.clear(attacker_sq);
+
+            // Uncover x-ray sliders behind the piece that just left: any rook- or
+            // bishop-like slider now seeing `to` through the freed line is added.
+            // Pieces already used were cleared from `attackers` and removed from
+            // `occ`, so re-OR'ing the slider set adds only the newly uncovered
+            // ones; the `& occ` keeps spent attackers from creeping back in.
+            attackers |= self.see_xray_attackers(to, occ) & occ;
+
+            side = side.opposite();
+
+            if depth + 1 >= gain.len() {
+                break;
+            }
+        }
+
+        // Min-max back-pass: each side, in reverse, takes the better of standing
+        // pat at the previous gain or forcing the capture chain to continue.
+        while depth > 0 {
+            gain[depth - 1] = -i32::max(-gain[depth - 1], gain[depth]);
+            depth -= 1;
+        }
+        gain[0]
+    }
+
+    /// The combined attacker set of *both* colors bearing on `sq` under `occ`,
+    /// the seed of the [`Position::see`] swap-off. Reuses [`Position::attackers_to`]
+    /// for each side.
+    fn see_attackers(&self, sq: Square, occ: Bitboard) -> Bitboard {
+        self.attackers_to(sq, Color::White, occ) | self.attackers_to(sq, Color::Black, occ)
+    }
+
+    /// The slider attackers (rook-, bishop-, and queen-like) of `sq` under `occ`,
+    /// of either color — used to re-add x-ray attackers uncovered as front pieces
+    /// leave the line during the [`Position::see`] swap-off. Steppers (pawn,
+    /// knight, king) are never x-rayed, so only sliders are recomputed.
+    fn see_xray_attackers(&self, sq: Square, occ: Bitboard) -> Bitboard {
+        let b = &self.board;
+        let bishop_like = b.by_role(Role::Bishop) | b.by_role(Role::Queen);
+        let rook_like = b.by_role(Role::Rook) | b.by_role(Role::Queen);
+        (bishop_attacks(sq, occ) & bishop_like) | (rook_attacks(sq, occ) & rook_like)
+    }
+
     // -- Move generation ---------------------------------------------------
 
     /// Generates every legal move for the side to move.
@@ -2617,6 +2831,36 @@ impl fmt::Display for Position {
     }
 }
 
+/// The centipawn material value of a role for Static Exchange Evaluation
+/// ([`Position::see`]). The scale is the conventional pawn = 100; the king is a
+/// large sentinel so a king recapture is never answered (no side allows its king
+/// to be taken in return).
+#[inline]
+const fn see_value(role: Role) -> i32 {
+    match role {
+        Role::Pawn => 100,
+        Role::Knight => 320,
+        Role::Bishop => 330,
+        Role::Rook => 500,
+        Role::Queen => 900,
+        Role::King => 10_000,
+    }
+}
+
+/// Picks the least valuable attacker in `attackers` (a single-color attacker set
+/// already restricted to the side about to recapture), the piece the swap-off
+/// brings on next. Returns `None` when there is no attacker. Roles are scanned
+/// cheapest-first, so the first non-empty intersection is the answer.
+fn see_least_valuable(board: &Board, attackers: Bitboard) -> Option<Square> {
+    for role in Role::ALL {
+        let of_role = attackers & board.by_role(role);
+        if let Some(sq) = of_role.lsb() {
+            return Some(sq);
+        }
+    }
+    None
+}
+
 /// The mask of light squares (a1 is dark), used for bishop-color analysis.
 const LIGHT_SQUARES: u64 = 0x55AA_55AA_55AA_55AA;
 
@@ -3322,5 +3566,191 @@ mod tests {
         let total: u64 = div.iter().map(|(_, n)| n).sum();
         assert_eq!(total, perft(&pos, 3));
         assert_eq!(div.len(), 20);
+    }
+
+    // -- Public attack/threat queries + SEE --------------------------------
+
+    #[test]
+    fn checkers_reports_single_checking_piece() {
+        // Black rook on e8 checks the white king on e1 down the open e-file.
+        let pos = Position::from_fen("4rk2/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert_eq!(pos.checkers(), Bitboard::from(Square::E8));
+        assert!(pos.is_check());
+    }
+
+    #[test]
+    fn checkers_reports_double_check() {
+        // White king e1; black rook e8 (file) and black bishop a5 (diagonal)
+        // both bear on e1 — a genuine double check.
+        let pos = Position::from_fen("4rk2/8/8/b7/8/8/8/4K3 w - - 0 1").unwrap();
+        let checkers = pos.checkers();
+        assert_eq!(checkers.count(), 2);
+        assert!(checkers.contains(Square::E8));
+        assert!(checkers.contains(Square::A5));
+    }
+
+    #[test]
+    fn pinned_reports_a_pinned_knight() {
+        // White king e1, white knight e4, black rook e8: the knight is pinned to
+        // the king down the e-file and may not move off it.
+        let pos = Position::from_fen("4rk2/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
+        let pinned = pos.pinned(Color::White);
+        assert_eq!(pinned, Bitboard::from(Square::E4));
+        // The enemy has nothing pinned.
+        assert!(pos.pinned(Color::Black).is_empty());
+        // A pinned knight has no legal moves here (every knight jump leaves the
+        // e-file).
+        assert!(!pos.legal_moves().iter().any(|m| m.from() == Square::E4));
+    }
+
+    #[test]
+    fn pinned_is_empty_without_a_pinner() {
+        // Same knight, but the rook is replaced by an empty file: nothing pins.
+        let pos = Position::from_fen("6k1/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
+        assert!(pos.pinned(Color::White).is_empty());
+    }
+
+    #[test]
+    fn attackers_to_collects_every_attacker() {
+        // d4 is attacked by: white pawn c3 (diagonal), white knight f3, white rook
+        // d1 (up the file), and a white queen on a7 (along the a7-d4 diagonal).
+        let pos = Position::from_fen("4k3/Q7/8/8/8/2P2N2/8/3RK3 w - - 0 1").unwrap();
+        let occ = pos.board().occupied();
+        let attackers = pos.attackers_to(Square::D4, Color::White, occ);
+        assert!(attackers.contains(Square::C3));
+        assert!(attackers.contains(Square::F3));
+        assert!(attackers.contains(Square::D1));
+        assert!(attackers.contains(Square::A7));
+        assert_eq!(attackers.count(), 4);
+        assert!(pos.is_attacked(Square::D4, Color::White));
+        // Black attacks none of d4.
+        assert!(!pos.is_attacked(Square::D4, Color::Black));
+    }
+
+    #[test]
+    fn attacks_from_each_piece_type() {
+        // Empty square attacks nothing.
+        let empty = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert!(empty.attacks_from(Square::D4).is_empty());
+
+        // Knight on d4 (center): all eight jumps.
+        let knight = Position::from_fen("4k3/8/8/8/3N4/8/8/4K3 w - - 0 1").unwrap();
+        assert_eq!(knight.attacks_from(Square::D4), knight_attacks(Square::D4));
+
+        // White pawn on d4 attacks c5 and e5 only.
+        let pawn = Position::from_fen("4k3/8/8/8/3P4/8/8/4K3 w - - 0 1").unwrap();
+        assert_eq!(
+            pawn.attacks_from(Square::D4),
+            Bitboard::from(Square::C5) | Bitboard::from(Square::E5)
+        );
+
+        // King on e1 (corner-ish): king-step pattern.
+        let king = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert_eq!(king.attacks_from(Square::E1), king_attacks(Square::E1));
+
+        // Bishop on c1 blocked on the e3 square shows the cut ray.
+        let bishop = Position::from_fen("4k3/8/8/8/8/4p3/8/2B1K3 w - - 0 1").unwrap();
+        let occ = bishop.board().occupied();
+        assert_eq!(
+            bishop.attacks_from(Square::C1),
+            bishop_attacks(Square::C1, occ)
+        );
+        assert!(bishop.attacks_from(Square::C1).contains(Square::E3));
+        assert!(!bishop.attacks_from(Square::C1).contains(Square::F4));
+
+        // Rook and queen mirror the slider helpers under occupancy.
+        let rook = Position::from_fen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").unwrap();
+        let occ = rook.board().occupied();
+        assert_eq!(rook.attacks_from(Square::A1), rook_attacks(Square::A1, occ));
+
+        let queen = Position::from_fen("4k3/8/8/8/8/8/8/Q3K3 w - - 0 1").unwrap();
+        let occ = queen.board().occupied();
+        assert_eq!(
+            queen.attacks_from(Square::A1),
+            bishop_attacks(Square::A1, occ) | rook_attacks(Square::A1, occ)
+        );
+    }
+
+    #[test]
+    fn see_free_piece_is_a_clear_win() {
+        // White rook on d1 captures an undefended black knight on d8: the knight
+        // is worth 320 and nothing recaptures, so SEE = +320.
+        let pos = Position::from_fen("3n4/8/8/8/8/8/8/3RK1k1 w - - 0 1").unwrap();
+        let cap = pos.parse_uci("d1d8").unwrap();
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), see_value(Role::Knight));
+    }
+
+    #[test]
+    fn see_defended_pawn_capture_loses_for_higher_value_initiator() {
+        // White rook on e1 captures a black pawn on e5 that is defended by a black
+        // pawn on d6. White wins a pawn (+100) but loses the rook (-500) in the
+        // recapture: SEE = 100 - 500 = -400.
+        let pos = Position::from_fen("4k3/8/3p4/4p3/8/8/8/4RK2 w - - 0 1").unwrap();
+        let cap = pos.parse_uci("e1e5").unwrap();
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), see_value(Role::Pawn) - see_value(Role::Rook));
+    }
+
+    #[test]
+    fn see_equal_pawn_trade_is_zero() {
+        // White pawn d4 captures black pawn e5, which is defended by black pawn
+        // f6: pawn for pawn, an even trade, SEE = 0.
+        let pos = Position::from_fen("4k3/8/5p2/4p3/3P4/8/8/4K3 w - - 0 1").unwrap();
+        let cap = pos.parse_uci("d4e5").unwrap();
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), 0);
+    }
+
+    #[test]
+    fn see_xray_through_a_stacked_rook() {
+        // The x-ray case: white rooks doubled on e1/e2 attack a black pawn on e5
+        // that is defended by a doubled black rook battery on e7/e8. The front
+        // white rook takes the pawn; black's front rook recaptures; the rear white
+        // rook (x-rayed in through e2 once e1 has moved) recaptures; black's rear
+        // rook recaptures. Net for white: +pawn (e5) - rook (e1 lost) + rook (e7
+        // won) - rook (the rear white rook lost) = 100 - 500 + 500 - 500 = -400.
+        let pos = Position::from_fen("4k3/4r3/4r3/4p3/8/8/4R3/4R1K1 w - - 0 1").unwrap();
+        // Build the front-rook capture directly: SEE judges the swap-off on `to`
+        // regardless of the move's full king-safety legality.
+        let cap = Move::new(Square::E1, Square::E5, MoveKind::Capture);
+        assert!(cap.is_capture());
+        assert_eq!(
+            pos.see(&cap),
+            see_value(Role::Pawn) - see_value(Role::Rook) + see_value(Role::Rook)
+                - see_value(Role::Rook)
+        );
+    }
+
+    #[test]
+    fn see_noncapture_is_zero_when_undefended() {
+        // A quiet rook move to an undefended square risks nothing: SEE = 0.
+        let pos = Position::from_fen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1").unwrap();
+        let quiet = pos.parse_uci("a1a4").unwrap();
+        assert!(!quiet.is_capture());
+        assert_eq!(pos.see(&quiet), 0);
+    }
+
+    #[test]
+    fn see_noncapture_is_negative_when_defended() {
+        // A quiet rook move onto a square defended by a black pawn: the rook can
+        // be taken for nothing, so SEE = -value(rook). Black pawn on b5 defends a4
+        // and c4; the rook slides a1->a4 onto the defended a4.
+        let pos = Position::from_fen("4k3/8/8/1p6/8/8/8/R3K3 w - - 0 1").unwrap();
+        let quiet = Move::new(Square::A1, Square::A4, MoveKind::Quiet);
+        assert!(!quiet.is_capture());
+        // Verify a4 is genuinely defended by the b5 pawn.
+        assert!(pos.is_attacked(Square::A4, Color::Black));
+        assert_eq!(pos.see(&quiet), -see_value(Role::Rook));
+    }
+
+    #[test]
+    fn see_en_passant_wins_a_pawn() {
+        // White pawn d5, black just played c7c5; white captures en passant. The
+        // recovered pawn is undefended, so SEE = +100.
+        let pos = Position::from_fen("4k3/8/8/2pP4/8/8/8/4K3 w - c6 0 1").unwrap();
+        let ep = pos.parse_uci("d5c6").unwrap();
+        assert_eq!(ep.kind(), MoveKind::EnPassant);
+        assert_eq!(pos.see(&ep), see_value(Role::Pawn));
     }
 }
