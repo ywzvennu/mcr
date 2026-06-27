@@ -51,6 +51,7 @@ book = []
 
 [dev-dependencies]
 criterion = "0.8"
+proptest = "1"
 
 [[bench]]
 name = "movegen"
