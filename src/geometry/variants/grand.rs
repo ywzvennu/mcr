@@ -50,7 +50,9 @@
 //! with the king on the e-file (file 4) and the marshal beside it on the f-file
 //! (file 5). Pawns sit on ranks 3 and 8.
 
-use crate::geometry::position::{GenericCastling, GenericGating, GenericPosition, GenericState};
+use crate::geometry::position::{
+    GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
+};
 use crate::geometry::{Board, Grand10x10, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
@@ -96,6 +98,7 @@ impl WideVariant<Grand10x10> for GrandRules {
             ep_square: None,
             gating: GenericGating::NONE,
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

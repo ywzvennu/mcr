@@ -17,7 +17,7 @@
 use alloc::vec::Vec;
 
 use super::attacks;
-use super::position::{GenericCastling, GenericGating, GenericState};
+use super::position::{GenericCastling, GenericGating, GenericPlacement, GenericState};
 use super::role::WideRole;
 use super::{Bitboard, Board, Geometry, Square};
 use crate::Color;
@@ -258,6 +258,71 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Sittuyin placement phase (default OFF) ---------------------------
+
+    /// Returns `true` if this variant has a **setup / placement phase**: the
+    /// non-pawn pieces start off-board in a pocket and are dropped, one per ply
+    /// in alternation, onto the player's own territory before normal play begins
+    /// (`docs/fairy-variants-architecture.md` §4.4). Sittuyin is the only such
+    /// variant.
+    ///
+    /// The default is `false`. While it is `false` the generic engine skips every
+    /// placement code path — the pocket stays [`GenericPlacement::NONE`], no drop
+    /// is ever emitted, and the FEN carries no holdings bracket — so a
+    /// non-placement variant produces byte-identical moves, state, and FEN to a
+    /// build without the feature.
+    ///
+    /// [`GenericPlacement::NONE`]: super::position::GenericPlacement::NONE
+    fn has_placement() -> bool {
+        false
+    }
+
+    /// The initial setup-phase pocket for a fresh game: the pieces each side must
+    /// deploy. The default is [`GenericPlacement::NONE`] (nothing to deploy),
+    /// matching `has_placement() == false`. A placement variant overrides
+    /// [`WideVariant::starting_position`] to seed a populated value.
+    ///
+    /// [`GenericPlacement::NONE`]: super::position::GenericPlacement::NONE
+    fn initial_placement() -> super::position::GenericPlacement {
+        super::position::GenericPlacement::NONE
+    }
+
+    /// Returns the squares onto which `color` may **drop** a pocketed `role`
+    /// during the placement phase, given the current `board`.
+    ///
+    /// Only consulted when [`has_placement`](WideVariant::has_placement) is
+    /// `true`. The default — the full board minus all occupied squares — is a
+    /// safe fallback; Sittuyin overrides it with its territory rule (the three
+    /// nearest ranks, minus own pawns, with Rooks confined to the back rank). A
+    /// drop is unconditionally pseudo-legal there (FSF applies no check filtering
+    /// during placement).
+    fn placement_targets(_role: WideRole, _color: Color, board: &Board<G>) -> Bitboard<G> {
+        !board.occupied()
+    }
+
+    /// Returns the **special-promotion landing squares** for the side-to-move
+    /// pawn standing on `from`, or `None` if the pawn may not specially promote.
+    ///
+    /// Only consulted when [`has_placement`](WideVariant::has_placement) is
+    /// `true`. The default is `None` (no special promotion). Sittuyin overrides
+    /// it: while a side has **no Met on the board**, each of its pawns may
+    /// transform into a Met (the only [`promotion_config`] role) either **in
+    /// place** — the returned set then contains `from` itself, a null-displacement
+    /// promotion — or by a one-step ferz move to an **empty** diagonal square.
+    /// The returned set is the union of those landing squares; the generic pawn
+    /// generator filters each square by the live check mask and pin line, so the
+    /// emitted promotions obey the same legality as every other move. This
+    /// expresses a promotion the rank-based standard path cannot.
+    ///
+    /// [`promotion_config`]: WideVariant::promotion_config
+    fn special_promotion_targets(
+        _board: &Board<G>,
+        _from: Square<G>,
+        _color: Color,
+    ) -> Option<Bitboard<G>> {
+        None
+    }
+
     // --- reserved fairy hooks (no-ops for standard rules) -----------------
 
     /// Returns the region mask for a [`WideRegion`]. Reserved for Phase 3
@@ -344,6 +409,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             ep_square: None,
             gating: GenericGating::NONE,
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

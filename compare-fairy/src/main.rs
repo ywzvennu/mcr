@@ -29,6 +29,7 @@ mod grand;
 mod locate;
 mod makruk;
 mod seirawan;
+mod sittuyin;
 mod uci;
 mod variants;
 
@@ -166,6 +167,7 @@ fn main() {
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
+    let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -175,6 +177,7 @@ fn main() {
         + seirawan_mismatches
         + grand_mismatches
         + duck_mismatches
+        + sittuyin_mismatches
         > 0
     {
         std::process::exit(1);
