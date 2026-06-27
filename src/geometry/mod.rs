@@ -35,11 +35,17 @@
 pub mod attacks;
 mod backing;
 mod bitboard;
+mod board;
+mod role;
 mod square;
+mod wide_move;
 
 pub use backing::BitboardBacking;
 pub use bitboard::{Bitboard, Squares};
+pub use board::{Board, ParseBoardError, WidePiece};
+pub use role::WideRole;
 pub use square::Square;
+pub use wide_move::{WideMove, WideMoveKind};
 
 /// A compile-time board geometry.
 ///
