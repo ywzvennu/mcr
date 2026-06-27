@@ -53,7 +53,9 @@ pub use position::{
 pub use role::WideRole;
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
-pub use variants::{Capablanca, CapablancaRules, Makruk, MakrukRules, Seirawan, SeirawanRules};
+pub use variants::{
+    Capablanca, CapablancaRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan, SeirawanRules,
+};
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
 /// A compile-time board geometry.
@@ -222,6 +224,21 @@ geometry!(
     u128,
     10,
     8
+);
+
+geometry!(
+    /// A ten-files by ten-ranks board (100 squares), backed by `u128`.
+    ///
+    /// The board of Grand chess. It validates a **second** `u128` geometry: ten
+    /// ranks as well as ten files, so a square index reaches `99` and a rank
+    /// renders as two digits (`a10`). Like [`Cap10x8`] its width is the
+    /// non-power-of-two `10`, so edge-masked shifts must not wrap past the tenth
+    /// file; unlike it, its `HEIGHT` is also `10`, exercising the rank geometry
+    /// at the top of the `u128`.
+    Grand10x10,
+    u128,
+    10,
+    10
 );
 
 #[cfg(test)]

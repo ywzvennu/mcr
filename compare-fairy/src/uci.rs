@@ -30,6 +30,12 @@ pub struct Engine {
     current_variant: Option<String>,
     /// The `UCI_Chess960` flag currently set.
     current_chess960: bool,
+    /// The variant names this binary advertises in its `UCI_Variant` combo option
+    /// (captured during the `uci` handshake). Used to detect when a large-board
+    /// variant (e.g. `grand`) is absent because FSF was built without
+    /// `largeboards=yes`, so the harness can skip rather than report a spurious
+    /// mismatch on a silently-truncated 8x8 position.
+    variants: Vec<String>,
 }
 
 /// The result of a single `go perft <depth>` call.
@@ -74,13 +80,55 @@ impl Engine {
             stdout,
             current_variant: None,
             current_chess960: false,
+            variants: Vec::new(),
         };
 
         eng.send("uci")?;
-        eng.wait_for("uciok")?;
+        eng.variants = eng.read_uciok_capturing_variants()?;
         eng.send("isready")?;
         eng.wait_for("readyok")?;
         Ok(eng)
+    }
+
+    /// Read the `uci` handshake up to `uciok`, returning the variant names listed
+    /// in the `option name UCI_Variant type combo ...` line (the tokens following
+    /// each `var`). Bounded by the same timeout as [`Engine::wait_for`].
+    fn read_uciok_capturing_variants(&mut self) -> Result<Vec<String>, String> {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let mut variants = Vec::new();
+        loop {
+            if Instant::now() > deadline {
+                return Err("timed out waiting for \"uciok\"".to_string());
+            }
+            let mut line = String::new();
+            let n = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|e| format!("read failed: {e}"))?;
+            if n == 0 {
+                return Err("engine closed stdout before \"uciok\"".to_string());
+            }
+            let trimmed = line.trim();
+            if trimmed.contains("UCI_Variant") && trimmed.contains("combo") {
+                // `... var chess var 3check var atomic ...`: every token right
+                // after a `var` token is a variant name.
+                let toks: Vec<&str> = trimmed.split_whitespace().collect();
+                for w in toks.windows(2) {
+                    if w[0] == "var" {
+                        variants.push(w[1].to_string());
+                    }
+                }
+            }
+            if trimmed == "uciok" {
+                return Ok(variants);
+            }
+        }
+    }
+
+    /// Returns `true` if this binary advertises the named `UCI_Variant`.
+    #[must_use]
+    pub fn has_variant(&self, name: &str) -> bool {
+        self.variants.iter().any(|v| v == name)
     }
 
     /// Write one command followed by a newline.

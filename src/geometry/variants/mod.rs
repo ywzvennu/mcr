@@ -9,9 +9,11 @@
 //! [`GenericPosition`]: super::GenericPosition
 
 pub mod capablanca;
+pub mod grand;
 pub mod makruk;
 pub mod seirawan;
 
 pub use capablanca::{Capablanca, CapablancaRules};
+pub use grand::{Grand, GrandRules};
 pub use makruk::{Makruk, MakrukRules};
 pub use seirawan::{Seirawan, SeirawanRules};

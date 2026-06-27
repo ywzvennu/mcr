@@ -133,6 +133,24 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         }
     }
 
+    /// Returns the legal promotion target roles for a pawn of `color` on the
+    /// current `board`, in a deterministic order.
+    ///
+    /// The default ignores `board` and returns
+    /// [`promotion_config`](WideVariant::promotion_config)'s static role set —
+    /// the behaviour of every variant whose promotion targets are fixed (standard
+    /// chess, Makruk, Capablanca, Seirawan). Only a variant whose legal targets
+    /// depend on the running position overrides this. Grand chess does: a pawn may
+    /// promote to a type only while the player has fewer than the **starting army
+    /// count** of that type on the board (Archbishop / Chancellor / Queen at most
+    /// one, Rook / Bishop / Knight at most two) — equivalently, only to a type the
+    /// player has had captured. The set is read live from the board, so no extra
+    /// position state is needed and every non-overriding variant enumerates
+    /// byte-identically to a build without this hook.
+    fn promotion_targets(_color: Color, _board: &Board<G>) -> Vec<WideRole> {
+        Self::promotion_config().roles
+    }
+
     /// Returns the rank (0-based) a pawn of `color` promotes on. The default is
     /// the furthest rank: `HEIGHT - 1` for white, `0` for black.
     fn promotion_rank(color: Color) -> u8 {
@@ -140,6 +158,37 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
             Color::White => G::HEIGHT - 1,
             Color::Black => 0,
         }
+    }
+
+    /// Returns `true` if a pawn of `color` arriving on `rank` is **in the
+    /// promotion zone** — i.e. it may (or must) promote there.
+    ///
+    /// The default is the single promotion rank ([`promotion_rank`]): standard
+    /// chess, Makruk, Capablanca, and Seirawan all promote on exactly one rank, so
+    /// the zone is that rank and nothing changes for them. Grand chess overrides
+    /// this to a three-rank zone (the far three ranks): promotion is *available*
+    /// throughout the zone but only *forced* on the last rank (see
+    /// [`promotion_is_forced`](WideVariant::promotion_is_forced)).
+    ///
+    /// [`promotion_rank`]: WideVariant::promotion_rank
+    fn in_promotion_zone(color: Color, rank: u8) -> bool {
+        rank == Self::promotion_rank(color)
+    }
+
+    /// Returns `true` if a pawn of `color` arriving on `rank` (already known to be
+    /// [`in_promotion_zone`](WideVariant::in_promotion_zone)) **must** promote —
+    /// a non-promoting move to that square is then illegal.
+    ///
+    /// The default is "always forced" (`true`): in the single-rank model the
+    /// promotion rank is the last rank, where a pawn cannot stay a pawn, so every
+    /// existing variant forces promotion and emits no non-promoting alternative —
+    /// byte-identical to before this hook. Grand chess overrides this so promotion
+    /// is *optional* on the near zone ranks (a plain push or capture is also
+    /// legal) and forced only on the final rank, matching Fairy-Stockfish's
+    /// `mandatoryPawnPromotion = false` with `immobilityIllegal = true`.
+    fn promotion_is_forced(color: Color, _rank: u8) -> bool {
+        let _ = color;
+        true
     }
 
     /// Returns the rank (0-based) from which a pawn of `color` may make its
