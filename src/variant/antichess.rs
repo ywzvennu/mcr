@@ -59,6 +59,11 @@ use crate::board::Board;
 use crate::movelist::MoveList;
 use crate::position::CastlingRights;
 use crate::{EndReason, Move, Position, Role};
+#[cfg(test)]
+use alloc::vec;
+use alloc::vec::Vec;
+#[cfg(test)]
+use alloc::{string::String, string::ToString};
 
 /// The roles a pawn may promote to in antichess: the standard four plus the
 /// king, in a stable order.

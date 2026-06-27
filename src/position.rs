@@ -24,6 +24,8 @@
 //!
 //! [fen]: https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
 
+use alloc::borrow::ToOwned;
+use alloc::{string::String, vec::Vec};
 use core::fmt;
 use core::str::FromStr;
 
@@ -3193,6 +3195,7 @@ impl fmt::Display for FenError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for FenError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -3222,6 +3225,7 @@ impl fmt::Display for ParseUciError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for ParseUciError {}
 
 #[cfg(test)]

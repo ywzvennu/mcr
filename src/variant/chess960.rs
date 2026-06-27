@@ -28,6 +28,12 @@ use super::{Variant, VariantId, VariantPosition};
 use crate::movelist::MoveList;
 use crate::position::{write_standard_castling_field, CastleSide};
 use crate::{Board, CastlingRights, Color, FenError, File, Piece, Rank, Role, Square};
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+#[cfg(test)]
+use alloc::vec;
+#[cfg(test)]
+use alloc::vec::Vec;
 
 /// The Chess960 (Fischer random) rule layer: standard movement with a 960
 /// starting placement and arbitrary-geometry castling.

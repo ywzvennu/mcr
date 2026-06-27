@@ -1,5 +1,9 @@
 //! Board squares, indexed `0..64` in little-endian rank-file order.
 
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+#[cfg(test)]
+use alloc::string::ToString;
 use core::fmt;
 use core::str::FromStr;
 
@@ -24,6 +28,7 @@ impl fmt::Display for InvalidSquareIndex {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for InvalidSquareIndex {}
 
 /// The error returned when parsing a [`Square`] from an algebraic string fails.
@@ -40,6 +45,7 @@ impl fmt::Display for ParseSquareError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for ParseSquareError {}
 
 impl Square {

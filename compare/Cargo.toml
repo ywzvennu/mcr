@@ -24,7 +24,10 @@ license = "GPL-3.0-or-later"
 magic = ["mce/magic"]
 
 [dependencies]
-mce = { path = "..", default-features = false }
+# `default-features = false` plus an explicit `std` keeps the benchmark on the
+# full std build (it links the std-only `shakmaty`) while still letting the
+# `magic` feature above toggle the slider backend independently of `default`.
+mce = { path = "..", default-features = false, features = ["std"] }
 shakmaty = { version = "0.27", features = ["variant"] }
 
 [dev-dependencies]

@@ -58,6 +58,9 @@
 //! [`Drop`]: MoveKind::Drop
 //! [`Promotion`]: MoveKind::Promotion
 
+#[cfg(test)]
+use alloc::format;
+use alloc::{string::String, string::ToString};
 use core::fmt;
 
 use crate::{Role, Square};

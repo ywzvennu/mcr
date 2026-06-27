@@ -32,6 +32,9 @@
 //! record, a bad position field, an unterminated quoted string, or non-ASCII
 //! bytes — yields an [`EpdError`] rather than a panic.
 
+use alloc::borrow::ToOwned;
+use alloc::format;
+use alloc::{string::String, vec::Vec};
 use core::fmt;
 
 use crate::{FenError, Move, Position, SanError};
@@ -377,6 +380,7 @@ impl fmt::Display for EpdError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for EpdError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {

@@ -42,6 +42,8 @@ use super::{Variant, VariantId, VariantPosition};
 use crate::attacks::king_attacks;
 use crate::movelist::MoveList;
 use crate::{Color, EndReason, Move, MoveKind, Piece, Position, Role, Square};
+#[cfg(test)]
+use alloc::{string::String, vec::Vec};
 
 /// The atomic rule layer: standard chess movement plus capture explosions and a
 /// king-explosion win condition. A zero-sized marker.

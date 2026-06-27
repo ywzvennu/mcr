@@ -27,6 +27,8 @@
 //! ([`Game::is_fifty_move_rule`], [`Game::is_threefold_repetition`]).
 
 use crate::{Color, Move, Position, Zobrist};
+use alloc::vec;
+use alloc::vec::Vec;
 
 /// The result of a finished game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -246,6 +248,7 @@ impl core::fmt::Display for IllegalMove {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for IllegalMove {}
 
 /// Counts how many entries of `history` equal `key`.

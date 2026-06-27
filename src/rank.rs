@@ -1,5 +1,7 @@
 //! Board ranks (rows `1` through `8`).
 
+#[cfg(test)]
+use alloc::string::ToString;
 use core::fmt;
 
 /// A rank (row) of the chessboard, from `First` (rank `1`) to `Eighth` (rank `8`).

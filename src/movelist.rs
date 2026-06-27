@@ -37,6 +37,7 @@
 //! `MaybeUninit`, no `unsafe`, and the type relies only on `Move: Copy`.
 
 use crate::{Move, MoveKind, Square};
+use alloc::vec::Vec;
 
 /// A throwaway sentinel move used to value-initialize the unused tail of the
 /// inline array. It is never read: only the first `len` slots are exposed, and
@@ -244,7 +245,7 @@ pub struct IntoIter {
     inline: [Move; MoveList::INLINE],
     inline_len: usize,
     pos: usize,
-    spill: std::vec::IntoIter<Move>,
+    spill: alloc::vec::IntoIter<Move>,
 }
 
 impl Iterator for IntoIter {

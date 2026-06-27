@@ -12,6 +12,7 @@
 //! the wrapped position and introduces no `unsafe` or trait-object indirection;
 //! the per-variant fast paths inside [`VariantPosition`](super::VariantPosition) are untouched.
 
+use alloc::{string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
@@ -35,6 +36,7 @@ impl core::fmt::Display for UnknownVariant {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for UnknownVariant {}
 
 impl FromStr for VariantId {

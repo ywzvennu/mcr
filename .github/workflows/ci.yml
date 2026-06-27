@@ -44,6 +44,40 @@ jobs:
       - name: Benches (compile only)
         run: cargo bench --all-features --no-run
 
+  # no_std gate: prove the crate still compiles with the default `std` feature
+  # off, both on the host and on bare-metal / wasm targets that have no standard
+  # library at all. This is the regression guard for issue #113 — the core
+  # geometry, rules, and (hyperbola) move generation must stay `no_std`. The
+  # `std`-only paths (the `std::error::Error` impls, the `book` file loader, and
+  # the magic table) are feature-gated and so are simply absent here.
+  no_std:
+    name: no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust with no_std targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi, wasm32-unknown-unknown
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Host build with `std` off: surfaces any missing `core`/`alloc` import
+      # without needing a cross target.
+      - name: Build (host, --no-default-features)
+        run: cargo build --no-default-features
+
+      # Bare-metal Cortex-M: a target with no `std` crate at all, so a stray
+      # `std::` reference fails to link here even if it slipped past the host.
+      - name: Build (thumbv7em-none-eabi, --no-default-features)
+        run: cargo build --no-default-features --target thumbv7em-none-eabi
+
+      # wasm: a second std-less target, the primary motivation for no_std.
+      - name: Build (wasm32-unknown-unknown, --no-default-features)
+        run: cargo build --no-default-features --target wasm32-unknown-unknown
+
   # Machine-verify the no-`unsafe` guarantee: run a fast subset of the library
   # unit tests under Miri to detect undefined behaviour. The subset is the
   # low-level primitive modules (bitboards, squares, attack lookups, move

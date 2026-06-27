@@ -35,26 +35,38 @@ todo = "warn"
 dbg_macro = "warn"
 
 [features]
-# Off by default. When on, `bishop_attacks`/`rook_attacks` use magic-bitboard
-# lookups (faster on slider-heavy positions, ~841 KiB attack table found at
-# first use) instead of the lean hyperbola-quintessence tables (~73 KiB). The
-# public API is unchanged either way.
-magic = []
+# On by default. Opts the crate back into the standard library. With it off
+# (`--no-default-features`) the crate is `#![no_std]` and draws its owned
+# containers from `alloc`: the core geometry, rules, and move generation — the
+# whole default movegen path (hyperbola-quintessence sliders) — build without
+# `std`. Turning `std` off withdraws the `std::error::Error` impls (the
+# `Display` impls remain), the filesystem book loader, and the magic table; see
+# the `book` and `magic` features below, which require `std`.
+default = ["std"]
+std = []
 
-# Off by default. Enables [`book::Book::open`], the filesystem convenience that
-# reads a Polyglot `.bin` book from a path via `std::fs`. The in-memory
-# [`book::Book::from_bytes`] reader and the Polyglot key need no feature; this
-# only gates the file-reading entry point.
-book = []
+# Off by default; requires `std`. When on, `bishop_attacks`/`rook_attacks` use
+# magic-bitboard lookups (faster on slider-heavy positions, ~841 KiB attack
+# table found at first use) instead of the lean hyperbola-quintessence tables
+# (~73 KiB). The public API is unchanged either way. The table is searched and
+# packed at first use through a `std::sync::LazyLock` once-cell, so this path is
+# `std`-only; the default `no_std` build uses the const-table hyperbola sliders.
+magic = ["std"]
 
-# Off by default. When on, exposes the `perft_parallel` /
+# Off by default; requires `std`. Enables [`book::Book::open`], the filesystem
+# convenience that reads a Polyglot `.bin` book from a path via `std::fs`. The
+# in-memory [`book::Book::from_bytes`] reader and the Polyglot key are `no_std`
+# and need no feature; this only gates the file-reading entry point.
+book = ["std"]
+
+# Off by default; requires `std`. When on, exposes the `perft_parallel` /
 # `perft_variant_parallel` node counters, which split the depth-1 root moves
 # across a rayon thread pool and compute each subtree serially. Intended for
 # benchmarking and tooling, not the core hot path — the result is
 # byte-identical to the serial `perft` / `perft_variant`. With the feature off,
 # rayon is absent from the dependency graph entirely (`cargo tree -e normal`
 # shows none).
-parallel = ["dep:rayon"]
+parallel = ["std", "dep:rayon"]
 
 # Off by default. When on, the public value types gain `serde::Serialize` /
 # `serde::Deserialize` impls. Small enums and scalars serialize structurally;

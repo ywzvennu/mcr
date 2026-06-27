@@ -1,5 +1,7 @@
 //! Board files (columns `a` through `h`).
 
+#[cfg(test)]
+use alloc::string::ToString;
 use core::fmt;
 
 /// A file (column) of the chessboard, from `A` (`a`-file) to `H` (`h`-file).

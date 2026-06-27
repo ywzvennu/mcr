@@ -36,6 +36,10 @@
 //! assert!(pgn.final_position().outcome().is_some());
 //! ```
 
+use alloc::format;
+#[cfg(test)]
+use alloc::vec;
+use alloc::{string::String, string::ToString, vec::Vec};
 use core::fmt;
 
 use crate::{AnyVariant, Move, Position, SanError, VariantId};
@@ -91,6 +95,7 @@ impl fmt::Display for PgnError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for PgnError {}
 
 /// The result of a PGN game, taken from the `[Result "..."]` tag and the

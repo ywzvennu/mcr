@@ -43,6 +43,12 @@ use super::{Variant, VariantId, VariantPosition};
 use crate::movelist::MoveList;
 use crate::position::parse_castling_field;
 use crate::{Color, EndReason, Move, Position};
+#[cfg(test)]
+use alloc::borrow::ToOwned;
+#[cfg(test)]
+use alloc::vec;
+#[cfg(test)]
+use alloc::{string::String, vec::Vec};
 
 /// The horde rule layer: a kingless white pawn horde against a standard black
 /// army. A zero-sized marker.
