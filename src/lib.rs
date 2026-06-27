@@ -112,6 +112,7 @@ mod chess_move;
 mod color;
 mod epd;
 mod file;
+pub mod geometry;
 #[cfg(feature = "magic")]
 mod magic;
 mod movelist;
