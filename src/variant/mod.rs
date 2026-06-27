@@ -1036,7 +1036,11 @@ impl<V: Variant> VariantPosition<V> {
             return Some(reason);
         }
         if self.legal_move_count() == 0 {
-            return Some(if V::king_is_royal() && self.core.is_check() {
+            // Route through the variant-aware check test so a variant whose king
+            // safety differs (atomic: a king adjacent to the enemy king is immune)
+            // labels a no-move position correctly — e.g. adjacent kings with no
+            // move is a stalemate draw, not a false checkmate.
+            return Some(if self.is_check() {
                 EndReason::Checkmate
             } else {
                 EndReason::Stalemate
