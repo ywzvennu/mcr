@@ -1,0 +1,38 @@
+# Build configuration for the `mce` Python extension module.
+#
+# Built with maturin against the pyo3 cdylib in this crate. Develop and build:
+#
+#     pip install maturin
+#     cd bindings/python
+#     maturin develop            # compile + install into the active venv
+#     maturin develop --release  # optimized build (recommended for perft)
+#     maturin build --release    # produce a wheel in target/wheels/
+#
+# Then: `import mce`. Run the tests with `pytest tests/`.
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "mce"
+version = "0.0.0"
+description = "Fast Rust-backed chess move generation and rules (pyo3 bindings for the mce engine)."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+keywords = ["chess", "chess960", "move-generation", "variants"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Board Games",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.maturin]
+# The crate already sets `[lib] crate-type = ["cdylib"]` and `name = "mce"`;
+# this builds the abi3 wheel so one artifact covers CPython 3.8+.
+bindings = "pyo3"
+strip = true
