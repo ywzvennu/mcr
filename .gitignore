@@ -11,6 +11,12 @@
 # Benchmark comparison crate (links GPL shakmaty; never published)
 /compare/target
 
+# Fairy-Stockfish comparison crate (drives the GPL FSF binary as a subprocess
+# ONLY — never links it; never published). Ignore its build artifacts and any
+# cloned/compiled FSF binary (which must never be committed).
+/compare-fairy/target
+/compare-fairy/build
+
 # Unified `mce` CLI crate (separate nested crate; never published)
 /cli/target
 

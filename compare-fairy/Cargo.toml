@@ -1,0 +1,49 @@
+# mce compare-fairy — perft comparison harness driving Fairy-Stockfish.
+#
+# This is a SEPARATE, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build` / `cargo
+# test`; it depends on `mce` by path only.
+#
+# GPL FENCE (hard requirement): Fairy-Stockfish (FSF) is GPL-3.0-or-later. This
+# harness DOES NOT link, copy, read, or otherwise incorporate any FSF source or
+# binary. It drives an externally provided `fairy-stockfish` UCI binary purely
+# AS A SUBPROCESS over a process boundary (spawn, write UCI commands to stdin,
+# read node counts from stdout). No GPL code links into anything; the FSF binary
+# is never committed or distributed by this repository. `mce` itself does not
+# depend on FSF (not even as a dev-dependency). This crate is `publish = false`.
+
+[package]
+name = "mce-compare-fairy"
+version = "0.0.0"
+edition = "2021"
+publish = false
+# Apache-2.0 OR MIT: this crate contains only original mce-side code; it links
+# NO GPL code (it only spawns the FSF binary as a subprocess). The licensing of
+# the FSF binary it drives is FSF's own and does not propagate across the
+# process boundary.
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# `default-features = false` plus explicit `std` keeps the harness on the full
+# std build (it spawns subprocesses and does FEN string surgery) while leaving
+# the `magic` slider feature togglable independently of `default`.
+mce = { path = "..", default-features = false, features = ["std"] }
+
+[features]
+# Forward to the mce dependency's `magic` feature so the same harness can
+# measure magic-on vs magic-off sliders:
+#   cargo run --release --features magic
+magic = ["mce/magic"]
+
+[[bin]]
+name = "compare-fairy"
+path = "src/main.rs"
+# `test = true` so the in-crate unit tests (FEN-dialect reconciliation, divide
+# parsing) run under `cargo test`. They are pure and do not spawn FSF.
+doc = false
+bench = false
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,370 @@
+//! Fairy-Stockfish perft comparison harness (issue #158).
+//!
+//! Differential perft + head-to-head timing of mce against Fairy-Stockfish (FSF)
+//! on the variants both engines share — atomic, king-of-the-hill, three-check,
+//! antichess (FSF: giveaway), racing-kings, horde, crazyhouse, chess960, and
+//! standard. For each shared position the two engines run perft to the same
+//! depth; the node counts are asserted equal, and the throughput (mce Mn/s vs
+//! FSF Mn/s) is reported. A mismatch prints the FEN + depth to reproduce.
+//!
+//! GPL FENCE: FSF is GPL-3.0+. This harness NEVER links FSF; it drives an
+//! externally provided `fairy-stockfish` UCI binary purely as a subprocess (see
+//! `uci.rs`). The mce library does not depend on FSF. This crate is
+//! `publish = false` and the FSF binary is never committed.
+//!
+//! ```text
+//! cargo run --release                # locate FSF (env / PATH / prebuilt), compare
+//! cargo run --release -- --build     # also clone + build FSF if not found
+//! cargo run --release -- --full      # one ply deeper
+//! cargo run --release --features magic   # mce magic-bitboard sliders
+//! ```
+//!
+//! If no FSF binary can be obtained, the harness SKIPS gracefully with install
+//! instructions and exits 0 (it never blocks or fails hard on FSF absence).
+
+mod corpus;
+mod locate;
+mod uci;
+mod variants;
+
+use std::time::Instant;
+
+use mce::{AnyVariant, VariantId};
+
+use corpus::{Case, CASES, VARIANTS};
+use locate::Source;
+
+/// Parsed command line.
+struct Opts {
+    /// Allow cloning + building FSF if no binary is found.
+    build: bool,
+    /// One ply deeper per position.
+    full: bool,
+}
+
+/// A single measured comparison row.
+struct Row {
+    id: VariantId,
+    label: &'static str,
+    fen: &'static str,
+    depth: u32,
+    mce_nodes: u64,
+    fsf_nodes: u64,
+    matched: bool,
+    mce_secs: f64,
+    fsf_secs: f64,
+}
+
+impl Row {
+    fn mce_mnps(&self) -> f64 {
+        if self.mce_secs > 0.0 {
+            self.mce_nodes as f64 / self.mce_secs / 1e6
+        } else {
+            f64::INFINITY
+        }
+    }
+    fn fsf_mnps(&self) -> f64 {
+        if self.fsf_secs > 0.0 {
+            self.fsf_nodes as f64 / self.fsf_secs / 1e6
+        } else {
+            f64::INFINITY
+        }
+    }
+    fn speedup(&self) -> f64 {
+        if self.mce_secs > 0.0 {
+            self.fsf_secs / self.mce_secs
+        } else {
+            f64::NAN
+        }
+    }
+}
+
+fn main() {
+    let opts = parse_args();
+
+    println!("mce vs Fairy-Stockfish — perft comparison harness (issue #158)");
+    #[cfg(feature = "magic")]
+    println!("mce slider backend: magic bitboards (--features magic)");
+    #[cfg(not(feature = "magic"))]
+    println!("mce slider backend: hyperbola-quintessence (default)");
+
+    // ---- locate (or build) the FSF binary ---------------------------------
+    let located = match locate::locate(opts.build) {
+        Ok(l) => l,
+        Err(reason) => {
+            println!();
+            println!("SKIP: {reason}");
+            println!();
+            println!("{}", locate::INSTALL_HELP);
+            // Skipping on FSF absence is a clean, expected outcome — exit 0.
+            return;
+        }
+    };
+    let src = match &located.source {
+        Source::Env(v) => format!("env ${v}"),
+        Source::Path(n) => format!("PATH ({n})"),
+        Source::Prebuilt(p) => format!("prebuilt {}", p.display()),
+        Source::Built(p) => format!("built {}", p.display()),
+    };
+    println!("FSF binary: {} (via {src})", located.bin);
+
+    let mut engine = match uci::Engine::spawn(&located.bin) {
+        Ok(e) => e,
+        Err(e) => {
+            println!();
+            println!("SKIP: could not start FSF over UCI: {e}");
+            println!();
+            println!("{}", locate::INSTALL_HELP);
+            return;
+        }
+    };
+    println!(
+        "tier: {}",
+        if opts.full {
+            "--full (+1 ply)"
+        } else {
+            "default"
+        }
+    );
+    println!();
+
+    // ---- run the corpus through both engines ------------------------------
+    let mut rows: Vec<Row> = Vec::with_capacity(CASES.len());
+    let mut mismatches = 0usize;
+    let mut skipped = 0usize;
+
+    for case in CASES {
+        match run_case(&mut engine, case, opts.full) {
+            Ok(row) => {
+                if !row.matched {
+                    mismatches += 1;
+                    report_mismatch(&mut engine, &row);
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                skipped += 1;
+                eprintln!("skip {}/{}: {e}", case.id.as_str(), case.label);
+            }
+        }
+    }
+
+    print_table(&rows);
+    println!();
+    print_summary(&rows, mismatches, skipped);
+
+    engine.quit();
+
+    if mismatches > 0 {
+        std::process::exit(1);
+    }
+}
+
+/// Parse `--build` / `--full` / `--help`.
+fn parse_args() -> Opts {
+    let mut o = Opts {
+        build: false,
+        full: false,
+    };
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--build" => o.build = true,
+            "--full" => o.full = true,
+            "--help" | "-h" => {
+                println!("usage: compare-fairy [--build] [--full]");
+                println!("  --build : clone + build Fairy-Stockfish if no binary is found");
+                println!("  --full  : one ply deeper per position");
+                println!("  env MCE_FSF_BIN=<path> selects an existing FSF binary");
+                std::process::exit(0);
+            }
+            other => eprintln!("warning: ignoring unknown argument {other:?}"),
+        }
+    }
+    o
+}
+
+/// Run one corpus case through both engines and measure it.
+fn run_case(engine: &mut uci::Engine, case: &Case, full: bool) -> Result<Row, String> {
+    let depth = if full { case.depth + 1 } else { case.depth };
+
+    // mce side.
+    let mce_pos =
+        AnyVariant::from_fen(case.id, case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
+    let mce_start = Instant::now();
+    let mce_nodes = mce_pos.perft(depth);
+    let mce_secs = mce_start.elapsed().as_secs_f64();
+
+    // FSF side.
+    let fsf = variants::to_fsf(case.id).ok_or("variant not shared with FSF")?;
+    let fsf_fen = variants::fen_to_fsf(case.id, case.fen);
+    engine.set_variant(fsf.uci_variant, fsf.chess960)?;
+    engine.set_position(&fsf_fen)?;
+    let fsf_res = engine.go_perft(depth, false)?;
+
+    Ok(Row {
+        id: case.id,
+        label: case.label,
+        fen: case.fen,
+        depth,
+        mce_nodes,
+        fsf_nodes: fsf_res.nodes,
+        matched: mce_nodes == fsf_res.nodes,
+        mce_secs,
+        fsf_secs: fsf_res.elapsed.as_secs_f64(),
+    })
+}
+
+/// On a mismatch, re-run with the per-move divide on both sides to localise the
+/// diverging move, and print the reproduction recipe.
+fn report_mismatch(engine: &mut uci::Engine, row: &Row) {
+    eprintln!(
+        "*** PARITY MISMATCH {}/{} depth {}: mce={} fsf={} ***",
+        row.id.as_str(),
+        row.label,
+        row.depth,
+        row.mce_nodes,
+        row.fsf_nodes,
+    );
+    eprintln!("    mce FEN : {}", row.fen);
+    let fsf_fen = variants::fen_to_fsf(row.id, row.fen);
+    eprintln!("    FSF FEN : {fsf_fen}");
+    eprintln!(
+        "    reproduce: UCI_Variant={} go perft {} on the FEN above",
+        variants::to_fsf(row.id)
+            .map(|v| v.uci_variant)
+            .unwrap_or("?"),
+        row.depth,
+    );
+
+    // FSF divide (mce divide is not part of the public API; FSF's localises the
+    // diverging first move, which is enough to start debugging).
+    if let Some(fsf) = variants::to_fsf(row.id) {
+        if engine.set_variant(fsf.uci_variant, fsf.chess960).is_ok()
+            && engine.set_position(&fsf_fen).is_ok()
+        {
+            if let Ok(res) = engine.go_perft(row.depth, true) {
+                eprintln!("    FSF divide ({} moves):", res.divide.len());
+                for (mv, n) in res.divide.iter().take(40) {
+                    eprintln!("      {mv}: {n}");
+                }
+            }
+        }
+    }
+}
+
+/// Print the per-position comparison table.
+fn print_table(rows: &[Row]) {
+    let head = format!(
+        "{:<16} {:<16} {:>5} {:>14} {:>14} {:>7} {:>10} {:>10} {:>8}",
+        "variant",
+        "position",
+        "depth",
+        "mce nodes",
+        "fsf nodes",
+        "match",
+        "mce Mn/s",
+        "fsf Mn/s",
+        "mce/fsf",
+    );
+    println!("{head}");
+    println!("{}", "-".repeat(head.len()));
+    for r in rows {
+        println!(
+            "{:<16} {:<16} {:>5} {:>14} {:>14} {:>7} {:>10.1} {:>10.1} {:>7.2}x",
+            r.id.as_str(),
+            r.label,
+            r.depth,
+            r.mce_nodes,
+            r.fsf_nodes,
+            if r.matched { "ok" } else { "MISMATCH" },
+            r.mce_mnps(),
+            r.fsf_mnps(),
+            r.speedup(),
+        );
+    }
+}
+
+/// Print the per-variant aggregate + overall summary.
+fn print_summary(rows: &[Row], mismatches: usize, skipped: usize) {
+    println!("per-variant parity + node-weighted throughput:");
+    let head = format!(
+        "{:<16} {:>5} {:>16} {:>10} {:>10} {:>9}",
+        "variant", "pos", "nodes verified", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+    );
+    println!("{head}");
+    println!("{}", "-".repeat(head.len()));
+
+    let (mut g_nodes, mut g_mce_s, mut g_fsf_s) = (0u64, 0.0f64, 0.0f64);
+    for &id in VARIANTS {
+        let group: Vec<&Row> = rows.iter().filter(|r| r.id == id).collect();
+        if group.is_empty() {
+            continue;
+        }
+        let nodes: u64 = group.iter().map(|r| r.mce_nodes).sum();
+        let mce_s: f64 = group.iter().map(|r| r.mce_secs).sum();
+        let fsf_s: f64 = group.iter().map(|r| r.fsf_secs).sum();
+        let all_ok = group.iter().all(|r| r.matched);
+        g_nodes += nodes;
+        g_mce_s += mce_s;
+        g_fsf_s += fsf_s;
+        println!(
+            "{:<16} {:>5} {:>16} {:>10.1} {:>10.1} {:>8.2}x {}",
+            id.as_str(),
+            group.len(),
+            nodes,
+            if mce_s > 0.0 {
+                nodes as f64 / mce_s / 1e6
+            } else {
+                0.0
+            },
+            if fsf_s > 0.0 {
+                nodes as f64 / fsf_s / 1e6
+            } else {
+                0.0
+            },
+            if mce_s > 0.0 { fsf_s / mce_s } else { 0.0 },
+            if all_ok { "" } else { "<- MISMATCH" },
+        );
+    }
+    println!("{}", "-".repeat(head.len()));
+    println!(
+        "{:<16} {:>5} {:>16} {:>10.1} {:>10.1} {:>8.2}x",
+        "OVERALL",
+        rows.len(),
+        g_nodes,
+        if g_mce_s > 0.0 {
+            g_nodes as f64 / g_mce_s / 1e6
+        } else {
+            0.0
+        },
+        if g_fsf_s > 0.0 {
+            g_nodes as f64 / g_fsf_s / 1e6
+        } else {
+            0.0
+        },
+        if g_mce_s > 0.0 {
+            g_fsf_s / g_mce_s
+        } else {
+            0.0
+        },
+    );
+    println!();
+
+    if mismatches == 0 {
+        println!(
+            "OK: all {} shared positions matched FSF ({} nodes verified across {} variants); \
+{} skipped.",
+            rows.len(),
+            g_nodes,
+            VARIANTS
+                .iter()
+                .filter(|&&id| rows.iter().any(|r| r.id == id))
+                .count(),
+            skipped,
+        );
+    } else {
+        eprintln!(
+            "ERROR: {mismatches} parity mismatch(es) vs FSF (see the FEN+depth above to reproduce).",
+        );
+    }
+}
