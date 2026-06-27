@@ -1005,23 +1005,28 @@ impl Position {
     /// threatens nothing (it cannot capture without detonating itself).
     fn attacked_by_nonking(&self, by: Color, occupied: Bitboard) -> Bitboard {
         let b = &self.board;
-        let mut attacked = Bitboard::EMPTY;
 
-        for from in b.pieces(by, Role::Pawn) {
-            attacked |= pawn_attacks(by, from);
-        }
+        // Same bulk shape as [`Position::attacked_by`] (pawns via shifts, sliders
+        // folded by ray family), but without the king's own attacks.
+        let pawns = b.pieces(by, Role::Pawn);
+        let mut attacked = match by {
+            Color::White => pawns.north_east() | pawns.north_west(),
+            Color::Black => pawns.south_east() | pawns.south_west(),
+        };
+
         for from in b.pieces(by, Role::Knight) {
             attacked |= knight_attacks(from);
         }
-        for from in b.pieces(by, Role::Bishop) {
+
+        let bishop_like = b.pieces(by, Role::Bishop) | b.pieces(by, Role::Queen);
+        for from in bishop_like {
             attacked |= bishop_attacks(from, occupied);
         }
-        for from in b.pieces(by, Role::Rook) {
+        let rook_like = b.pieces(by, Role::Rook) | b.pieces(by, Role::Queen);
+        for from in rook_like {
             attacked |= rook_attacks(from, occupied);
         }
-        for from in b.pieces(by, Role::Queen) {
-            attacked |= bishop_attacks(from, occupied) | rook_attacks(from, occupied);
-        }
+
         attacked
     }
 
@@ -1030,23 +1035,35 @@ impl Position {
     /// color may not move to).
     fn attacked_by(&self, by: Color, occupied: Bitboard) -> Bitboard {
         let b = &self.board;
-        let mut attacked = Bitboard::EMPTY;
 
-        for from in b.pieces(by, Role::Pawn) {
-            attacked |= pawn_attacks(by, from);
-        }
+        // Pawn attacks in bulk: every pawn's two capture squares come from a
+        // single pair of bitboard shifts of the whole pawn set, rather than a
+        // per-pawn table lookup. (Profiling round 2: this is the dominant share
+        // of the king-danger map, and the shift form measured faster in both the
+        // magic and hyperbola builds.)
+        let pawns = b.pieces(by, Role::Pawn);
+        let mut attacked = match by {
+            Color::White => pawns.north_east() | pawns.north_west(),
+            Color::Black => pawns.south_east() | pawns.south_west(),
+        };
+
         for from in b.pieces(by, Role::Knight) {
             attacked |= knight_attacks(from);
         }
-        for from in b.pieces(by, Role::Bishop) {
+
+        // Sliders by ray family rather than by piece role: a queen contributes to
+        // both the diagonal and the orthogonal pass, so folding the queens into
+        // the bishop and rook sets issues each slider its rays directly with no
+        // separate per-queen branch.
+        let bishop_like = b.pieces(by, Role::Bishop) | b.pieces(by, Role::Queen);
+        for from in bishop_like {
             attacked |= bishop_attacks(from, occupied);
         }
-        for from in b.pieces(by, Role::Rook) {
+        let rook_like = b.pieces(by, Role::Rook) | b.pieces(by, Role::Queen);
+        for from in rook_like {
             attacked |= rook_attacks(from, occupied);
         }
-        for from in b.pieces(by, Role::Queen) {
-            attacked |= bishop_attacks(from, occupied) | rook_attacks(from, occupied);
-        }
+
         if let Some(king) = b.king_of(by) {
             attacked |= king_attacks(king);
         }
