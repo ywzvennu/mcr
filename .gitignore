@@ -11,6 +11,9 @@
 # Benchmark comparison crate (links GPL shakmaty; never published)
 /compare/target
 
+# proptest failure-replay seeds: regenerated on demand, not part of the suite.
+proptest-regressions/
+
 # Editor / OS
 .idea/
 .vscode/
