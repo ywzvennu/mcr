@@ -241,6 +241,23 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         board.kings_of(color)
     }
 
+    // --- Duck chess (default OFF) -----------------------------------------
+
+    /// Returns `true` if this variant has the neutral Duck: a single blocker
+    /// belonging to neither side that is added to the occupancy for movegen and
+    /// is moved to a fresh empty square as the second half of every ply
+    /// (`docs/fairy-variants-architecture.md` §4.4).
+    ///
+    /// The default is `false`. While it is `false` the generic engine skips every
+    /// duck code path — the duck never enters the occupancy, no king-safety
+    /// relaxation applies, no two-part move is emitted, and the FEN carries no
+    /// `*` — so a non-duck variant produces byte-identical moves, state, and FEN
+    /// to a build without the duck feature. Only Duck chess overrides this to
+    /// `true`.
+    fn has_duck() -> bool {
+        false
+    }
+
     // --- reserved fairy hooks (no-ops for standard rules) -----------------
 
     /// Returns the region mask for a [`WideRegion`]. Reserved for Phase 3
@@ -326,6 +343,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             castling: GenericCastling::standard::<G>(),
             ep_square: None,
             gating: GenericGating::NONE,
+            duck: None,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

@@ -14,11 +14,15 @@
 //! alphabet depends on the board width/height), which is why
 //! [`WideMove::to_uci`] takes the geometry as a type parameter.
 //!
-//! # Bit layout (`u32`)
+//! # Bit layout (`u64`)
+//!
+//! The low 32 bits hold the base move exactly as a plain chess / fairy move; the
+//! high 32 bits carry the Duck-chess addendum (`docs/fairy-variants-architecture.md`
+//! §4.4), zero for every non-Duck move.
 //!
 //! ```text
-//! bit:  31 ... 26 | 25 24 23 22 21 | 20 19 18 17 16 | 15 ... 8 | 7 ... 0
-//!       \--unused-/ \----kind-----/ \-----role-----/ \--from--/ \--to--/
+//! bit:  31 ... 29 | 28 | 27 26 | 25 24 23 22 21 | 20 19 18 17 16 | 15 ... 8 | 7 ... 0
+//!       \-unused-/ \rk/ \gate-/ \----kind-----/ \-----role-----/ \--from--/ \--to--/
 //! ```
 //!
 //! * **`to`** (bits 0..8): destination square index, `0..128`.
@@ -38,6 +42,16 @@
 //!   non-castling base move the gated square is always the move's origin, so
 //!   bit 28 is `0`. These bits are `0` for every non-gating move, so a variant
 //!   without gating produces byte-identical words to before this field existed.
+//!
+//! ## Duck addendum (bits 32..40), Duck chess only
+//!
+//! * **`duck`** (bits 33..40): the square the neutral Duck is moved to as the
+//!   second half of the ply, plus a presence bit. Bit 32 is the **has-duck**
+//!   flag (`1` when this move carries a duck placement); bits 33..40 hold the
+//!   8-bit duck destination index (`0..128`). The whole high word is `0` for
+//!   every non-Duck move, so a variant without the duck mechanic produces words
+//!   whose value is identical to the old `u32` layout (zero-extended) — its base
+//!   logic, ordering, and equality are unchanged.
 
 use alloc::string::String;
 use core::fmt;
@@ -159,6 +173,12 @@ const GATE_NONE: u32 = 0;
 const GATE_HAWK: u32 = 1;
 const GATE_ELEPHANT: u32 = 2;
 
+// Duck addendum, in the high 32 bits of the `u64` word. Bit 32 is the presence
+// flag; bits 33..41 hold the 8-bit duck destination index.
+const DUCK_PRESENT_SHIFT: u32 = 32;
+const DUCK_SQUARE_SHIFT: u32 = 33;
+const DUCK_PRESENT: u64 = 1 << DUCK_PRESENT_SHIFT;
+
 /// The Seirawan reserve piece a [`WideMove`] gates in as the second half of a
 /// back-rank piece's first move: a Hawk (Bishop + Knight) or an Elephant
 /// (Rook + Knight). See [`WideMove::with_gate`].
@@ -226,17 +246,18 @@ pub enum GateSquare {
 /// assert_eq!(m.to_uci::<Chess8x8>(), "e2e4");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct WideMove(u32);
+pub struct WideMove(u64);
 
 impl WideMove {
-    /// Packs `from`, `to`, a `role` index, and a `kind` tag into the word.
+    /// Packs `from`, `to`, a `role` index, and a `kind` tag into the word. The
+    /// base move occupies the low 32 bits; the Duck addendum (high word) is `0`.
     #[inline]
     const fn pack(from: u8, to: u8, role: u32, kind: u32) -> WideMove {
         WideMove(
-            (kind << KIND_SHIFT)
+            ((kind << KIND_SHIFT)
                 | (role << ROLE_SHIFT)
                 | ((from as u32) << FROM_SHIFT)
-                | ((to as u32) << TO_SHIFT),
+                | ((to as u32) << TO_SHIFT)) as u64,
         )
     }
 
@@ -283,16 +304,22 @@ impl WideMove {
         WideMove::pack(s, s, role.index() as u32, KIND_DROP)
     }
 
+    /// The low 32 bits: the base move, with the Duck addendum stripped.
+    #[inline]
+    const fn base(self) -> u32 {
+        self.0 as u32
+    }
+
     /// The raw kind tag in bits 21..26.
     #[inline]
     const fn kind_tag(self) -> u32 {
-        (self.0 >> KIND_SHIFT) & KIND_MASK
+        (self.base() >> KIND_SHIFT) & KIND_MASK
     }
 
     /// The raw role index in bits 16..21.
     #[inline]
     const fn role_index(self) -> usize {
-        ((self.0 >> ROLE_SHIFT) & ROLE_MASK) as usize
+        ((self.base() >> ROLE_SHIFT) & ROLE_MASK) as usize
     }
 
     /// Returns the origin square index, `0..128`.
@@ -302,14 +329,14 @@ impl WideMove {
     #[must_use]
     #[inline]
     pub const fn from_index(self) -> u8 {
-        ((self.0 >> FROM_SHIFT) & SQ_MASK) as u8
+        ((self.base() >> FROM_SHIFT) & SQ_MASK) as u8
     }
 
     /// Returns the destination square index, `0..128`.
     #[must_use]
     #[inline]
     pub const fn to_index(self) -> u8 {
-        ((self.0 >> TO_SHIFT) & SQ_MASK) as u8
+        ((self.base() >> TO_SHIFT) & SQ_MASK) as u8
     }
 
     /// Returns the origin square for a board of geometry `G`.
@@ -430,10 +457,13 @@ impl WideMove {
             GateSquare::Origin => 0,
             GateSquare::RookOrigin => 1,
         };
+        // The gate fields live in the low 32 bits; the high word (Duck addendum)
+        // is preserved.
+        let high = self.0 & 0xffff_ffff_0000_0000;
+        let base = self.base() & !((GATE_ROLE_MASK << GATE_ROLE_SHIFT) | (1 << GATE_ON_ROOK_SHIFT));
         WideMove(
-            (self.0 & !((GATE_ROLE_MASK << GATE_ROLE_SHIFT) | (1 << GATE_ON_ROOK_SHIFT)))
-                | (gate.code() << GATE_ROLE_SHIFT)
-                | (on_rook << GATE_ON_ROOK_SHIFT),
+            high | ((base | (gate.code() << GATE_ROLE_SHIFT) | (on_rook << GATE_ON_ROOK_SHIFT))
+                as u64),
         )
     }
 
@@ -441,7 +471,7 @@ impl WideMove {
     #[must_use]
     #[inline]
     pub fn gate(self) -> Option<GateRole> {
-        match (self.0 >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK {
+        match (self.base() >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK {
             GATE_HAWK => Some(GateRole::Hawk),
             GATE_ELEPHANT => Some(GateRole::Elephant),
             _ => None,
@@ -454,7 +484,7 @@ impl WideMove {
     #[must_use]
     #[inline]
     pub const fn gate_square(self) -> GateSquare {
-        if (self.0 >> GATE_ON_ROOK_SHIFT) & 1 == 1 {
+        if (self.base() >> GATE_ON_ROOK_SHIFT) & 1 == 1 {
             GateSquare::RookOrigin
         } else {
             GateSquare::Origin
@@ -465,7 +495,41 @@ impl WideMove {
     #[must_use]
     #[inline]
     pub const fn is_gating(self) -> bool {
-        (self.0 >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK != GATE_NONE
+        (self.base() >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK != GATE_NONE
+    }
+
+    /// Returns a copy of this move carrying a Duck-chess placement: the second
+    /// half of the ply moves the neutral Duck onto `square`. The base move is
+    /// unchanged; only the high-word Duck addendum is set.
+    ///
+    /// Used only by Duck chess (`docs/fairy-variants-architecture.md` §4.4); every
+    /// other variant leaves the addendum `0`, so its words are bit-identical to
+    /// the zero-extended old `u32` layout.
+    #[must_use]
+    #[inline]
+    pub fn with_duck<G: Geometry>(self, square: Square<G>) -> WideMove {
+        let high = DUCK_PRESENT | ((square.index() as u64) << DUCK_SQUARE_SHIFT);
+        WideMove((self.0 & 0x0000_0000_ffff_ffff) | high)
+    }
+
+    /// Returns the square the Duck is placed on this ply, or `None` if this move
+    /// carries no Duck placement.
+    #[must_use]
+    #[inline]
+    pub const fn duck_to_index(self) -> Option<u8> {
+        if self.0 & DUCK_PRESENT != 0 {
+            Some((self.0 >> DUCK_SQUARE_SHIFT) as u8)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the Duck destination square for a board of geometry `G`, or `None`
+    /// if this move carries no Duck placement.
+    #[must_use]
+    #[inline]
+    pub fn duck_to<G: Geometry>(self) -> Option<Square<G>> {
+        self.duck_to_index().map(Square::new)
     }
 
     /// Renders a square index as a UCI-ish coordinate for a board of geometry
@@ -533,6 +597,16 @@ impl WideMove {
                 s.push('r');
             }
         }
+        // A Duck placement is rendered FSF-style as the base move, a comma, and the
+        // duck sub-move `<from><to>`. FSF's duck `from` field is cosmetic (it
+        // ignores it on input and prints the moved piece's destination), so we
+        // render the base move's destination as the duck `from` to match its
+        // divide strings exactly (e.g. `a2a3,a3a2`).
+        if let Some(duck_to) = self.duck_to_index() {
+            s.push(',');
+            Self::render_square::<G>(&mut s, self.to_index());
+            Self::render_square::<G>(&mut s, duck_to);
+        }
         s
     }
 }
@@ -576,8 +650,33 @@ mod tests {
     );
 
     #[test]
-    fn wide_move_is_four_bytes() {
-        assert_eq!(core::mem::size_of::<WideMove>(), 4);
+    fn wide_move_is_eight_bytes() {
+        // The base move occupies the low 32 bits; the high 32 carry the Duck
+        // addendum (zero for every non-Duck move).
+        assert_eq!(core::mem::size_of::<WideMove>(), 8);
+    }
+
+    #[test]
+    fn duck_addendum_round_trips_and_is_default_off() {
+        let m = WideMove::new(
+            Square::<Chess8x8>::new(8),  // a2
+            Square::<Chess8x8>::new(16), // a3
+            WideMoveKind::Quiet,
+        );
+        // No duck by default.
+        assert_eq!(m.duck_to_index(), None);
+        // A non-duck move's word value equals the zero-extended old u32 layout.
+        assert_eq!(m.0 & 0xffff_ffff_0000_0000, 0);
+
+        let d = m.with_duck(Square::<Chess8x8>::new(8)); // duck to a2
+        assert_eq!(d.duck_to_index(), Some(8));
+        assert_eq!(d.duck_to::<Chess8x8>(), Some(Square::<Chess8x8>::new(8)));
+        // The base move is untouched.
+        assert_eq!(d.from_index(), m.from_index());
+        assert_eq!(d.to_index(), m.to_index());
+        assert_eq!(d.kind(), m.kind());
+        // FSF-style rendering: base move, comma, duck `<piece_dest><duck_to>`.
+        assert_eq!(d.to_uci::<Chess8x8>(), "a2a3,a3a2");
     }
 
     #[test]

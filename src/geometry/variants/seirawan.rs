@@ -100,6 +100,7 @@ impl WideVariant<Chess8x8> for SeirawanRules {
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
             gating: Self::initial_gating(),
+            duck: None,
             halfmove_clock: 0,
             fullmove_number: 1,
         };
