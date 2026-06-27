@@ -8,7 +8,10 @@
 [package]
 name = "mce"
 description = "Modular Chess Engine — a permissively licensed chess move-generation and rules library covering standard chess and variants."
-version = "0.2.0"
+version = "0.0.0"
+# In active development — not yet released. `publish = false` guards against an
+# accidental `cargo publish` while the API is still in flux.
+publish = false
 edition = "2021"
 rust-version = "1.82"
 license = "MIT OR Apache-2.0"
