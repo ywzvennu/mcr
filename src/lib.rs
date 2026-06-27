@@ -77,7 +77,32 @@
 //! let after = pos.play(&e4);
 //! assert!(after.outcome().is_none());
 //! ```
+//!
+//! ## `no_std`
+//!
+//! The crate is `#![no_std]` with the default `std` feature turned off
+//! (`--no-default-features`); it then draws its owned containers (`Vec`,
+//! `String`) from `alloc`, so an allocator is still required. The whole core —
+//! the geometry primitives, the [`Board`]/[`Position`] types, legal move
+//! generation (hyperbola-quintessence sliders), SAN/FEN/UCI/PGN/EPD
+//! parsing and rendering, Zobrist hashing, outcomes, and all variants — builds
+//! and runs without `std`, including on bare-metal and `wasm` targets.
+//!
+//! The default-on `std` feature only adds the parts that genuinely need the
+//! standard library: the `std::error::Error` impls on the error types (their
+//! [`core::fmt::Display`] impls are always present), the filesystem
+//! `Book::open` loader (the in-memory [`Book::from_bytes`] reader is
+//! `no_std`), and the runtime-built `magic` slider table. Accordingly the
+//! `magic`, `book`, and `parallel` features imply `std`.
 #![doc(html_root_url = "https://docs.rs/mce")]
+// The crate is `no_std` by default; the on-by-default `std` feature opts back
+// into the standard library (for `std::error::Error`, `std::fs` book loading,
+// and the magic-table runtime init). The core geometry, rules, and move
+// generation compile without `std`, drawing `Vec`/`String`/`format!` from
+// `alloc`.
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 pub mod attacks;
 mod bitboard;

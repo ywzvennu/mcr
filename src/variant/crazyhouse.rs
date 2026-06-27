@@ -42,6 +42,8 @@ use super::{Variant, VariantId, VariantPosition, VariantState};
 use crate::movelist::MoveList;
 use crate::position::{FenError, Position};
 use crate::{Bitboard, Board, Color, Move, MoveKind, Piece, Role, SanError, Square};
+use alloc::format;
+use alloc::{string::String, string::ToString, vec::Vec};
 
 /// The number of droppable roles (pawn, knight, bishop, rook, queen — never the
 /// king). Indexed by [`pocket_index`].

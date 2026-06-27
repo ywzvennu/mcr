@@ -37,6 +37,7 @@
 //! (`!`/`?`) glyphs. It resolves the SAN against the position's legal moves and
 //! rejects anything illegal or ambiguous with a [`SanError`].
 
+use alloc::{string::String, string::ToString};
 use core::fmt;
 
 use crate::{File, Move, MoveKind, Position, Rank, Role, Square};
@@ -68,6 +69,7 @@ impl fmt::Display for SanError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for SanError {}
 
 impl Position {

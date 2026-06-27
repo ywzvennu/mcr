@@ -1,5 +1,7 @@
 //! The two sides of a chess game.
 
+#[cfg(test)]
+use alloc::string::ToString;
 use core::fmt;
 
 /// One of the two players / sides in a chess game.

@@ -41,6 +41,8 @@ mod koth;
 mod racing;
 mod three_check;
 
+use alloc::borrow::ToOwned;
+use alloc::{string::String, vec::Vec};
 use core::fmt;
 use core::hash::Hash;
 

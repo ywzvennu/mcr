@@ -1,5 +1,7 @@
 //! Piece roles and colored pieces, with FEN-character conversions.
 
+#[cfg(test)]
+use alloc::{string::ToString, vec::Vec};
 use core::fmt;
 
 use crate::Color;

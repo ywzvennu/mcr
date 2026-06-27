@@ -36,6 +36,8 @@
 //!
 //! [splitmix64]: https://en.wikipedia.org/wiki/Xorshift#Initialization
 
+#[cfg(test)]
+use alloc::format;
 use core::fmt;
 
 use crate::position::CastleSide;

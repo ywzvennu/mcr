@@ -22,6 +22,8 @@
 use super::{Variant, VariantId, VariantPosition, VariantState};
 use crate::position::FenError;
 use crate::{Color, EndReason, Move, Position};
+use alloc::borrow::ToOwned;
+use alloc::string::String;
 
 /// The number of checks a side must deliver to win.
 const WIN_CHECKS: u8 = 3;

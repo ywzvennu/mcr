@@ -1,5 +1,9 @@
 //! A 64-bit set of squares.
 
+#[cfg(test)]
+use alloc::vec;
+#[cfg(test)]
+use alloc::{string::ToString, vec::Vec};
 use core::fmt;
 use core::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,

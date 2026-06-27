@@ -73,6 +73,8 @@
 //! and the lookup — is our own code. All indexing here is bounds-checked safe
 //! Rust; the crate denies `unsafe`.
 
+use alloc::vec;
+use alloc::vec::Vec;
 use std::sync::LazyLock;
 
 use crate::{Bitboard, Square};

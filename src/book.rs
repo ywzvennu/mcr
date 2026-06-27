@@ -33,6 +33,7 @@
 //! ```
 
 use crate::{CastleSide, Color, File, Move, MoveKind, Position, Rank, Role, Square};
+use alloc::vec::Vec;
 
 /// One decoded entry of a Polyglot book: the packed move, its weight, and the
 /// learn field, for a single position key.

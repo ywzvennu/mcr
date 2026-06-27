@@ -29,6 +29,8 @@ mod tests {
     use super::*;
     use crate::variant::{perft_variant, VariantPosition};
     use crate::{Position, Square};
+    #[cfg(test)]
+    use alloc::format;
 
     /// A standard-chess rule layer that opts *out* of the fast-legality sentinel,
     /// forcing the generic pseudo-legal + make-move filter path. Used only to

@@ -30,6 +30,7 @@ use crate::{
     AnyVariant, Board, CastleSide, CastlingRights, Color, File, Move, MoveKind, Position, Square,
     VariantId,
 };
+use alloc::string::String;
 
 // -- Square -----------------------------------------------------------------
 

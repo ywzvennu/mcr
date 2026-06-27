@@ -57,6 +57,8 @@ use crate::board::Board;
 use crate::movelist::MoveList;
 use crate::position::CastlingRights;
 use crate::{Bitboard, Color, EndReason, Move, Position, Rank, Role, Square};
+#[cfg(test)]
+use alloc::{string::String, vec::Vec};
 
 /// The rank a king must reach to finish the race.
 const GOAL_RANK: Rank = Rank::Eighth;

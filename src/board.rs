@@ -11,6 +11,11 @@
 //! union of the color masks is the set of occupied squares. All mutators keep
 //! these masks in agreement.
 
+#[cfg(test)]
+use alloc::format;
+use alloc::string::String;
+#[cfg(test)]
+use alloc::{string::ToString, vec::Vec};
 use core::fmt;
 use core::str::FromStr;
 
@@ -498,6 +503,7 @@ impl fmt::Display for ParseBoardError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for ParseBoardError {}
 
 #[cfg(test)]
