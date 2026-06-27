@@ -597,12 +597,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
 
-        // Standard destinations: kingside king to file 6 (g), rook to 5 (f);
-        // queenside king to file 2 (c), rook to 3 (d). These are the 8x8
-        // standard files.
+        // Castle destinations come from the variant's `castle_dest_files` hook.
+        // The default is the standard 8x8 geometry (kingside king to file 6 / g
+        // and rook to 5 / f; queenside king to 2 / c and rook to 3 / d); a wide
+        // variant like Capablanca overrides it for its own king/rook files.
+        let (k_king, k_rook) = V::castle_dest_files(KINGSIDE);
+        let (q_king, q_rook) = V::castle_dest_files(QUEENSIDE);
         for (side, king_dest_file, rook_dest_file, kind) in [
-            (KINGSIDE, 6u8, 5u8, WideMoveKind::CastleKingside),
-            (QUEENSIDE, 2u8, 3u8, WideMoveKind::CastleQueenside),
+            (KINGSIDE, k_king, k_rook, WideMoveKind::CastleKingside),
+            (QUEENSIDE, q_king, q_rook, WideMoveKind::CastleQueenside),
         ] {
             let Some(rook_file) = self.state.castling.rook_file(us, side) else {
                 continue;
@@ -698,11 +701,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
             }
             WideMoveKind::CastleKingside | WideMoveKind::CastleQueenside => {
-                let (side, rook_dest_file) = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
-                    (KINGSIDE, 5u8)
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
                 } else {
-                    (QUEENSIDE, 3u8)
+                    QUEENSIDE
                 };
+                // The rook destination file comes from the same hook the
+                // generator used, so make-move and movegen stay in lockstep for
+                // any board geometry.
+                let (_king_dest_file, rook_dest_file) = V::castle_dest_files(side);
                 let rook_file = self
                     .state
                     .castling

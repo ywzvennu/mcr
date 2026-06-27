@@ -8,6 +8,8 @@
 //! [`WideVariant`]: super::WideVariant
 //! [`GenericPosition`]: super::GenericPosition
 
+pub mod capablanca;
 pub mod makruk;
 
+pub use capablanca::{Capablanca, CapablancaRules};
 pub use makruk::{Makruk, MakrukRules};

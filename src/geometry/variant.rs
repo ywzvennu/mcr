@@ -158,6 +158,30 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         true
     }
 
+    /// Returns the castle destination files `(king_dest_file, rook_dest_file)`
+    /// for a castling side (`0` = kingside, `1` = queenside).
+    ///
+    /// The default is the standard 8x8 geometry: kingside the king lands on file
+    /// `6` (g) with the rook on `5` (f); queenside the king lands on file `2` (c)
+    /// with the rook on `3` (d). These hold for any board where the king starts
+    /// on the e-file, so [`StandardChess`] (8x8) keeps the byte-identical
+    /// behaviour the concrete engine and the existing perft suites pin.
+    ///
+    /// Wider boards whose king and rooks sit on different files (Capablanca: king
+    /// on the f-file, rooks on the a/j files; the king castles to the i/c files)
+    /// override this with the variant's own castle geometry. The king and rook
+    /// destinations must lie on the board (`< WIDTH`); an off-board file
+    /// suppresses that castle.
+    fn castle_dest_files(side: usize) -> (u8, u8) {
+        if side == 0 {
+            // Kingside: king to file 6 (g), rook to file 5 (f).
+            (6, 5)
+        } else {
+            // Queenside: king to file 2 (c), rook to file 3 (d).
+            (2, 3)
+        }
+    }
+
     /// Returns the set of royal squares of `color` whose safety defines check.
     ///
     /// The default is every king of `color` (one in standard chess). Multi-king

@@ -22,6 +22,7 @@
 //! If no FSF binary can be obtained, the harness SKIPS gracefully with install
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
+mod capablanca;
 mod corpus;
 mod locate;
 mod makruk;
@@ -154,13 +155,15 @@ fn main() {
     println!();
     print_summary(&rows, mismatches, skipped);
 
-    // Makruk rides the generic engine (not the `AnyVariant` corpus above), so it
-    // has its own comparison loop. Fold its mismatches into the exit status.
+    // Makruk and Capablanca ride the generic engine (not the `AnyVariant` corpus
+    // above), so each has its own comparison loop. Fold their mismatches into the
+    // exit status.
     let makruk_mismatches = makruk::run(&mut engine, opts.full);
+    let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
 
     engine.quit();
 
-    if mismatches + makruk_mismatches > 0 {
+    if mismatches + makruk_mismatches + capablanca_mismatches > 0 {
         std::process::exit(1);
     }
 }
