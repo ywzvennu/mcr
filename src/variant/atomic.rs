@@ -746,4 +746,72 @@ mod tests {
             "standard chess must reject adjacent kings, but from_fen accepted it"
         );
     }
+
+    /// Adjacent kings with zero legal moves is a stalemate draw, not a false
+    /// checkmate: the core check test reports check (a rook bears on the king),
+    /// but atomic's adjacency immunity means the king is not actually in check.
+    #[test]
+    fn adjacent_kings_zero_moves_is_stalemate_not_checkmate_issue_131() {
+        let start: Atomic = "k7/p1K5/P7/8/8/8/8/R6R w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["c7b7", "a8b8", "h1h8", "b8a8", "h8b8"]);
+
+        let core = pos.core();
+        assert_eq!(pos.turn(), Color::Black);
+        assert_eq!(core.board().king_of(Color::Black), Some(sq("a8")));
+        assert_eq!(core.board().king_of(Color::White), Some(sq("b7")));
+        assert!(
+            king_attacks(sq("a8")).contains(sq("b7")),
+            "the two kings are adjacent"
+        );
+        assert!(
+            core.is_check(),
+            "core check test (no atomic immunity) reports check"
+        );
+        assert!(
+            !pos.is_check(),
+            "atomic king adjacent to the enemy king is immune -> not in check"
+        );
+        assert!(pos.legal_moves().is_empty(), "black has no legal move");
+        assert_eq!(
+            pos.end_reason(),
+            Some(EndReason::Stalemate),
+            "no-move adjacent-kings position is stalemate, not a false checkmate"
+        );
+        assert_eq!(pos.outcome(), Some(Outcome::Draw));
+    }
+
+    /// A genuine atomic checkmate (mated king not adjacent to the enemy king, so
+    /// no immunity) must still label `Checkmate` — the control against
+    /// over-relaxing the labeling.
+    #[test]
+    fn ordinary_atomic_checkmate_still_labels_checkmate_issue_131() {
+        let pos: Atomic = "4R1k1/5Rpp/8/8/8/8/8/K7 b - - 0 1".parse().unwrap();
+        assert!(pos.is_check(), "black king is genuinely in check");
+        assert!(pos.legal_moves().is_empty(), "black has no legal move");
+        assert_eq!(pos.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(
+            pos.outcome(),
+            Some(Outcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+
+    /// The adjacency immunity must also make `is_check()` report `false` for an
+    /// adjacent-kings position that still has legal moves, even though the core
+    /// test reports check.
+    #[test]
+    fn is_check_false_when_king_adjacent_to_enemy_king_issue_131() {
+        let start: Atomic = "8/8/8/8/8/k7/7r/K7 w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["a1a2", "h2g2"]);
+        assert!(
+            pos.core().is_check(),
+            "core test reports check from the g2 rook"
+        );
+        assert!(
+            !pos.is_check(),
+            "atomic: king adjacent to the enemy king is immune, so not in check"
+        );
+        assert!(pos.outcome().is_none());
+    }
 }
