@@ -132,14 +132,18 @@ impl Variant for AntichessRules {
     }
 
     /// The core pseudo-legal generator emits only the four standard promotion
-    /// roles (it has no knowledge of [`Variant::promotion_roles`]). Antichess
-    /// adds the king-promotion moves here: the standard pass is generated, then
+    /// roles (it has no knowledge of [`Variant::promotion_roles`]). It is invoked
+    /// here through [`Position::pseudo_into_all_kings`] so that king moves are
+    /// emitted for *every* king of the side to move — a side may have several
+    /// kings, since antichess allows promotion to a king — rather than only one.
+    /// Antichess adds the king-promotion moves here: the standard pass is
+    /// generated, then
     /// every queen-promotion (which the core always emits, exactly once per
     /// promoting from/to/capture combination) is mirrored to a king-promotion of
     /// the same shape. This is the only pseudo-legal difference from standard
     /// chess; the slow legality path (king safety is off) then accepts every one.
     fn gen_pseudo(core: &Position, out: &mut MoveList) {
-        core.pseudo_into(out);
+        core.pseudo_into_all_kings(out);
         let king_promos: Vec<Move> = out
             .iter()
             .filter_map(|mv| match mv.kind() {
@@ -214,7 +218,7 @@ impl Variant for AntichessRules {
 /// exists.
 fn has_legal_move(core: &Position) -> bool {
     let mut pseudo = MoveList::new();
-    core.pseudo_into(&mut pseudo);
+    core.pseudo_into_all_kings(&mut pseudo);
     !pseudo.is_empty()
 }
 
@@ -328,6 +332,56 @@ mod tests {
             })
         );
         assert_eq!(after.end_reason(), Some(EndReason::VariantWin));
+    }
+
+    #[test]
+    fn two_kings_both_generate_moves() {
+        // #122: a side may have more than one king in antichess (a pawn can
+        // promote to a king). Both kings must generate their moves, not only one.
+        // White kings on b8 and g4, black queen on a1, white to move, no capture
+        // available, so every quiet move counts. Correct total is 13 legal moves
+        // (5 for the b8 king on the edge/corner-ish square + 8 for the g4 king in
+        // the open); the pre-fix engine emitted only one king's moves.
+        let pos: Antichess = "1K6/8/8/8/6K1/8/8/q7 w - - 0 1".parse().unwrap();
+        let moves = pos.legal_moves();
+        assert!(
+            moves.iter().all(|mv| !mv.is_capture()),
+            "no capture is available, so nothing is forced: {:?}",
+            moves.iter().map(|m| m.to_uci()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            moves.len(),
+            13,
+            "both kings must move: {:?}",
+            moves.iter().map(|m| m.to_uci()).collect::<Vec<_>>()
+        );
+        // Each king must contribute moves (sanity that we are not double-counting
+        // one king).
+        let ucis: Vec<String> = moves.iter().map(|m| m.to_uci()).collect();
+        assert!(ucis.iter().any(|m| m.starts_with("b8")), "{ucis:?}");
+        assert!(ucis.iter().any(|m| m.starts_with("g4")), "{ucis:?}");
+    }
+
+    #[test]
+    fn multi_king_forced_capture_across_both_kings() {
+        // Two white kings, each adjacent to a different black pawn it can capture
+        // (king on c5 can take b6/d6 pawns; king on f3 can take e4 pawn). With
+        // captures available, the forced-capture filter must keep captures from
+        // BOTH kings and drop every quiet move.
+        let pos: Antichess = "8/8/1p1p4/2K5/4p3/5K2/8/8 w - - 0 1".parse().unwrap();
+        let moves = pos.legal_moves();
+        assert!(
+            moves.iter().all(|mv| mv.is_capture()),
+            "all retained moves must be captures: {:?}",
+            moves.iter().map(|m| m.to_uci()).collect::<Vec<_>>()
+        );
+        let mut ucis: Vec<String> = moves.iter().map(|m| m.to_uci()).collect();
+        ucis.sort();
+        // c5 king captures b6 and d6; f3 king captures e4.
+        assert_eq!(
+            ucis,
+            vec!["c5b6".to_string(), "c5d6".to_string(), "f3e4".to_string()]
+        );
     }
 
     #[test]
