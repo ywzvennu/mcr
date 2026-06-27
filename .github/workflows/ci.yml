@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Weekly full matrix (macOS/Windows/Miri/MSRV/no_std). On pull requests only
+    # the fast ubuntu `ci` gate runs, to keep Actions minutes low; the heavier
+    # jobs run on push to main and on this weekly schedule.
+    - cron: '0 6 * * 1'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -52,6 +57,7 @@ jobs:
   # the magic table) are feature-gated and so are simply absent here.
   no_std:
     name: no_std
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -90,6 +96,7 @@ jobs:
   # public API). This job is informational and must stay green.
   miri:
     name: miri
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -117,6 +124,7 @@ jobs:
   # the cross-platform matrix.
   msrv:
     name: msrv (1.83)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -135,6 +143,7 @@ jobs:
   # job's fast set / release sweeps elsewhere) so this matrix stays quick.
   cross-platform:
     name: test (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
