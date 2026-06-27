@@ -1,0 +1,45 @@
+# mce-c — C ABI (FFI) bindings for the mce chess engine.
+#
+# This is a separate, nested crate. It is NOT part of the published `mce`
+# library, the workspace, or the parent crate's normal `cargo build`/`cargo
+# test`; it depends on `mce` by path and re-exports a flat C ABI over an
+# opaque handle.
+#
+# UNSAFE SCOPE: a C FFI boundary inherently needs `unsafe` (extern "C" plus raw
+# pointer / C-string handling). That unsafe lives ONLY here, each block carrying
+# a `// SAFETY:` comment, and is kept minimal and contained. The core `mce`
+# library stays unsafe-free (`unsafe_code = "deny"`); this crate does not change
+# that.
+#
+# Build the libraries:        cargo build              (in this directory)
+# Regenerate the header:      cbindgen --config cbindgen.toml --crate mce-c --output include/mce.h
+# Smoke-test (needs a C cc):  ./build_test.sh
+
+[package]
+name = "mce-c"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "C ABI (FFI) bindings for the mce chess engine."
+
+[lib]
+name = "mce"
+# A static archive for static linking and a shared library for dynamic linking.
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+# Path dependency on the parent mce crate. This binding is a CONSUMER of mce; it
+# is never a dependency of mce, so the mce package stays clean.
+mce = { path = "../.." }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+# The FFI boundary deliberately takes raw pointers and is documented as such;
+# these lints flag the unavoidable shape of a C ABI, not real defects.
+not_unsafe_ptr_arg_deref = "allow"
+missing_safety_doc = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
