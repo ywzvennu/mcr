@@ -24,6 +24,7 @@
 
 mod capablanca;
 mod corpus;
+mod duck;
 mod grand;
 mod locate;
 mod makruk;
@@ -164,6 +165,7 @@ fn main() {
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
+    let duck_mismatches = duck::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -172,6 +174,7 @@ fn main() {
         + capablanca_mismatches
         + seirawan_mismatches
         + grand_mismatches
+        + duck_mismatches
         > 0
     {
         std::process::exit(1);

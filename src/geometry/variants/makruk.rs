@@ -78,6 +78,7 @@ impl WideVariant<Chess8x8> for MakrukRules {
             castling: GenericCastling::NONE,
             ep_square: None,
             gating: GenericGating::NONE,
+            duck: None,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

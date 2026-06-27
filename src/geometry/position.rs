@@ -269,6 +269,12 @@ pub struct GenericState<G: Geometry> {
     /// The Seirawan gating state (reserves in hand + gating-eligible squares).
     /// [`GenericGating::NONE`] for every non-gating variant.
     pub gating: GenericGating<G>,
+    /// The square the neutral Duck occupies (Duck chess only). `None` for every
+    /// other variant — including before the Duck enters the board on the first
+    /// move — so the duck-blocker and two-part-move code paths, all guarded
+    /// behind [`WideVariant::has_duck`], never fire and produced moves and state
+    /// stay byte-identical to a build without the duck mechanic.
+    pub duck: Option<Square<G>>,
     /// The halfmove clock (plies since the last capture or pawn move).
     pub halfmove_clock: u16,
     /// The fullmove number (incremented after a black move).
@@ -282,6 +288,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("castling", &self.castling)
             .field("ep_square", &self.ep_square.map(|s| s.index()))
             .field("gating", &self.gating)
+            .field("duck", &self.duck.map(|s| s.index()))
             .field("halfmove_clock", &self.halfmove_clock)
             .field("fullmove_number", &self.fullmove_number)
             .finish()
@@ -515,6 +522,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// Pushes every legal move into `out`.
     fn generate_into(&self, out: &mut Vec<WideMove>) {
+        // Duck chess has its own generator: there is no check, so no pin /
+        // king-danger filtering, and every base piece move is crossed with every
+        // legal duck placement. Gated behind `has_duck()` (default off), so every
+        // other variant takes the standard path below unchanged.
+        if V::has_duck() {
+            self.generate_duck_into(out);
+            return;
+        }
         let us = self.state.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -590,6 +605,134 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // unless the variant supports gating.
         if V::supports_gating() {
             self.append_gating_moves(out, us);
+        }
+    }
+
+    /// Generates every legal Duck-chess move: each pseudo-legal base piece move
+    /// crossed with every legal duck placement (`docs/fairy-variants-architecture.md`
+    /// §4.4).
+    ///
+    /// Duck chess has **no check**: the king is not royal, so there is no pin,
+    /// king-danger, or self-check filtering — every base move whose landing
+    /// square is empty-of-friends-and-not-the-duck is legal (including capturing
+    /// the enemy king, which is the win). After the base move, the **Duck** is
+    /// moved to any square that is then empty and different from where it sits
+    /// now, forming the second half of the one ply.
+    fn generate_duck_into(&self, out: &mut Vec<WideMove>) {
+        let us = self.state.turn;
+        let board = &self.board;
+        // If the side to move has no king, its king was captured on the previous
+        // ply: the game is already over and there are no further moves. (FSF lists
+        // a king capture as a legal move whose resulting node is terminal.)
+        if board.king_of(us).is_none() {
+            return;
+        }
+        let duck = self.state.duck;
+        // The duck blocks every piece: it is part of the occupancy for sliders and
+        // steppers (knights jump over it, since their attack set ignores
+        // occupancy). It is neither side's piece, so it is never a capture target.
+        let piece_occ = board.occupied();
+        let occupied = match duck {
+            Some(d) => piece_occ.with(d),
+            None => piece_occ,
+        };
+        let our_pieces = board.by_color(us);
+        let their_pieces = board.by_color(us.opposite());
+
+        // Collect the pseudo-legal base moves first (no check filtering).
+        let mut base = Vec::new();
+        self.gen_duck_base_moves(&mut base, us, occupied, our_pieces, their_pieces);
+
+        // Cross each base move with every legal duck placement.
+        for mv in base {
+            // The board occupancy after the base move: the piece leaves `from`
+            // and lands on `to` (a capture removes the enemy already counted in
+            // `piece_occ`). An en-passant also frees the captured pawn's square.
+            let from = mv.from::<G>();
+            let to = mv.to::<G>();
+            let mut after = piece_occ.without(from).with(to);
+            if matches!(mv.kind(), WideMoveKind::EnPassant) {
+                if let Some(captured) = Square::<G>::from_file_rank(to.file(), from.rank()) {
+                    after = after.without(captured);
+                }
+            }
+            // Castling also moves the rook; reflect both squares so the duck never
+            // lands on the rook's destination.
+            if mv.is_castle() {
+                let rank = back_rank::<G>(us);
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                if let Some(rook_file) = self.state.castling.rook_file(us, side) {
+                    if let Some(rook_from) = Square::<G>::from_file_rank(rook_file, rank) {
+                        after = after.without(rook_from);
+                    }
+                }
+                let (_k, rook_dest_file) = V::castle_dest_files(side);
+                if let Some(rook_to) = Square::<G>::from_file_rank(rook_dest_file, rank) {
+                    after = after.with(rook_to);
+                }
+            }
+            // Duck destinations: every square empty after the base move, except the
+            // duck's current square (it must move to a *different* square).
+            let mut duck_targets = !after;
+            if let Some(d) = duck {
+                duck_targets = duck_targets.without(d);
+            }
+            for dsq in duck_targets {
+                out.push(mv.with_duck::<G>(dsq));
+            }
+        }
+    }
+
+    /// Pushes the pseudo-legal base piece moves for Duck chess (no check / pin
+    /// filtering) into `base`. The duck already sits in `occupied`, blocking
+    /// landings and slider rays.
+    fn gen_duck_base_moves(
+        &self,
+        base: &mut Vec<WideMove>,
+        us: Color,
+        occupied: Bitboard<G>,
+        our_pieces: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+    ) {
+        let board = &self.board;
+        // No piece may land on the duck. The duck is in `occupied` (so it blocks
+        // slider rays), but a stepper's attack set is occupancy-independent — a
+        // knight or king reaching the duck's square must still be excluded
+        // explicitly, since the duck is in neither color mask.
+        let not_duck = match self.state.duck {
+            Some(d) => !Bitboard::<G>::from_square(d),
+            None => Bitboard::FULL,
+        };
+        // Non-pawn pieces (including the king): attack set minus friendly pieces
+        // and minus the duck square. The duck is in neither color mask so it is
+        // never a friendly piece nor a capture target.
+        for role in WideRole::ALL {
+            if role == WideRole::Pawn {
+                continue;
+            }
+            for from in board.pieces(us, role) {
+                let targets = V::role_attacks(role, us, from, occupied) & !our_pieces & not_duck;
+                emit_targets(base, from, targets, their_pieces);
+            }
+        }
+
+        // Pawns: pushes, double pushes, captures, en passant, promotions — with no
+        // pin/check confinement (full board mask, no pin lines).
+        let full = Bitboard::FULL;
+        let pins = Pins::empty(board.king_of(us).unwrap_or_else(|| Square::new(0)));
+        let king_sq = board.king_of(us).unwrap_or_else(|| Square::new(0));
+        self.gen_pawn_moves(base, us, occupied, their_pieces, full, &pins, king_sq);
+
+        // Castling: in duck chess there is no check, but FSF still forbids
+        // castling through, out of, or into the duck's blocking squares and keeps
+        // the empty-path requirement. King-safety (danger) is irrelevant with no
+        // check, so pass an empty danger set.
+        if V::has_castling() {
+            self.gen_castles(base, us, occupied, Bitboard::EMPTY, king_sq);
         }
     }
 
@@ -756,19 +899,26 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         // En passant.
         if let Some(ep) = self.state.ep_square {
-            // A pawn that attacks the ep square may take. The captured pawn sits
-            // on the ep file, on the capturing pawn's rank.
-            let takers = V::role_attacks(WideRole::Pawn, us.opposite(), ep, occupied) & pawns;
-            for from in takers {
-                let pin_line = pins.line_of(from);
-                let captured = match Square::<G>::from_file_rank(ep.file(), from.rank()) {
-                    Some(sq) => sq,
-                    None => continue,
-                };
-                let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
-                let ep_pin_ok = self.ep_is_legal(us, from, ep, captured, king_sq);
-                if resolves_check && pin_line.contains(ep) && ep_pin_ok {
-                    out.push(WideMove::new(from, ep, WideMoveKind::EnPassant));
+            // The en-passant landing square is normally empty (the enemy pawn
+            // skipped it), but in Duck chess the neutral Duck may sit on it; the
+            // duck is part of `occupied`, so a blocked ep square forbids the
+            // capture. (For non-duck variants `ep` is never occupied, so this is a
+            // no-op.)
+            if !occupied.contains(ep) {
+                // A pawn that attacks the ep square may take. The captured pawn
+                // sits on the ep file, on the capturing pawn's rank.
+                let takers = V::role_attacks(WideRole::Pawn, us.opposite(), ep, occupied) & pawns;
+                for from in takers {
+                    let pin_line = pins.line_of(from);
+                    let captured = match Square::<G>::from_file_rank(ep.file(), from.rank()) {
+                        Some(sq) => sq,
+                        None => continue,
+                    };
+                    let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
+                    let ep_pin_ok = self.ep_is_legal(us, from, ep, captured, king_sq);
+                    if resolves_check && pin_line.contains(ep) && ep_pin_ok {
+                        out.push(WideMove::new(from, ep, WideMoveKind::EnPassant));
+                    }
                 }
             }
         }
@@ -784,6 +934,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         captured: Square<G>,
         king_sq: Square<G>,
     ) -> bool {
+        // Variants whose king is not royal (Duck) have no check, so an en-passant
+        // capture can never be illegal for exposing the king. Skipping the test
+        // keeps the byte-identical standard path for every royal-king variant.
+        if V::royal_squares(&self.board, us).is_empty() {
+            return true;
+        }
         let them = us.opposite();
         let occ = self
             .board
@@ -989,6 +1145,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.update_gating(mv, from, to, us, castle_rook_from);
         }
 
+        // Duck chess: the second half of the ply moves the neutral Duck to its new
+        // square (default-off — a non-duck move carries no duck addendum).
+        if V::has_duck() {
+            if let Some(dsq) = mv.duck_to::<G>() {
+                self.state.duck = Some(dsq);
+            }
+        }
+
         if reset_clock {
             self.state.halfmove_clock = 0;
         } else {
@@ -1135,6 +1299,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // after the board placement (the crazyhouse holdings convention). Split it
         // off before parsing the board.
         let (placement, holdings) = split_holdings(placement_field);
+        // Duck chess renders the neutral Duck as a `*` in the placement. Strip it
+        // out (recording its square) before the board parser, which knows only
+        // real pieces. Non-duck variants never see a `*`, so they keep the
+        // borrowed placement and allocate nothing here.
+        let mut duck = None;
+        let stripped;
+        let placement = if V::has_duck() {
+            let (s, d) = split_duck::<G>(placement)?;
+            duck = d;
+            stripped = s;
+            stripped.as_str()
+        } else {
+            placement
+        };
         let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
         let turn = match fields.next().ok_or(WideFenError::MissingField)? {
@@ -1178,6 +1356,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             castling,
             ep_square,
             gating,
+            duck,
             halfmove_clock,
             fullmove_number,
         };
@@ -1192,7 +1371,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// dialect. A non-gating variant produces the plain six-field FEN unchanged.
     #[must_use]
     pub fn to_fen(&self) -> String {
-        let mut out = self.board.to_fen_placement();
+        let mut out = if V::has_duck() {
+            placement_with_duck::<G>(&self.board, self.state.duck)
+        } else {
+            self.board.to_fen_placement()
+        };
         if V::supports_gating() {
             write_holdings(self.state.gating, &mut out);
         }
@@ -1657,6 +1840,116 @@ fn write_castling_and_gating<G: Geometry>(
 
     if out.len() == before {
         out.push('-');
+    }
+}
+
+// -- Duck (Duck chess) FEN helpers ------------------------------------------
+
+/// Splits the neutral Duck's `*` cell out of a placement field, returning the
+/// placement with the duck cell rewritten as one empty square and the duck's
+/// square (`None` if the position has no duck on the board yet).
+///
+/// The `*` occupies one file like a piece letter; replacing it with a blank
+/// lets the real-piece board parser consume the rest unchanged. At most one `*`
+/// is allowed.
+fn split_duck<G: Geometry>(placement: &str) -> Result<(String, Option<Square<G>>), WideFenError> {
+    let width = G::WIDTH;
+    let height = G::HEIGHT;
+    let mut out = String::with_capacity(placement.len());
+    let mut duck: Option<Square<G>> = None;
+
+    let _ = width;
+    for (rank_from_top, rank_str) in placement.split('/').enumerate() {
+        if rank_from_top > 0 {
+            out.push('/');
+        }
+        if rank_from_top as u8 >= height {
+            // Let the board parser report the structural error; just copy through.
+            out.push_str(rank_str);
+            continue;
+        }
+        let rank = height - 1 - rank_from_top as u8;
+        let mut file: u32 = 0;
+        // Re-emit the rank with the duck cell turned into one empty square,
+        // tracking a running empty-run so an inserted blank merges cleanly with
+        // adjacent empty counts rather than concatenating into a larger digit run.
+        let mut empty: u32 = 0;
+        let bytes = rank_str.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            let b = bytes[i];
+            if b == b'*' {
+                if duck.is_some() {
+                    return Err(WideFenError::Placement(
+                        super::ParseBoardError::InvalidChar('*'),
+                    ));
+                }
+                let sq = Square::<G>::from_file_rank(file as u8, rank)
+                    .ok_or(WideFenError::BadEnPassant)?;
+                duck = Some(sq);
+                empty += 1; // the duck cell is empty for the board parser
+                file += 1;
+                i += 1;
+            } else if b.is_ascii_digit() {
+                let mut skip: u32 = 0;
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    skip = skip
+                        .saturating_mul(10)
+                        .saturating_add((bytes[i] - b'0') as u32);
+                    i += 1;
+                }
+                empty = empty.saturating_add(skip);
+                file = file.saturating_add(skip);
+            } else {
+                flush_empty(&mut out, &mut empty);
+                out.push(b as char);
+                file = file.saturating_add(1);
+                i += 1;
+            }
+        }
+        flush_empty(&mut out, &mut empty);
+    }
+    Ok((out, duck))
+}
+
+/// Renders a placement field with the neutral Duck shown as a `*` on its square.
+/// The inverse of [`split_duck`]; iterates per cell like
+/// [`Board::to_fen_placement`] but emits `*` on the duck square.
+fn placement_with_duck<G: Geometry>(board: &Board<G>, duck: Option<Square<G>>) -> String {
+    let width = G::WIDTH;
+    let height = G::HEIGHT;
+    let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
+    for rank_from_top in 0..height {
+        let rank = height - 1 - rank_from_top;
+        let mut empty: u32 = 0;
+        for file in 0..width {
+            let square = Square::<G>::new(rank * width + file);
+            let is_duck = duck == Some(square);
+            match (board.piece_at(square), is_duck) {
+                (Some(piece), _) => {
+                    flush_empty(&mut fen, &mut empty);
+                    fen.push(piece.char());
+                }
+                (None, true) => {
+                    flush_empty(&mut fen, &mut empty);
+                    fen.push('*');
+                }
+                (None, false) => empty += 1,
+            }
+        }
+        flush_empty(&mut fen, &mut empty);
+        if rank > 0 {
+            fen.push('/');
+        }
+    }
+    fen
+}
+
+/// Flushes a pending empty-square run into a FEN rank as its decimal count.
+fn flush_empty(out: &mut String, empty: &mut u32) {
+    if *empty > 0 {
+        push_decimal(out, *empty);
+        *empty = 0;
     }
 }
 

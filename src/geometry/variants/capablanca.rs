@@ -82,6 +82,7 @@ impl WideVariant<Cap10x8> for CapablancaRules {
             castling: GenericCastling::standard::<Cap10x8>(),
             ep_square: None,
             gating: GenericGating::NONE,
+            duck: None,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

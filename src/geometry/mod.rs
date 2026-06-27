@@ -54,7 +54,8 @@ pub use role::WideRole;
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
-    Capablanca, CapablancaRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan, SeirawanRules,
+    Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan,
+    SeirawanRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
