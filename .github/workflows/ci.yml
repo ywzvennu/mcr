@@ -43,3 +43,80 @@ jobs:
       # an actual (slow) bench run in CI.
       - name: Benches (compile only)
         run: cargo bench --all-features --no-run
+
+  # Machine-verify the no-`unsafe` guarantee: run a fast subset of the library
+  # unit tests under Miri to detect undefined behaviour. The subset is the
+  # low-level primitive modules (bitboards, squares, attack lookups, move
+  # encoding, outcome) — exactly where UB such as out-of-bounds shifts or index
+  # math would surface. The deep movegen/perft and FEN/SAN parsing tests are
+  # deliberately excluded: Miri's interpreter runs them orders of magnitude
+  # slower, and they exercise the same primitives this subset already covers.
+  # Default features only — the optional `magic` attack table is const-built and
+  # is impractically slow to evaluate under Miri (the lean tables cover the same
+  # public API). This job is informational and must stay green.
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install nightly Rust with Miri
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Miri (primitive unit tests)
+        run: >
+          cargo +nightly miri test --lib --
+          bitboard:: square:: rank:: file:: color:: piece::
+          chess_move:: movelist:: attacks:: outcome::
+
+  # Build on the declared MSRV (`rust-version` in Cargo.toml) so newer-API usage
+  # that would break downstream consumers is caught early. We check `build`
+  # (the consumer-facing surface) rather than `test`: the dev-dependency tree
+  # (criterion -> clap_lex 1.1) pulls in an `edition = "2024"` manifest that
+  # only resolves on cargo 1.85+, and dev-deps never propagate to consumers, so
+  # they do not constrain the published MSRV. Full `test` runs on stable across
+  # the cross-platform matrix.
+  msrv:
+    name: msrv (1.83)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust 1.83
+        uses: dtolnay/rust-toolchain@1.83.0
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (library + binaries, all features)
+        run: cargo +1.83.0 build --all-features
+
+  # Portability gate: build+test the suite on all three tier-1 platforms. The
+  # deep `--include-ignored` perft sweep stays ubuntu-only (in the core `ci`
+  # job's fast set / release sweeps elsewhere) so this matrix stays quick.
+  cross-platform:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --all-features
+
+      - name: Test
+        run: cargo test --all-features

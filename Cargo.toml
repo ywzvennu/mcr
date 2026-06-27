@@ -13,7 +13,7 @@ version = "0.0.0"
 # accidental `cargo publish` while the API is still in flux.
 publish = false
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ywzvennu/mce"
 homepage = "https://github.com/ywzvennu/mce"
