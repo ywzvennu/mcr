@@ -1210,6 +1210,9 @@ impl Position {
     ) {
         let board = &self.board;
         let pawns = board.pieces(us, Role::Pawn);
+        if pawns.is_empty() {
+            return;
+        }
         let promo_rank = match us {
             Color::White => Rank::Eighth,
             Color::Black => Rank::First,
@@ -1220,21 +1223,100 @@ impl Position {
         };
         let forward: i8 = if us.is_white() { 1 } else { -1 };
 
-        for from in pawns {
+        // A pinned pawn is confined to the line through the king and its pinner;
+        // a pin ray is rare, so the overwhelming majority of pawns are unpinned.
+        // The unpinned set is generated in bulk via bitboard shifts (one shift +
+        // mask per move class, reconstructing each `from` by the fixed back-shift
+        // of its class), and the few pinned pawns are handled individually along
+        // their pin line by the original per-pawn logic.
+        let unpinned = pawns & !pins.pinned;
+        let pinned = pawns & pins.pinned;
+        let empty = !occupied;
+        let promo_mask = if us.is_white() {
+            Bitboard::RANK_8
+        } else {
+            Bitboard::RANK_1
+        };
+        // The rank a single push lands on for a double-push-eligible (start-rank)
+        // pawn — the intermediate square of its potential double push.
+        let double_step_rank = if us.is_white() {
+            Bitboard::RANK_3
+        } else {
+            Bitboard::RANK_6
+        };
+
+        // The forward, north-east-equivalent, and north-west-equivalent shifts of
+        // the unpinned set, plus the back-shift deltas that recover each target's
+        // source square. White advances by +8 (north); black by -8 (south). The
+        // "left"/"right" capture directions are named relative to the absolute
+        // board, not the moving side, so the deltas match the shift used.
+        let (forward_set, cap_a, cap_b, fwd_delta, cap_a_delta, cap_b_delta) = if us.is_white() {
+            (
+                unpinned.north(),
+                unpinned.north_east(),
+                unpinned.north_west(),
+                8u8,
+                9u8,
+                7u8,
+            )
+        } else {
+            (
+                unpinned.south(),
+                unpinned.south_east(),
+                unpinned.south_west(),
+                8u8,
+                7u8,
+                9u8,
+            )
+        };
+
+        // Single pushes: forward onto an empty square, kept by the check mask.
+        let single = forward_set & empty;
+        Self::emit_pawn_pushes(out, single & check_mask, fwd_delta, promo_mask, us);
+
+        // Double pushes: from the start rank, both the intermediate and the
+        // target square empty. `single` (computed before the check mask) already
+        // required the intermediate square empty, so a start-rank pawn's valid
+        // first step lands on `double_step_rank`; advancing it once more onto an
+        // empty square (kept by the check mask) gives the double-push targets.
+        let start_step = single & double_step_rank;
+        let double = if us.is_white() {
+            start_step.north()
+        } else {
+            start_step.south()
+        } & empty
+            & check_mask;
+        for to in double {
+            let from = back_shift(to, fwd_delta + 8, us);
+            out.emit(from, to, MoveKind::DoublePawnPush);
+        }
+
+        // Horde's first-rank white pawns may also advance two squares, but per the
+        // horde convention this sets no en-passant target — a plain quiet
+        // two-square move. The `white_first_rank_double` flag is false for every
+        // standard caller, so this whole branch is skipped there.
+        if white_first_rank_double && us == Color::White {
+            let rank1_step = single & Bitboard::RANK_2;
+            for to in rank1_step.north() & empty & check_mask {
+                let from = back_shift(to, fwd_delta + 8, us);
+                out.emit(from, to, MoveKind::Quiet);
+            }
+        }
+
+        // Captures (including capturing promotions), one direction at a time.
+        let caps_a = cap_a & their_pieces & check_mask;
+        Self::emit_pawn_captures(out, caps_a, cap_a_delta, promo_mask, us);
+        let caps_b = cap_b & their_pieces & check_mask;
+        Self::emit_pawn_captures(out, caps_b, cap_b_delta, promo_mask, us);
+
+        // The few pinned pawns, along their pin line, with the original per-pawn
+        // logic. This loop is empty in the common (no-pin) node.
+        for from in pinned {
             let pin_line = pins.line_of(from);
 
-            // Single and double pushes.
             if let Some(one) = from.offset(0, forward) {
                 if !occupied.contains(one) {
                     self.push_pawn_advance(out, from, one, promo_rank, check_mask, pin_line);
-                    // A standard double push from the start rank creates an
-                    // en-passant target (`MoveKind::DoublePawnPush`). In horde,
-                    // white's first-rank pawns may *also* advance two squares, but
-                    // per the horde convention such a first-rank double push does
-                    // *not* create an en-passant target — so it is emitted as a
-                    // plain quiet two-square move. The `white_first_rank_double`
-                    // flag (false for standard chess and every other caller) gates
-                    // that extra, ep-less source rank.
                     if from.rank() == start_rank {
                         if let Some(two) = from.offset(0, 2 * forward) {
                             if !occupied.contains(two)
@@ -1244,25 +1326,10 @@ impl Position {
                                 out.emit(from, two, MoveKind::DoublePawnPush);
                             }
                         }
-                    } else if white_first_rank_double
-                        && us == Color::White
-                        && from.rank() == Rank::First
-                    {
-                        if let Some(two) = from.offset(0, 2 * forward) {
-                            if !occupied.contains(two)
-                                && check_mask.contains(two)
-                                && pin_line.contains(two)
-                            {
-                                // No en-passant target for a first-rank double
-                                // push: a quiet two-square advance.
-                                out.emit(from, two, MoveKind::Quiet);
-                            }
-                        }
                     }
                 }
             }
 
-            // Captures (including capturing promotions).
             let caps = pawn_attacks(us, from) & their_pieces;
             for to in caps {
                 if !check_mask.contains(to) || !pin_line.contains(to) {
@@ -1283,26 +1350,86 @@ impl Position {
                     out.emit(from, to, MoveKind::Capture);
                 }
             }
+        }
 
-            // En passant.
-            if let Some(ep) = self.ep_square {
-                if pawn_attacks(us, from).contains(ep) {
-                    // The captured pawn sits on the ep square's file, on `from`'s
-                    // rank.
-                    let captured = Square::from_file_rank(ep.file(), from.rank());
-                    // En passant resolves check only if it captures the checking
-                    // pawn or blocks on the ep target.
-                    let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
-                    // The standard discovered-check ep-pin filter is a king-safety
-                    // concern; a variant on the make-move filter path (e.g. atomic,
-                    // whose explosion may remove the would-be pinning slider) passes
-                    // `filter_ep_pin = false` and re-validates the move itself.
-                    let ep_pin_ok =
-                        !filter_ep_pin || self.ep_is_legal(us, from, ep, captured, king_sq);
-                    if resolves_check && pin_line.contains(ep) && ep_pin_ok {
-                        out.emit(from, ep, MoveKind::EnPassant);
-                    }
+        // En passant: rare, and the discovered-check ep-pin legality depends on
+        // the *specific* capturing pawn, so it is handled per taker (pinned or
+        // not) with the original logic, preserving `filter_ep_pin` exactly.
+        if let Some(ep) = self.ep_square {
+            let takers = pawn_attacks(us.opposite(), ep) & pawns;
+            for from in takers {
+                let pin_line = pins.line_of(from);
+                // The captured pawn sits on the ep square's file, on `from`'s rank.
+                let captured = Square::from_file_rank(ep.file(), from.rank());
+                // En passant resolves check only if it captures the checking pawn
+                // or blocks on the ep target.
+                let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
+                // The standard discovered-check ep-pin filter is a king-safety
+                // concern; a variant on the make-move filter path (e.g. atomic,
+                // whose explosion may remove the would-be pinning slider) passes
+                // `filter_ep_pin = false` and re-validates the move itself.
+                let ep_pin_ok = !filter_ep_pin || self.ep_is_legal(us, from, ep, captured, king_sq);
+                if resolves_check && pin_line.contains(ep) && ep_pin_ok {
+                    out.emit(from, ep, MoveKind::EnPassant);
                 }
+            }
+        }
+    }
+
+    /// Emits the unpinned single-push moves whose targets are `targets`, each
+    /// reached from the square `delta` indices behind it (the fixed back-shift of
+    /// the forward direction). Last-rank targets expand to the four promotions.
+    #[inline]
+    fn emit_pawn_pushes<S: MoveSink>(
+        out: &mut S,
+        targets: Bitboard,
+        delta: u8,
+        promo_mask: Bitboard,
+        us: Color,
+    ) {
+        for to in targets & !promo_mask {
+            out.emit(back_shift(to, delta, us), to, MoveKind::Quiet);
+        }
+        for to in targets & promo_mask {
+            let from = back_shift(to, delta, us);
+            for role in PROMOTION_ROLES {
+                out.emit(
+                    from,
+                    to,
+                    MoveKind::Promotion {
+                        role,
+                        capture: false,
+                    },
+                );
+            }
+        }
+    }
+
+    /// Emits the unpinned capture moves whose targets are `targets`, each reached
+    /// from the square `delta` indices behind it. Last-rank targets expand to the
+    /// four capturing promotions.
+    #[inline]
+    fn emit_pawn_captures<S: MoveSink>(
+        out: &mut S,
+        targets: Bitboard,
+        delta: u8,
+        promo_mask: Bitboard,
+        us: Color,
+    ) {
+        for to in targets & !promo_mask {
+            out.emit(back_shift(to, delta, us), to, MoveKind::Capture);
+        }
+        for to in targets & promo_mask {
+            let from = back_shift(to, delta, us);
+            for role in PROMOTION_ROLES {
+                out.emit(
+                    from,
+                    to,
+                    MoveKind::Promotion {
+                        role,
+                        capture: true,
+                    },
+                );
             }
         }
     }
@@ -2212,6 +2339,21 @@ const LIGHT_SQUARES: u64 = 0x55AA_55AA_55AA_55AA;
 
 /// The roles a pawn may promote to, in a stable order.
 const PROMOTION_ROLES: [Role; 4] = [Role::Knight, Role::Bishop, Role::Rook, Role::Queen];
+
+/// Recovers a bulk-generated pawn move's source square from its target `to` and
+/// the fixed index `delta` of the move class (the forward/diagonal shift that
+/// produced `to`). White pawns advance toward higher indices, so the source is
+/// `delta` below; black pawns advance toward lower indices, so it is `delta`
+/// above. The result is always on the board because `to` was produced by
+/// shifting a real pawn — the inverse shift lands back on that pawn's square.
+#[inline]
+fn back_shift(to: Square, delta: u8, us: Color) -> Square {
+    if us.is_white() {
+        Square::new(to.index() - delta)
+    } else {
+        Square::new(to.index() + delta)
+    }
+}
 
 /// Parses the en-passant FEN field (`-` or a target square on the 3rd/6th rank)
 /// into an optional target square. Shared by [`Position::from_fen`] and variant
