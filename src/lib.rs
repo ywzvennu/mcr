@@ -114,7 +114,7 @@ pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, Ille
 pub use crate::pgn::{Pgn, PgnError, PgnMove, PgnResult};
 pub use crate::piece::{Piece, Role};
 pub use crate::position::{
-    perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position,
+    perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position, Undo,
 };
 pub use crate::rank::Rank;
 pub use crate::san::SanError;
@@ -124,6 +124,6 @@ pub use crate::variant::{
     CheckCounters, Chess, Chess960, Chess960Rules, ChessRules, Crazyhouse, CrazyhouseRules,
     CrazyhouseState, Horde, HordeRules, KingOfTheHill, KingOfTheHillRules, RacingKings,
     RacingKingsRules, ThreeCheck, ThreeCheckRules, UnknownVariant, Variant, VariantId,
-    VariantPosition, VariantState,
+    VariantPosition, VariantState, VariantUndo,
 };
 pub use crate::zobrist::Zobrist;

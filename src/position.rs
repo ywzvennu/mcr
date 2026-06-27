@@ -360,6 +360,53 @@ pub struct Position {
     turn: Color,
 }
 
+/// The minimal state needed to reverse a single [`Position::make`], the undo
+/// token for zero-copy make/unmake search.
+///
+/// A search descends the tree by calling [`Position::make`] on each step and
+/// pops back up with [`Position::unmake`], threading the [`Undo`] returned by
+/// the former into the latter. Unlike [`Position::play`] this copies nothing:
+/// `make` mutates the position in place and records only the handful of fields a
+/// move cannot reconstruct from the board alone — the captured piece (with its
+/// square, which differs from the move's destination for en passant), and the
+/// prior castling rights, en-passant target, move clocks, and Zobrist key, each
+/// of which a move can clear or change irreversibly.
+///
+/// An `Undo` is opaque and only meaningful when paired with the exact move and
+/// position it came from; see [`Position::unmake`] for the contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Undo {
+    /// The piece removed by the move and the square it stood on, or `None` for a
+    /// non-capturing move. The square is the move's destination for an ordinary
+    /// capture or capturing promotion, and the en-passant pawn's square (on the
+    /// destination's file, the origin's rank) for en passant.
+    captured: Option<(Piece, Square)>,
+    /// Castling rights before the move (a king or rook move, or a capture of a
+    /// rook on its home square, can revoke a right the board cannot recover).
+    castling: CastlingRights,
+    /// En-passant target before the move (cleared every move, set only by a
+    /// double push).
+    ep_square: Option<Square>,
+    /// Halfmove clock before the move (reset by a capture or pawn move).
+    halfmove_clock: u8,
+    /// Fullmove number before the move (incremented after a black move).
+    fullmove_number: u16,
+    /// Incremental Zobrist key before the move, restored verbatim so the key is
+    /// byte-identical after the unmake rather than re-derived.
+    hash: u64,
+}
+
+impl Undo {
+    /// The piece a capturing move removed, and the square it stood on, or `None`
+    /// for a non-capturing move. Used by the variant layer to drive its
+    /// capture-side-effect hook from the same record the core unmake reverses.
+    #[must_use]
+    #[inline]
+    pub(crate) fn captured(self) -> Option<(Piece, Square)> {
+        self.captured
+    }
+}
+
 impl Default for Position {
     #[inline]
     fn default() -> Position {
@@ -1845,6 +1892,127 @@ impl Position {
         captured
     }
 
+    /// Applies `mv` **in place** and returns an [`Undo`] that reverses it
+    /// exactly, the zero-copy make half of make/unmake search.
+    ///
+    /// This is [`Position::play_unchecked`] plus a tiny reversal record: it
+    /// performs the identical in-place edit (so the resulting position is
+    /// byte-for-byte what `play_unchecked` and `play` produce) while snapshotting
+    /// the captured piece and the prior irreversible state into the returned
+    /// token. Pass that token to [`Position::unmake`] with the *same* move to
+    /// restore the position.
+    ///
+    /// # Contract
+    ///
+    /// The move **must be legal** for this position, exactly as for
+    /// [`Position::play_unchecked`]; `make` does not re-validate it. The returned
+    /// [`Undo`] is valid only for unmaking *this* move from the position `make`
+    /// produced — do not reorder make/unmake pairs or pair an [`Undo`] with a
+    /// different move.
+    pub fn make(&mut self, mv: &Move) -> Undo {
+        let undo = Undo {
+            captured: self.captured_piece(mv),
+            castling: self.castling,
+            ep_square: self.ep_square,
+            halfmove_clock: self.halfmove_clock,
+            fullmove_number: self.fullmove_number,
+            hash: self.hash,
+        };
+        self.apply(mv);
+        undo
+    }
+
+    /// Reverses a [`Position::make`] **in place**, restoring the position to
+    /// exactly what it was before `mv` was made — board, side to move, castling
+    /// rights, en-passant target, both move clocks, and the Zobrist key all
+    /// byte-identical.
+    ///
+    /// # Contract
+    ///
+    /// `mv` and `undo` must be the move and token from the matching
+    /// [`Position::make`] call on the position this is the successor of, and
+    /// make/unmake pairs must nest (last made, first unmade). Misuse leaves the
+    /// position in an unspecified state. There is no validation.
+    pub fn unmake(&mut self, mv: &Move, undo: Undo) {
+        // Flip the side back first so the moving side is `us` again; every board
+        // edit below is described from the mover's perspective.
+        self.turn = self.turn.opposite();
+        let us = self.turn;
+        let from = mv.from();
+        let to = mv.to();
+        let rank = back_rank(us);
+
+        match mv.kind() {
+            MoveKind::Quiet | MoveKind::DoublePawnPush | MoveKind::Capture => {
+                // The moved piece is whatever now sits on `to`; carry it home.
+                let moving = self
+                    .board
+                    .piece_at(to)
+                    .expect("unmake: destination is occupied by the moved piece");
+                self.board.remove_piece(to);
+                self.board.set_piece(from, moving);
+            }
+            MoveKind::EnPassant => {
+                let moving = self
+                    .board
+                    .piece_at(to)
+                    .expect("unmake: destination holds the capturing pawn");
+                self.board.remove_piece(to);
+                self.board.set_piece(from, moving);
+                // The captured pawn is restored from `undo` (its square is on the
+                // destination's file and the origin's rank).
+            }
+            MoveKind::CastleKingside | MoveKind::CastleQueenside => {
+                let side = if matches!(mv.kind(), MoveKind::CastleKingside) {
+                    CastleSide::King
+                } else {
+                    CastleSide::Queen
+                };
+                // The rook's home file comes from the *prior* castling rights in
+                // `undo` (current rights have already been revoked by the castle).
+                let rook_file = undo
+                    .castling
+                    .rook_file(us, side)
+                    .expect("unmake: castling right present in the undo token");
+                let rook_from = Square::from_file_rank(rook_file, rank);
+                let rook_dest_file = match side {
+                    CastleSide::King => File::F,
+                    CastleSide::Queen => File::D,
+                };
+                let rook_to = Square::from_file_rank(rook_dest_file, rank);
+                let king = Piece::new(us, Role::King);
+                let rook = Piece::new(us, Role::Rook);
+                // Remove both from their destinations, then restore both to their
+                // origins (handles the case where one origin equals the other's
+                // destination).
+                self.board.remove_piece(to);
+                self.board.remove_piece(rook_to);
+                self.board.set_piece(from, king);
+                self.board.set_piece(rook_from, rook);
+            }
+            MoveKind::Promotion { .. } => {
+                // The pawn promoted; remove the promoted piece and restore a pawn.
+                self.board.remove_piece(to);
+                self.board.set_piece(from, Piece::new(us, Role::Pawn));
+            }
+            MoveKind::Drop { .. } => {
+                unreachable!("drops are unmade via the variant layer");
+            }
+        }
+
+        // Restore any captured piece on its original square.
+        if let Some((piece, sq)) = undo.captured {
+            self.board.set_piece(sq, piece);
+        }
+
+        // Restore the scalar state and the incremental hash verbatim.
+        self.castling = undo.castling;
+        self.ep_square = undo.ep_square;
+        self.halfmove_clock = undo.halfmove_clock;
+        self.fullmove_number = undo.fullmove_number;
+        self.hash = undo.hash;
+    }
+
     /// The enemy piece (and its square) a move removes from the board, if any.
     fn captured_piece(&self, mv: &Move) -> Option<(Piece, Square)> {
         match mv.kind() {
@@ -1890,6 +2058,45 @@ impl Position {
         self.turn = them;
         self.hash ^= crate::zobrist::side_key(us);
         self.hash ^= crate::zobrist::side_key(them);
+    }
+
+    /// Captures the current reversible scalar state into an [`Undo`] *without*
+    /// applying any move, for the variant make/unmake path to wrap a hook-driven
+    /// edit (a crazyhouse drop) it applies itself.
+    ///
+    /// The returned token records no captured piece and the prior castling /
+    /// en-passant / clock / hash state, exactly as a [`Position::make`] of a
+    /// non-capturing move would for those fields.
+    pub(crate) fn snapshot_undo(&self) -> Undo {
+        Undo {
+            captured: None,
+            castling: self.castling,
+            ep_square: self.ep_square,
+            halfmove_clock: self.halfmove_clock,
+            fullmove_number: self.fullmove_number,
+            hash: self.hash,
+        }
+    }
+
+    /// Reverses a crazyhouse drop wrapped by [`Position::snapshot_undo`]: removes
+    /// the dropped piece from `to`, flips the side back, and restores the scalar
+    /// state and Zobrist key from `undo`.
+    pub(crate) fn unmake_drop(&mut self, to: Square, undo: Undo) {
+        self.board.remove_piece(to);
+        self.turn = self.turn.opposite();
+        self.castling = undo.castling;
+        self.ep_square = undo.ep_square;
+        self.halfmove_clock = undo.halfmove_clock;
+        self.fullmove_number = undo.fullmove_number;
+        self.hash = undo.hash;
+    }
+
+    /// Restores a `piece` onto `square`, the board edit [`VariantPosition::unmake`]
+    /// uses to put back a piece a variant hook removed (atomic's blast) before
+    /// reversing the core move. The hash is *not* touched here — the verbatim hash
+    /// restore in the core unmake (or the variant state restore) covers it.
+    pub(crate) fn restore_piece(&mut self, square: Square, piece: Piece) {
+        self.board.set_piece(square, piece);
     }
 
     /// Folds an opaque extra-state contribution into the incremental Zobrist key,

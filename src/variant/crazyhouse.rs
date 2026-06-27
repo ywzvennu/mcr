@@ -232,6 +232,7 @@ impl Variant for CrazyhouseRules {
         state: &mut Self::State,
         mv: &Move,
         captured: (Piece, Square),
+        _removed: &mut super::heapless_removals::Removals,
     ) {
         let _ = core;
         let (piece, square) = captured;

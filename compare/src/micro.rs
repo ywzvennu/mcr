@@ -160,6 +160,51 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         });
     }
 
+    // ---- make_unmake(): zero-copy down-and-up-a-ply cost -------------------
+    {
+        // One "op" here is a full ply descent and ascent: mce makes a move in
+        // place on a single owned position and then unmakes it (no clone), while
+        // shakmaty — which has no unmake — clones the position and plays the move
+        // on the clone (the clone is its "ascent": it is dropped). This is the
+        // make/unmake vs copy-make comparison for one search ply.
+        //
+        // For mce's compact `Position` (a handful of bitboards plus a few scalar
+        // fields, ~80 bytes) a clone is a cheap memcpy, so copy-make stays
+        // competitive: make/unmake pays the board edits twice (down then up) where
+        // copy-make pays one memcpy plus one make. The numbers below report that
+        // honestly rather than assume a win; perft is therefore left on copy-make.
+        let mut mce_owned: Vec<Position> = mce_pos.clone();
+        let mce_moves: Vec<_> = mce_owned.iter().map(|p| p.legal_moves()[0]).collect();
+        let shak_moves: Vec<_> = shak_pos
+            .iter()
+            .map(|p| p.legal_moves()[0].clone())
+            .collect();
+        let mce_t = time_throughput(ops_per_batch, || {
+            for _ in 0..INNER {
+                for (p, mv) in mce_owned.iter_mut().zip(&mce_moves) {
+                    let undo = p.make(mv);
+                    black_box(p.turn());
+                    p.unmake(mv, undo);
+                }
+            }
+        });
+        let shak_t = time_throughput(ops_per_batch, || {
+            for _ in 0..INNER {
+                for (p, mv) in shak_pos.iter().zip(&shak_moves) {
+                    let mut q = p.clone();
+                    q.play_unchecked(mv);
+                    black_box(q.turn());
+                }
+            }
+        });
+        out.push(MicroResult {
+            name: "make_unmake",
+            mce_ops: ops_per_sec(&mce_t, ops_per_batch),
+            shak_ops: Some(ops_per_sec(&shak_t, ops_per_batch)),
+            mce_cv: mce_t.cv(),
+        });
+    }
+
     // ---- FEN parse + serialize round-trip throughput ----------------------
     {
         let mce_t = time_throughput(ops_per_batch, || {
