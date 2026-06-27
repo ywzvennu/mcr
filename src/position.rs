@@ -907,6 +907,31 @@ impl Position {
             let targets = knight_attacks(from) & empty & check_mask & pin_line;
             out.emit_targets(from, targets, Bitboard::EMPTY);
         }
+        // Slider quiet moves. The role-split shape (see `gen_slider_moves`) wins
+        // with the cheap magic lookup and is in the noise with the default
+        // hyperbola lookup, so it is gated the same way; both emit byte-identical
+        // sets.
+        #[cfg(feature = "magic")]
+        {
+            let allowed = empty & check_mask;
+            for from in board.pieces(us, Role::Bishop) {
+                let pin_line = pins.line_of(from);
+                let targets = bishop_attacks(from, occupied) & allowed & pin_line;
+                out.emit_targets(from, targets, Bitboard::EMPTY);
+            }
+            for from in board.pieces(us, Role::Rook) {
+                let pin_line = pins.line_of(from);
+                let targets = rook_attacks(from, occupied) & allowed & pin_line;
+                out.emit_targets(from, targets, Bitboard::EMPTY);
+            }
+            for from in board.pieces(us, Role::Queen) {
+                let pin_line = pins.line_of(from);
+                let attacks = bishop_attacks(from, occupied) | rook_attacks(from, occupied);
+                let targets = attacks & allowed & pin_line;
+                out.emit_targets(from, targets, Bitboard::EMPTY);
+            }
+        }
+        #[cfg(not(feature = "magic"))]
         for (role, diagonal, straight) in [
             (Role::Bishop, true, false),
             (Role::Rook, false, true),
@@ -1372,6 +1397,39 @@ impl Position {
         pins: &Pins,
     ) {
         let board = &self.board;
+
+        // Split by role rather than branching on `diagonal`/`straight` per square:
+        // a bishop needs only the diagonal lookup, a rook only the straight one,
+        // and a queen both, so each loop issues exactly the lookups it uses with
+        // no per-square boolean test and no dead `EMPTY` accumulator. Measured a
+        // ~7% win on the whole leaf generator with the cheap magic slider lookup
+        // (where the per-square branch is a relatively large share of the work);
+        // with the heavier default hyperbola lookup the branch is in the noise and
+        // the split measured ~1% *slower*, so the original single-loop shape is
+        // kept there. Both shapes emit byte-identical move sets (parity-checked).
+        #[cfg(feature = "magic")]
+        {
+            // Destination filter shared by every slider square: never land on a
+            // friendly piece, always resolve the check, never leave a pin line.
+            let allowed = !our_pieces & check_mask;
+            for from in board.pieces(us, Role::Bishop) {
+                let pin_line = pins.line_of(from);
+                let targets = bishop_attacks(from, occupied) & allowed & pin_line;
+                out.emit_targets(from, targets, their_pieces);
+            }
+            for from in board.pieces(us, Role::Rook) {
+                let pin_line = pins.line_of(from);
+                let targets = rook_attacks(from, occupied) & allowed & pin_line;
+                out.emit_targets(from, targets, their_pieces);
+            }
+            for from in board.pieces(us, Role::Queen) {
+                let pin_line = pins.line_of(from);
+                let attacks = bishop_attacks(from, occupied) | rook_attacks(from, occupied);
+                let targets = attacks & allowed & pin_line;
+                out.emit_targets(from, targets, their_pieces);
+            }
+        }
+        #[cfg(not(feature = "magic"))]
         for (role, diagonal, straight) in [
             (Role::Bishop, true, false),
             (Role::Rook, false, true),
