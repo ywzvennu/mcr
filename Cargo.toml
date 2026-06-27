@@ -41,6 +41,12 @@ dbg_macro = "warn"
 # public API is unchanged either way.
 magic = []
 
+# Off by default. Enables [`book::Book::open`], the filesystem convenience that
+# reads a Polyglot `.bin` book from a path via `std::fs`. The in-memory
+# [`book::Book::from_bytes`] reader and the Polyglot key need no feature; this
+# only gates the file-reading entry point.
+book = []
+
 [dependencies]
 
 [dev-dependencies]

@@ -82,6 +82,7 @@
 pub mod attacks;
 mod bitboard;
 mod board;
+pub mod book;
 mod chess_move;
 mod color;
 mod file;
@@ -104,6 +105,7 @@ pub use crate::attacks::{
 };
 pub use crate::bitboard::{Bitboard, Squares};
 pub use crate::board::{Board, ParseBoardError};
+pub use crate::book::{decode_move, polyglot_key, weighted_pick, Book, BookEntry};
 pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::file::File;

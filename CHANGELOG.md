@@ -22,6 +22,15 @@ or published; everything below is unreleased and the public API may change.
 - Game outcomes and draw detection: `Outcome`, precise `EndReason` labels,
   repetition tracking, and the move-validating `Game` driver.
 
+### Formats & ecosystem
+
+- Polyglot (`.bin`) opening-book reading in the `book` module: the standard
+  Polyglot Zobrist key (`polyglot_key`, separate from the internal `Zobrist`),
+  a `Book` reader (`from_bytes`, and `open` behind the `book` feature) with
+  binary-search `lookup`, Polyglot move decoding (`decode_move`, including the
+  castling-as-king-takes-rook quirk and promotions), and a `weighted_pick`
+  helper.
+
 ### Variants
 
 - Eight perft-verified variants — Chess960, King of the Hill, Three-check,
