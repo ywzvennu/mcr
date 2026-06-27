@@ -46,7 +46,9 @@
 //! * **Kingside**: king f1 -> **i1** (file 8), rook j1 -> **h1** (file 7).
 //! * **Queenside**: king f1 -> **c1** (file 2), rook a1 -> **d1** (file 3).
 
-use crate::geometry::position::{GenericCastling, GenericGating, GenericPosition, GenericState};
+use crate::geometry::position::{
+    GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
+};
 use crate::geometry::{Board, Cap10x8, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
@@ -83,6 +85,7 @@ impl WideVariant<Cap10x8> for CapablancaRules {
             ep_square: None,
             gating: GenericGating::NONE,
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

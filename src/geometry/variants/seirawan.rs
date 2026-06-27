@@ -52,7 +52,9 @@
 //!   dialect). The generic [`from_fen`](crate::geometry::GenericPosition::from_fen)
 //!   parses both extensions when [`WideVariant::supports_gating`] is `true`.
 
-use crate::geometry::position::{GenericCastling, GenericGating, GenericPosition, GenericState};
+use crate::geometry::position::{
+    GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
+};
 use crate::geometry::{
     Bitboard, Board, Chess8x8, Geometry, PromotionConfig, Square, WideRole, WideVariant,
 };
@@ -101,6 +103,7 @@ impl WideVariant<Chess8x8> for SeirawanRules {
             ep_square: None,
             gating: Self::initial_gating(),
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

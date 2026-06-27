@@ -50,7 +50,9 @@
 //! [`WideMove`]: crate::geometry::WideMove
 //! [`WideMove::with_duck`]: crate::geometry::WideMove::with_duck
 
-use crate::geometry::position::{GenericCastling, GenericGating, GenericPosition, GenericState};
+use crate::geometry::position::{
+    GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
+};
 use crate::geometry::{Bitboard, Board, Chess8x8, WideVariant};
 use crate::Color;
 
@@ -80,6 +82,7 @@ impl WideVariant<Chess8x8> for DuckRules {
             gating: GenericGating::NONE,
             // The Duck enters on the first move; it is off the board at the start.
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

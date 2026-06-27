@@ -45,7 +45,9 @@
 //! the same diagonal asymmetry FSF and pychess use.
 
 use crate::geometry::attacks::leaper_attacks;
-use crate::geometry::position::{GenericCastling, GenericGating, GenericPosition, GenericState};
+use crate::geometry::position::{
+    GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
+};
 use crate::geometry::{
     Bitboard, Board, Chess8x8, Geometry, PromotionConfig, Square, StandardChess, WideRole,
     WideVariant,
@@ -79,6 +81,7 @@ impl WideVariant<Chess8x8> for MakrukRules {
             ep_square: None,
             gating: GenericGating::NONE,
             duck: None,
+            placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
         };

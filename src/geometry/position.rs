@@ -256,6 +256,90 @@ const fn gate_bit(gate: super::GateRole) -> u8 {
     }
 }
 
+/// The placement-phase pocket of a generic position: the pieces each side has
+/// **still to deploy** in a setup-phase variant (Sittuyin), held off-board until
+/// dropped onto the player's own territory (`docs/fairy-variants-architecture.md`
+/// §4.4).
+///
+/// It carries one count per [`WideRole`] per color. For every variant **without**
+/// a placement phase the value is [`GenericPlacement::NONE`] (all zeros) and the
+/// placement code paths — all guarded behind [`WideVariant::has_placement`] —
+/// never fire, so produced moves, state, and FEN stay byte-identical to a build
+/// without the placement mechanic. It carries no [`Geometry`] data (the pocket is
+/// a piece-count tally, board-size-independent), so it is a plain `Copy` value.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GenericPlacement {
+    /// White's undeployed piece counts, indexed by [`WideRole::index`].
+    white: [u8; WideRole::COUNT],
+    /// Black's undeployed piece counts, indexed by [`WideRole::index`].
+    black: [u8; WideRole::COUNT],
+}
+
+impl GenericPlacement {
+    /// The empty pocket: no pieces in hand for either side. The value every
+    /// non-placement variant carries, and the state of a placement variant once
+    /// both sides are fully deployed.
+    pub const NONE: GenericPlacement = GenericPlacement {
+        white: [0; WideRole::COUNT],
+        black: [0; WideRole::COUNT],
+    };
+
+    /// Builds a pocket from explicit per-color, per-role counts.
+    #[must_use]
+    pub const fn new(
+        white: [u8; WideRole::COUNT],
+        black: [u8; WideRole::COUNT],
+    ) -> GenericPlacement {
+        GenericPlacement { white, black }
+    }
+
+    /// Returns the number of `role` pieces `color` has still to deploy.
+    #[must_use]
+    #[inline]
+    pub fn count(self, color: Color, role: WideRole) -> u8 {
+        match color {
+            Color::White => self.white[role.index()],
+            Color::Black => self.black[role.index()],
+        }
+    }
+
+    /// Returns `true` if `color` has any piece still to deploy.
+    #[must_use]
+    #[inline]
+    pub fn any(self, color: Color) -> bool {
+        let counts = match color {
+            Color::White => &self.white,
+            Color::Black => &self.black,
+        };
+        counts.iter().any(|&n| n != 0)
+    }
+
+    /// Removes one `role` piece from `color`'s pocket (it has just been dropped).
+    #[inline]
+    fn take(&mut self, color: Color, role: WideRole) {
+        let slot = match color {
+            Color::White => &mut self.white[role.index()],
+            Color::Black => &mut self.black[role.index()],
+        };
+        *slot = slot.saturating_sub(1);
+    }
+}
+
+impl Default for GenericPlacement {
+    fn default() -> Self {
+        GenericPlacement::NONE
+    }
+}
+
+impl core::fmt::Debug for GenericPlacement {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("GenericPlacement")
+            .field("white", &self.white)
+            .field("black", &self.black)
+            .finish()
+    }
+}
+
 /// The non-board state of a generic position: side to move, castling rights,
 /// en-passant target square, and the two move clocks.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -275,6 +359,12 @@ pub struct GenericState<G: Geometry> {
     /// behind [`WideVariant::has_duck`], never fire and produced moves and state
     /// stay byte-identical to a build without the duck mechanic.
     pub duck: Option<Square<G>>,
+    /// The setup-phase pocket: the pieces each side has yet to deploy
+    /// (Sittuyin only). [`GenericPlacement::NONE`] for every other variant — so
+    /// the placement code paths, all guarded behind
+    /// [`WideVariant::has_placement`], never fire and produced moves, state, and
+    /// FEN stay byte-identical to a build without the placement mechanic.
+    pub placement: GenericPlacement,
     /// The halfmove clock (plies since the last capture or pawn move).
     pub halfmove_clock: u16,
     /// The fullmove number (incremented after a black move).
@@ -289,6 +379,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("ep_square", &self.ep_square.map(|s| s.index()))
             .field("gating", &self.gating)
             .field("duck", &self.duck.map(|s| s.index()))
+            .field("placement", &self.placement)
             .field("halfmove_clock", &self.halfmove_clock)
             .field("fullmove_number", &self.fullmove_number)
             .finish()
@@ -530,6 +621,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_duck_into(out);
             return;
         }
+        // Setup / placement phase (Sittuyin): while the side to move still has
+        // pieces in hand it makes a placement drop — never a board move — onto its
+        // own territory. The phase is per-side (a side that has emptied its pocket
+        // plays normally even while the opponent is still deploying), and FSF
+        // applies no check filtering to placement drops. Gated behind
+        // `has_placement()` (default-off), so every other variant takes the
+        // standard path below unchanged.
+        if V::has_placement() && self.state.placement.any(self.state.turn) {
+            self.generate_placement_into(out);
+            return;
+        }
         let us = self.state.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -741,6 +843,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         V::emit_drops(&self.board, &self.state, out);
     }
 
+    /// Generates the side-to-move's **placement-phase** drops (Sittuyin): for
+    /// each role still in hand, a [`WideMove::drop`] onto every square the variant
+    /// permits ([`WideVariant::placement_targets`]). FSF applies no check filter
+    /// during placement, so the drops are emitted directly. Only reached while
+    /// [`WideVariant::has_placement`] is `true` and the side's pocket is
+    /// non-empty.
+    fn generate_placement_into(&self, out: &mut Vec<WideMove>) {
+        let us = self.state.turn;
+        for role in WideRole::ALL {
+            if self.state.placement.count(us, role) == 0 {
+                continue;
+            }
+            let targets = V::placement_targets(role, us, &self.board);
+            for sq in targets {
+                out.push(WideMove::drop(role, sq));
+            }
+        }
+    }
+
     /// For every base move already in `out` that vacates a gating-eligible
     /// square, appends the gated variants (one per available reserve piece). A
     /// castling move vacates two eligible squares (the king's origin and the
@@ -893,6 +1014,32 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     }
                 } else {
                     out.push(WideMove::new(from, to, WideMoveKind::Capture));
+                }
+            }
+
+            // Special promotion (Sittuyin): when the side has no Met on the
+            // board, a pawn may become a Met in place or by a one-step ferz move
+            // to an empty diagonal square. Gated behind `has_placement()`
+            // (default-off), so every other variant skips this entirely and is
+            // byte-identical. Each landing square is filtered by the same check
+            // mask and pin line as every other move; an in-place promotion
+            // (`to == from`) stays on the pin line and is legal only out of check
+            // (the check mask never contains a friendly pawn's own square).
+            if V::has_placement() {
+                if let Some(targets) = V::special_promotion_targets(board, from, us) {
+                    let met = promo_roles.first().copied().unwrap_or(WideRole::Met);
+                    for to in targets {
+                        if check_mask.contains(to) && pin_line.contains(to) {
+                            out.push(WideMove::new(
+                                from,
+                                to,
+                                WideMoveKind::Promotion {
+                                    role: met,
+                                    capture: false,
+                                },
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -1049,6 +1196,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let to = mv.to::<G>();
         let rank = back_rank::<G>(us);
 
+        // A drop has no origin piece (the square it names is empty before the
+        // drop), so it is handled before the `from`-piece lookup the board moves
+        // require. It places a held piece, advances the side and fullmove number,
+        // and — in the placement phase — consumes the piece from the pocket. The
+        // setup phase never resets nor advances the halfmove clock in FSF's
+        // counting (it stays 0 through deployment), so leave it untouched.
+        if let WideMoveKind::Drop { role } = mv.kind() {
+            self.board.set_piece(to, WidePiece::new(us, role));
+            if V::has_placement() {
+                self.state.placement.take(us, role);
+            }
+            self.state.ep_square = None;
+            if us.is_black() {
+                self.state.fullmove_number = self.state.fullmove_number.saturating_add(1);
+            }
+            self.state.turn = them;
+            return;
+        }
+
         let moving = self
             .board
             .piece_at(from)
@@ -1122,9 +1288,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 self.board.remove_piece(from);
                 self.board.set_piece(to, WidePiece::new(us, role));
             }
-            WideMoveKind::Drop { role } => {
-                // Reserved variant path; standard chess never emits drops.
-                self.board.set_piece(to, WidePiece::new(us, role));
+            WideMoveKind::Drop { .. } => {
+                // Drops are fully handled by the early return above (a drop has no
+                // origin piece, so it cannot share the board-move path).
+                unreachable!("drops are handled before the board-move match");
             }
         }
 
@@ -1315,6 +1482,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
         let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
+        // Sittuyin carries the setup-phase pocket in the same `[..]` holdings
+        // bracket the gating variants use (the crazyhouse convention): uppercase
+        // letters are white's undeployed pieces, lowercase black's. A non-
+        // placement variant never reads the bracket here, so its pocket stays
+        // `NONE`.
+        let placement_pocket = if V::has_placement() {
+            parse_placement_holdings(holdings)?
+        } else {
+            GenericPlacement::NONE
+        };
+
         let turn = match fields.next().ok_or(WideFenError::MissingField)? {
             "w" => Color::White,
             "b" => Color::Black,
@@ -1357,6 +1535,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             ep_square,
             gating,
             duck,
+            placement: placement_pocket,
             halfmove_clock,
             fullmove_number,
         };
@@ -1378,6 +1557,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
         if V::supports_gating() {
             write_holdings(self.state.gating, &mut out);
+        }
+        if V::has_placement() {
+            write_placement_holdings(self.state.placement, &mut out);
         }
         out.push(' ');
         out.push(if self.state.turn.is_white() { 'w' } else { 'b' });
@@ -1770,6 +1952,46 @@ fn parse_holdings(holdings: &str) -> Result<([bool; 2], [bool; 2]), WideFenError
         }
     }
     Ok((white, black))
+}
+
+/// Parses a placement-phase `[..]` holdings string into a [`GenericPlacement`]
+/// pocket. Uppercase letters tally white's undeployed pieces, lowercase black's,
+/// each letter the role's FEN character (mce dialect — the Met is `m`, the Silver
+/// `s`). Any letter that is not a known role is rejected.
+fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenError> {
+    let mut pocket = GenericPlacement::NONE;
+    for ch in holdings.chars() {
+        let role = WideRole::from_char(ch).ok_or(WideFenError::BadCastling)?;
+        let counts = if ch.is_ascii_uppercase() {
+            &mut pocket.white
+        } else {
+            &mut pocket.black
+        };
+        counts[role.index()] = counts[role.index()].saturating_add(1);
+    }
+    Ok(pocket)
+}
+
+/// Writes the placement-phase `[..]` holdings bracket: white's undeployed pieces
+/// (uppercase) then black's (lowercase), each role in [`WideRole::ALL`] index
+/// order, repeated by its count. An empty pocket (both sides fully deployed)
+/// emits `[]`, matching FSF's rendering once the setup phase is over.
+fn write_placement_holdings(placement: GenericPlacement, out: &mut String) {
+    out.push('[');
+    for (color, upper) in [(Color::White, true), (Color::Black, false)] {
+        for role in WideRole::ALL {
+            let n = placement.count(color, role);
+            let ch = if upper {
+                role.upper_char()
+            } else {
+                role.char()
+            };
+            for _ in 0..n {
+                out.push(ch);
+            }
+        }
+    }
+    out.push(']');
 }
 
 /// Writes the `[..]` holdings bracket for a gating variant: the white reserves
