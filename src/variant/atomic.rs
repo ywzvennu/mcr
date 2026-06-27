@@ -143,6 +143,37 @@ fn king_is_safe(after: &Position, my_king: Square, opponent: Color, enemy_king: 
     attackers.is_empty()
 }
 
+/// Whether the side to move in `core` is in check under the atomic king-safety
+/// rule.
+///
+/// This mirrors the move-generation immunity of [`king_is_safe`]: a king
+/// standing **adjacent to the enemy king** can never be captured (any enemy
+/// attacker would detonate a blast that also catches its own king), so it is
+/// never in check there — regardless of how many pieces ordinarily "attack" the
+/// square. Otherwise the standard core check test applies.
+///
+/// With both kings present this is precisely `!king_is_safe(core, my_king,
+/// enemy, enemy_king)` evaluated on the current position; it is factored out so
+/// the result reads directly as "in check". A side with no king is treated as
+/// not in check (the game is already decided by [`AtomicRules::extra_terminal`]).
+fn atomic_is_check(core: &Position) -> bool {
+    let mover = core.turn();
+    let Some(my_king) = core.board().king_of(mover) else {
+        // No king of the side to move: the game is over by king-explosion, not
+        // by check. Report "not in check" so terminal labeling defers to
+        // `extra_terminal` (KingExploded) rather than the checkmate path.
+        return false;
+    };
+    let opponent = mover.opposite();
+    match core.board().king_of(opponent) {
+        // Adjacent to the enemy king: immune to every attacker, never in check.
+        Some(enemy_king) => !king_is_safe(core, my_king, opponent, enemy_king),
+        // The enemy king is gone: there is no attacker to give check (and the
+        // mover has already won); not in check.
+        None => false,
+    }
+}
+
 impl Variant for AtomicRules {
     type State = ();
     const ID: VariantId = VariantId::Atomic;
@@ -242,6 +273,19 @@ impl Variant for AtomicRules {
                 out.push(mv);
             }
         });
+    }
+
+    /// H3b: atomic check detection with king-adjacency immunity.
+    ///
+    /// Delegates to [`atomic_is_check`], which excludes the enemy king as an
+    /// attacker and treats a king adjacent to the enemy king as never in check
+    /// (it cannot be captured without the capturer exploding the adjacent enemy
+    /// king). This is the same immunity the move generator applies via #121, so
+    /// the checkmate-vs-stalemate split in [`VariantPosition::end_reason`] agrees
+    /// with the legal-move set: a position with adjacent kings and no legal move
+    /// is a stalemate draw, not a false checkmate.
+    fn is_check(core: &Position, _state: &Self::State) -> bool {
+        atomic_is_check(core)
     }
 
     /// H1: a missing king is decisive for the side whose king survives.
@@ -629,6 +673,103 @@ mod tests {
                 pos = pos.play(&mv);
             }
         }
+    }
+
+    /// Regression for #131: an atomic position with the side-to-move's king
+    /// adjacent to the enemy king, attacked by an enemy rook, and with **zero**
+    /// legal moves must be labelled a **stalemate draw**, not a false checkmate.
+    ///
+    /// The enemy rook "attacks" the black king, so the shared core check test
+    /// (`Position::is_check`) reports check -- which, with no legal move, the old
+    /// labeling turned into `Checkmate`. But in atomic the black king is immune
+    /// while adjacent to the white king (any capturer would detonate the white
+    /// king too -- the #121 movegen immunity), so it is *not* in check, and zero
+    /// legal moves is a stalemate. The mapping is: adjacent-king "check" with no
+    /// legal move -> `EndReason::Stalemate` -> `Outcome::Draw`.
+    ///
+    /// The adjacent-kings position is unparseable as a FEN, so it is built by
+    /// play. Final position (black to move): black Ka8/Pa7, white Kb7/Rb8/Ra1/Pa6
+    /// -- `kR6/pK6/P7/8/8/8/8/R7 b - - 5 3`.
+    #[test]
+    fn adjacent_kings_zero_moves_is_stalemate_not_checkmate_issue_131() {
+        let start: Atomic = "k7/p1K5/P7/8/8/8/8/R6R w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["c7b7", "a8b8", "h1h8", "b8a8", "h8b8"]);
+
+        // Both kings stand adjacent, black to move, with a rook bearing on a8.
+        let core = pos.core();
+        assert_eq!(pos.turn(), Color::Black);
+        assert_eq!(core.board().king_of(Color::Black), Some(sq("a8")));
+        assert_eq!(core.board().king_of(Color::White), Some(sq("b7")));
+        assert!(
+            king_attacks(sq("a8")).contains(sq("b7")),
+            "the two kings are adjacent"
+        );
+
+        // The shared core test sees a rook attacking a8 and reports check...
+        assert!(
+            core.is_check(),
+            "core check test (no atomic immunity) reports check"
+        );
+        // ...but atomic's variant-aware test applies the adjacency immunity: the
+        // black king cannot be captured here, so it is NOT in check.
+        assert!(
+            !pos.is_check(),
+            "atomic king adjacent to the enemy king is immune -> not in check"
+        );
+
+        // With zero legal moves and not in check, the position is a stalemate
+        // draw, not a checkmate.
+        assert!(pos.legal_moves().is_empty(), "black has no legal move");
+        assert_eq!(
+            pos.end_reason(),
+            Some(EndReason::Stalemate),
+            "no-move adjacent-kings position is stalemate, not a false checkmate"
+        );
+        assert_eq!(pos.outcome(), Some(Outcome::Draw));
+    }
+
+    /// A genuine atomic checkmate -- the mated king is *not* adjacent to the
+    /// enemy king, so no immunity applies -- must still label `Checkmate`. This
+    /// is the control that keeps the #131 fix from over-relaxing the labeling.
+    #[test]
+    fn ordinary_atomic_checkmate_still_labels_checkmate_issue_131() {
+        // Back-rank mate: black Kg8 boxed by its own g7/h7 pawns. White Re8
+        // checks along the 8th rank; white Rf7 covers the f7/f8 flight squares.
+        // The white king is on a1, nowhere near g8, so the black king has no
+        // adjacency immunity -- this is a real checkmate.
+        let pos: Atomic = "4R1k1/5Rpp/8/8/8/8/8/K7 b - - 0 1".parse().unwrap();
+        assert!(pos.is_check(), "black king is genuinely in check");
+        assert!(pos.legal_moves().is_empty(), "black has no legal move");
+        assert_eq!(pos.end_reason(), Some(EndReason::Checkmate));
+        assert_eq!(
+            pos.outcome(),
+            Some(Outcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+
+    /// The atomic king-adjacency immunity must also make `is_check()` report
+    /// `false` for an adjacent-kings position that still has legal moves, even
+    /// though the core test reports check. (Pairs with the movegen-side
+    /// `king_already_adjacent_to_enemy_king_keeps_full_move_set` test, whose doc
+    /// noted `is_check()` was previously left to this separate change.)
+    #[test]
+    fn is_check_false_when_king_adjacent_to_enemy_king_issue_131() {
+        // White king on a2 adjacent to black king a3, "attacked" by a rook on the
+        // 2nd rank -- built by play, since adjacent kings are unparseable.
+        let start: Atomic = "8/8/8/8/8/k7/7r/K7 w - - 0 1".parse().unwrap();
+        let pos = play_line(start, &["a1a2", "h2g2"]);
+        assert!(
+            pos.core().is_check(),
+            "core test reports check from the g2 rook"
+        );
+        assert!(
+            !pos.is_check(),
+            "atomic: king adjacent to the enemy king is immune, so not in check"
+        );
+        // The game is not over: the king still has its normal moves.
+        assert!(pos.outcome().is_none());
     }
 
     #[test]

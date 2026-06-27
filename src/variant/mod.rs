@@ -307,6 +307,26 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         true
     }
 
+    /// Whether the side to move is in check under this variant's king-safety
+    /// rule (H3b).
+    ///
+    /// This drives both [`VariantPosition::is_check`] and the
+    /// checkmate-vs-stalemate split in [`VariantPosition::end_reason`]: with zero
+    /// legal moves, an in-check position is checkmate and an out-of-check one is
+    /// stalemate. It is only consulted when [`Variant::king_is_royal`] is `true`.
+    ///
+    /// Default: the standard core test ([`Position::is_check`]), so standard
+    /// chess and every variant whose check rule is standard are byte-for-byte
+    /// unaffected. Atomic overrides this: a king standing adjacent to the enemy
+    /// king is immune to capture (any attacker would detonate the adjacent enemy
+    /// king too), so it is never in check there — mirroring the move-generation
+    /// immunity, so that an adjacent-kings position with no legal move is labelled
+    /// a stalemate draw rather than a false checkmate.
+    #[must_use]
+    fn is_check(core: &Position, _state: &Self::State) -> bool {
+        core.is_check()
+    }
+
     /// Whether a position with insufficient mating material is an automatic draw.
     ///
     /// Default: `true` (standard chess). Variants whose goal is not checkmate —
@@ -764,7 +784,7 @@ impl<V: Variant> VariantPosition<V> {
     /// royal in this variant ([`Variant::king_is_royal`] is `false`).
     #[must_use]
     pub fn is_check(&self) -> bool {
-        V::king_is_royal() && self.core.is_check()
+        V::king_is_royal() && V::is_check(&self.core, &self.state)
     }
 
     /// The legal moves of the side to move under variant `V`.
@@ -991,11 +1011,13 @@ impl<V: Variant> VariantPosition<V> {
             return Some(reason);
         }
         if self.legal_move_count() == 0 {
-            return Some(if V::king_is_royal() && self.core.is_check() {
-                EndReason::Checkmate
-            } else {
-                EndReason::Stalemate
-            });
+            return Some(
+                if V::king_is_royal() && V::is_check(&self.core, &self.state) {
+                    EndReason::Checkmate
+                } else {
+                    EndReason::Stalemate
+                },
+            );
         }
         // Material / clock draws only apply when the standard concepts do; the
         // core check is reused as the standard default.
