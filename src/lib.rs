@@ -119,12 +119,16 @@ pub use crate::movelist::MoveList;
 pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, IllegalMove, Outcome};
 pub use crate::pgn::{Pgn, PgnError, PgnMove, PgnResult};
 pub use crate::piece::{Piece, Role};
+#[cfg(feature = "parallel")]
+pub use crate::position::perft_parallel;
 pub use crate::position::{
     perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position, Undo,
 };
 pub use crate::rank::Rank;
 pub use crate::san::SanError;
 pub use crate::square::{InvalidSquareIndex, ParseSquareError, Square};
+#[cfg(feature = "parallel")]
+pub use crate::variant::perft_variant_parallel;
 pub use crate::variant::{
     perft_variant, Antichess, AntichessRules, AnyVariant, Atomic, AtomicRules, CastleGeometry,
     CheckCounters, Chess, Chess960, Chess960Rules, ChessRules, Crazyhouse, CrazyhouseRules,

@@ -341,6 +341,7 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "proptest",
+ "rayon",
  "serde",
  "serde_json",
 ]
