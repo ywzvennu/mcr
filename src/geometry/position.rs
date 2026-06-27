@@ -679,9 +679,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
         let forward: i8 = if us.is_white() { 1 } else { -1 };
-        let promo_rank = V::promotion_rank(us);
         let start_rank = V::double_push_rank(us);
-        let promo_roles = V::promotion_config().roles;
+        // The legal promotion targets. The default reads only the static
+        // promotion config (every existing variant), so it is unchanged for them;
+        // Grand chess overrides it to a board-dependent set, so it is recomputed
+        // per generation from the live board.
+        let promo_roles = V::promotion_targets(us, board);
 
         for from in pawns {
             let pin_line = pins.line_of(from);
@@ -690,7 +693,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if let Some(one) = from.offset(0, forward) {
                 if !occupied.contains(one) {
                     if check_mask.contains(one) && pin_line.contains(one) {
-                        if one.rank() == promo_rank {
+                        if V::in_promotion_zone(us, one.rank()) {
                             for &role in &promo_roles {
                                 out.push(WideMove::new(
                                     from,
@@ -700,6 +703,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                                         capture: false,
                                     },
                                 ));
+                            }
+                            // In a multi-rank promotion zone (Grand) a near-rank
+                            // push may also stay a pawn; the last rank forces it.
+                            if !V::promotion_is_forced(us, one.rank()) {
+                                out.push(WideMove::new(from, one, WideMoveKind::Quiet));
                             }
                         } else {
                             out.push(WideMove::new(from, one, WideMoveKind::Quiet));
@@ -724,7 +732,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 if !check_mask.contains(to) || !pin_line.contains(to) {
                     continue;
                 }
-                if to.rank() == promo_rank {
+                if V::in_promotion_zone(us, to.rank()) {
                     for &role in &promo_roles {
                         out.push(WideMove::new(
                             from,
@@ -734,6 +742,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                                 capture: true,
                             },
                         ));
+                    }
+                    // Optional-promotion zone (Grand): a capture onto a near zone
+                    // rank may also be a plain capture; the last rank forces it.
+                    if !V::promotion_is_forced(us, to.rank()) {
+                        out.push(WideMove::new(from, to, WideMoveKind::Capture));
                     }
                 } else {
                     out.push(WideMove::new(from, to, WideMoveKind::Capture));
