@@ -1295,3 +1295,45 @@ fn perft_variant_inner<V: Variant>(
     });
     nodes
 }
+
+/// Like [`perft_variant`], but splits the root moves across a [`rayon`] thread
+/// pool — the optional, parallel counterpart gated behind the `parallel`
+/// feature, and the variant-generic analogue of [`crate::perft_parallel`].
+///
+/// Perft is embarrassingly parallel: the subtrees below the root's depth-1
+/// children are independent, so this generates the root moves, hands each child
+/// subtree to the rayon work-stealing pool, and sums the per-child serial
+/// [`perft_variant`] results. The node count is **byte-identical** to serial
+/// [`perft_variant`] — only the order the subtrees are summed in differs, and
+/// `u64` addition is associative for these counts. It exists for benchmarking
+/// and tooling, not as the core hot path.
+///
+/// Depths 0 and 1 are handled trivially (no thread pool is touched): depth 0 is
+/// `1`, depth 1 is the serial leaf count.
+#[cfg(feature = "parallel")]
+#[must_use]
+pub fn perft_variant_parallel<V>(position: &VariantPosition<V>, depth: u32) -> u64
+where
+    V: Variant + Sync,
+    V::State: Sync,
+{
+    use rayon::prelude::*;
+
+    if depth == 0 {
+        return 1;
+    }
+    if depth == 1 {
+        // A single ply: reuse the serial leaf count (which already chooses the
+        // bulk-count or materializing path per variant), so the count matches
+        // `perft_variant` exactly without touching the thread pool.
+        return perft_variant(position, 1);
+    }
+    // Split the root moves across the pool; each child computes its own subtree
+    // serially via the existing allocation-free `perft_variant`. Collecting the
+    // root moves up front lets rayon own the per-child work items.
+    let root_moves = position.legal_moves();
+    root_moves
+        .par_iter()
+        .map(|mv| perft_variant(&position.play(mv), depth - 1))
+        .sum()
+}

@@ -3102,6 +3102,48 @@ pub fn perft_divide(position: &Position, depth: u32) -> Vec<(Move, u64)> {
     out
 }
 
+/// Like [`perft`], but splits the root moves across a [`rayon`] thread pool —
+/// the optional, parallel counterpart gated behind the `parallel` feature.
+///
+/// Perft is embarrassingly parallel: the subtrees below the root's depth-1
+/// children are independent, so this generates the root moves, hands each child
+/// subtree to the rayon work-stealing pool, and sums the per-child serial
+/// [`perft`] results. The node count is **byte-identical** to serial [`perft`]
+/// — only the order the subtrees are summed in differs, and `u64` addition is
+/// associative for these counts. It exists for benchmarking and tooling, not as
+/// the core hot path.
+///
+/// Depths 0 and 1 are handled trivially (no thread pool is touched): depth 0 is
+/// `1`, depth 1 is the bulk leaf count.
+///
+/// ```
+/// use mce::{perft, perft_parallel, Position};
+/// let pos = Position::startpos();
+/// assert_eq!(perft_parallel(&pos, 4), perft(&pos, 4));
+/// ```
+#[cfg(feature = "parallel")]
+#[must_use]
+pub fn perft_parallel(position: &Position, depth: u32) -> u64 {
+    use rayon::prelude::*;
+
+    if depth == 0 {
+        return 1;
+    }
+    if depth == 1 {
+        // A single ply: bulk-count the root's legal moves directly, matching
+        // serial `perft` and avoiding any thread-pool overhead.
+        return position.count_legal();
+    }
+    // Split the root moves across the pool; each child computes its own subtree
+    // serially via the existing allocation-free `perft`. Collecting the root
+    // moves up front lets rayon own the per-child work items.
+    let root_moves = position.legal_moves();
+    root_moves
+        .par_iter()
+        .map(|mv| perft(&position.play(mv), depth - 1))
+        .sum()
+}
+
 /// The error returned when a six-field FEN string cannot be parsed into a
 /// [`Position`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -3592,6 +3634,30 @@ mod tests {
         let total: u64 = div.iter().map(|(_, n)| n).sum();
         assert_eq!(total, perft(&pos, 3));
         assert_eq!(div.len(), 20);
+    }
+
+    /// `perft_parallel` must return node counts byte-identical to serial
+    /// `perft`, including the trivial depth-0 and depth-1 cases that bypass the
+    /// thread pool, across the startpos and the Kiwipete tactical position.
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn perft_parallel_matches_serial() {
+        let start = Position::startpos();
+        for depth in 0..=5 {
+            assert_eq!(
+                perft_parallel(&start, depth),
+                perft(&start, depth),
+                "startpos depth {depth}"
+            );
+        }
+        let kiwipete = Position::from_fen(KIWIPETE).unwrap();
+        for depth in 0..=4 {
+            assert_eq!(
+                perft_parallel(&kiwipete, depth),
+                perft(&kiwipete, depth),
+                "kiwipete depth {depth}"
+            );
+        }
     }
 
     // -- Public attack/threat queries + SEE --------------------------------
