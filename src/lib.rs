@@ -84,6 +84,7 @@ mod bitboard;
 mod board;
 mod chess_move;
 mod color;
+mod epd;
 mod file;
 #[cfg(feature = "magic")]
 mod magic;
@@ -106,6 +107,7 @@ pub use crate::bitboard::{Bitboard, Squares};
 pub use crate::board::{Board, ParseBoardError};
 pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
+pub use crate::epd::{Epd, EpdError};
 pub use crate::file::File;
 #[cfg(feature = "magic")]
 pub use crate::magic::attack_table_len;
