@@ -11,6 +11,11 @@
 # Benchmark comparison crate (links GPL shakmaty; never published)
 /compare/target
 
+# WebAssembly bindings crate (separate, never published): build artifacts and
+# the wasm-pack output package.
+/bindings/wasm/target
+/bindings/wasm/pkg
+
 # proptest failure-replay seeds: regenerated on demand, not part of the suite.
 proptest-regressions/
 
