@@ -40,6 +40,7 @@ pub mod position;
 mod role;
 mod square;
 pub mod variant;
+pub mod variants;
 mod wide_move;
 
 pub use backing::BitboardBacking;
@@ -51,6 +52,7 @@ pub use position::{
 pub use role::WideRole;
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
+pub use variants::{Makruk, MakrukRules};
 pub use wide_move::{WideMove, WideMoveKind};
 
 /// A compile-time board geometry.

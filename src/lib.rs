@@ -140,6 +140,10 @@ pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::epd::{Epd, EpdError};
 pub use crate::file::File;
+// The first fairy variant on the generic engine (Makruk / Thai chess). The
+// `GenericPosition`-based generic layer lives under `geometry`; its concrete
+// variants are surfaced at the crate root for convenience.
+pub use crate::geometry::{Makruk, MakrukRules};
 #[cfg(feature = "magic")]
 pub use crate::magic::attack_table_len;
 pub use crate::movelist::MoveList;
