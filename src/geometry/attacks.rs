@@ -1,0 +1,572 @@
+//! Generic attack and ray generation over an arbitrary [`Geometry`].
+//!
+//! This is the parallel generic analogue of the frozen concrete
+//! [`crate::attacks`] module: the same steppers, hyperbola-quintessence sliders,
+//! and `between` / `line` rays, but parametrised over `G: Geometry` so they work
+//! for the standard 8x8 board (`u64` backing) and for wider boards such as
+//! [`Cap10x8`](super::Cap10x8) (`u128` backing, ten files) alike.
+//!
+//! Everything here is `safe`, `no_std` Rust:
+//!
+//! * **Steppers** — [`pawn_attacks`], [`knight_attacks`], [`king_attacks`] are
+//!   built on the generic [`leaper_attacks`] primitive, which expands a list of
+//!   `(file, rank)` offsets at a square with full edge handling (no wrap across
+//!   the board's left/right edges, no leak off the top/bottom).
+//! * **Sliders** — [`bishop_attacks`], [`rook_attacks`], [`queen_attacks`] use
+//!   hyperbola quintessence generalised to `G::Bits`: the `o ^ (o - 2s)` trick
+//!   over per-direction line masks (rank / file / diagonal / anti-diagonal)
+//!   regenerated for the geometry from its width and height. Pure integer
+//!   arithmetic, no `unsafe`.
+//! * **Geometry rays** — [`between`] and [`line`] give the strictly-between and
+//!   full-line squares for two aligned squares.
+//!
+//! The slider line masks and ray walks are recomputed per call from the
+//! geometry's dimensions. They are cheap (a bounded walk along one ray) and keep
+//! the surface free of const-generic array lengths, which are not expressible
+//! for `[Bitboard<G>; G::SQUARES as usize]` on stable Rust. The 8x8 results are
+//! bit-for-bit identical to the frozen concrete tables (see the equivalence
+//! tests).
+
+use super::backing::BitboardBacking;
+use super::{Bitboard, Geometry, Square};
+use crate::Color;
+
+// ---------------------------------------------------------------------------
+// Leaper primitive.
+// ---------------------------------------------------------------------------
+
+/// Returns the squares a leaper on `sq` reaches by the given `(file, rank)`
+/// offsets, dropping any offset that lands off the board.
+///
+/// This is the reusable stepper primitive: every fairy leaper (knight, ferz =
+/// `±1` diagonal, wazir = `±1` orthogonal, the gold/silver generals, the knight
+/// component of an archbishop, and so on) is a fixed offset list fed to this
+/// function. Edges are respected exactly — an offset that would cross the left
+/// or right edge, or leave the top or bottom, simply contributes nothing rather
+/// than wrapping, because the destination file/rank are range-checked through
+/// [`Square::offset`].
+///
+/// ```
+/// use mce::geometry::{attacks::leaper_attacks, Chess8x8, Square};
+/// // Wazir (orthogonal one-steppers) on a corner reaches two squares.
+/// let wazir = leaper_attacks::<Chess8x8>(Square::new(0), &[(1, 0), (-1, 0), (0, 1), (0, -1)]);
+/// assert_eq!(wazir.count(), 2);
+/// ```
+#[must_use]
+pub fn leaper_attacks<G: Geometry>(sq: Square<G>, offsets: &[(i8, i8)]) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in offsets {
+        if let Some(dest) = sq.offset(df, dr) {
+            bb.set(dest);
+        }
+    }
+    bb
+}
+
+/// The eight knight (`(±1,±2)` / `(±2,±1)`) leaps.
+const KNIGHT_OFFSETS: [(i8, i8); 8] = [
+    (1, 2),
+    (2, 1),
+    (2, -1),
+    (1, -2),
+    (-1, -2),
+    (-2, -1),
+    (-2, 1),
+    (-1, 2),
+];
+
+/// The eight king (one-step in any of the eight directions) leaps.
+const KING_OFFSETS: [(i8, i8); 8] = [
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+];
+
+/// Returns the squares a pawn of `color` standing on `sq` attacks.
+///
+/// White pawns attack the two squares one rank toward the last rank (north-east
+/// and north-west); black pawns attack one rank toward the first rank. Captures
+/// off a side edge are dropped, and a pawn on the far rank attacks nothing.
+///
+/// ```
+/// use mce::geometry::{attacks::pawn_attacks, Chess8x8, Square};
+/// use mce::Color;
+/// // A white pawn in the centre attacks the two forward diagonals.
+/// assert_eq!(pawn_attacks::<Chess8x8>(Color::White, Square::new(28)).count(), 2);
+/// ```
+#[must_use]
+pub fn pawn_attacks<G: Geometry>(color: Color, sq: Square<G>) -> Bitboard<G> {
+    let offsets: [(i8, i8); 2] = if color.is_white() {
+        [(-1, 1), (1, 1)]
+    } else {
+        [(-1, -1), (1, -1)]
+    };
+    leaper_attacks(sq, &offsets)
+}
+
+/// Returns the squares a knight on `sq` attacks.
+///
+/// ```
+/// use mce::geometry::{attacks::knight_attacks, Chess8x8, Square};
+/// // A knight in the centre of an 8x8 board reaches all eight squares.
+/// assert_eq!(knight_attacks::<Chess8x8>(Square::new(27)).count(), 8);
+/// ```
+#[must_use]
+pub fn knight_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    leaper_attacks(sq, &KNIGHT_OFFSETS)
+}
+
+/// Returns the squares a king on `sq` attacks (the up-to-eight adjacent
+/// squares).
+#[must_use]
+pub fn king_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    leaper_attacks(sq, &KING_OFFSETS)
+}
+
+// ---------------------------------------------------------------------------
+// Slider line masks (regenerated per geometry from width/height).
+// ---------------------------------------------------------------------------
+
+/// The full file through `sq` (every square sharing its file).
+fn file_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    let file = sq.file();
+    let mut bb = Bitboard::EMPTY;
+    let mut rank = 0u8;
+    while rank < G::HEIGHT {
+        bb.set(Square::new(rank * G::WIDTH + file));
+        rank += 1;
+    }
+    bb
+}
+
+/// The full rank through `sq` (every square sharing its rank).
+fn rank_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    let rank = sq.rank();
+    let mut bb = Bitboard::EMPTY;
+    let mut file = 0u8;
+    while file < G::WIDTH {
+        bb.set(Square::new(rank * G::WIDTH + file));
+        file += 1;
+    }
+    bb
+}
+
+/// The diagonal (north-east / south-west, constant `rank - file`) through `sq`.
+fn diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    walk_line(sq, 1, 1)
+}
+
+/// The anti-diagonal (north-west / south-east, constant `rank + file`) through
+/// `sq`.
+fn anti_diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    walk_line(sq, -1, 1)
+}
+
+/// Builds the full line through `sq` in the `(df, dr)` direction and its
+/// opposite, to both board edges (including `sq` itself).
+fn walk_line<G: Geometry>(sq: Square<G>, df: i8, dr: i8) -> Bitboard<G> {
+    let mut bb = Bitboard::from_square(sq);
+    for &(sf, sr) in &[(df, dr), (-df, -dr)] {
+        let mut cur = sq.offset(sf, sr);
+        while let Some(next) = cur {
+            bb.set(next);
+            cur = next.offset(sf, sr);
+        }
+    }
+    bb
+}
+
+// ---------------------------------------------------------------------------
+// Slider core (hyperbola quintessence over `G::Bits`).
+// ---------------------------------------------------------------------------
+
+/// Computes the blocker-aware attack set along a single ray `mask` (a rank,
+/// file, diagonal, or anti-diagonal passing through `sq`), generalised to
+/// `G::Bits`.
+///
+/// The result excludes `sq` itself and includes the first blocker on each side.
+/// The reversal operates over the whole backing width and is masked back to the
+/// line, exactly as the frozen `u64` path does.
+fn sliding<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>, mask: Bitboard<G>) -> Bitboard<G> {
+    let s = G::Bits::bit(sq.index() as u32);
+    let o = occupied.0 & mask.0;
+
+    // Forward: subtracting `2s` flips every bit up to and including the first
+    // blocker above `sq`. `2s` is formed as `s + s` to avoid a debug overflow
+    // panic when `s` is the high bit of the backing integer.
+    let two_s = s.wrapping_add(s);
+    let forward = o.wrapping_sub(two_s);
+
+    // Reverse: the same trick on the bit-reversed line covers below `sq`.
+    let rev_o = o.reverse_bits();
+    let rev_s = s.reverse_bits();
+    let two_rev_s = rev_s.wrapping_add(rev_s);
+    let reverse = rev_o.wrapping_sub(two_rev_s).reverse_bits();
+
+    Bitboard((forward ^ reverse) & mask.0)
+}
+
+/// Returns the squares a bishop on `sq` attacks given the `occupied` set.
+///
+/// Each diagonal ray stops at the first occupied square (which is included). The
+/// caller masks out friendly pieces.
+#[must_use]
+pub fn bishop_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    sliding(sq, occupied, diag_mask(sq)) | sliding(sq, occupied, anti_diag_mask(sq))
+}
+
+/// Returns the squares a rook on `sq` attacks given the `occupied` set.
+///
+/// Each orthogonal ray stops at the first occupied square (which is included).
+#[must_use]
+pub fn rook_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    sliding(sq, occupied, file_mask(sq)) | sliding(sq, occupied, rank_mask(sq))
+}
+
+/// Returns the squares a queen on `sq` attacks given the `occupied` set (the
+/// union of the rook and bishop rays).
+#[must_use]
+pub fn queen_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    rook_attacks(sq, occupied) | bishop_attacks(sq, occupied)
+}
+
+// ---------------------------------------------------------------------------
+// Geometry rays: `between` and `line`.
+// ---------------------------------------------------------------------------
+
+/// Returns the unit step `(df, dr)` from `a` toward `b` when they are aligned on
+/// a rank, file, or diagonal; `None` otherwise (including when `a == b`).
+fn step_toward<G: Geometry>(a: Square<G>, b: Square<G>) -> Option<(i8, i8)> {
+    let df = b.file() as i16 - a.file() as i16;
+    let dr = b.rank() as i16 - a.rank() as i16;
+    if df == 0 && dr == 0 {
+        return None;
+    }
+    let sign = |x: i16| -> i8 {
+        if x > 0 {
+            1
+        } else if x < 0 {
+            -1
+        } else {
+            0
+        }
+    };
+    if df == 0 || dr == 0 || df == dr || df == -dr {
+        Some((sign(df), sign(dr)))
+    } else {
+        None
+    }
+}
+
+/// Returns the squares strictly between `a` and `b` when they share a rank,
+/// file, or diagonal; otherwise the empty set.
+///
+/// The endpoints are never included; adjacent or identical aligned squares yield
+/// the empty set.
+///
+/// ```
+/// use mce::geometry::{attacks::between, Chess8x8, Square};
+/// // C1 to C8 on an 8x8 board: the six squares strictly between.
+/// assert_eq!(between::<Chess8x8>(Square::new(2), Square::new(58)).count(), 6);
+/// ```
+#[must_use]
+pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    let Some((df, dr)) = step_toward(a, b) else {
+        return Bitboard::EMPTY;
+    };
+    let mut bb = Bitboard::EMPTY;
+    let mut cur = a.offset(df, dr);
+    while let Some(next) = cur {
+        if next == b {
+            break;
+        }
+        bb.set(next);
+        cur = next.offset(df, dr);
+    }
+    bb
+}
+
+/// Returns the full rank, file, or diagonal line through `a` and `b`, extended
+/// to the board edges; the empty set if they are not aligned.
+///
+/// Both endpoints are included.
+///
+/// ```
+/// use mce::geometry::{attacks::line, Chess8x8, Square};
+/// // A whole 8x8 file line has eight squares.
+/// assert_eq!(line::<Chess8x8>(Square::new(2), Square::new(34)).count(), 8);
+/// ```
+#[must_use]
+pub fn line<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    let Some((df, dr)) = step_toward(a, b) else {
+        return Bitboard::EMPTY;
+    };
+    walk_line(a, df, dr)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::{Cap10x8, Chess8x8};
+    use crate::{attacks as concrete, Bitboard as CBitboard, Square as CSquare};
+    use alloc::vec::Vec;
+
+    /// Maps a generic 8x8 bitboard to the concrete one for direct comparison.
+    fn c(bb: Bitboard<Chess8x8>) -> CBitboard {
+        CBitboard(bb.0)
+    }
+
+    /// A deterministic xorshift over `u64` for sampling occupancies.
+    fn rng() -> impl FnMut() -> u64 {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        }
+    }
+
+    // ----- 8x8 equivalence with the frozen concrete path ----------------------
+
+    #[test]
+    fn pawn_equivalence_all_squares() {
+        for index in 0..64u8 {
+            let g = Square::<Chess8x8>::new(index);
+            let cs = CSquare::new(index);
+            assert_eq!(
+                c(pawn_attacks::<Chess8x8>(Color::White, g)),
+                concrete::pawn_attacks(Color::White, cs),
+                "white pawn {index}"
+            );
+            assert_eq!(
+                c(pawn_attacks::<Chess8x8>(Color::Black, g)),
+                concrete::pawn_attacks(Color::Black, cs),
+                "black pawn {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn knight_king_equivalence_all_squares() {
+        for index in 0..64u8 {
+            let g = Square::<Chess8x8>::new(index);
+            let cs = CSquare::new(index);
+            assert_eq!(
+                c(knight_attacks::<Chess8x8>(g)),
+                concrete::knight_attacks(cs),
+                "knight {index}"
+            );
+            assert_eq!(
+                c(king_attacks::<Chess8x8>(g)),
+                concrete::king_attacks(cs),
+                "king {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn slider_equivalence_all_squares_and_occupancies() {
+        let mut next = rng();
+        for index in 0..64u8 {
+            let g = Square::<Chess8x8>::new(index);
+            let cs = CSquare::new(index);
+            // Empty and full boards explicitly, plus many random occupancies.
+            let mut occs = Vec::new();
+            occs.push(0u64);
+            occs.push(!0u64);
+            for _ in 0..64 {
+                occs.push(next());
+            }
+            for &raw in &occs {
+                let go = Bitboard::<Chess8x8>(raw);
+                let co = CBitboard(raw);
+                assert_eq!(
+                    c(rook_attacks::<Chess8x8>(g, go)),
+                    concrete::rook_attacks(cs, co),
+                    "rook {index} occ {raw:#x}"
+                );
+                assert_eq!(
+                    c(bishop_attacks::<Chess8x8>(g, go)),
+                    concrete::bishop_attacks(cs, co),
+                    "bishop {index} occ {raw:#x}"
+                );
+                assert_eq!(
+                    c(queen_attacks::<Chess8x8>(g, go)),
+                    concrete::queen_attacks(cs, co),
+                    "queen {index} occ {raw:#x}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn between_line_equivalence_all_pairs() {
+        for a in 0..64u8 {
+            for b in 0..64u8 {
+                let ga = Square::<Chess8x8>::new(a);
+                let gb = Square::<Chess8x8>::new(b);
+                let ca = CSquare::new(a);
+                let cb = CSquare::new(b);
+                assert_eq!(
+                    c(between::<Chess8x8>(ga, gb)),
+                    concrete::between(ca, cb),
+                    "between {a} {b}"
+                );
+                assert_eq!(
+                    c(line::<Chess8x8>(ga, gb)),
+                    concrete::line(ca, cb),
+                    "line {a} {b}"
+                );
+            }
+        }
+    }
+
+    // ----- Leaper helper edge behaviour ---------------------------------------
+
+    #[test]
+    fn leaper_respects_edges_8x8() {
+        // Ferz (diagonal one-steppers) on a corner reaches exactly one square.
+        let ferz = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
+        assert_eq!(leaper_attacks::<Chess8x8>(Square::new(0), &ferz).count(), 1);
+        // Wazir on a corner reaches exactly two squares.
+        let wazir = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+        assert_eq!(
+            leaper_attacks::<Chess8x8>(Square::new(0), &wazir).count(),
+            2
+        );
+    }
+
+    // ----- Cap10x8 (u128) brute-force cross-checks ----------------------------
+
+    /// Independent reference: scan each direction until off-board or a blocker
+    /// (inclusive). Used to validate the generic sliders on the `u128` board.
+    fn scan_rays<G: Geometry>(
+        sq: Square<G>,
+        occupied: Bitboard<G>,
+        dirs: &[(i8, i8)],
+    ) -> Bitboard<G> {
+        let mut out = Bitboard::EMPTY;
+        for &(df, dr) in dirs {
+            let mut cur = sq.offset(df, dr);
+            while let Some(next) = cur {
+                out.set(next);
+                if occupied.contains(next) {
+                    break;
+                }
+                cur = next.offset(df, dr);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn cap10x8_sliders_match_ray_scan() {
+        // A handful of structured occupancies plus randomised ones, confined to
+        // the 80 on-board squares.
+        let mut next = rng();
+        let board = Cap10x8::BOARD_MASK;
+        let mut occs: Vec<u128> = Vec::new();
+        occs.push(0);
+        occs.push(board);
+        for _ in 0..32 {
+            let lo = next() as u128;
+            let hi = (next() as u128) << 64;
+            occs.push((lo | hi) & board);
+        }
+        for index in 0..80u8 {
+            let sq = Square::<Cap10x8>::new(index);
+            for &raw in &occs {
+                let occ = Bitboard::<Cap10x8>(raw);
+                assert_eq!(
+                    rook_attacks::<Cap10x8>(sq, occ),
+                    scan_rays(sq, occ, &[(0, 1), (0, -1), (1, 0), (-1, 0)]),
+                    "rook {index} occ {raw:#x}"
+                );
+                assert_eq!(
+                    bishop_attacks::<Cap10x8>(sq, occ),
+                    scan_rays(sq, occ, &[(1, 1), (1, -1), (-1, 1), (-1, -1)]),
+                    "bishop {index} occ {raw:#x}"
+                );
+                assert_eq!(
+                    queen_attacks::<Cap10x8>(sq, occ),
+                    rook_attacks::<Cap10x8>(sq, occ) | bishop_attacks::<Cap10x8>(sq, occ),
+                    "queen {index} occ {raw:#x}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cap10x8_attacks_stay_on_board() {
+        // No generic attack may set a bit outside the 80-square board mask.
+        let off = !Cap10x8::BOARD_MASK;
+        let occ = Bitboard::<Cap10x8>(Cap10x8::BOARD_MASK);
+        for index in 0..80u8 {
+            let sq = Square::<Cap10x8>::new(index);
+            assert_eq!(knight_attacks::<Cap10x8>(sq).0 & off, 0);
+            assert_eq!(king_attacks::<Cap10x8>(sq).0 & off, 0);
+            assert_eq!(pawn_attacks::<Cap10x8>(Color::White, sq).0 & off, 0);
+            assert_eq!(rook_attacks::<Cap10x8>(sq, occ).0 & off, 0);
+            assert_eq!(bishop_attacks::<Cap10x8>(sq, occ).0 & off, 0);
+        }
+    }
+
+    #[test]
+    fn cap10x8_knight_does_not_wrap_edges() {
+        // A knight on the a-file (file 0) must not reach the j-file (file 9).
+        for rank in 0..8u8 {
+            let sq = Square::<Cap10x8>::from_file_rank(0, rank).unwrap();
+            for dest in knight_attacks::<Cap10x8>(sq) {
+                assert!(dest.file() <= 2, "a-file knight wrapped to {dest:?}");
+            }
+            let sq = Square::<Cap10x8>::from_file_rank(9, rank).unwrap();
+            for dest in knight_attacks::<Cap10x8>(sq) {
+                assert!(dest.file() >= 7, "j-file knight wrapped to {dest:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn cap10x8_rook_does_not_wrap_across_tenth_file() {
+        // Rook on file 9 of rank 0 with an empty board: the east ray must be
+        // empty (no wrap onto rank 1), and the rank ray must cover files 0..=8.
+        let sq = Square::<Cap10x8>::from_file_rank(9, 0).unwrap();
+        let attacks = rook_attacks::<Cap10x8>(sq, Bitboard::EMPTY);
+        for dest in attacks {
+            // Every attacked square shares either the file or the rank.
+            assert!(
+                dest.file() == 9 || dest.rank() == 0,
+                "rook reached unaligned {dest:?}"
+            );
+        }
+        // The rank ray reaches file 0 of rank 0 (index 0) without leaking up.
+        assert!(attacks.contains(Square::new(0)));
+        assert!(!attacks.contains(Square::new(10)), "wrapped onto rank 1");
+    }
+
+    #[test]
+    fn cap10x8_between_line_aligned() {
+        // File line through file 5: between two ends excludes them and is a
+        // subset of the line.
+        let a = Square::<Cap10x8>::from_file_rank(5, 0).unwrap();
+        let b = Square::<Cap10x8>::from_file_rank(5, 7).unwrap();
+        let mid = between::<Cap10x8>(a, b);
+        let whole = line::<Cap10x8>(a, b);
+        assert_eq!(mid.count(), 6);
+        assert!(!mid.contains(a) && !mid.contains(b));
+        assert_eq!(mid & whole, mid);
+        assert_eq!(whole.count(), 8);
+        assert!(whole.contains(a) && whole.contains(b));
+        // Non-aligned squares yield empty rays.
+        let p = Square::<Cap10x8>::from_file_rank(0, 0).unwrap();
+        let q = Square::<Cap10x8>::from_file_rank(1, 2).unwrap();
+        assert_eq!(between::<Cap10x8>(p, q), Bitboard::EMPTY);
+        assert_eq!(line::<Cap10x8>(p, q), Bitboard::EMPTY);
+    }
+}

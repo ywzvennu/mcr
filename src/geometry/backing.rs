@@ -55,6 +55,27 @@ pub trait BitboardBacking:
     ///
     /// For a zero value this returns zero.
     fn clear_lowest(self) -> Self;
+
+    /// Wrapping integer subtraction (`self - rhs` modulo `2^BITS`).
+    ///
+    /// Used by the hyperbola-quintessence sliders, whose `o - 2s` step relies on
+    /// the borrow propagating up to the first blocker; the wrap is intentional.
+    fn wrapping_sub(self, rhs: Self) -> Self;
+
+    /// Wrapping integer addition (`self + rhs` modulo `2^BITS`).
+    ///
+    /// Used only to form `2s = s + s` for the slider step without risking a
+    /// debug-mode overflow panic when `s` is the top bit.
+    fn wrapping_add(self, rhs: Self) -> Self;
+
+    /// Returns the value with its bits in reverse order over the full backing
+    /// width (`BITS` bits).
+    ///
+    /// The reverse direction of hyperbola quintessence operates on the
+    /// bit-reversed line; the reversal is over the whole integer just as the
+    /// frozen `u64` path reverses over all 64 bits before masking back to the
+    /// line.
+    fn reverse_bits(self) -> Self;
 }
 
 macro_rules! impl_backing {
@@ -86,7 +107,22 @@ macro_rules! impl_backing {
 
             #[inline]
             fn clear_lowest(self) -> Self {
-                self & self.wrapping_sub(1)
+                self & <$ty>::wrapping_sub(self, 1)
+            }
+
+            #[inline]
+            fn wrapping_sub(self, rhs: Self) -> Self {
+                <$ty>::wrapping_sub(self, rhs)
+            }
+
+            #[inline]
+            fn wrapping_add(self, rhs: Self) -> Self {
+                <$ty>::wrapping_add(self, rhs)
+            }
+
+            #[inline]
+            fn reverse_bits(self) -> Self {
+                <$ty>::reverse_bits(self)
             }
         }
     };

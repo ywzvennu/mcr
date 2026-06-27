@@ -32,6 +32,7 @@
 //! assert_eq!(Chess8x8::SQUARES, 64);
 //! ```
 
+pub mod attacks;
 mod backing;
 mod bitboard;
 mod square;
