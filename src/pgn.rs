@@ -19,11 +19,16 @@
 //!
 //! # Scope
 //!
-//! Only the *mainline* is replayed and stored as moves. Recursive variations
-//! (`(...)`) are tolerated — they are skipped over by balanced-paren scanning so
-//! they never corrupt the mainline — but their contents are not retained. Tag
-//! pairs and per-move annotations (NAGs, comments) are preserved across a
-//! round-trip.
+//! The whole recursive variation *tree* is parsed and retained. The game is a
+//! list of [`PgnNode`]s walking the mainline; each node carries its SAN-resolved
+//! move, its NAGs and comments, and a list of *alternative* sub-lines (the RAV
+//! `(...)` variations that branch from the position *before* that node). Each
+//! variation is itself a list of nodes and may nest to any depth. The flat
+//! [`Pgn::moves`] accessor is preserved (it is the mainline = walking the
+//! top-level / first-child nodes); [`Pgn::mainline`] and per-node
+//! [`PgnNode::variations`] expose the tree. Tag pairs, NAGs, `{...}`/`;`
+//! comments (including embedded `[%clk ...]`/`[%emt ...]`/`[%eval ...]` command
+//! tokens, preserved verbatim), and variations all round-trip.
 //!
 //! ```
 //! use mce::Pgn;
@@ -34,6 +39,20 @@
 //! assert_eq!(pgn.moves().len(), 7);
 //! // The final position is checkmate.
 //! assert!(pgn.final_position().outcome().is_some());
+//! ```
+//!
+//! ```
+//! use mce::Pgn;
+//!
+//! // A mainline with a variation branching at Black's first reply.
+//! let pgn = Pgn::from_pgn("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *\n").unwrap();
+//! // The mainline is still e4 e5 Nf3.
+//! let sans: Vec<&str> = pgn.moves().iter().map(|m| m.san()).collect();
+//! assert_eq!(sans, ["e4", "e5", "Nf3"]);
+//! // The second mainline node (1... e5) has one alternative: 1... c5 2. Nf3 d6.
+//! let alt = &pgn.mainline()[1].variations()[0];
+//! let alt_sans: Vec<&str> = alt.iter().map(|n| n.san()).collect();
+//! assert_eq!(alt_sans, ["c5", "Nf3", "d6"]);
 //! ```
 
 use alloc::format;
@@ -46,6 +65,11 @@ use crate::{AnyVariant, Move, Position, SanError, VariantId};
 
 /// One `[Name "Value"]` header tag pair.
 type TagPair = (String, String);
+
+/// The product of parsing one movetext line: the parsed nodes, any preamble
+/// comments (only non-empty for a top-level line), and a terminating result
+/// token (only set when a top-level line ended on a result).
+type ParsedLine = (Vec<PgnNode>, Vec<String>, Option<PgnResult>);
 
 /// The error returned when a PGN string cannot be parsed by [`Pgn::from_pgn`].
 ///
@@ -188,6 +212,67 @@ impl PgnMove {
     }
 }
 
+/// One node in the recursive variation tree.
+///
+/// A node holds the move played (as a concrete [`Move`] plus its canonical SAN),
+/// the annotations attached to it (NAGs and comments), and the list of
+/// *alternative* sub-lines that branch from the position *before* this move — the
+/// RAV `(...)` variations. Each alternative is itself a `Vec<PgnNode>` and may
+/// nest to any depth.
+///
+/// A line (the mainline, or any variation) is a `&[PgnNode]`: walking it forward
+/// replays the moves in order, and at each step `variations()` gives the lines
+/// that could have been played *instead of* that node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PgnNode {
+    /// The concrete legal move, resolved against the position before it.
+    mv: Move,
+    /// The canonical SAN for the move, as rendered in the position before it.
+    san: String,
+    /// Numeric Annotation Glyphs (`$n`) attached to this move, in order.
+    nags: Vec<u16>,
+    /// `{...}`/`;` comments attached to this move, in order, without delimiters.
+    comments: Vec<String>,
+    /// Alternative sub-lines branching from the position *before* this move.
+    /// Each is a full line of nodes; the order is the source `(...)` order.
+    variations: Vec<Vec<PgnNode>>,
+}
+
+impl PgnNode {
+    /// The concrete legal move.
+    #[must_use]
+    pub const fn mv(&self) -> Move {
+        self.mv
+    }
+
+    /// The canonical SAN string for the move.
+    #[must_use]
+    pub fn san(&self) -> &str {
+        &self.san
+    }
+
+    /// The NAGs (`$n`) attached to this move, in order.
+    #[must_use]
+    pub fn nags(&self) -> &[u16] {
+        &self.nags
+    }
+
+    /// The comments attached to this move, in order (delimiter-free). Embedded
+    /// `[%clk ...]`/`[%emt ...]`/`[%eval ...]` command tokens are kept verbatim.
+    #[must_use]
+    pub fn comments(&self) -> &[String] {
+        &self.comments
+    }
+
+    /// The alternative sub-lines (RAV `(...)` variations) that branch from the
+    /// position *before* this node, in source order. Empty if this node has no
+    /// alternatives. Each sub-line is itself a slice of [`PgnNode`]s.
+    #[must_use]
+    pub fn variations(&self) -> &[Vec<PgnNode>] {
+        &self.variations
+    }
+}
+
 /// A parsed PGN game: tag pairs, start position, mainline moves, and result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pgn {
@@ -204,8 +289,13 @@ pub struct Pgn {
     /// Whether the start position came from an explicit `[FEN]` tag (as opposed to
     /// the default start array), which controls whether `to_pgn` re-emits SetUp/FEN.
     explicit_fen: bool,
-    /// The mainline moves, in order.
+    /// The mainline moves, in order. This is a flattened, annotation-bearing
+    /// view of the top-level (first-child) walk of [`Pgn::tree`], kept in sync
+    /// with it and preserved for the #106 API.
     moves: Vec<PgnMove>,
+    /// The full recursive variation tree. The top-level vec is the mainline;
+    /// each node may carry alternative sub-lines via [`PgnNode::variations`].
+    tree: Vec<PgnNode>,
     /// Free-text comments appearing before the first move (game-level preamble).
     initial_comments: Vec<String>,
     /// The game result.
@@ -250,6 +340,31 @@ impl Pgn {
     #[must_use]
     pub fn moves(&self) -> &[PgnMove] {
         &self.moves
+    }
+
+    /// The mainline as variation-tree nodes.
+    ///
+    /// This is the top-level line of the tree: walking it forward replays the
+    /// mainline, and each node's [`PgnNode::variations`] gives the alternative
+    /// sub-lines (RAV `(...)`) branching from the position before that node.
+    #[must_use]
+    pub fn mainline(&self) -> &[PgnNode] {
+        &self.tree
+    }
+
+    /// Visits every node in the variation tree in depth-first, pre-order order,
+    /// calling `visit(depth, node)` for each. The mainline is depth `0`; a node
+    /// inside one of a node's `variations` is one deeper, and so on recursively.
+    pub fn walk_tree<F: FnMut(usize, &PgnNode)>(&self, mut visit: F) {
+        fn go<F: FnMut(usize, &PgnNode)>(line: &[PgnNode], depth: usize, visit: &mut F) {
+            for node in line {
+                visit(depth, node);
+                for variation in &node.variations {
+                    go(variation, depth + 1, visit);
+                }
+            }
+        }
+        go(&self.tree, 0, &mut visit);
     }
 
     /// The game result.
@@ -330,11 +445,16 @@ impl Pgn {
             start: start.clone(),
             explicit_fen,
             moves: Vec::new(),
+            tree: Vec::new(),
             initial_comments: Vec::new(),
             result: header_result.unwrap_or_default(),
         };
 
-        let movetext_result = parse_movetext(rest, &start, &mut game)?;
+        let mut parser = MovetextParser::new(rest);
+        let (tree, initial_comments, movetext_result) = parser.parse_line(&start, true)?;
+        game.tree = tree;
+        game.initial_comments = initial_comments;
+        game.moves = flatten_mainline(&game.tree);
         if let Some(r) = movetext_result {
             game.result = r;
         }
@@ -390,28 +510,21 @@ impl Pgn {
 
         // Determine the side to move and starting move number from the start FEN.
         let start_fen = self.start.to_fen();
-        let (mut fullmove, mut white_to_move) = parse_side_and_number(&start_fen);
+        let (fullmove, white_to_move) = parse_side_and_number(&start_fen);
 
-        for m in &self.moves {
-            if white_to_move {
-                push_token(&mut out, &mut line, &format!("{fullmove}."));
-            } else if line.is_empty() {
-                // Black move at the start of a wrapped line / after a comment:
-                // re-emit the move number with the "..." continuation marker.
-                push_token(&mut out, &mut line, &format!("{fullmove}..."));
-            }
-            push_token(&mut out, &mut line, &m.san);
-            for &nag in &m.nags {
-                push_token(&mut out, &mut line, &format!("${nag}"));
-            }
-            for c in &m.comments {
-                push_token(&mut out, &mut line, &format!("{{{c}}}"));
-            }
-            if !white_to_move {
-                fullmove += 1;
-            }
-            white_to_move = !white_to_move;
-        }
+        // After the preamble comments a black-to-move start needs a continuation
+        // marker before its first move; signal that with `force_number`.
+        let force_number = !self.initial_comments.is_empty();
+        write_line(
+            &mut out,
+            &mut line,
+            &push_token,
+            &self.tree,
+            fullmove,
+            white_to_move,
+            force_number,
+            false,
+        );
 
         push_token(&mut out, &mut line, self.result.as_str());
         if !line.is_empty() {
@@ -419,6 +532,88 @@ impl Pgn {
         }
         out.push('\n');
         out
+    }
+}
+
+/// Emits one line of movetext (the mainline or a `(...)` variation body) into the
+/// running `line`/`out` buffers, recursing into each node's alternative
+/// variations. `fullmove`/`white_to_move` are the move number and side at the
+/// start of `nodes`; `force_number` forces a move-number (or `N...`) marker
+/// before the first move even when it is black's, used after a preamble or at the
+/// start of a variation.
+#[allow(clippy::too_many_arguments)]
+fn write_line(
+    out: &mut String,
+    line: &mut String,
+    push_token: &impl Fn(&mut String, &mut String, &str),
+    nodes: &[PgnNode],
+    mut fullmove: u32,
+    mut white_to_move: bool,
+    mut force_number: bool,
+    mut glue: bool,
+) {
+    for node in nodes {
+        // Render the move-number marker, gluing it onto a just-opened `(` when
+        // this is the first token of a variation body.
+        let number = if white_to_move {
+            Some(format!("{fullmove}."))
+        } else if force_number || line.is_empty() {
+            // Black move after an interruption (variation, comment, wrap, or the
+            // start of a variation line): re-emit the number with `...`.
+            Some(format!("{fullmove}..."))
+        } else {
+            None
+        };
+        if let Some(num) = number {
+            if glue {
+                line.push_str(&num);
+            } else {
+                push_token(out, line, &num);
+            }
+            glue = false;
+        }
+        force_number = false;
+        if glue {
+            line.push_str(&node.san);
+            glue = false;
+        } else {
+            push_token(out, line, &node.san);
+        }
+        for &nag in &node.nags {
+            push_token(out, line, &format!("${nag}"));
+        }
+        for c in &node.comments {
+            push_token(out, line, &format!("{{{c}}}"));
+            // A comment interrupts move flow; the next move needs a number.
+            force_number = true;
+        }
+        // Alternative sub-lines branch from the position *before* this node, so
+        // they are emitted with this node's own move number / side.
+        for variation in &node.variations {
+            push_token(out, line, "(");
+            write_line(
+                out,
+                line,
+                push_token,
+                variation,
+                fullmove,
+                white_to_move,
+                true,
+                true,
+            );
+            // Append `)` directly onto the last token without a leading space.
+            if line.is_empty() {
+                out.push(')');
+            } else {
+                line.push(')');
+            }
+            // After a variation, the next mainline move needs a number marker.
+            force_number = true;
+        }
+        if !white_to_move {
+            fullmove += 1;
+        }
+        white_to_move = !white_to_move;
     }
 }
 
@@ -521,109 +716,173 @@ fn parse_tag_inner(inner: &str) -> Result<(String, String), PgnError> {
     Ok((name.to_string(), value))
 }
 
-/// Parses (and replays) the movetext, populating `game.moves`,
-/// `game.initial_comments`, and returning the result token if one was found.
-fn parse_movetext(
-    text: &str,
-    start: &AnyVariant,
-    game: &mut Pgn,
-) -> Result<Option<PgnResult>, PgnError> {
-    let bytes = text.as_bytes();
-    let mut i = 0;
-    let mut pos = start.clone();
-    let mut result = None;
-    // NAGs/comments seen before the first move attach to `initial_comments`.
-    let mut have_first_move = false;
+/// Flattens the top-level (mainline) walk of a node tree into the legacy
+/// [`PgnMove`] list, copying each mainline node's move, SAN, NAGs and comments.
+fn flatten_mainline(tree: &[PgnNode]) -> Vec<PgnMove> {
+    tree.iter()
+        .map(|n| PgnMove {
+            mv: n.mv,
+            san: n.san.clone(),
+            nags: n.nags.clone(),
+            comments: n.comments.clone(),
+        })
+        .collect()
+}
 
-    while i < bytes.len() {
-        let b = bytes[i];
-        match b {
-            // Whitespace.
-            b' ' | b'\t' | b'\r' | b'\n' => {
-                i += 1;
-            }
-            // Comment to end of line.
-            b';' => {
-                i = text[i..].find('\n').map_or(bytes.len(), |nl| i + nl + 1);
-            }
-            // Brace comment.
-            b'{' => {
-                let end = text[i + 1..]
-                    .find('}')
-                    .ok_or(PgnError::UnterminatedComment)?;
-                let comment = text[i + 1..i + 1 + end].trim().to_string();
-                if have_first_move {
-                    if let Some(last) = game.moves.last_mut() {
-                        last.comments.push(comment);
-                    } else {
-                        game.initial_comments.push(comment);
-                    }
-                } else {
-                    game.initial_comments.push(comment);
-                }
-                i += 1 + end + 1;
-            }
-            // Recursive variation: skip with balanced-paren scanning.
-            b'(' => {
-                i = skip_variation(text, i)?;
-            }
-            // A stray `)` without a matching `(` — tolerate by skipping it.
-            b')' => {
-                i += 1;
-            }
-            // NAG.
-            b'$' => {
-                let mut j = i + 1;
-                while j < bytes.len() && bytes[j].is_ascii_digit() {
-                    j += 1;
-                }
-                if j > i + 1 {
-                    let nag: u16 = text[i + 1..j].parse().unwrap_or(0);
-                    if let Some(last) = game.moves.last_mut() {
-                        last.nags.push(nag);
-                    }
-                }
-                i = j;
-            }
-            // A move number or a token starting with a digit (move number,
-            // result like `1-0`, or `1/2-1/2`).
-            _ => {
-                let tok_end = token_end(bytes, i);
-                let token = &text[i..tok_end];
-                i = tok_end;
+/// A recursive-descent parser over PGN movetext that builds the full variation
+/// tree. A single shared byte cursor (`i`) walks the text; `parse_line` consumes
+/// one line of moves (the mainline, or the body of one `(...)` variation),
+/// recursing into nested variations and stopping at the `)` that closes its own
+/// line (or at a result token / end of input for the top-level line).
+struct MovetextParser<'a> {
+    text: &'a str,
+    bytes: &'a [u8],
+    i: usize,
+}
 
-                // Pure move-number tokens (e.g. `1.`, `12...`, `1`) are skipped.
-                if is_move_number(token) {
-                    continue;
-                }
-                // Result tokens end the game.
-                if let Some(r) = PgnResult::from_token(token) {
-                    result = Some(r);
-                    break;
-                }
-                // Otherwise it must be SAN. A token may carry leading move-number
-                // digits glued to the SAN (e.g. `1.e4`); strip them.
-                let san = strip_leading_move_number(token);
-                if san.is_empty() {
-                    continue;
-                }
-                let mv = variant_parse_san(&pos, san).map_err(|reason| PgnError::IllegalMove {
-                    san: san.to_string(),
-                    reason,
-                })?;
-                let canonical = variant_san(&pos, &mv);
-                pos = pos.play(&mv);
-                have_first_move = true;
-                game.moves.push(PgnMove {
-                    mv,
-                    san: canonical,
-                    nags: Vec::new(),
-                    comments: Vec::new(),
-                });
-            }
+impl<'a> MovetextParser<'a> {
+    fn new(text: &'a str) -> Self {
+        MovetextParser {
+            text,
+            bytes: text.as_bytes(),
+            i: 0,
         }
     }
-    Ok(result)
+
+    /// Parses one line of movetext played against `start`. When `top_level` is
+    /// true, comments before the first move are collected as game preamble and a
+    /// result token terminates the line; otherwise (inside a `(...)`) the line is
+    /// terminated by its closing `)` and any result token is ignored.
+    ///
+    /// Returns the parsed nodes, the preamble comments (only non-empty at the top
+    /// level), and the result token if one ended a top-level line.
+    fn parse_line(&mut self, start: &AnyVariant, top_level: bool) -> Result<ParsedLine, PgnError> {
+        let mut nodes: Vec<PgnNode> = Vec::new();
+        let mut preamble: Vec<String> = Vec::new();
+        let mut result = None;
+        // Position before the most-recently-pushed node, so a `(...)` opened
+        // after that node can be replayed from the same point.
+        let mut pos_before_last = start.clone();
+        // Position after the most-recently-pushed node (the running position).
+        let mut pos = start.clone();
+
+        while self.i < self.bytes.len() {
+            let b = self.bytes[self.i];
+            match b {
+                b' ' | b'\t' | b'\r' | b'\n' => {
+                    self.i += 1;
+                }
+                // Comment to end of line.
+                b';' => {
+                    let rest = &self.text[self.i..];
+                    let comment = rest
+                        .find('\n')
+                        .map_or(&rest[1..], |nl| &rest[1..nl])
+                        .trim()
+                        .to_string();
+                    self.i = rest
+                        .find('\n')
+                        .map_or(self.bytes.len(), |nl| self.i + nl + 1);
+                    Self::attach_comment(&mut nodes, &mut preamble, comment);
+                }
+                // Brace comment (may contain `[%clk ...]` etc.; kept verbatim).
+                b'{' => {
+                    let end = self.text[self.i + 1..]
+                        .find('}')
+                        .ok_or(PgnError::UnterminatedComment)?;
+                    let comment = self.text[self.i + 1..self.i + 1 + end].trim().to_string();
+                    self.i += 1 + end + 1;
+                    Self::attach_comment(&mut nodes, &mut preamble, comment);
+                }
+                // Recursive variation: parse against the position before the last
+                // move and attach the resulting line to that node as an alternative.
+                b'(' => {
+                    self.i += 1;
+                    let (line, _, _) = self.parse_line(&pos_before_last, false)?;
+                    if let Some(last) = nodes.last_mut() {
+                        last.variations.push(line);
+                    }
+                    // else: a `(...)` with no preceding move; the parsed line is
+                    // discarded (nothing legal to attach it to).
+                }
+                // Closing paren: end of this variation line.
+                b')' => {
+                    self.i += 1;
+                    if top_level {
+                        // A stray `)` at the top level — tolerate by ignoring it.
+                        continue;
+                    }
+                    return Ok((nodes, preamble, result));
+                }
+                // NAG.
+                b'$' => {
+                    let mut j = self.i + 1;
+                    while j < self.bytes.len() && self.bytes[j].is_ascii_digit() {
+                        j += 1;
+                    }
+                    if j > self.i + 1 {
+                        let nag: u16 = self.text[self.i + 1..j].parse().unwrap_or(0);
+                        if let Some(last) = nodes.last_mut() {
+                            last.nags.push(nag);
+                        }
+                    }
+                    self.i = j;
+                }
+                _ => {
+                    let tok_end = token_end(self.bytes, self.i);
+                    let token = &self.text[self.i..tok_end];
+                    self.i = tok_end;
+
+                    if is_move_number(token) {
+                        continue;
+                    }
+                    if let Some(r) = PgnResult::from_token(token) {
+                        if top_level {
+                            result = Some(r);
+                            break;
+                        }
+                        // Result tokens inside a variation are ignored.
+                        continue;
+                    }
+                    let san = strip_leading_move_number(token);
+                    if san.is_empty() {
+                        continue;
+                    }
+                    let mv =
+                        variant_parse_san(&pos, san).map_err(|reason| PgnError::IllegalMove {
+                            san: san.to_string(),
+                            reason,
+                        })?;
+                    let canonical = variant_san(&pos, &mv);
+                    pos_before_last = pos.clone();
+                    pos = pos.play(&mv);
+                    nodes.push(PgnNode {
+                        mv,
+                        san: canonical,
+                        nags: Vec::new(),
+                        comments: Vec::new(),
+                        variations: Vec::new(),
+                    });
+                }
+            }
+        }
+
+        if !top_level {
+            // Reached end of input without the closing `)`.
+            return Err(PgnError::UnterminatedComment);
+        }
+        Ok((nodes, preamble, result))
+    }
+
+    /// Attaches a comment to the last parsed node, or to the preamble when no
+    /// move has been seen yet on this line.
+    fn attach_comment(nodes: &mut [PgnNode], preamble: &mut Vec<String>, comment: String) {
+        if let Some(last) = nodes.last_mut() {
+            last.comments.push(comment);
+        } else {
+            preamble.push(comment);
+        }
+    }
 }
 
 /// Returns the byte index just past a whitespace/structure-delimited token that
@@ -637,41 +896,6 @@ fn token_end(bytes: &[u8], i: usize) -> usize {
         }
     }
     j
-}
-
-/// Skips a balanced `(...)` variation starting at `start` (the `(`), returning
-/// the index just past the matching `)`. Brace comments inside are respected so
-/// a `)` inside a comment does not close the variation.
-fn skip_variation(text: &str, start: usize) -> Result<usize, PgnError> {
-    let bytes = text.as_bytes();
-    let mut depth = 0usize;
-    let mut i = start;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'(' => {
-                depth += 1;
-                i += 1;
-            }
-            b')' => {
-                depth -= 1;
-                i += 1;
-                if depth == 0 {
-                    return Ok(i);
-                }
-            }
-            b'{' => {
-                let end = text[i + 1..]
-                    .find('}')
-                    .ok_or(PgnError::UnterminatedComment)?;
-                i += 1 + end + 1;
-            }
-            b';' => {
-                i = text[i..].find('\n').map_or(bytes.len(), |nl| i + nl + 1);
-            }
-            _ => i += 1,
-        }
-    }
-    Err(PgnError::UnterminatedComment)
 }
 
 /// Whether `token` is purely a move-number indicator: digits optionally followed
@@ -755,7 +979,7 @@ impl Pgn {
         let variant = start.variant_id();
         let explicit_fen = start.to_fen() != AnyVariant::startpos(variant).to_fen();
         let mut pos = start.clone();
-        let mut recorded = Vec::with_capacity(moves.len());
+        let mut tree = Vec::with_capacity(moves.len());
         for mv in moves {
             if !pos.legal_moves().iter().any(|legal| legal == mv) {
                 return Err(PgnError::IllegalMove {
@@ -765,13 +989,15 @@ impl Pgn {
             }
             let san = variant_san(&pos, mv);
             pos = pos.play(mv);
-            recorded.push(PgnMove {
+            tree.push(PgnNode {
                 mv: *mv,
                 san,
                 nags: Vec::new(),
                 comments: Vec::new(),
+                variations: Vec::new(),
             });
         }
+        let recorded = flatten_mainline(&tree);
 
         let result = tags
             .iter()
@@ -795,6 +1021,7 @@ impl Pgn {
             start,
             explicit_fen,
             moves: recorded,
+            tree,
             initial_comments: Vec::new(),
             result,
         })
@@ -819,6 +1046,7 @@ impl From<Position> for Pgn {
             start,
             explicit_fen,
             moves: Vec::new(),
+            tree: Vec::new(),
             initial_comments: Vec::new(),
             result: PgnResult::Unknown,
         }
@@ -1018,8 +1246,10 @@ mod tests {
             Pgn::from_pgn("1. e4 {never closed\n"),
             Err(PgnError::UnterminatedComment)
         );
+        // An unterminated `(...)` variation (legal move, missing `)`) is caught
+        // as the same "unterminated comment or variation" error.
         assert_eq!(
-            Pgn::from_pgn("1. e4 (1... e5"),
+            Pgn::from_pgn("1. e4 (1. d4 d5"),
             Err(PgnError::UnterminatedComment)
         );
     }
@@ -1091,5 +1321,143 @@ mod tests {
         let pgn = Pgn::from(pos);
         assert!(pgn.has_explicit_fen());
         assert_eq!(pgn.variant(), VariantId::Standard);
+    }
+
+    /// Collects the SAN of a line of nodes.
+    fn line_sans(line: &[PgnNode]) -> Vec<&str> {
+        line.iter().map(PgnNode::san).collect()
+    }
+
+    #[test]
+    fn parses_variation_tree_structure() {
+        // Mainline e4 e5 Nf3 Nc6, with one alternative at each black reply and a
+        // nested variation inside the first alternative.
+        let text = "1. e4 e5 (1... c5 2. Nf3 (2. Nc3 Nc6) d6) 2. Nf3 Nc6 \
+                     (2... d6 3. d4) *\n";
+        let pgn = Pgn::from_pgn(text).unwrap();
+
+        // Mainline is unchanged and flat-accessible.
+        let sans: Vec<&str> = pgn.moves().iter().map(PgnMove::san).collect();
+        assert_eq!(sans, ["e4", "e5", "Nf3", "Nc6"]);
+        assert_eq!(line_sans(pgn.mainline()), ["e4", "e5", "Nf3", "Nc6"]);
+
+        // The 1... e5 node (index 1) carries the Sicilian alternative.
+        let e5 = &pgn.mainline()[1];
+        assert_eq!(e5.san(), "e5");
+        assert_eq!(e5.variations().len(), 1);
+        let sicilian = &e5.variations()[0];
+        assert_eq!(line_sans(sicilian), ["c5", "Nf3", "d6"]);
+
+        // Inside the Sicilian, the Nf3 node has a nested 2. Nc3 alternative.
+        let v_nf3 = &sicilian[1];
+        assert_eq!(v_nf3.san(), "Nf3");
+        assert_eq!(v_nf3.variations().len(), 1);
+        assert_eq!(line_sans(&v_nf3.variations()[0]), ["Nc3", "Nc6"]);
+
+        // The 2... Nc6 mainline node carries the 2... d6 alternative.
+        let nc6 = &pgn.mainline()[3];
+        assert_eq!(nc6.variations().len(), 1);
+        assert_eq!(line_sans(&nc6.variations()[0]), ["d6", "d4"]);
+    }
+
+    #[test]
+    fn walk_tree_visits_every_node_with_depth() {
+        let text = "1. e4 e5 (1... c5 2. Nf3 (2. Nc3 Nc6) d6) 2. Nf3 *\n";
+        let pgn = Pgn::from_pgn(text).unwrap();
+        let mut seen: Vec<(usize, String)> = Vec::new();
+        pgn.walk_tree(|depth, node| seen.push((depth, node.san().to_string())));
+        // Pre-order: mainline e4, e5, then its depth-1 variation, with the
+        // depth-2 nested line inside it, then mainline Nf3.
+        let depths: Vec<usize> = seen.iter().map(|(d, _)| *d).collect();
+        let sans: Vec<&str> = seen.iter().map(|(_, s)| s.as_str()).collect();
+        assert_eq!(sans, ["e4", "e5", "c5", "Nf3", "Nc3", "Nc6", "d6", "Nf3"]);
+        assert_eq!(depths, [0, 0, 1, 1, 2, 2, 1, 0]);
+    }
+
+    #[test]
+    fn round_trips_annotated_game_with_variations() {
+        let text = "[Event \"Annotated\"]\n[Result \"*\"]\n\n\
+            1. e4 {good} e5 $1 (1... c5 {Sicilian} 2. Nf3 d6) \
+            2. Nf3 Nc6 (2... d6 $6 {passive}) 3. Bb5 *\n";
+        let pgn = Pgn::from_pgn(text).unwrap();
+        let written = pgn.to_pgn();
+        let reparsed = Pgn::from_pgn(&written).unwrap();
+
+        // Mainline preserved.
+        let a: Vec<&str> = pgn.moves().iter().map(PgnMove::san).collect();
+        let b: Vec<&str> = reparsed.moves().iter().map(PgnMove::san).collect();
+        assert_eq!(a, b);
+        assert_eq!(a, ["e4", "e5", "Nf3", "Nc6", "Bb5"]);
+
+        // The full tree (moves, NAGs, comments, variations) survives the round-trip.
+        assert_eq!(pgn.mainline(), reparsed.mainline());
+
+        // Spot-check annotations on the re-parsed tree.
+        assert_eq!(reparsed.mainline()[0].comments(), &["good".to_string()]);
+        assert_eq!(reparsed.mainline()[1].nags(), &[1]);
+        let sicilian = &reparsed.mainline()[1].variations()[0];
+        assert_eq!(sicilian[0].comments(), &["Sicilian".to_string()]);
+        assert_eq!(line_sans(sicilian), ["c5", "Nf3", "d6"]);
+    }
+
+    #[test]
+    fn preserves_clk_emt_eval_command_tokens_in_comments() {
+        let text = "[Result \"*\"]\n\n\
+            1. e4 {[%clk 0:01:23] [%eval 0.21]} e5 {[%emt 0:00:05]} 2. Nf3 *\n";
+        let pgn = Pgn::from_pgn(text).unwrap();
+        assert_eq!(
+            pgn.mainline()[0].comments(),
+            &["[%clk 0:01:23] [%eval 0.21]".to_string()]
+        );
+        assert_eq!(
+            pgn.mainline()[1].comments(),
+            &["[%emt 0:00:05]".to_string()]
+        );
+        // The command tokens are preserved verbatim across a round-trip.
+        let reparsed = Pgn::from_pgn(&pgn.to_pgn()).unwrap();
+        assert_eq!(reparsed.mainline(), pgn.mainline());
+        assert!(reparsed.to_pgn().contains("[%clk 0:01:23]"));
+        assert!(reparsed.to_pgn().contains("[%emt 0:00:05]"));
+    }
+
+    #[test]
+    fn deeply_nested_variations_round_trip() {
+        // Variations nested four deep, each branching from the position before
+        // its parent move.
+        let text = "1. e4 e5 (1... c5 2. Nf3 (2. Nc3 Nc6 (2... a6 3. g3)) d6) 2. Nf3 *\n";
+        let pgn = Pgn::from_pgn(text).unwrap();
+        let reparsed = Pgn::from_pgn(&pgn.to_pgn()).unwrap();
+        assert_eq!(pgn.mainline(), reparsed.mainline());
+        // Drill to the depth-3 line: e5 -> c5 -> Nf3 -> Nc3 -> Nc6 -> a6.
+        let l1 = &pgn.mainline()[1].variations()[0]; // c5 Nf3 d6
+        let l2 = &l1[1].variations()[0]; // Nc3 Nc6
+        let l3 = &l2[1].variations()[0]; // a6 g3
+        assert_eq!(line_sans(l3), ["a6", "g3"]);
+    }
+
+    #[test]
+    fn variation_with_illegal_move_is_rejected() {
+        // The (1... Ke7) variation, branching from after 1. e4, plays an illegal
+        // king move (blocked by the pawn on e7).
+        let text = "1. e4 e5 (1... Ke7) 2. Nf3 *\n";
+        let err = Pgn::from_pgn(text).unwrap_err();
+        assert!(matches!(err, PgnError::IllegalMove { .. }));
+    }
+
+    #[test]
+    fn malformed_variation_inputs_do_not_panic() {
+        let inputs = [
+            "1. e4 (",                       // truncated variation
+            "1. e4 ()",                      // empty variation
+            "1. e4 (((",                     // many unterminated opens
+            "1. e4 )))",                     // stray closes
+            "1. e4 ( \u{1f600} )",           // emoji inside variation
+            "1. e4 (1... \u{e9}5)",          // non-ASCII SAN in variation
+            "(1. e4) 1. e4 *",               // variation before any mainline move
+            "1. e4 (1... e5 {[%clk }) e5 *", // brace command split across paren
+        ];
+        for input in inputs {
+            let _ = Pgn::from_pgn(input);
+        }
     }
 }
