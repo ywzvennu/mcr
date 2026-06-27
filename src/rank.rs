@@ -6,6 +6,7 @@ use core::fmt;
 ///
 /// The discriminant is the zero-based index, so `Rank::First as u8 == 0`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Rank {
     /// Rank `1` (index 0).

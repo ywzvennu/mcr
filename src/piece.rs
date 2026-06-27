@@ -6,6 +6,7 @@ use crate::Color;
 
 /// The kind of a piece, independent of color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Role {
     /// A pawn.
     Pawn,
@@ -103,6 +104,7 @@ impl fmt::Display for Role {
 
 /// A colored piece: a [`Role`] together with a [`Color`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Piece {
     /// The side the piece belongs to.
     pub color: Color,

@@ -13,6 +13,7 @@ use crate::Square;
 /// Bit `i` (value `1 << i`) corresponds to the square with index `i` in
 /// little-endian rank-file order, so bit `0` is `a1` and bit `63` is `h8`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct Bitboard(pub u64);
 

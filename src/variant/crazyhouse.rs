@@ -88,6 +88,7 @@ const fn color_index(color: Color) -> usize {
 /// occupant arrived there by promotion, so that capturing it returns a pawn —
 /// not the promoted role — to the pocket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CrazyhouseState {
     /// Per-color, per-role counts of pocketed pieces, indexed
     /// `[color][role]` via `color_index` / `pocket_index`.

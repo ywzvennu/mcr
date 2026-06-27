@@ -30,6 +30,7 @@ use crate::{Color, Move, Position, Zobrist};
 
 /// The result of a finished game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Outcome {
     /// One side won; `winner` is the victorious color.
     Decisive {
@@ -54,6 +55,7 @@ pub enum Outcome {
 /// produced when it formerly reused [`EndReason::Checkmate`] or
 /// [`EndReason::VariantWin`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EndReason {
     /// The side to move is in check and has no legal move. Decisive for the side
     /// *not* to move.

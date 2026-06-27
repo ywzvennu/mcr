@@ -32,6 +32,7 @@ const WIN_CHECKS: u8 = 3;
 /// at `WIN_CHECKS`. The startpos value is `0`/`0`; reaching `WIN_CHECKS` is an
 /// immediate win for that side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CheckCounters {
     /// Checks delivered by White.
     pub white: u8,
