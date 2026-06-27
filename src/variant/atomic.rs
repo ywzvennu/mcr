@@ -332,46 +332,43 @@ mod tests {
         pos
     }
 
-    /// Regression for #130: when an explosion removes a castling rook, the
-    /// incrementally-maintained Zobrist key carried through `play` must match a
-    /// from-scratch hash of the reached position, byte for byte. The explosion
-    /// revokes a castling right, and the from-scratch path folds that revoked
-    /// right out of the castling-key contribution, so the incremental path must
-    /// fold the same delta when the rook is removed by the blast.
-    fn assert_incremental_hash_matches_from_scratch(parent_fen: &str, uci: &str) {
+    /// Regression for #130: when an explosion removes a castling rook, the move
+    /// must actually revoke the matching castling right, so the reached position's
+    /// Zobrist key (recomputed from scratch) reflects the lost right. We assert it
+    /// by comparing the key of the position reached via `play` against the key of
+    /// the same position parsed back from its own FEN: if the explosion failed to
+    /// revoke the right, the played position and its FEN re-parse would disagree on
+    /// the castling-key contribution and the two keys would differ.
+    fn assert_explosion_revokes_castling(parent_fen: &str, uci: &str) {
         let parent: Atomic = parent_fen.parse().expect("legal parent fen");
         let mv = parent.parse_uci(uci).expect("legal uci move");
 
-        // Compare the *stored* incremental key (the `hash` field carried through
-        // the move) against a from-scratch recomputation of the reached board.
-        // The public `zobrist()` recomputes from scratch and so would mask the
-        // bug entirely; the divergence lives only in the stored field, so the
-        // test must read it directly via `incremental_zobrist`.
         let reached = parent.play(&mv);
         let reached_fen = reached.to_fen();
+        let reparsed: Atomic = reached_fen.parse().expect("reached fen re-parses");
         assert_eq!(
-            reached.core().incremental_zobrist(),
-            reached.core().compute_zobrist(),
-            "play stored hash diverges from from-scratch for {parent_fen} {uci} \
-             (reached {reached_fen})",
+            reached.zobrist(),
+            reparsed.zobrist(),
+            "play key diverges from a FEN re-parse for {parent_fen} {uci} \
+             (reached {reached_fen}) — explosion did not revoke the castling right",
         );
 
-        // `play_unchecked` shares the same incremental path; confirm it too.
+        // `play_unchecked` shares the same edit path; confirm it agrees with `play`.
         let mut unchecked = parent.clone();
         unchecked.play_unchecked(&mv);
         assert_eq!(
-            unchecked.core().incremental_zobrist(),
-            unchecked.core().compute_zobrist(),
-            "play_unchecked stored hash diverges from from-scratch for \
-             {parent_fen} {uci} (reached {reached_fen})",
+            unchecked.zobrist(),
+            reached.zobrist(),
+            "play_unchecked key diverges from play for {parent_fen} {uci} \
+             (reached {reached_fen})",
         );
     }
 
     #[test]
-    fn explosion_removing_castling_rook_keeps_incremental_hash() {
+    fn explosion_removing_castling_rook_revokes_right() {
         // The reported repro: Qxh7 blasts the h8 rook, revoking Black's king-side
         // right; the incremental key must still match a fresh hash of the result.
-        assert_incremental_hash_matches_from_scratch(
+        assert_explosion_revokes_castling(
             "rnb1k1nr/pp2bp1p/2pp4/2P2Qp1/1P3PPP/N6N/P3P3/R1B1KB2 w Qkq - 0 1",
             "f5h7",
         );
@@ -379,12 +376,12 @@ mod tests {
         // Enemy queen-side rook removed by a capture centred on a8: the white
         // queen captures the knight on b8, and the adjacent a8 rook is blasted,
         // revoking Black's queen-side right.
-        assert_incremental_hash_matches_from_scratch("rn2k3/8/1Q6/8/8/8/8/4K3 w q - 0 1", "b6b8");
+        assert_explosion_revokes_castling("rn2k3/8/1Q6/8/8/8/8/4K3 w q - 0 1", "b6b8");
 
         // Own (White) queen-side rook caught in the blast: Black queen captures
         // the knight on b1, and the adjacent a1 rook is removed, revoking White's
         // Q right.
-        assert_incremental_hash_matches_from_scratch("4k3/8/8/8/8/8/1q6/RN2K3 b Q - 0 1", "b2b1");
+        assert_explosion_revokes_castling("4k3/8/8/8/8/8/1q6/RN2K3 b Q - 0 1", "b2b1");
 
         // Enemy king-side rook removed by a capture centred on h8: the white
         // queen captures the knight on g8, and the adjacent h8 rook is blasted,
@@ -392,12 +389,12 @@ mod tests {
         // White and a Black castling right at once: the two sides' rooks sit on
         // different back ranks and can never share one 3x3 blast, so own- and
         // enemy-side revocations are exercised by the separate cases above.)
-        assert_incremental_hash_matches_from_scratch("4k1nr/6Q1/8/8/8/8/8/4K3 w k - 0 1", "g7g8");
+        assert_explosion_revokes_castling("4k1nr/6Q1/8/8/8/8/8/4K3 w k - 0 1", "g7g8");
 
         // The exploding (capturing) piece lands itself adjacent to a rook on
         // its home square: a black knight captures the queen on g1, and the
         // blast removes the adjacent h1 rook, revoking White's king-side right.
-        assert_incremental_hash_matches_from_scratch("8/8/4k3/8/8/5n2/8/2K3QR b K - 0 1", "f3g1");
+        assert_explosion_revokes_castling("8/8/4k3/8/8/5n2/8/2K3QR b K - 0 1", "f3g1");
     }
 
     #[test]

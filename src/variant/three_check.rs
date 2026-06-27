@@ -402,9 +402,9 @@ mod tests {
     }
 
     #[test]
-    fn incremental_hash_matches_after_check() {
+    fn hash_matches_after_check() {
         // Playing a checking move and reparsing the resulting FEN must yield the
-        // same key, proving the incremental state-hash update is consistent.
+        // same key, proving the check-count state hash is folded in consistently.
         let pos: ThreeCheck = "4k3/8/8/8/8/8/8/Q3K3 w - - 0 1 3+3".parse().unwrap();
         let after = play_line(pos, &["a1a8"]);
         let reparsed: ThreeCheck = after.to_fen().parse().unwrap();
