@@ -37,7 +37,7 @@ jobs:
         run: cargo test --all-features
 
       - name: Build
-        run: cargo build --all-features
+        run: cargo build --all-features --examples
 
       # Compile the criterion benches so they cannot bit-rot, without paying for
       # an actual (slow) bench run in CI.
