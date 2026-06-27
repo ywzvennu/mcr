@@ -37,6 +37,7 @@
 //! taking the king with it). For non-capturing moves the ordinary king-safety
 //! rule applies: you may not leave your own king attacked.
 
+use super::heapless_removals::Removals;
 use super::{Variant, VariantId, VariantPosition};
 use crate::attacks::king_attacks;
 use crate::movelist::MoveList;
@@ -70,17 +71,20 @@ fn is_capture(mv: &Move) -> bool {
 /// sits one rank back, on the square the moving pawn passed behind); the core
 /// make-move has already removed it, so only the blast around the destination
 /// remains to apply here.
-fn detonate(core: &mut Position, mv: &Move) {
+fn detonate(core: &mut Position, mv: &Move, removed: &mut Removals) {
     let center = mv.to();
 
     // The capturing piece is destroyed at its destination (the blast centre).
-    core.remove_piece_tracked(center);
+    if let Some(piece) = core.remove_piece_tracked(center) {
+        removed.push(piece, center);
+    }
 
     // Every adjacent non-pawn piece is destroyed; pawns survive the blast.
     for sq in king_attacks(center) {
         if let Some(piece) = core.board().piece_at(sq) {
             if piece.role != Role::Pawn {
                 core.remove_piece_tracked(sq);
+                removed.push(piece, sq);
             }
         }
     }
@@ -97,7 +101,7 @@ fn detonate(core: &mut Position, mv: &Move) {
 /// the fast non-capture generator instead.
 fn capture_is_legal(parent: &Position, mv: &Move) -> bool {
     let mut after = parent.play(mv);
-    detonate(&mut after, mv);
+    detonate(&mut after, mv, &mut Removals::new());
 
     let mover = parent.turn();
     let opponent = mover.opposite();
@@ -139,8 +143,11 @@ impl Variant for AtomicRules {
         _state: &mut Self::State,
         mv: &Move,
         _captured: (Piece, Square),
+        removed: &mut Removals,
     ) {
-        detonate(core, mv);
+        // Record the blasted pieces so make/unmake can restore them; the forward
+        // `play` path passes a throwaway buffer and ignores them.
+        detonate(core, mv, removed);
     }
 
     /// H2: legality after the move and its explosion have been applied.
@@ -158,7 +165,7 @@ impl Variant for AtomicRules {
         let exploded;
         let after = if is_capture(mv) {
             let mut c = child.clone();
-            detonate(&mut c, mv);
+            detonate(&mut c, mv, &mut Removals::new());
             exploded = c;
             &exploded
         } else {

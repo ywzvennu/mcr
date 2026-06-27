@@ -61,7 +61,79 @@ use crate::position::{
     parse_castling_field, parse_clock, parse_ep_field, write_standard_castling_field,
     CastlingRights, FenError, ParseUciError, Position,
 };
-use crate::{Color, EndReason, Move, Outcome, Role, Square, Zobrist};
+use crate::{Color, EndReason, Move, Outcome, Role, Square, Undo, Zobrist};
+
+/// The maximum number of pieces a single variant hook can remove from the board
+/// beyond the standard make-move, recorded so [`VariantPosition::unmake`] can
+/// restore them. An atomic capture detonates the capturing piece plus up to its
+/// eight neighbours (nine in all); no other variant hook removes more.
+const MAX_HOOK_REMOVALS: usize = 9;
+
+/// The undo token for a single [`VariantPosition::make`]: the core [`Undo`], a
+/// snapshot of the variant state, and any pieces a variant hook removed from the
+/// board beyond the standard move.
+///
+/// The state is captured by value (every [`VariantState`] is small — pockets and
+/// a mask for crazyhouse, counters for three-check, a zero-sized `()` for most),
+/// so restoring it is a plain copy-back rather than a recomputation. The extra
+/// removals cover atomic's explosion (which clears several squares the core undo
+/// knows nothing about); for every other variant the buffer is empty.
+#[derive(Debug, Clone)]
+pub struct VariantUndo<S> {
+    /// The core position's undo token.
+    core: Undo,
+    /// The variant state before the move, restored verbatim on unmake.
+    state: S,
+    /// Pieces removed by a variant hook (atomic blast), with their squares, to be
+    /// put back on unmake. Empty for every non-board-editing hook.
+    removed: heapless_removals::Removals,
+}
+
+/// A tiny fixed-capacity vector of removed `(Piece, Square)` pairs, avoiding any
+/// heap allocation on the make/unmake hot path.
+pub(crate) mod heapless_removals {
+    use crate::{Piece, Square};
+
+    use super::MAX_HOOK_REMOVALS;
+
+    /// An inline, allocation-free buffer of at most [`MAX_HOOK_REMOVALS`] removed
+    /// pieces.
+    #[derive(Debug, Clone)]
+    pub struct Removals {
+        items: [(Piece, Square); MAX_HOOK_REMOVALS],
+        len: usize,
+    }
+
+    impl Removals {
+        /// An empty buffer (the common case: no hook removed anything).
+        #[inline]
+        pub fn new() -> Removals {
+            Removals {
+                // A1 / a white pawn is an arbitrary never-read filler for the
+                // unused tail; only the first `len` entries are ever observed.
+                items: [(
+                    Piece::new(crate::Color::White, crate::Role::Pawn),
+                    Square::A1,
+                ); MAX_HOOK_REMOVALS],
+                len: 0,
+            }
+        }
+
+        /// Records a removed piece and its square.
+        #[inline]
+        pub fn push(&mut self, piece: Piece, square: Square) {
+            self.items[self.len] = (piece, square);
+            self.len += 1;
+        }
+
+        /// The recorded removals, most-recently-removed first irrelevant (each is
+        /// restored to its own square independently).
+        #[inline]
+        pub fn iter(&self) -> impl Iterator<Item = (Piece, Square)> + '_ {
+            self.items[..self.len].iter().copied()
+        }
+    }
+}
 
 /// A stable identifier for a chess variant, used for `Display` and FEN dispatch.
 ///
@@ -269,6 +341,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         _state: &mut Self::State,
         _mv: &Move,
         _captured: (crate::Piece, Square),
+        _removed: &mut heapless_removals::Removals,
     ) {
     }
 
@@ -789,7 +862,10 @@ impl<V: Variant> VariantPosition<V> {
                     }
                     _ => mv.to(),
                 };
-                V::capture_side_effects(core, state, mv, (piece, sq));
+                // `play_unchecked` discards the removal record (it produces a
+                // fresh successor, not an undo token); make/unmake captures it.
+                let mut removed = heapless_removals::Removals::new();
+                V::capture_side_effects(core, state, mv, (piece, sq), &mut removed);
             }
         }
 
@@ -804,6 +880,98 @@ impl<V: Variant> VariantPosition<V> {
         let mut child_extra = 0u64;
         V::hash_state(state, &mut child_extra);
         core.xor_hash(child_extra);
+    }
+
+    /// Applies `mv` **in place** and returns a [`VariantUndo`] reversing it, the
+    /// zero-copy make half of make/unmake search for variant `V`.
+    ///
+    /// This produces exactly the position [`VariantPosition::play_unchecked`]
+    /// would — the same core board, variant state, and Zobrist key — while
+    /// recording the small amount of information [`VariantPosition::unmake`] needs
+    /// to restore the prior position: the core [`Undo`], a snapshot of the variant
+    /// state, and any pieces a variant hook removed (atomic's blast).
+    ///
+    /// # Contract
+    ///
+    /// The move **must be legal**, as for [`VariantPosition::play_unchecked`]; no
+    /// validation is performed. The returned token is valid only for unmaking
+    /// *this* move, and make/unmake pairs must nest (last made is first unmade).
+    pub fn make(&mut self, mv: &Move) -> VariantUndo<V::State> {
+        // Snapshot the variant state before any mutation; unmake restores it
+        // verbatim. The core hash currently folds in this same parent state, so the
+        // core undo's hash (captured below) is the full parent key — restoring it
+        // on unmake needs no rebalancing.
+        let state_before = self.state.clone();
+
+        // Mirror `play_unchecked`'s hash rebalance so the produced child is
+        // byte-identical to it.
+        let mut parent_extra = 0u64;
+        V::hash_state(&self.state, &mut parent_extra);
+
+        let mut removed = heapless_removals::Removals::new();
+        let core_undo;
+
+        {
+            let core = &mut self.core;
+            let state = &mut self.state;
+
+            if mv.is_drop() {
+                // The variant's drop hook edits both the core board and the state;
+                // snapshot the core's reversible scalars first so unmake can undo
+                // the board edit and restore the scalars, and let the state
+                // snapshot above cover the pocket decrement.
+                core_undo = core.snapshot_undo();
+                V::apply_extra(core, state, mv);
+            } else {
+                core_undo = core.make(mv);
+                if let Some((piece, sq)) = core_undo.captured() {
+                    V::capture_side_effects(core, state, mv, (piece, sq), &mut removed);
+                }
+            }
+
+            V::post_apply(core, state, mv);
+
+            core.xor_hash(parent_extra);
+            let mut child_extra = 0u64;
+            V::hash_state(state, &mut child_extra);
+            core.xor_hash(child_extra);
+        }
+
+        VariantUndo {
+            core: core_undo,
+            state: state_before,
+            removed,
+        }
+    }
+
+    /// Reverses a [`VariantPosition::make`] **in place**, restoring the position
+    /// to exactly what it was before `mv` — core board and state, variant state,
+    /// and Zobrist key all byte-identical.
+    ///
+    /// # Contract
+    ///
+    /// `mv` and `undo` must come from the matching [`VariantPosition::make`] on
+    /// this position's predecessor, and make/unmake pairs must nest. Misuse leaves
+    /// the position unspecified; there is no validation.
+    pub fn unmake(&mut self, mv: &Move, undo: VariantUndo<V::State>) {
+        if mv.is_drop() {
+            // A drop only added a piece on `mv.to()` and flipped the side; the core
+            // helper removes it and restores the scalar state and hash.
+            self.core.unmake_drop(mv.to(), undo.core);
+        } else {
+            // Restore any pieces a hook removed beyond the standard move (atomic's
+            // blast), rebuilding the post-core-move board, then reverse the core
+            // move itself.
+            for (piece, sq) in undo.removed.iter() {
+                self.core.restore_piece(sq, piece);
+            }
+            self.core.unmake(mv, undo.core);
+        }
+
+        // The core undo's hash already carries the full parent key (it included the
+        // parent variant-state contribution at make time), so restoring the state
+        // snapshot needs no hash rebalancing.
+        self.state = undo.state;
     }
 
     /// The variant-aware game result derivable from this position, or `None`.
