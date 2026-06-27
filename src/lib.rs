@@ -89,6 +89,7 @@ mod file;
 mod magic;
 mod movelist;
 mod outcome;
+mod pgn;
 mod piece;
 mod position;
 mod rank;
@@ -110,6 +111,7 @@ pub use crate::file::File;
 pub use crate::magic::attack_table_len;
 pub use crate::movelist::MoveList;
 pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, IllegalMove, Outcome};
+pub use crate::pgn::{Pgn, PgnError, PgnMove, PgnResult};
 pub use crate::piece::{Piece, Role};
 pub use crate::position::{
     perft, perft_divide, CastleSide, CastlingRights, FenError, ParseUciError, Position,
