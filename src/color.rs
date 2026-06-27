@@ -4,6 +4,7 @@ use core::fmt;
 
 /// One of the two players / sides in a chess game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Color {
     /// The side that moves first.
     White,

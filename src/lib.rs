@@ -96,6 +96,8 @@ mod piece;
 mod position;
 mod rank;
 mod san;
+#[cfg(feature = "serde")]
+mod serde_impls;
 mod square;
 mod variant;
 mod zobrist;

@@ -65,6 +65,7 @@ use crate::{Role, Square};
 /// The kind of a [`Move`], recording the special semantics needed to apply it
 /// and to serialize it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MoveKind {
     /// A move to an empty square that is not any of the special cases below.
     Quiet,

@@ -141,6 +141,7 @@ pub(crate) mod heapless_removals {
 /// identifiers are reserved for the variants that will build on this layer, so
 /// their numbering and naming are fixed up front.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VariantId {
     /// Standard chess.
     Standard,
