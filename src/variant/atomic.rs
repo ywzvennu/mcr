@@ -244,6 +244,52 @@ impl Variant for AtomicRules {
         });
     }
 
+    /// H3: whether the side to move is in check, under atomic king safety.
+    ///
+    /// The side-to-move's king is in check iff it is *not* safe by the atomic
+    /// rule [`king_is_safe`]: the enemy king is excluded as an attacker (it would
+    /// explode itself), and a king adjacent to the enemy king is immune. The
+    /// standard [`Position::is_check`] counts both the neighbouring enemy king
+    /// and attacks that exist only because the kings stand adjacent, so it would
+    /// over-report check in exactly the positions atomic reaches with the kings
+    /// side by side.
+    fn is_check(core: &Position) -> bool {
+        let us = core.turn();
+        let Some(my_king) = core.board().king_of(us) else {
+            // No king of the side to move (it was exploded): not "in check" —
+            // the game is already decided by the missing king.
+            return false;
+        };
+        match core.board().king_of(us.opposite()) {
+            Some(enemy_king) => !king_is_safe(core, my_king, us.opposite(), enemy_king),
+            // Enemy king gone: no attacker can give atomic check (the game is
+            // already won), so the side to move is not in check.
+            None => false,
+        }
+    }
+
+    /// Atomic FEN validation of the side *not* to move's king safety.
+    ///
+    /// Reuses the atomic king-safety rule [`king_is_safe`]: the enemy king (here
+    /// the side *to* move) gives no executable check, and a king adjacent to it
+    /// is immune. Without this override the standard `is_attacked` would reject
+    /// legal atomic positions in which the two kings stand adjacent — positions
+    /// atomic reaches in normal play and serializes via `to_fen`, then could not
+    /// re-parse. With the side not to move's king missing the caller skips this
+    /// hook entirely, so `their_king` is always present here.
+    fn opposite_king_in_check_for_fen(core: &Position, their_king: Square, them: Color) -> bool {
+        // The side to move is `them.opposite()`; from its perspective `them`'s
+        // king is the "enemy king" excluded from the attacker set, and `them`'s
+        // king is "my king" whose safety is being judged.
+        match core.board().king_of(them.opposite()) {
+            // Both kings present: atomic king safety, enemy king excluded.
+            Some(my_king) => !king_is_safe(core, their_king, them.opposite(), my_king),
+            // The side to move has no king (e.g. it was just exploded); fall back
+            // to the plain attack test against the remaining king.
+            None => core.is_attacked(their_king, them.opposite()),
+        }
+    }
+
     /// H1: a missing king is decisive for the side whose king survives.
     ///
     /// Atomic positions reachable by play never have *both* kings missing, so
@@ -640,5 +686,64 @@ mod tests {
             let pos: Atomic = fen.parse().unwrap();
             assert_eq!(pos.to_fen(), fen);
         }
+    }
+
+    /// Regression for #134: atomic legitimately reaches positions with the two
+    /// kings adjacent (a king may step beside the enemy king — capturing it would
+    /// explode the capturer's own king). `from_fen` must accept such a position
+    /// and round-trip it; the standard validator wrongly rejected it because a
+    /// king "attacks" its neighbouring square, so atomic generated legal FENs it
+    /// could not re-parse.
+    #[test]
+    fn adjacent_kings_fen_round_trips_issue_134() {
+        // Real FENs from the difftest --all atomic divergences (#134): the two
+        // kings stand on adjacent squares with the side not to move's king beside
+        // the side-to-move's king.
+        for fen in [
+            "4k3/3K4/1p3r2/b1ppp3/P1PP3p/N6P/5QPR/R4B2 b - - 1 42",
+            "8/8/4P3/6pP/2k5/p2K1p2/P3RP2/8 w - - 4 49",
+            "1nb2r2/3p4/6Pp/P1N5/5p1P/2pK4/2Pk4/R7 w - - 3 46",
+            // Minimal hand-built adjacent-kings position.
+            "8/8/8/8/8/8/3k4/3K4 w - - 0 1",
+        ] {
+            let pos: Atomic = fen.parse().unwrap_or_else(|e| {
+                panic!("atomic from_fen rejected legal adjacent-kings FEN {fen}: {e}")
+            });
+            let out = pos.to_fen();
+            assert_eq!(out, fen, "atomic FEN did not round-trip");
+            // The re-parsed position must equal the original.
+            let reparsed: Atomic = out.parse().expect("re-parse of to_fen output");
+            assert_eq!(reparsed, pos, "atomic FEN round-trip not equal");
+        }
+    }
+
+    /// Regression for #134: with the two kings adjacent, the side to move is NOT
+    /// in check under atomic rules (its king is immune beside the enemy king),
+    /// even when an enemy piece otherwise bears on the king square. The standard
+    /// `is_check` over-reported check here, diverging from shakmaty.
+    #[test]
+    fn adjacent_kings_side_to_move_not_in_check_issue_134() {
+        // White king d3 adjacent to black king d2 (this is one of the #134 FENs).
+        let pos: Atomic = "1nb2r2/3p4/6Pp/P1N5/5p1P/2pK4/2Pk4/R7 w - - 3 46"
+            .parse()
+            .expect("legal adjacent-kings atomic FEN");
+        assert!(
+            !pos.is_check(),
+            "atomic: side to move adjacent to enemy king must not be in check"
+        );
+    }
+
+    /// Standard chess must still reject two kings on adjacent squares: such a
+    /// position is unreachable (the side not to move would be giving/standing in
+    /// an illegal king-on-king position), so `Chess::from_fen` errors. This pins
+    /// down that the #134 relaxation is atomic-only.
+    #[test]
+    fn standard_rejects_adjacent_kings() {
+        use crate::variant::Chess;
+        let result: Result<Chess, _> = "8/8/8/8/8/8/3k4/3K4 w - - 0 1".parse();
+        assert!(
+            result.is_err(),
+            "standard chess must reject adjacent kings, but from_fen accepted it"
+        );
     }
 }

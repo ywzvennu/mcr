@@ -308,6 +308,23 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
         true
     }
 
+    /// Whether the side to move is in check, for royal-king variants.
+    ///
+    /// Only consulted by [`VariantPosition::is_check`] when
+    /// [`Variant::king_is_royal`] is `true`. The default is the standard rule:
+    /// the side-to-move's king is attacked ([`Position::is_check`]).
+    ///
+    /// Atomic overrides this. In atomic the enemy king gives no executable check
+    /// (capturing the checked king would explode the capturer's own king), and a
+    /// king standing adjacent to the enemy king is wholly immune — so neither the
+    /// enemy king nor an attacker reachable only across an adjacent-kings face
+    /// counts as check. The standard [`Position::is_check`] would report check in
+    /// those cases, diverging from atomic semantics.
+    #[must_use]
+    fn is_check(core: &Position) -> bool {
+        core.is_check()
+    }
+
     /// Whether a position with insufficient mating material is an automatic draw.
     ///
     /// Default: `true` (standard chess). Variants whose goal is not checkmate —
@@ -329,6 +346,29 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     #[must_use]
     fn requires_two_kings() -> bool {
         true
+    }
+
+    /// Whether the king of the side *not* to move is in check, for FEN
+    /// validation only ([`VariantPosition::from_fen`]).
+    ///
+    /// A FEN whose non-moving side is in check is unreachable (the previous move
+    /// would have been illegal), so `from_fen` rejects it. The default uses the
+    /// standard notion of attack: the opposing king is in check iff the side to
+    /// move attacks it.
+    ///
+    /// Atomic overrides this. In atomic the enemy king never gives executable
+    /// check (capturing it would explode the capturer's own king), and a king
+    /// standing **adjacent** to the enemy king is immune to capture for the same
+    /// reason — so two kings may legally stand side by side. The standard
+    /// `is_attacked` would flag such a position (a king "attacks" its
+    /// neighbouring square), causing atomic to generate legal FENs it could not
+    /// re-parse; the atomic override applies the correct atomic king-safety rule.
+    ///
+    /// Only consulted when [`Variant::king_is_royal`] is `true` and the position
+    /// actually has a king for the side not to move.
+    #[must_use]
+    fn opposite_king_in_check_for_fen(core: &Position, their_king: Square, them: Color) -> bool {
+        core.is_attacked(their_king, them.opposite())
     }
 
     /// Applies variant side effects of a capture to the just-produced `core`
@@ -763,9 +803,13 @@ impl<V: Variant> VariantPosition<V> {
 
     /// Whether the side to move is in check. Always `false` when the king is not
     /// royal in this variant ([`Variant::king_is_royal`] is `false`).
+    ///
+    /// Royal variants delegate to [`Variant::is_check`], which defaults to the
+    /// standard [`Position::is_check`] but lets a variant whose king safety
+    /// differs (atomic) supply its own rule.
     #[must_use]
     pub fn is_check(&self) -> bool {
-        V::king_is_royal() && self.core.is_check()
+        V::king_is_royal() && V::is_check(&self.core)
     }
 
     /// The legal moves of the side to move under variant `V`.
@@ -1137,7 +1181,11 @@ impl<V: Variant + Default> VariantPosition<V> {
             halfmove_clock,
             fullmove_number,
         );
-        core.validate_core(V::requires_two_kings(), V::king_is_royal())?;
+        core.validate_core_with(
+            V::requires_two_kings(),
+            V::king_is_royal(),
+            V::opposite_king_in_check_for_fen,
+        )?;
 
         Ok(Self::from_parts(core, state, V::default()))
     }
