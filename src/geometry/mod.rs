@@ -55,8 +55,8 @@ pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan,
-    SeirawanRules, Shako, ShakoRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Xiangqi,
-    XiangqiRules,
+    SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules, Sittuyin, SittuyinRules, Spartan,
+    SpartanRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -257,6 +257,20 @@ geometry!(
     u128,
     9,
     10
+);
+
+geometry!(
+    /// The Shogi (Japanese chess) board: nine files by nine ranks (81 squares),
+    /// backed by `u128`.
+    ///
+    /// A square (9-by-9) `u128` geometry with the odd non-power-of-two width `9`: a
+    /// square index reaches `80`, and edge-masked east/west shifts must not wrap
+    /// past the ninth file. Files run a..i, ranks 1..9. It hosts Shogi, whose
+    /// captured pieces enter a persistent hand and are dropped back onto the board.
+    Shogi9x9,
+    u128,
+    9,
+    9
 );
 
 #[cfg(test)]

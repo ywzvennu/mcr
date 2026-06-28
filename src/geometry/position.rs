@@ -323,6 +323,17 @@ impl GenericPlacement {
         };
         *slot = slot.saturating_sub(1);
     }
+
+    /// Adds one `role` piece to `color`'s hand (a Shogi capture banks the captured
+    /// piece, flipped to the captor's side and reverted to its base role).
+    #[inline]
+    fn add(&mut self, color: Color, role: WideRole) {
+        let slot = match color {
+            Color::White => &mut self.white[role.index()],
+            Color::Black => &mut self.black[role.index()],
+        };
+        *slot = slot.saturating_add(1);
+    }
 }
 
 impl Default for GenericPlacement {
@@ -468,6 +479,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         self.state.fullmove_number
     }
 
+    /// Returns the number of `role` pieces `color` holds **in hand** (a Shogi
+    /// hand or a Sittuyin placement pocket); `0` for a variant with neither.
+    #[must_use]
+    #[inline]
+    pub fn hand_count(&self, color: Color, role: WideRole) -> u8 {
+        self.state.placement.count(color, role)
+    }
+
     // -- Attack queries ----------------------------------------------------
 
     /// Returns the set of `attacker` pieces that attack `sq` under `occupied`.
@@ -502,7 +521,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // piece of `attacker` hits `sq`, project the *opposing*-colour
             // pattern back from `sq`. Every other role's attack set is symmetric
             // (a attacks b iff b attacks a under the same occupancy).
-            let from_sq = if role == WideRole::Pawn || role == WideRole::Hoplite {
+            let from_sq = if V::role_attack_is_directional(role) {
                 V::role_attacks(role, attacker.opposite(), sq, occupied)
             } else {
                 V::role_attacks(role, attacker, sq, occupied)
@@ -681,6 +700,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             || V::multi_royal()
             || V::has_cannons()
             || V::supports_gating()
+            || V::has_hand()
             || (V::has_placement() && self.state.placement.any(self.state.turn));
         !special
     }
@@ -814,18 +834,32 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // variant does not field have an empty piece mask, so their loop body
         // never runs — the `is_empty` guard skips the per-role `role_attacks`
         // dispatch and (for a count sink) keeps the inner loop branch-light.
+        // A hand variant (Shogi) routes its Pawn through this generic piece loop
+        // as a forward stepper — its `role_attacks` is the single forward square,
+        // which serves as both its quiet push and its forward capture (a Shogi
+        // pawn captures straight ahead, not diagonally) — and skips the diagonal-
+        // capture `gen_pawn_moves` path below. Every other variant keeps the Pawn
+        // on the dedicated pawn generator, byte-identically.
+        let pawn_is_stepper = V::has_hand();
         for role in WideRole::ALL {
-            if role == WideRole::King || role == WideRole::Pawn {
+            if role == WideRole::King || (role == WideRole::Pawn && !pawn_is_stepper) {
                 continue;
             }
             let pieces = board.pieces(us, role);
             if pieces.is_empty() {
                 continue;
             }
+            // Whether this role expands into promote / non-promote variants per
+            // target (a hand variant's promotable piece). Inert otherwise.
+            let promotable = V::has_hand() && V::role_can_promote(role);
             for from in pieces {
                 let pin_line = pins.line_of(from);
                 let targets =
                     V::role_attacks(role, us, from, occupied) & !our_pieces & check_mask & pin_line;
+                if promotable {
+                    self.emit_promotable_targets(out, role, from, targets, their_pieces, us);
+                    continue;
+                }
                 out.emit_targets(from, targets, their_pieces);
                 // Quiet-only steps: squares a piece may move to but never capture
                 // on — the cannon's empty rook-rays (its captures are the
@@ -843,8 +877,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
         }
 
-        // Pawns: pushes, double pushes, captures, en passant, promotions.
-        self.gen_pawn_moves(out, us, occupied, their_pieces, check_mask, &pins, king_sq);
+        // Pawns: pushes, double pushes, captures, en passant, promotions. A hand
+        // variant (Shogi) handled its forward-stepping Pawn in the piece loop
+        // above, so the diagonal-capture pawn generator is skipped for it.
+        if !pawn_is_stepper {
+            self.gen_pawn_moves(out, us, occupied, their_pieces, check_mask, &pins, king_sq);
+        }
 
         // Castling, only when not in check.
         if V::has_castling() && num_checkers == 0 {
@@ -1226,6 +1264,129 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
     }
 
+    /// Emits the moves of a promotable hand-variant piece (Shogi) from `from` to
+    /// each square in `targets`: a move that **starts or ends in the promotion
+    /// zone** may promote, and on the squares where the piece would otherwise have
+    /// no legal move (a Pawn/Lance last rank, a Knight last two ranks) it **must**.
+    ///
+    /// Each non-zone move stays a plain quiet / capture; each zone move emits the
+    /// promotion (to the role's promoted form), plus the non-promoting variant
+    /// when promotion is optional there. The capture / quiet split is read from
+    /// `their_pieces`, exactly as [`WideSink::emit_targets`].
+    fn emit_promotable_targets<S: WideSink>(
+        &self,
+        out: &mut S,
+        role: WideRole,
+        from: Square<G>,
+        targets: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+        us: Color,
+    ) {
+        let from_in_zone = V::in_promotion_zone(us, from.rank());
+        let promoted = role.promoted_form();
+        for to in targets {
+            let capture = their_pieces.contains(to);
+            let to_rank = to.rank();
+            if from_in_zone || V::in_promotion_zone(us, to_rank) {
+                out.push(WideMove::new(
+                    from,
+                    to,
+                    WideMoveKind::Promotion {
+                        role: promoted,
+                        capture,
+                    },
+                ));
+                // The non-promoting alternative, unless the piece would then have
+                // no further move (forced promotion).
+                if !V::role_promotion_forced(role, us, to_rank) {
+                    let kind = if capture {
+                        WideMoveKind::Capture
+                    } else {
+                        WideMoveKind::Quiet
+                    };
+                    out.push(WideMove::new(from, to, kind));
+                }
+            } else {
+                let kind = if capture {
+                    WideMoveKind::Capture
+                } else {
+                    WideMoveKind::Quiet
+                };
+                out.push(WideMove::new(from, to, kind));
+            }
+        }
+    }
+
+    /// Generates the side-to-move's **hand drops** (Shogi): for each base role in
+    /// hand, a [`WideMove::drop`] onto every square the variant permits
+    /// ([`WideVariant::drop_targets`] — already excluding dead squares and nifu
+    /// files), each filtered for self-check, and — for the pawn-drop role under
+    /// [`WideVariant::pawn_drop_mate_forbidden`] — suppressed when the drop is
+    /// checkmate (*uchifuzume*).
+    ///
+    /// A drop never exposes the dropping side's own king to a *new* discovered
+    /// check (it adds a friendly blocker to an empty square and moves nothing), so
+    /// the only self-check a drop must avoid is **failing to block an existing
+    /// check** — handled by the check mask: while in check, a drop is legal only on
+    /// a square that blocks the (single) checker. Out of check, every permitted
+    /// target is self-check-safe. Reached only while [`WideVariant::has_hand`] is
+    /// `true`.
+    fn gen_hand_drops<S: WideSink>(&self, out: &mut S) {
+        let us = self.state.turn;
+        let board = &self.board;
+        let them = us.opposite();
+        let occupied = board.occupied();
+
+        // The check mask: a drop must resolve a single check by interposing on a
+        // square between the king and the (single) checker. Under double check no
+        // drop helps (only a king move), and a drop can never capture the checker.
+        let drop_mask = match board.king_of(us) {
+            Some(king_sq) => {
+                let checkers = self.attackers_to(king_sq, them, occupied);
+                match checkers.count() {
+                    0 => Bitboard::FULL,
+                    // A drop cannot capture, so only the between-squares resolve a
+                    // single check.
+                    1 => between(king_sq, checkers.lsb().expect("one checker")),
+                    // Double check: no drop is legal.
+                    _ => return,
+                }
+            }
+            None => Bitboard::FULL,
+        };
+
+        let pawn_role = V::pawn_drop_role();
+        let check_uchifuzume = V::pawn_drop_mate_forbidden();
+        for role in WideRole::ALL {
+            if self.state.placement.count(us, role) == 0 {
+                continue;
+            }
+            let targets = V::drop_targets(role, us, board) & drop_mask;
+            for sq in targets {
+                let mv = WideMove::drop(role, sq);
+                // Uchifuzume: a pawn drop that checkmates the opponent is illegal.
+                // Only test pawn drops that actually give check, on the rare drop
+                // that does — the mate test (a full child legal-move generation) is
+                // skipped for every non-checking pawn drop and every other piece.
+                if check_uchifuzume && role == pawn_role && self.pawn_drop_is_mate(sq) {
+                    continue;
+                }
+                out.push(mv);
+            }
+        }
+    }
+
+    /// Returns `true` if dropping a pawn of `us` on `sq` delivers immediate
+    /// checkmate to the opponent (the *uchifuzume* condition). The drop is applied
+    /// to a clone and the opponent is checkmate iff it is in check with no legal
+    /// reply.
+    fn pawn_drop_is_mate(&self, sq: Square<G>) -> bool {
+        let mv = WideMove::drop(V::pawn_drop_role(), sq);
+        let next = self.play(&mv);
+        // `next` is the opponent to move. Checkmate = in check and no legal move.
+        next.is_check() && next.legal_moves().is_empty()
+    }
+
     /// Appends any variant drop moves (reserved; standard chess emits none).
     ///
     /// The [`WideVariant::emit_drops`] hook writes into a `Vec<WideMove>`; no
@@ -1233,6 +1394,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// no-op on every path (the standard generator's [`WideSink`] never sees a
     /// drop). When a drop variant lands, its moves are forwarded into the sink.
     fn append_drops<S: WideSink>(&self, out: &mut S) {
+        // Shogi-style persistent hand drops, generated with full legality (dead
+        // squares, nifu, check-blocking, uchifuzume). Gated behind `has_hand()`
+        // (default-off), so every other variant skips it.
+        if V::has_hand() {
+            self.gen_hand_drops(out);
+        }
+        // The reserved `emit_drops` hook (no variant overrides it yet).
         let mut drops: Vec<WideMove> = Vec::new();
         V::emit_drops(&self.board, &self.state, &mut drops);
         for mv in drops {
@@ -1603,7 +1771,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // counting (it stays 0 through deployment), so leave it untouched.
         if let WideMoveKind::Drop { role } = mv.kind() {
             self.board.set_piece(to, WidePiece::new(us, role));
-            if V::has_placement() {
+            if V::has_placement() || V::has_hand() {
                 self.state.placement.take(us, role);
             }
             self.state.ep_square = None;
@@ -1637,6 +1805,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
             WideMoveKind::Capture => {
                 reset_clock = true;
+                // A hand variant (Shogi) banks the captured piece — flipped to the
+                // captor's side and reverted to its base role — before it is
+                // overwritten. Default-off, so inert for every other variant.
+                if V::has_hand() {
+                    if let Some(captured) = self.board.piece_at(to) {
+                        self.state.placement.add(us, captured.role.promoted_base());
+                    }
+                }
                 // `to` holds the captured enemy, so `set_piece` clears it first;
                 // `from`'s occupant is the known `moving` piece.
                 self.board.remove_known(from, moving);
@@ -1697,7 +1873,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
             WideMoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
-                // `from` holds the known promoting pawn (`moving`); `to` may hold a
+                // A hand variant (Shogi) banks the captured piece on a capturing
+                // promotion too. Default-off, so inert for every other variant.
+                if V::has_hand() && capture {
+                    if let Some(captured) = self.board.piece_at(to) {
+                        self.state.placement.add(us, captured.role.promoted_base());
+                    }
+                }
+                // `from` holds the known promoting piece (`moving`); `to` may hold a
                 // captured enemy (capturing promotion), so it keeps `set_piece`.
                 self.board.remove_known(from, moving);
                 self.board.set_piece(to, WidePiece::new(us, role));
@@ -1901,7 +2084,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // letters are white's undeployed pieces, lowercase black's. A non-
         // placement variant never reads the bracket here, so its pocket stays
         // `NONE`.
-        let placement_pocket = if V::has_placement() {
+        let placement_pocket = if V::has_placement() || V::has_hand() {
             parse_placement_holdings(holdings)?
         } else {
             GenericPlacement::NONE
@@ -1972,7 +2155,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::supports_gating() {
             write_holdings(self.state.gating, &mut out);
         }
-        if V::has_placement() {
+        if V::has_placement() || V::has_hand() {
             write_placement_holdings(self.state.placement, &mut out);
         }
         out.push(' ');

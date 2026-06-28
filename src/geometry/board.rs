@@ -350,6 +350,30 @@ impl<G: Geometry> Board<G> {
                         i += 1;
                     }
                     file = file.saturating_add(skip);
+                } else if b == b'+' {
+                    // A `+` prefix marks a Shogi promoted piece: the following
+                    // letter is the base piece, placed in its promoted form (`+P`
+                    // = Tokin, `+R` = Dragon, ...). The base role must have a Shogi
+                    // promotion; a `+` before a non-promotable piece is rejected.
+                    i += 1;
+                    let next = bytes
+                        .get(i)
+                        .copied()
+                        .ok_or(ParseBoardError::InvalidChar('+'))?;
+                    let base = WidePiece::from_char(next as char)
+                        .ok_or(ParseBoardError::InvalidChar('+'))?;
+                    let promoted = base.role.promoted_form();
+                    if promoted == base.role {
+                        // The base piece has no Shogi promotion.
+                        return Err(ParseBoardError::InvalidChar('+'));
+                    }
+                    if file >= width {
+                        return Err(ParseBoardError::RankTooLong(rank + 1));
+                    }
+                    let square = Square::new(rank * G::WIDTH + file as u8);
+                    board.set_piece(square, WidePiece::new(base.color, promoted));
+                    file += 1;
+                    i += 1;
                 } else if let Some(piece) = WidePiece::from_char(b as char) {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
@@ -405,6 +429,13 @@ impl<G: Geometry> Board<G> {
                         if empty > 0 {
                             push_empty_run(&mut fen, empty);
                             empty = 0;
+                        }
+                        // A Shogi promoted piece renders as its base letter with a
+                        // `+` prefix (`+P`, `+R`, ...); every other piece is a
+                        // single letter. `char()` already returns the base letter
+                        // for a promoted role, so only the prefix is added.
+                        if piece.role.is_promoted() {
+                            fen.push('+');
                         }
                         fen.push(piece.char());
                     }

@@ -283,6 +283,32 @@ pub fn queen_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitbo
     rook_attacks(sq, occupied) | bishop_attacks(sq, occupied)
 }
 
+/// Returns the squares a Shogi Lance of `color` on `sq` attacks given the
+/// `occupied` set: the blocker-aware **forward** file ray only (north for white,
+/// south for black), stopping at and including the first occupant.
+///
+/// It is the rook's file ray restricted to the half of the file in the side's
+/// forward direction — the Lance slides any number of squares straight ahead but
+/// never sideways or backward.
+#[must_use]
+pub fn lance_attacks<G: Geometry>(
+    color: Color,
+    sq: Square<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    let file_ray = sliding(sq, occupied, file_mask(sq));
+    // Keep only the squares ahead of `sq` on its file. Forward is the higher
+    // ranks for white, the lower ranks for black.
+    let mut forward = Bitboard::<G>::EMPTY;
+    let step: i8 = if color.is_white() { 1 } else { -1 };
+    let mut cur = sq.offset(0, step);
+    while let Some(next) = cur {
+        forward.set(next);
+        cur = next.offset(0, step);
+    }
+    file_ray & forward
+}
+
 // ---------------------------------------------------------------------------
 // Cannon primitive (Xiangqi / Janggi / Shako).
 // ---------------------------------------------------------------------------

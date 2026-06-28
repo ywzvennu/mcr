@@ -462,6 +462,100 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    // --- Shogi hand / drops + per-piece promotion (default OFF) ----------
+
+    /// Returns `true` if this variant has a **persistent hand**: a captured piece
+    /// flips side and enters the captor's hand, from which it may later be
+    /// **dropped** back onto an empty square as the captor's own piece (Shogi,
+    /// crazyhouse). The hand rides in [`GenericPlacement`](super::position::GenericPlacement)
+    /// — the same per-color, per-role count store the Sittuyin placement pocket
+    /// uses — but here it persists for the whole game and is fed by captures.
+    ///
+    /// The default is `false`. While it is `false` the generic engine never banks
+    /// a captured piece, never emits a drop, and writes no holdings bracket, so a
+    /// variant without a hand produces byte-identical moves, state, and FEN to a
+    /// build without the hand mechanic. Only Shogi overrides this to `true`.
+    fn has_hand() -> bool {
+        false
+    }
+
+    /// Returns the squares onto which `color` may **drop** a held `role`, given
+    /// the current `board`. Only consulted when [`has_hand`](WideVariant::has_hand)
+    /// is `true`.
+    ///
+    /// The default — every empty square — is the crazyhouse rule. Shogi overrides
+    /// it with its drop restrictions: a piece may not be dropped where it would
+    /// have no future move (a Pawn or Lance on the last rank, a Knight on the last
+    /// two ranks), and a Pawn may not be dropped onto a file that already holds an
+    /// unpromoted friendly Pawn (**nifu**). The pawn-drop-mate restriction
+    /// (**uchifuzume**) is *not* expressed here — it depends on the resulting
+    /// position, so the generic drop generator applies it via
+    /// [`drop_gives_legal_mate_ok`](WideVariant::pawn_drop_mate_forbidden).
+    fn drop_targets(_role: WideRole, _color: Color, board: &Board<G>) -> Bitboard<G> {
+        !board.occupied()
+    }
+
+    /// Returns `true` if this variant forbids a **pawn drop that delivers
+    /// immediate checkmate** (Shogi's *uchifuzume*). Only consulted when
+    /// [`has_hand`](WideVariant::has_hand) is `true` and the dropped role is the
+    /// one [`pawn_drop_role`](WideVariant::pawn_drop_role) names.
+    ///
+    /// The default is `false` (crazyhouse allows pawn-drop mate). Shogi overrides
+    /// it to `true`; the generic drop generator then suppresses a pawn drop whose
+    /// resulting position is checkmate for the opponent.
+    fn pawn_drop_mate_forbidden() -> bool {
+        false
+    }
+
+    /// Returns the role whose drop is subject to the *uchifuzume* mate check (the
+    /// Shogi Pawn). Only consulted when
+    /// [`pawn_drop_mate_forbidden`](WideVariant::pawn_drop_mate_forbidden) is
+    /// `true`. The default is [`WideRole::Pawn`].
+    fn pawn_drop_role() -> WideRole {
+        WideRole::Pawn
+    }
+
+    /// Returns `true` if a piece of `role`'s attack set is **direction-dependent**
+    /// — asymmetric under a color flip, so a piece of one color attacking `sq` is
+    /// found by projecting the *opposite* color's pattern back from `sq` (as a
+    /// pawn's diagonal capture is). The generic [`attackers_to`] uses this when
+    /// scanning for attackers of a square.
+    ///
+    /// The default classifies only the Pawn and the Berolina Hoplite, matching the
+    /// pre-hook behaviour exactly (every existing variant). Shogi overrides it to
+    /// add its forward-biased steppers — the Gold and Silver Generals, the Knight,
+    /// the Lance, and the Gold-moving promoted minors (+P/+L/+N/+S) — whose attack
+    /// sets all point forward and so must be projected with the opposite color.
+    ///
+    /// [`attackers_to`]: super::position::GenericPosition::attackers_to
+    fn role_attack_is_directional(role: WideRole) -> bool {
+        matches!(role, WideRole::Pawn | WideRole::Hoplite)
+    }
+
+    /// Returns `true` if a piece of `role` **may promote** by a move that starts
+    /// or ends in the promotion zone. Only consulted when
+    /// [`has_hand`](WideVariant::has_hand) is `true` (the generic per-piece
+    /// promotion path is otherwise inert).
+    ///
+    /// The default is `false`. Shogi overrides it for its promotable pieces (Pawn,
+    /// Lance, Knight, Silver, Rook, Bishop); the Gold General and King never
+    /// promote, and an already-promoted piece never promotes again.
+    fn role_can_promote(_role: WideRole) -> bool {
+        false
+    }
+
+    /// Returns `true` if a piece of `role` of `color` moving to `to_rank` **must**
+    /// promote — a non-promoting move there is then illegal because the piece
+    /// would have no further move. Only consulted when
+    /// [`has_hand`](WideVariant::has_hand) is `true` and the role
+    /// [`role_can_promote`](WideVariant::role_can_promote)s.
+    ///
+    /// The default is `false`. Shogi overrides it: a Pawn or Lance on the last
+    /// rank, and a Knight on the last two ranks, must promote.
+    fn role_promotion_forced(_role: WideRole, _color: Color, _to_rank: u8) -> bool {
+        false
+    }
+
     // --- reserved fairy hooks (no-ops for standard rules) -----------------
 
     /// Returns the region mask for a [`WideRegion`]. Reserved for Phase 3
