@@ -32,6 +32,7 @@ mod grand;
 mod hoppelpoppel;
 mod janggi;
 mod knightmate;
+mod kyotoshogi;
 mod locate;
 mod makruk;
 mod manchu;
@@ -205,6 +206,8 @@ fn main() {
     let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
     let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
+    // Kyoto Shogi is a FSF built-in (no variants.ini needed), like minishogi.
+    let kyotoshogi_mismatches = kyotoshogi::run(&mut engine, opts.full);
     let minixiangqi_mismatches = minixiangqi::run(&mut engine, opts.full);
     // Orda is an INI variant: orda::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant orda`.
@@ -244,6 +247,7 @@ fn main() {
         + janggi_mismatches
         + shogi_mismatches
         + minishogi_mismatches
+        + kyotoshogi_mismatches
         + minixiangqi_mismatches
         + orda_mismatches
         + ordamirror_mismatches

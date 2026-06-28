@@ -1981,6 +1981,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         let pawn_role = V::pawn_drop_role();
         let check_uchifuzume = V::pawn_drop_mate_forbidden();
+        // Kyoto Shogi: a held (base) piece may be deployed in either its base or
+        // its promoted form (FSF `dropPromoted`). Default-off, so every other hand
+        // variant emits a single base-form drop per square and stays byte-identical.
+        let drops_can_promote = V::drops_can_promote();
         for role in WideRole::ALL {
             if self.state.placement.count(us, role) == 0 {
                 continue;
@@ -1996,6 +2000,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     continue;
                 }
                 out.push(mv);
+            }
+            // The promoted-form deployment of the same held piece. It rides the
+            // same drop targets (Kyoto imposes no per-form drop restriction —
+            // `immobilityIllegal` is off, so a promoted Pawn may sit on the last
+            // rank), drops nothing extra from hand (the base leaves the pocket on
+            // apply), and is suppressed for every variant where the (base) held
+            // role has no alternate form. The alternate form is the role's
+            // `flips_on_move` target, the per-move flip mechanic that also defines
+            // the dual-form drop.
+            if drops_can_promote {
+                if let Some(promoted) = V::flips_on_move(role) {
+                    let targets = V::drop_targets(promoted, us, board) & drop_mask;
+                    for sq in targets {
+                        out.push(WideMove::drop(promoted, sq));
+                    }
+                }
             }
         }
     }
@@ -2470,7 +2490,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if let WideMoveKind::Drop { role } = mv.kind() {
             self.board.set_piece(to, WidePiece::new(us, role));
             if V::has_placement() || V::has_hand() {
-                self.state.placement.take(us, role);
+                // The hand stores the **base** role; under `drops_can_promote`
+                // (Kyoto) a piece may be deployed in its promoted form, but it is
+                // the base it was banked as that leaves the pocket. For every other
+                // variant the dropped role is already its own base
+                // (`role_hand_base` is the identity there), so this is
+                // byte-identical.
+                self.state.placement.take(us, V::role_hand_base(role));
             }
             self.state.ep_square = None;
             if us.is_black() {
@@ -2596,6 +2622,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // origin piece, so it cannot share the board-move path).
                 unreachable!("drops are handled before the board-move match");
             }
+        }
+
+        // Kyoto Shogi per-move flip (default-off): a moved piece toggles to its
+        // alternate form on the square it just reached. Applied after the move is
+        // on the board, so it never affects the legality of the move itself — only
+        // the next position sees the flipped role. The King (and every piece in a
+        // non-flipping variant) returns `None` and is left untouched, keeping every
+        // other variant byte-identical. A castled rook never flips (its move is the
+        // king's `moving`, whose role decides the flip), and a flip is a board
+        // rewrite only — it does not bank anything to hand.
+        if let Some(flipped) = V::flips_on_move(moving.role) {
+            self.board.set_piece(to, WidePiece::new(us, flipped));
         }
 
         // Castling-right updates. A king move clears *both* of its side's castling

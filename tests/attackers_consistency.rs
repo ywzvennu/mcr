@@ -40,10 +40,11 @@
 
 use mce::geometry::{
     Bitboard, CambodianRules, CapablancaRules, ChakRules, DuckRules, EmpireRules, GenericPosition,
-    Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules,
-    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
-    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules,
+    MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
+    SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules,
+    SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant,
+    XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Xiangqi9x10,
@@ -576,6 +577,31 @@ variant_test!(
         "3k3/2*G4/7/3*I3/7/2*i4/3K3[*Y*y] w - - 0 1",
         "2k4/1*Y5/7/3*A3/7/5*y1/4K2[*Y*A*y*a] w - - 0 1",
         "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/7/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[*Y*y] w - - 0 1",
+    ]
+);
+
+// -- Kyoto Shogi (5x5 per-move flipping) ------------------------------------
+//
+// Every non-royal piece carries two forms and alternates between them each move.
+// The consistency guard exercises both directional forward-biased forms (the base
+// Pawn / Silver / Knight and the Gold-moving promoted Lance / Knight, flagged via
+// `role_attack_is_directional`) and the color-symmetric promoted sliders (the
+// `+P` Rook and `+S` Bishop), confirming `attackers_to` reverse-projects each
+// flipping form exactly as the forward generator emits it. The corpus is reused
+// from `tests/perft_kyotoshogi.rs`: the startpos, a Silver+Pawn dual-form-drop
+// position, the all-base-roles drop pool, a board with a promoted Silver, and the
+// two-promoted-slider middlegame.
+
+variant_test!(
+    kyotoshogi,
+    Minishogi5x5,
+    KyotoshogiRules,
+    "kyotoshogi",
+    [
+        "2k2/5/5/5/2K2[SPsp] w - - 0 1",
+        "2k2/5/5/5/2K2[PSLNpsln] w - - 0 1",
+        "p+nks+l/5/2+S2/5/+LSK+NP[] w - - 0 1",
+        "1k3/5/1+s3/5/1K2+P[] w - - 0 1",
     ]
 );
 
