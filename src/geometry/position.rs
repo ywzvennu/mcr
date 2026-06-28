@@ -1053,28 +1053,122 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// attacked at once (duple check, for two kings); otherwise it is free to
     /// move — even to leave a king en prise, sacrificing it and continuing with
     /// the survivor. So legality is exactly "not all my kings are attacked after
-    /// the move," which the [`Self::royals_survive`] predicate tests on the
+    /// the move," which the [`Self::royals_survive_after`] predicate tests on the
     /// applied position. This unifies both colours: white (one king) reduces to
     /// the standard "king not in check," black (two kings) to "not duple check."
+    ///
+    /// Hot-path shape (issue #183), mirroring the cannon path (#194): the
+    /// per-move verify uses **make/unmake** on a `Copy` board+state snapshot of
+    /// one reused scratch position rather than cloning the whole
+    /// [`GenericPosition`] per move, the king-attack test scans only the enemy
+    /// roles **actually fielded** (precomputed once per node) instead of all
+    /// [`WideRole::COUNT`] of them, and a **fast-accept geometry filter** skips
+    /// the make/unmake+scan for a non-king move that provably cannot change any
+    /// royal's safety. The produced move set is byte-identical.
     fn generate_multi_royal_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
+        let kings = self.board.kings_of(us);
         // A side with no kings has already lost (its last king was captured on the
         // previous ply): no moves.
-        if self.board.kings_of(us).is_empty() {
+        if kings.is_empty() {
             return;
         }
         // Pseudo-legal moves into a stack-backed buffer (no per-node heap
         // allocation), then verified one at a time.
         let mut pseudo = WideMoveList::new();
         self.gen_multi_royal_pseudo(&mut pseudo, us);
+        let them = us.opposite();
+
+        // The enemy roles in play, computed once for the whole node: the verify
+        // test then projects only these from each royal square rather than
+        // looping every `WideRole`. A scratch position drives make/unmake in
+        // place.
+        let attackers = EnemyAttackers::new(&self.board, them);
+
+        // Fast-accept filter (issue #183). When the side is **not currently in
+        // duple check** — at least one of its kings is unattacked now — a move
+        // that moves no king and whose origin and destination both lie off every
+        // line through every royal square cannot add or remove a blocker on any
+        // royal's rank, file, or diagonal, so it changes no slider/leaper/pawn
+        // attack on any king: every king's attacked-status is exactly what it was
+        // before the move. A king that was unattacked therefore stays unattacked,
+        // so the side keeps a surviving king and the move is provably legal — it
+        // skips the make/unmake + scan entirely. Anything that *could* matter (a
+        // king move, an en-passant's third-square shuffle, a move touching a
+        // royal line) falls through to the full verify, so the result is
+        // identical. (When already in duple check, no move is pre-accepted: every
+        // move must be verified, since legality then requires the move to *create*
+        // a surviving king.)
+        let occ = self.board.occupied();
+        let in_duple_check = !kings
+            .into_iter()
+            .any(|k| !self.royal_attacked(k, them, occ));
+        let royal_lines = multi_royal_attack_lines::<G>(kings);
+
+        let mut scratch = self.clone();
         pseudo.for_each(|mv| {
-            let mut next = self.clone();
-            next.apply(&mv);
-            // `apply` flipped the side to move; test our (now non-to-move) kings.
-            if next.royals_survive(us) {
+            if !in_duple_check && multi_royal_move_off_lines::<G>(&mv, kings, royal_lines) {
+                // Provably safe: no apply/unmake, no scan.
+                out.push(mv);
+            } else if scratch.multi_royal_move_is_legal(self, &mv, us, &attackers) {
                 out.push(mv);
             }
         });
+    }
+
+    /// Returns `true` if the pseudo-legal multi-royal move `mv` is legal — leaves
+    /// at least one of our kings unattacked — testing it by **make/unmake** on
+    /// `self` (a scratch position seeded from `base`).
+    ///
+    /// `self` is mutated to the post-move position, the duple-check survival test
+    /// runs on the true post-move occupancy via
+    /// [`royals_survive_after`](Self::royals_survive_after), and then `self` is
+    /// restored byte-identically to `base` — so one scratch position serves every
+    /// sibling move with no per-move heap work and no `GenericPosition`
+    /// reconstruction. Identical in result to cloning, applying, and calling
+    /// [`royals_survive`](Self::royals_survive).
+    fn multi_royal_move_is_legal(
+        &mut self,
+        base: &Self,
+        mv: &WideMove,
+        us: Color,
+        attackers: &EnemyAttackers,
+    ) -> bool {
+        self.apply(mv);
+        // `apply` flipped the side to move; test our (now non-to-move) kings.
+        let legal = self.royals_survive_after(us, attackers);
+        // The fielded-role survival test must agree with the authoritative
+        // full-role predicate on the very same post-move position; assert it in
+        // debug/test builds so any drift between them is caught at the perft
+        // suites rather than shipped.
+        debug_assert_eq!(
+            legal,
+            self.royals_survive(us),
+            "multi-royal fielded-role survival diverged from the full-role predicate"
+        );
+        // Unmake: restore board + state from the untouched base snapshot. Both are
+        // `Copy`, so this is a plain stack assignment — no allocation, no clone of
+        // the `GenericPosition` wrapper.
+        self.board = base.board;
+        self.state = base.state;
+        legal
+    }
+
+    /// Returns `true` if color `who` keeps at least one unattacked king under the
+    /// current occupancy, scanning only the enemy roles `attackers` records as
+    /// present. A side with no king at all returns `false` (it has been
+    /// eliminated). This is [`royals_survive`](Self::royals_survive) restricted to
+    /// the fielded enemy roles via [`king_safe_after`](Self::king_safe_after), and
+    /// is identical to it in result.
+    fn royals_survive_after(&self, who: Color, attackers: &EnemyAttackers) -> bool {
+        let kings = self.board.kings_of(who);
+        if kings.is_empty() {
+            return false;
+        }
+        let them = who.opposite();
+        kings
+            .into_iter()
+            .any(|k| self.king_safe_after(k, them, attackers))
     }
 
     /// Generates every legal move for a **cannon** variant (Shako, Xiangqi) via
@@ -2678,6 +2772,50 @@ fn cannon_move_off_king_lines<G: Geometry>(
     }
     let to = mv.to::<G>();
     !king_lines.contains(from) && !king_lines.contains(to)
+}
+
+/// The union of [`king_attack_lines`] over every royal square in `kings` — every
+/// rank, file, and diagonal along which a slider (or the default-off
+/// flying-general file) can attack *any* of the side's kings.
+///
+/// A non-king move whose origin and destination both lie *off* this set adds and
+/// removes no blocker on any line through any royal, so it cannot change whether
+/// any king is attacked. The multi-royal verify path uses it as a fast-accept
+/// test. Costs the four short ray walks per king, paid once and shared by every
+/// sibling move of the node.
+#[inline]
+fn multi_royal_attack_lines<G: Geometry>(kings: Bitboard<G>) -> Bitboard<G> {
+    let mut lines = Bitboard::<G>::EMPTY;
+    for king in kings {
+        lines |= king_attack_lines::<G>(king);
+    }
+    lines
+}
+
+/// Returns `true` if the multi-royal move `mv` is **provably safe** by geometry
+/// alone: it moves no king, is not an en-passant, and its origin and destination
+/// both lie off [`multi_royal_attack_lines`].
+///
+/// Such a move leaves no blocker change on any line through any royal, so — when
+/// the side is not currently in duple check — every king's attacked-status is
+/// unchanged and at least one king stays unattacked: the move needs no
+/// make/unmake verification. Every other move returns `false` and is routed to
+/// the full verify, keeping the produced set byte-identical. A king move can
+/// shift a king onto or off an attacked square, and an en-passant removes a
+/// third (captured-pawn) square that may sit on a royal line, so both fall
+/// through.
+#[inline]
+fn multi_royal_move_off_lines<G: Geometry>(
+    mv: &WideMove,
+    kings: Bitboard<G>,
+    royal_lines: Bitboard<G>,
+) -> bool {
+    let from = mv.from::<G>();
+    if kings.contains(from) || matches!(mv.kind(), WideMoveKind::EnPassant) {
+        return false;
+    }
+    let to = mv.to::<G>();
+    !royal_lines.contains(from) && !royal_lines.contains(to)
 }
 
 /// The back rank (0-based) of `color`: rank `0` for white, the top rank for
