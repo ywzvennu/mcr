@@ -28,6 +28,7 @@ mod duck;
 mod empire;
 mod grand;
 mod janggi;
+mod knightmate;
 mod locate;
 mod makruk;
 mod minishogi;
@@ -182,6 +183,7 @@ fn main() {
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
+    let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
@@ -210,6 +212,7 @@ fn main() {
         + spartan_mismatches
         + shako_mismatches
         + shinobi_mismatches
+        + knightmate_mismatches
         + xiangqi_mismatches
         + janggi_mismatches
         + shogi_mismatches
