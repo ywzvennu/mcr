@@ -235,9 +235,40 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         //   sideways after the river) exactly. Without it `attackers_to` lets the
         //   enemy king step in front of (or, post-river, beside) a soldier.
         //
-        // The Elephant's eye is symmetric (the intervening diagonal is the same
-        // square from either end), so it needs no special handling.
-        matches!(role, WideRole::Horse | WideRole::Soldier)
+        // * **Cannon** — its *attack* (over-screen capture) set lands only on an
+        //   **occupied** square (the captured piece), so it is occupancy-
+        //   asymmetric: reverse-projecting the cannon pattern from a target `t`
+        //   treats `t` as a cannon origin and reports a cannon attacker even when
+        //   `t` is *empty* (where a cannon, capturing nothing, does not attack).
+        //   That phantom is harmless on an occupied royal square but is a genuine
+        //   asymmetry, so attacker detection forward-projects from each cannon —
+        //   exactly as the move generator does — keeping `attackers_to` the true
+        //   forward relation on every square. (Issue #202.)
+        //
+        // * **General, Advisor, Elephant** — each is **region-confined**: its
+        //   attack set is intersected with the palace (General, Advisor) or the
+        //   own river-half (Elephant), a mask keyed on the piece's **origin**
+        //   square. That makes the relation asymmetric across the region boundary:
+        //   reverse-projecting from a target *outside* the region still yields
+        //   in-region source squares, but a confined piece on such a source cannot
+        //   actually reach the out-of-region target (its own confinement mask
+        //   forbids it). Reverse-projection therefore invents attacks on
+        //   out-of-region squares; forward-projecting from each piece — keyed on
+        //   its own origin and confinement — matches the real geometry on every
+        //   square. (The Elephant's *eye* is symmetric, but its half-board
+        //   confinement is not.) These never affect king-safety (a royal square is
+        //   always inside its own palace, where the relation is symmetric), so
+        //   perft is unchanged; the fix only corrects `attackers_to` on the
+        //   out-of-region squares the property test probes. (Issue #202.)
+        matches!(
+            role,
+            WideRole::Horse
+                | WideRole::Soldier
+                | WideRole::Cannon
+                | WideRole::King
+                | WideRole::Advisor
+                | WideRole::XiangqiElephant
+        )
     }
 
     fn role_is_slider(role: WideRole) -> bool {
