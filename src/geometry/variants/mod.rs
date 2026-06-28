@@ -13,6 +13,7 @@ pub mod duck;
 pub mod grand;
 pub mod makruk;
 pub mod seirawan;
+pub mod shako;
 pub mod sittuyin;
 pub mod spartan;
 
@@ -21,5 +22,6 @@ pub use duck::{Duck, DuckRules};
 pub use grand::{Grand, GrandRules};
 pub use makruk::{Makruk, MakrukRules};
 pub use seirawan::{Seirawan, SeirawanRules};
+pub use shako::{Shako, ShakoRules};
 pub use sittuyin::{Sittuyin, SittuyinRules};
 pub use spartan::{Spartan, SpartanRules};

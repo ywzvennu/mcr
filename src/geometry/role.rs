@@ -89,6 +89,15 @@ pub enum WideRole {
     /// (two from its start rank), captures one square straight forward. (Spartan
     /// chess.) The Warlord (Bishop + Knight) reuses [`WideRole::Hawk`].
     Hoplite = 17,
+
+    /// Fers-Alfil — the Shako elephant: a leaper to the four adjacent diagonal
+    /// squares (Ferz) **and** the four squares two diagonal steps away (Alfil),
+    /// jumping over the intervening square. (Shako; FSF's `FERS_ALFIL`, Betza
+    /// `FA`.) Distinct from the Rook + Knight [`WideRole::Elephant`] (the
+    /// Capablanca/Grand marshal), which already claims the `e` letter; this one
+    /// takes `v`, and the `compare-fairy` harness maps it to FSF's `e` when
+    /// driving Shako.
+    FersAlfil = 18,
 }
 
 impl WideRole {
@@ -96,7 +105,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 18;
+    pub const COUNT: usize = 19;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -118,6 +127,7 @@ impl WideRole {
         WideRole::General,
         WideRole::Captain,
         WideRole::Hoplite,
+        WideRole::FersAlfil,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -169,6 +179,11 @@ impl WideRole {
             WideRole::General => 'd',
             WideRole::Captain => 'i',
             WideRole::Hoplite => 'h',
+            // Shako Fers-Alfil elephant. FSF's `shako` spells it `e`, but `e`
+            // already names the Rook+Knight Elephant (marshal) here; the
+            // Fers-Alfil takes the free letter `v`, and the `compare-fairy`
+            // harness maps it to FSF's `e` when driving Shako.
+            WideRole::FersAlfil => 'v',
         }
     }
 
@@ -212,6 +227,7 @@ impl WideRole {
             'd' => Some(WideRole::General),
             'i' => Some(WideRole::Captain),
             'h' => Some(WideRole::Hoplite),
+            'v' => Some(WideRole::FersAlfil),
             _ => None,
         }
     }
@@ -238,6 +254,7 @@ impl fmt::Display for WideRole {
             WideRole::General => "general",
             WideRole::Captain => "captain",
             WideRole::Hoplite => "hoplite",
+            WideRole::FersAlfil => "fers-alfil",
         })
     }
 }
@@ -302,7 +319,7 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), chars.len(), "role chars must be distinct");
-        // All eighteen roles are named (the six standard plus twelve fairy).
-        assert_eq!(chars.len(), 18);
+        // All nineteen roles are named (the six standard plus thirteen fairy).
+        assert_eq!(chars.len(), 19);
     }
 }

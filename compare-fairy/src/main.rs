@@ -29,6 +29,7 @@ mod grand;
 mod locate;
 mod makruk;
 mod seirawan;
+mod shako;
 mod sittuyin;
 mod spartan;
 mod uci;
@@ -170,6 +171,7 @@ fn main() {
     let duck_mismatches = duck::run(&mut engine, opts.full);
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
+    let shako_mismatches = shako::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -181,6 +183,7 @@ fn main() {
         + duck_mismatches
         + sittuyin_mismatches
         + spartan_mismatches
+        + shako_mismatches
         > 0
     {
         std::process::exit(1);
