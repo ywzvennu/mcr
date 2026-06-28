@@ -744,6 +744,40 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         role.promoted_form()
     }
 
+    /// Returns the role a piece of `role` **flips into after every board move it
+    /// makes** (the Kyoto Shogi mechanic), or `None` if the piece does not flip.
+    ///
+    /// The default is `None` — no piece flips, so the move-application path never
+    /// rewrites a moved piece's role and every other variant is byte-identical.
+    /// Only Kyoto Shogi overrides it: each of its five flipping pieces alternates
+    /// between two forms move-to-move (Pawn ↔ promoted-Pawn, Silver ↔
+    /// promoted-Silver, Lance ↔ promoted-Lance, Knight ↔ promoted-Knight), so a
+    /// base piece flips to its promoted form and a promoted piece flips back to its
+    /// base. The King has no alternate form and never flips (`None`). The flip is a
+    /// pure post-move state transform — it changes the moved piece's role at its
+    /// destination *after* legality is decided, so the mask-based legality of the
+    /// move itself is unaffected (a flip can neither expose nor shield the mover's
+    /// own king, only the **next** position sees the flipped role).
+    fn flips_on_move(_role: WideRole) -> Option<WideRole> {
+        None
+    }
+
+    /// Returns `true` if a held piece may be **dropped in either its base or its
+    /// promoted form** (FSF `dropPromoted`; the Kyoto Shogi rule). Only consulted
+    /// when [`has_hand`](WideVariant::has_hand) is `true`.
+    ///
+    /// The default is `false` — a drop always deploys the (base) role banked in
+    /// hand, the Shogi / crazyhouse rule, keeping every hand variant
+    /// byte-identical. Kyoto overrides it to `true`: the hand stores the base role,
+    /// but on a drop the side chooses to place it either as that base role or as
+    /// its [`role_promoted_to`](WideVariant::role_promoted_to) form, so the drop
+    /// generator emits both and the drop-application path consumes the **base**
+    /// role from hand ([`role_hand_base`](WideVariant::role_hand_base)) regardless
+    /// of the deployed form.
+    fn drops_can_promote() -> bool {
+        false
+    }
+
     /// Returns `true` if a promotable piece **must** promote on any move that
     /// starts or ends in the promotion zone — there is no non-promoting
     /// alternative. Only consulted when [`has_hand`](WideVariant::has_hand) is
