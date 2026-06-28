@@ -39,11 +39,11 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CapablancaRules, ChakRules, DuckRules, EmpireRules, GenericPosition, Geometry,
-    GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules,
-    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules,
-    ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
+    Bitboard, CambodianRules, CapablancaRules, ChakRules, DuckRules, EmpireRules, GenericPosition,
+    Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules,
+    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
+    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules,
+    Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -258,6 +258,27 @@ variant_test!(
     [
         "rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSKMSNR b - - 0 2",
         "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 4",
+    ]
+);
+
+// -- Cambodian / Ouk Chaktrang (8x8) ----------------------------------------
+//
+// Cambodian shares Makruk's piece set — the only colour-directional attacker is
+// the Khon (Silver), exactly as Makruk — and adds one-time king / Met leaps that
+// are emitted by the generator, not by the static `role_attacks` relation, so
+// they do not affect the forward/reverse attack agreement this test guards. The
+// corpus keeps the leap rights live (`DEde`) and develops pieces around the
+// kings so the consistency check covers the leap-bearing positions too.
+
+variant_test!(
+    cambodian,
+    Chess8x8,
+    CambodianRules,
+    "cambodian",
+    [
+        "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w DEde - 0 1",
+        "rnsmksnr/8/pp1ppp1p/2p2p2/2P2P2/PP1PPP1P/8/RNSKMSNR w DEde - 0 3",
+        "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w DEde - 0 4",
     ]
 );
 

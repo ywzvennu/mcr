@@ -8,6 +8,7 @@
 //! [`WideVariant`]: super::WideVariant
 //! [`GenericPosition`]: super::GenericPosition
 
+pub mod cambodian;
 pub mod capablanca;
 pub mod chak;
 pub mod duck;
@@ -33,6 +34,7 @@ pub mod spartan;
 pub mod synochess;
 pub mod xiangqi;
 
+pub use cambodian::{Cambodian, CambodianRules};
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use chak::{Chak, ChakRules};
 pub use duck::{Duck, DuckRules};
