@@ -42,6 +42,14 @@ pub trait BitboardBacking:
     /// bit). For a zero value this is [`Self::BITS`].
     fn trailing_zeros(self) -> u32;
 
+    /// Returns the number of leading zero bits (counting from the most
+    /// significant bit). For a zero value this is [`Self::BITS`].
+    ///
+    /// Used by the cannon ray path to find the *highest* set bit on a masked
+    /// occupancy — the nearest occupant along a south / west (descending-index)
+    /// ray — in a single bit-scan instead of stepping square by square.
+    fn leading_zeros(self) -> u32;
+
     /// Returns `true` if no bit is set.
     fn is_zero(self) -> bool;
 
@@ -93,6 +101,11 @@ macro_rules! impl_backing {
             #[inline]
             fn trailing_zeros(self) -> u32 {
                 <$ty>::trailing_zeros(self)
+            }
+
+            #[inline]
+            fn leading_zeros(self) -> u32 {
+                <$ty>::leading_zeros(self)
             }
 
             #[inline]

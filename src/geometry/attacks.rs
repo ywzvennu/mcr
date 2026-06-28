@@ -310,11 +310,202 @@ pub fn lance_attacks<G: Geometry>(
 }
 
 // ---------------------------------------------------------------------------
-// Cannon primitive (Xiangqi / Janggi / Shako).
+// Orthogonal ray masks + nearest-occupant bit-scan (cannon / king-line path).
 // ---------------------------------------------------------------------------
 
-/// The four orthogonal ray directions a cannon travels along.
-const CANNON_DIRS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+/// The four orthogonal half-rays from a square, one per cannon direction.
+///
+/// Each field is the set of on-board squares strictly beyond `sq` along one
+/// orthogonal ray (it never includes `sq` itself). The two **ascending** rays
+/// (`east`, `north`) hold squares with a higher bit index than `sq`; their
+/// nearest occupant to `sq` is the lowest set bit of `occ & ray`
+/// (`trailing_zeros`). The two **descending** rays (`west`, `south`) hold lower
+/// bit indices; their nearest occupant is the highest set bit (`leading_zeros`).
+///
+/// These per-direction masks let the cannon find each ray's screen and target
+/// with one or two nearest-occupant bit-scans instead of stepping square by
+/// square — the precomputed-ray-table fast path of issue #209. The masks are
+/// pure geometry (no occupancy), so for any given square they are constant; they
+/// are built from the existing file/rank line masks split at `sq`'s bit, which
+/// the optimiser folds for the monomorphised geometry exactly as a stored
+/// per-square table would.
+struct OrthoRays<G: Geometry> {
+    /// East half-ray (ascending bit index — same rank, higher files).
+    east: Bitboard<G>,
+    /// West half-ray (descending — same rank, lower files).
+    west: Bitboard<G>,
+    /// North half-ray (ascending — same file, higher ranks).
+    north: Bitboard<G>,
+    /// South half-ray (descending — same file, lower ranks).
+    south: Bitboard<G>,
+}
+
+/// Builds the four orthogonal half-rays from `sq` (see [`OrthoRays`]).
+#[inline]
+fn ortho_rays<G: Geometry>(sq: Square<G>) -> OrthoRays<G> {
+    let s = G::Bits::bit(sq.index() as u32);
+    // Bits strictly above `sq`: clear `sq` and everything below it. `2s - 1` is
+    // the mask of `sq` and all lower bits; its complement is the strictly-above
+    // set. `2s` is formed as `s + s` to avoid an overflow panic at the top bit.
+    let two_s = s.wrapping_add(s);
+    let above = !two_s.wrapping_sub(G::Bits::ONE);
+    // Bits strictly below `sq`: `s - 1`.
+    let below = s.wrapping_sub(G::Bits::ONE);
+
+    let file = file_mask::<G>(sq).0;
+    let rank = rank_mask::<G>(sq).0;
+
+    OrthoRays {
+        north: Bitboard::<G>(file & above),
+        south: Bitboard::<G>(file & below),
+        east: Bitboard::<G>(rank & above),
+        west: Bitboard::<G>(rank & below),
+    }
+}
+
+/// Returns the nearest occupant to `sq` on an **ascending** half-ray: the lowest
+/// set bit of `masked` (which must already be `occupied & ray`), or `None` if
+/// the ray is clear. The nearest square on an ascending ray is the lowest-index
+/// occupant, i.e. `trailing_zeros`.
+#[inline]
+fn nearest_up<G: Geometry>(masked: Bitboard<G>) -> Option<Square<G>> {
+    if masked.0.is_zero() {
+        None
+    } else {
+        Some(Square::new(masked.0.trailing_zeros() as u8))
+    }
+}
+
+/// Returns the nearest occupant to `sq` on a **descending** half-ray: the
+/// highest set bit of `masked` (`occupied & ray`), or `None` if clear. The
+/// nearest square on a descending ray is the highest-index occupant, i.e.
+/// `BITS - 1 - leading_zeros`.
+#[inline]
+fn nearest_down<G: Geometry>(masked: Bitboard<G>) -> Option<Square<G>> {
+    if masked.0.is_zero() {
+        None
+    } else {
+        Some(Square::new(
+            (G::Bits::BITS - 1 - masked.0.leading_zeros()) as u8,
+        ))
+    }
+}
+
+/// On the ascending half-ray `ray` (from `sq`, exclusive), returns the cannon
+/// **target**: the first occupant strictly beyond the first occupant (the
+/// screen). `None` if there is no screen or nothing past it.
+#[inline]
+fn cannon_target_up<G: Geometry>(occupied: Bitboard<G>, ray: Bitboard<G>) -> Option<Square<G>> {
+    let masked = occupied & ray;
+    let screen = nearest_up(masked)?;
+    // Squares beyond the screen on the same ascending ray: clear the screen and
+    // everything below it, then the next occupant is the nearest above.
+    let beyond = Bitboard::<G>(masked.0 & !screen_and_below::<G>(screen));
+    nearest_up(beyond)
+}
+
+/// On the descending half-ray `ray`, returns the cannon **target** beyond the
+/// first occupant (the screen). `None` if no screen or nothing past it.
+#[inline]
+fn cannon_target_down<G: Geometry>(occupied: Bitboard<G>, ray: Bitboard<G>) -> Option<Square<G>> {
+    let masked = occupied & ray;
+    let screen = nearest_down(masked)?;
+    // Beyond the screen, descending: keep only bits strictly below the screen.
+    let beyond = Bitboard::<G>(masked.0 & screen_below::<G>(screen));
+    nearest_down(beyond)
+}
+
+/// The mask of `sq`'s bit and every lower bit (`2s - 1`).
+#[inline]
+fn screen_and_below<G: Geometry>(sq: Square<G>) -> G::Bits {
+    let s = G::Bits::bit(sq.index() as u32);
+    s.wrapping_add(s).wrapping_sub(G::Bits::ONE)
+}
+
+/// The mask of every bit strictly below `sq` (`s - 1`).
+#[inline]
+fn screen_below<G: Geometry>(sq: Square<G>) -> G::Bits {
+    G::Bits::bit(sq.index() as u32).wrapping_sub(G::Bits::ONE)
+}
+
+/// One ascending-ray Janggi-cannon contribution: given the half-ray `ray` (from
+/// `sq`, exclusive, ascending), the full `occupied` set, and the `cannons`
+/// subset, returns the empty squares jumped past one non-cannon screen (the
+/// quiet jumps) and the over-screen capture target if it exists and is not a
+/// cannon. A ray whose first piece (the screen) is a cannon is dead and yields
+/// nothing.
+#[inline]
+fn janggi_ray_up<G: Geometry>(
+    occupied: Bitboard<G>,
+    cannons: Bitboard<G>,
+    ray: Bitboard<G>,
+) -> (Bitboard<G>, Option<Square<G>>) {
+    let masked = occupied & ray;
+    let Some(screen) = nearest_up(masked) else {
+        return (Bitboard::EMPTY, None);
+    };
+    // The screen may not itself be a cannon: such a ray is dead.
+    if cannons.contains(screen) {
+        return (Bitboard::EMPTY, None);
+    }
+    // The segment of the ray strictly beyond the screen (ascending): clear the
+    // screen and everything at or below it.
+    let beyond_mask = ray.0 & !screen_and_below::<G>(screen);
+    let beyond_occ = Bitboard::<G>(masked.0 & beyond_mask);
+    match nearest_up(beyond_occ) {
+        // A target piece past the screen: the quiet squares are those strictly
+        // between the screen and the target; the capture lands on the target
+        // unless it is a cannon.
+        Some(target) => {
+            let quiet = Bitboard::<G>(beyond_mask & screen_below::<G>(target));
+            let cap = if cannons.contains(target) {
+                None
+            } else {
+                Some(target)
+            };
+            (quiet, cap)
+        }
+        // Nothing past the screen: every square beyond it is a quiet jump.
+        None => (Bitboard::<G>(beyond_mask), None),
+    }
+}
+
+/// The descending-ray analogue of [`janggi_ray_up`].
+#[inline]
+fn janggi_ray_down<G: Geometry>(
+    occupied: Bitboard<G>,
+    cannons: Bitboard<G>,
+    ray: Bitboard<G>,
+) -> (Bitboard<G>, Option<Square<G>>) {
+    let masked = occupied & ray;
+    let Some(screen) = nearest_down(masked) else {
+        return (Bitboard::EMPTY, None);
+    };
+    if cannons.contains(screen) {
+        return (Bitboard::EMPTY, None);
+    }
+    // The segment strictly beyond the screen (descending): keep only bits below
+    // the screen.
+    let beyond_mask = ray.0 & screen_below::<G>(screen);
+    let beyond_occ = Bitboard::<G>(masked.0 & beyond_mask);
+    match nearest_down(beyond_occ) {
+        Some(target) => {
+            // Quiet squares strictly between screen and target: above the target.
+            let quiet = Bitboard::<G>(beyond_mask & !screen_and_below::<G>(target));
+            let cap = if cannons.contains(target) {
+                None
+            } else {
+                Some(target)
+            };
+            (quiet, cap)
+        }
+        None => (Bitboard::<G>(beyond_mask), None),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cannon primitive (Xiangqi / Janggi / Shako).
+// ---------------------------------------------------------------------------
 
 /// Returns the squares a cannon on `sq` may move to **without capturing**: the
 /// empty rook-ray squares, exactly as a rook's quiet moves, stopping one short
@@ -341,18 +532,12 @@ const CANNON_DIRS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 #[must_use]
 #[inline]
 pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
-    let mut bb = Bitboard::EMPTY;
-    for &(df, dr) in &CANNON_DIRS {
-        let mut cur = sq.offset(df, dr);
-        while let Some(next) = cur {
-            if occupied.contains(next) {
-                break; // first piece on the ray: a cannon cannot move onto it.
-            }
-            bb.set(next);
-            cur = next.offset(df, dr);
-        }
-    }
-    bb
+    // A cannon's quiet rays are exactly a rook's slides minus the first blocker
+    // it would land on: `rook_attacks` stops at and includes that blocker, so
+    // dropping the occupied squares leaves only the reachable empty squares. This
+    // is the hyperbola-quintessence slider — a handful of bit ops per ray, no
+    // square-by-square walk.
+    rook_attacks(sq, occupied) & !occupied
 }
 
 /// Returns the squares a cannon on `sq` **threatens / may capture on**: along
@@ -384,27 +569,22 @@ pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> 
 #[must_use]
 #[inline]
 pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    // Each of the four orthogonal rays contributes at most one target — the first
+    // occupant strictly beyond the first occupant (the screen). Found by two
+    // nearest-occupant bit-scans on the masked ray rather than walking it.
+    let rays = ortho_rays::<G>(sq);
     let mut bb = Bitboard::EMPTY;
-    for &(df, dr) in &CANNON_DIRS {
-        // Walk to the first piece on the ray (the screen).
-        let mut cur = sq.offset(df, dr);
-        let screen = loop {
-            match cur {
-                None => break None,
-                Some(next) if occupied.contains(next) => break Some(next),
-                Some(next) => cur = next.offset(df, dr),
-            }
-        };
-        let Some(screen) = screen else { continue };
-        // Walk past the screen to the next piece (the capture target).
-        let mut cur = screen.offset(df, dr);
-        while let Some(next) = cur {
-            if occupied.contains(next) {
-                bb.set(next);
-                break;
-            }
-            cur = next.offset(df, dr);
-        }
+    if let Some(t) = cannon_target_up(occupied, rays.north) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_up(occupied, rays.east) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_down(occupied, rays.south) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_down(occupied, rays.west) {
+        bb.set(t);
     }
     bb
 }
@@ -445,33 +625,12 @@ pub fn janggi_cannon_quiet<G: Geometry>(
     occupied: Bitboard<G>,
     cannons: Bitboard<G>,
 ) -> Bitboard<G> {
+    let rays = ortho_rays::<G>(sq);
     let mut bb = Bitboard::EMPTY;
-    for &(df, dr) in &CANNON_DIRS {
-        // Walk to the first piece on the ray (the screen).
-        let mut cur = sq.offset(df, dr);
-        let screen = loop {
-            match cur {
-                None => break None,
-                Some(next) if occupied.contains(next) => break Some(next),
-                Some(next) => cur = next.offset(df, dr),
-            }
-        };
-        let Some(screen) = screen else { continue };
-        // The screen may not be a cannon — a cannon cannot use another cannon as
-        // its mount.
-        if cannons.contains(screen) {
-            continue;
-        }
-        // Every empty square beyond the screen, up to the next piece (exclusive).
-        let mut cur = screen.offset(df, dr);
-        while let Some(next) = cur {
-            if occupied.contains(next) {
-                break;
-            }
-            bb.set(next);
-            cur = next.offset(df, dr);
-        }
-    }
+    bb |= janggi_ray_up(occupied, cannons, rays.north).0;
+    bb |= janggi_ray_up(occupied, cannons, rays.east).0;
+    bb |= janggi_ray_down(occupied, cannons, rays.south).0;
+    bb |= janggi_ray_down(occupied, cannons, rays.west).0;
     bb
 }
 
@@ -503,34 +662,19 @@ pub fn janggi_cannon_capture<G: Geometry>(
     occupied: Bitboard<G>,
     cannons: Bitboard<G>,
 ) -> Bitboard<G> {
+    let rays = ortho_rays::<G>(sq);
     let mut bb = Bitboard::EMPTY;
-    for &(df, dr) in &CANNON_DIRS {
-        // Walk to the first piece on the ray (the screen).
-        let mut cur = sq.offset(df, dr);
-        let screen = loop {
-            match cur {
-                None => break None,
-                Some(next) if occupied.contains(next) => break Some(next),
-                Some(next) => cur = next.offset(df, dr),
-            }
-        };
-        let Some(screen) = screen else { continue };
-        // The screen may not be a cannon.
-        if cannons.contains(screen) {
-            continue;
-        }
-        // Walk past the screen to the next piece (the capture target).
-        let mut cur = screen.offset(df, dr);
-        while let Some(next) = cur {
-            if occupied.contains(next) {
-                // A cannon may not capture another cannon.
-                if !cannons.contains(next) {
-                    bb.set(next);
-                }
-                break;
-            }
-            cur = next.offset(df, dr);
-        }
+    if let Some(t) = janggi_ray_up(occupied, cannons, rays.north).1 {
+        bb.set(t);
+    }
+    if let Some(t) = janggi_ray_up(occupied, cannons, rays.east).1 {
+        bb.set(t);
+    }
+    if let Some(t) = janggi_ray_down(occupied, cannons, rays.south).1 {
+        bb.set(t);
+    }
+    if let Some(t) = janggi_ray_down(occupied, cannons, rays.west).1 {
+        bb.set(t);
     }
     bb
 }
@@ -705,6 +849,32 @@ pub fn janggi_elephant_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>
         }
     }
     bb
+}
+
+// ---------------------------------------------------------------------------
+// King attack lines (slider / cannon / flying-general king-safety geometry).
+// ---------------------------------------------------------------------------
+
+/// Returns every square on the king's **rank, file, and two diagonals**,
+/// excluding the king's own square — the union of the four full lines along
+/// which a slider, a cannon (over a screen), or the Xiangqi flying general can
+/// attack the king.
+///
+/// This is the masked-table form of the king-line geometry: it ORs the four line
+/// masks the slider primitives already derive by arithmetic (rank, file,
+/// diagonal, anti-diagonal) rather than walking eight rays a square at a time, so
+/// the cannon / multi-royal verify path pays a handful of bit ops per node for
+/// its fast-accept filter. Bit-for-bit identical to the per-step ray walk it
+/// replaces (the slider line masks are validated square-by-square against
+/// independent ray scans on every supported geometry).
+#[must_use]
+#[inline]
+pub fn king_attack_lines<G: Geometry>(king: Square<G>) -> Bitboard<G> {
+    let lines = file_mask::<G>(king)
+        | rank_mask::<G>(king)
+        | diag_mask::<G>(king)
+        | anti_diag_mask::<G>(king);
+    lines.without(king)
 }
 
 // ---------------------------------------------------------------------------
@@ -1079,6 +1249,253 @@ mod tests {
             }
         }
         out
+    }
+
+    /// Independent reference for the Xiangqi/Shako cannon **quiet** moves: walk
+    /// each ray, collecting empties up to (not including) the first piece. This is
+    /// the original square-by-square definition the bit-scan path replaced.
+    fn scan_cannon_quiet<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let mut cur = sq.offset(df, dr);
+            while let Some(next) = cur {
+                if occ.contains(next) {
+                    break;
+                }
+                bb.set(next);
+                cur = next.offset(df, dr);
+            }
+        }
+        bb
+    }
+
+    /// Independent reference for the Xiangqi/Shako cannon **capture** targets:
+    /// over exactly one screen, the first piece beyond it.
+    fn scan_cannon_caps<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let mut cur = sq.offset(df, dr);
+            let screen = loop {
+                match cur {
+                    None => break None,
+                    Some(n) if occ.contains(n) => break Some(n),
+                    Some(n) => cur = n.offset(df, dr),
+                }
+            };
+            let Some(screen) = screen else { continue };
+            let mut cur = screen.offset(df, dr);
+            while let Some(next) = cur {
+                if occ.contains(next) {
+                    bb.set(next);
+                    break;
+                }
+                cur = next.offset(df, dr);
+            }
+        }
+        bb
+    }
+
+    /// Independent reference for the Janggi cannon **quiet** jumps: empties beyond
+    /// one non-cannon screen, up to the next piece.
+    fn scan_janggi_quiet<G: Geometry>(
+        sq: Square<G>,
+        occ: Bitboard<G>,
+        cannons: Bitboard<G>,
+    ) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let mut cur = sq.offset(df, dr);
+            let screen = loop {
+                match cur {
+                    None => break None,
+                    Some(n) if occ.contains(n) => break Some(n),
+                    Some(n) => cur = n.offset(df, dr),
+                }
+            };
+            let Some(screen) = screen else { continue };
+            if cannons.contains(screen) {
+                continue;
+            }
+            let mut cur = screen.offset(df, dr);
+            while let Some(next) = cur {
+                if occ.contains(next) {
+                    break;
+                }
+                bb.set(next);
+                cur = next.offset(df, dr);
+            }
+        }
+        bb
+    }
+
+    /// Independent reference for the Janggi cannon **capture** targets: first
+    /// non-cannon piece beyond one non-cannon screen.
+    fn scan_janggi_caps<G: Geometry>(
+        sq: Square<G>,
+        occ: Bitboard<G>,
+        cannons: Bitboard<G>,
+    ) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let mut cur = sq.offset(df, dr);
+            let screen = loop {
+                match cur {
+                    None => break None,
+                    Some(n) if occ.contains(n) => break Some(n),
+                    Some(n) => cur = n.offset(df, dr),
+                }
+            };
+            let Some(screen) = screen else { continue };
+            if cannons.contains(screen) {
+                continue;
+            }
+            let mut cur = screen.offset(df, dr);
+            while let Some(next) = cur {
+                if occ.contains(next) {
+                    if !cannons.contains(next) {
+                        bb.set(next);
+                    }
+                    break;
+                }
+                cur = next.offset(df, dr);
+            }
+        }
+        bb
+    }
+
+    /// Sweep every square × a basket of occupancies (and, for Janggi, cannon
+    /// subsets) on a geometry `G`, asserting the bit-scan cannon primitives equal
+    /// the independent square-by-square references — the byte-identity guarantee
+    /// behind the issue-#209 rewrite.
+    fn cannon_bitscan_matches_walk<G>(squares: u8)
+    where
+        G: Geometry,
+        G::Bits: core::fmt::Debug,
+    {
+        let mut next = rng();
+        let board = Bitboard::<G>::FULL;
+        // Build a backing value bit-for-bit from a u128 seed, generic over the
+        // backing width; off-board high bits are then masked away.
+        let cast = |x: u128| -> Bitboard<G> {
+            let mut v = G::Bits::ZERO;
+            let mut bit = 0u32;
+            while bit < G::Bits::BITS && bit < 128 {
+                if (x >> bit) & 1 == 1 {
+                    v = v | G::Bits::bit(bit);
+                }
+                bit += 1;
+            }
+            Bitboard::<G>(v) & board
+        };
+        let mut occs: Vec<Bitboard<G>> = Vec::new();
+        occs.push(Bitboard::EMPTY);
+        occs.push(board);
+        for _ in 0..48 {
+            let lo = next() as u128;
+            let hi = (next() as u128) << 64;
+            occs.push(cast(lo | hi));
+        }
+        for index in 0..squares {
+            let sq = Square::<G>::new(index);
+            for &occ in &occs {
+                assert_eq!(
+                    cannon_quiet_moves::<G>(sq, occ),
+                    scan_cannon_quiet(sq, occ),
+                    "cannon quiet sq {index}"
+                );
+                assert_eq!(
+                    cannon_capture_targets::<G>(sq, occ),
+                    scan_cannon_caps(sq, occ),
+                    "cannon caps sq {index}"
+                );
+                // Janggi: pair the occupancy with a couple of cannon subsets.
+                let subsets = [Bitboard::EMPTY, occ, cast(next() as u128) & occ];
+                for cannons in subsets {
+                    assert_eq!(
+                        janggi_cannon_quiet::<G>(sq, occ, cannons),
+                        scan_janggi_quiet(sq, occ, cannons),
+                        "janggi quiet sq {index}"
+                    );
+                    assert_eq!(
+                        janggi_cannon_capture::<G>(sq, occ, cannons),
+                        scan_janggi_caps(sq, occ, cannons),
+                        "janggi caps sq {index}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Independent reference for the king attack lines: walk all eight directions
+    /// to the board edge, the original per-step definition.
+    fn scan_king_lines<G: Geometry>(king: Square<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[
+            (1, 0),
+            (0, 1),
+            (1, 1),
+            (1, -1),
+            (-1, 0),
+            (0, -1),
+            (-1, -1),
+            (-1, 1),
+        ] {
+            let mut cur = king.offset(df, dr);
+            while let Some(next) = cur {
+                bb.set(next);
+                cur = next.offset(df, dr);
+            }
+        }
+        bb
+    }
+
+    fn king_lines_match_walk<G>(squares: u8)
+    where
+        G: Geometry,
+        G::Bits: core::fmt::Debug,
+    {
+        for index in 0..squares {
+            let sq = Square::<G>::new(index);
+            assert_eq!(
+                king_attack_lines::<G>(sq),
+                scan_king_lines(sq),
+                "king lines sq {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn king_lines_match_walk_all_geometries() {
+        use crate::geometry::{Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10};
+        king_lines_match_walk::<Chess8x8>(64);
+        king_lines_match_walk::<Cap10x8>(80);
+        king_lines_match_walk::<Grand10x10>(100);
+        king_lines_match_walk::<Xiangqi9x10>(90);
+        king_lines_match_walk::<Shogi9x9>(81);
+        king_lines_match_walk::<Minixiangqi7x7>(49);
+        king_lines_match_walk::<Minishogi5x5>(25);
+    }
+
+    #[test]
+    fn cannon_bitscan_matches_walk_chess8x8() {
+        cannon_bitscan_matches_walk::<Chess8x8>(64);
+    }
+
+    #[test]
+    fn cannon_bitscan_matches_walk_cap10x8() {
+        cannon_bitscan_matches_walk::<Cap10x8>(80);
+    }
+
+    #[test]
+    fn cannon_bitscan_matches_walk_grand10x10() {
+        use crate::geometry::Grand10x10;
+        cannon_bitscan_matches_walk::<Grand10x10>(100);
+    }
+
+    #[test]
+    fn cannon_bitscan_matches_walk_xiangqi9x10() {
+        use crate::geometry::Xiangqi9x10;
+        cannon_bitscan_matches_walk::<Xiangqi9x10>(90);
     }
 
     #[test]
