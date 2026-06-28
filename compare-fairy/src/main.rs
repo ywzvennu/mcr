@@ -32,6 +32,7 @@ mod makruk;
 mod minishogi;
 mod minixiangqi;
 mod orda;
+mod ordamirror;
 mod seirawan;
 mod shako;
 mod shinobi;
@@ -188,6 +189,9 @@ fn main() {
     // Orda is an INI variant: orda::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant orda`.
     let orda_mismatches = orda::run(&mut engine, &located.bin, opts.full);
+    // Ordamirror is also an INI variant: ordamirror::run loads FSF's variants.ini
+    // (resolved from the located binary) before driving `UCI_Variant ordamirror`.
+    let ordamirror_mismatches = ordamirror::run(&mut engine, &located.bin, opts.full);
     let synochess_mismatches = synochess::run(&mut engine, opts.full);
 
     engine.quit();
@@ -208,6 +212,7 @@ fn main() {
         + minishogi_mismatches
         + minixiangqi_mismatches
         + orda_mismatches
+        + ordamirror_mismatches
         + synochess_mismatches
         > 0
     {

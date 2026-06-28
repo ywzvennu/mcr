@@ -40,9 +40,9 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
-    MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, SeirawanRules, ShakoRules,
-    ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
-    WideRole, WideVariant, XiangqiRules,
+    MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
+    ShakoRules, ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess,
+    SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -368,6 +368,31 @@ variant_test!(
         "1wysk1w1/8/p1pppp1p/8/2f2f2/PP4PP/2PPPP2/RNBQKBNR b KQ - 0 1",
         "4k3/8/3y4/2f1s3/2P1P3/3w4/8/4K3 b - - 0 1",
         "fwysk1wf/8/8/8/8/8/4W3/4K3 b - - 0 1",
+        "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
+    ]
+);
+
+// -- Ordamirror (symmetric horde: Orda leapers + the Falcon + flag win, 8x8) -
+//
+// Both armies are Orda-style: the Lancer / Archer **move** like a knight but
+// **capture** along a slider line (their `role_attacks` rook / bishop set is the
+// attack relation; the knight jumps are quiet-only). The new **Falcon** is the
+// inverse — it **moves** like a queen (quiet-only) but **captures** like a knight,
+// so its knight pattern is the symmetric attack relation and its queen slides
+// never enter it. The corpus is reused from `tests/perft_ordamirror.rs` (each
+// FSF-confirmed): the developed middlegame, the two-Falcon tactic, the
+// both-Falcons middlegame, and a flag-race position.
+
+variant_test!(
+    ordamirror,
+    Chess8x8,
+    OrdamirrorRules,
+    "ordamirror",
+    [
+        "fwy*fkywf/8/pppppppp/8/4P3/8/PPP1PPPP/FWY*FKYWF b - - 0 1",
+        "fwy*fk1wf/8/p1pppppp/8/2y1P3/2P5/PP1P1PPP/FWY*FK1WF w - - 0 1",
+        "4k3/8/3p1p2/3p*f3/3*F4/2P1P3/8/4K3 w - - 0 1",
+        "fwy1k1wf/8/p1ppp1pp/5p2/2*f5/2*F5/PP1PPPPP/FWY1K1WF w - - 0 1",
         "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
     ]
 );

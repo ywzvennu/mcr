@@ -231,6 +231,27 @@ pub enum WideRole {
     /// Shinobi.
     ShogiKnight = 34,
 
+    // --- Ordamirror Falcon (§ Phase 3, Milestone 10) ---
+    //
+    // Ordamirror's symmetric horde reuses the Orda [`WideRole::Lancer`] /
+    // [`WideRole::Kheshig`] / [`WideRole::Archer`] for both armies; its one
+    // genuinely-new piece is the Falcon.
+    /// Falcon (FSF `customPiece1 = f:mQcN`) — the inverse of the Lancer/Archer:
+    /// it **moves like a queen** (any number of squares along a rank, file, or
+    /// diagonal, to an **empty** square) but **captures like a knight** (a 2-1
+    /// leap). Its quiet queen slides are non-capturing and its only attacking /
+    /// checking squares are the eight knight jumps. (Ordamirror.)
+    ///
+    /// Landing past the single-letter alphabet (every `a..=z` already names a
+    /// role), the Falcon is an **overflow role** like the Commoner and Shogi
+    /// Knight: it has no bare letter and spells itself with the
+    /// [`OVERFLOW_PREFIX`] (`*`) followed by a recycled base letter whose case
+    /// carries the colour. FSF spells it `f`, but `f` already names the Lancer
+    /// here, so the Falcon recycles that same mnemonic as its overflow base: its
+    /// token is `*F` (white) / `*f` (black), distinct from the bare Lancer `f`.
+    /// The `compare-fairy` harness maps `*f → f` when driving Ordamirror.
+    Falcon = 35,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -267,7 +288,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 35;
+    pub const COUNT: usize = 36;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -306,6 +327,7 @@ impl WideRole {
         WideRole::Archer,
         WideRole::Commoner,
         WideRole::ShogiKnight,
+        WideRole::Falcon,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -400,6 +422,14 @@ impl WideRole {
             // `*` prefix. The `compare-fairy` harness maps `*n` to FSF's `h` when
             // driving Shinobi.
             WideRole::ShogiKnight => 'n',
+            // Ordamirror's Falcon — an overflow role past the exhausted
+            // single-letter alphabet. Like the Commoner / Shogi Knight its FEN
+            // token is the `*` prefix plus a recycled base letter (here `f`, the
+            // FSF Falcon mnemonic, distinct from the bare Lancer `f` because of
+            // the `*` prefix), so `char()` returns the bare base letter and the
+            // board FEN I/O adds the `*` prefix. The `compare-fairy` harness maps
+            // `*f` to FSF's `f` when driving Ordamirror.
+            WideRole::Falcon => 'f',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -477,7 +507,10 @@ impl WideRole {
     #[must_use]
     #[inline]
     pub const fn is_overflow(self) -> bool {
-        matches!(self, WideRole::Commoner | WideRole::ShogiKnight)
+        matches!(
+            self,
+            WideRole::Commoner | WideRole::ShogiKnight | WideRole::Falcon
+        )
     }
 
     /// For an overflow role, the **recycled base letter** its FEN token reuses
@@ -505,6 +538,7 @@ impl WideRole {
         match ch.to_ascii_lowercase() {
             'u' => Some(WideRole::Commoner),
             'n' => Some(WideRole::ShogiKnight),
+            'f' => Some(WideRole::Falcon),
             _ => None,
         }
     }
@@ -606,6 +640,7 @@ impl fmt::Display for WideRole {
             WideRole::Archer => "archer",
             WideRole::Commoner => "commoner",
             WideRole::ShogiKnight => "shogi-knight",
+            WideRole::Falcon => "falcon",
         })
     }
 }
