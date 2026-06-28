@@ -28,6 +28,7 @@ mod duck;
 mod grand;
 mod locate;
 mod makruk;
+mod minishogi;
 mod seirawan;
 mod shako;
 mod shogi;
@@ -176,6 +177,7 @@ fn main() {
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
+    let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -190,6 +192,7 @@ fn main() {
         + shako_mismatches
         + xiangqi_mismatches
         + shogi_mismatches
+        + minishogi_mismatches
         > 0
     {
         std::process::exit(1);
