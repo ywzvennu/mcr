@@ -40,9 +40,10 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
-    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, MinishogiRules, MinixiangqiRules,
-    OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
-    SpartanRules, Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
+    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules, MinishogiRules,
+    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules,
+    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, WideRole,
+    WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -428,6 +429,31 @@ variant_test!(
         "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
         "9/9/3k5/4Z4/9/9/9/9/9/4K4 b - - 0 1",
         "9/3k5/4Z4/9/9/9/9/9/9/4K4 b - - 0 1",
+    ]
+);
+
+// -- Manchu (asymmetric Xiangqi: the Banner super-piece, 9x10) --------------
+//
+// The Banner (Rook + Cannon + Horse) has an occupancy-asymmetric attack relation
+// (its cannon part lands only on an occupied square; its horse part is hobbled by
+// a leg adjacent to the Banner), so `forward_attacks_to` projects it from the
+// board-aware `role_attacks_board` hook — without that, a Banner row would
+// spuriously mismatch. Every other role is exactly the Xiangqi mover. The corpus
+// reuses the FSF-confirmed FENs from `tests/perft_manchu.rs`: the startpos, the
+// Banner centred (rook/cannon/horse in the open), the Black army to move, the
+// Banner deep in enemy territory, the cannon-checkmate, and the rook-check.
+variant_test!(
+    manchu,
+    Xiangqi9x10,
+    ManchuRules,
+    "manchu",
+    [
+        "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1",
+        "rjoukuojr/9/1c5c1/z1z1z1z1z/9/4*M4/Z1Z1Z1Z1Z/9/9/2OUKUO2 w - - 0 1",
+        "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 b - - 0 1",
+        "rjoukuojr/4*M4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/2OUKUO2 w - - 0 1",
+        "k8/9/9/9/z8/9/9/9/9/*M3K4 b - - 0 1",
+        "4k4/9/9/9/9/9/9/9/9/4*M4 b - - 0 1",
     ]
 );
 

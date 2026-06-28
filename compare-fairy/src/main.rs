@@ -32,6 +32,7 @@ mod janggi;
 mod knightmate;
 mod locate;
 mod makruk;
+mod manchu;
 mod minishogi;
 mod minixiangqi;
 mod orda;
@@ -186,6 +187,8 @@ fn main() {
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
+    // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
+    let manchu_mismatches = manchu::run(&mut engine, opts.full);
     let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
     let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
@@ -217,6 +220,7 @@ fn main() {
         + shinobi_mismatches
         + knightmate_mismatches
         + xiangqi_mismatches
+        + manchu_mismatches
         + janggi_mismatches
         + shogi_mismatches
         + minishogi_mismatches
