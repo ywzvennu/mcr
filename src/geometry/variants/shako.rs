@@ -163,6 +163,20 @@ impl WideVariant<Grand10x10> for ShakoRules {
         <StandardChess as WideVariant<Grand10x10>>::role_is_slider(role)
     }
 
+    fn role_attack_is_leg_asymmetric(role: WideRole) -> bool {
+        // The Cannon's over-screen capture set lands only on an *occupied* square
+        // (the captured piece), so it is occupancy-asymmetric: reverse-projecting
+        // the cannon pattern from a target `t` treats `t` as a cannon origin and
+        // reports a cannon attacker even when `t` is *empty*, where a cannon —
+        // capturing nothing — does not attack. That phantom is harmless on an
+        // occupied royal square but is a genuine asymmetry, so attacker detection
+        // forward-projects from each cannon (exactly as the move generator does),
+        // keeping `attackers_to` the true forward relation on every square. The
+        // Fers-Alfil Elephant is a plain symmetric leaper and needs no special
+        // handling. (Issue #202.)
+        matches!(role, WideRole::Cannon)
+    }
+
     fn promotion_config() -> PromotionConfig {
         // A Shako pawn promotes to any of Queen, Rook, Bishop, Knight, Cannon, or
         // Elephant — FSF's `promotionPieceTypes`. Order affects only enumeration,

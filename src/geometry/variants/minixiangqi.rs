@@ -185,7 +185,20 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
         // from each horse (the same handling as Xiangqi; Minixiangqi has no
         // elephant). Reusing #199's hook keeps `attackers_to` symmetric for the
         // hobbled horse.
-        matches!(role, WideRole::Horse)
+        //
+        // The Cannon is also leg-asymmetric: its over-screen capture set lands
+        // only on an occupied square, so reverse-projecting from an empty target
+        // reports a phantom cannon attacker there. Forward-projecting from each
+        // cannon keeps `attackers_to` the true forward relation on every square
+        // (the same handling as Xiangqi; issue #202).
+        //
+        // The General (King) is **palace-confined**: its attack set is masked to
+        // the palace by its *origin*, so reverse-projecting from a target outside
+        // the palace invents an attack from an in-palace general that cannot
+        // actually reach it. Forward-projection from each general matches the real
+        // geometry on every square. This never affects king-safety (a royal square
+        // is always inside its own palace), so perft is unchanged. (Issue #202.)
+        matches!(role, WideRole::Horse | WideRole::Cannon | WideRole::King)
     }
 
     fn role_is_slider(role: WideRole) -> bool {

@@ -116,6 +116,17 @@ impl WideVariant<Chess8x8> for MakrukRules {
         }
     }
 
+    fn role_attack_is_directional(role: WideRole) -> bool {
+        // The Khon (Silver General) adds a single straight step **toward the far
+        // rank** to its four diagonals, so its attack set is color-directional —
+        // forward-biased, exactly like a pawn's diagonal capture. To find the
+        // squares *from which* a Khon of one color hits `sq`, `attackers_to` must
+        // reverse-project with the *opposite* color; the default (Pawn / Hoplite
+        // only) would test the wrong forward direction and miss a Khon check (the
+        // #201 class). The Met (ferz) is symmetric and needs no flip.
+        matches!(role, WideRole::Pawn | WideRole::Silver)
+    }
+
     fn promotion_config() -> PromotionConfig {
         // A Bia promotes only to a Met (ferz); there is no choice of role.
         PromotionConfig {

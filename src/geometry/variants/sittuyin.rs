@@ -228,6 +228,16 @@ impl WideVariant<Chess8x8> for SittuyinRules {
         }
     }
 
+    fn role_attack_is_directional(role: WideRole) -> bool {
+        // The Sin (Silver General) adds a single straight step **toward the far
+        // rank** to its four diagonals (exactly Makruk's Khon), so its attack set
+        // is color-directional — forward-biased, like a pawn's diagonal capture.
+        // `attackers_to` must reverse-project it with the *opposite* color; the
+        // default (Pawn / Hoplite only) would test the wrong forward direction and
+        // miss a Sin check (the #201 class). The Met (ferz) is symmetric.
+        matches!(role, WideRole::Pawn | WideRole::Silver)
+    }
+
     fn promotion_config() -> PromotionConfig {
         // A Nè promotes only to a Met; there is no choice of role.
         PromotionConfig {
