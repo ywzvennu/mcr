@@ -22,6 +22,21 @@
 //! `WideMove::to_uci` matches it. The duck-cross-product makes the branching
 //! factor huge, so default depths are modest.
 //!
+//! ## Confirmed FSF version (issue #189)
+//!
+//! The built-in `UCI_Variant duck` is sent the corpus FENs verbatim (no
+//! rewrite, no `variants.ini`/`VariantPath`), so the comparison depends only on
+//! FSF's built-in Duck definition. That definition has been stable: the live run
+//! matches mce **byte-identically** on all five corpus positions at the default
+//! depth 3 (and the pinned depth 2) against upstream Fairy-Stockfish commit
+//! `1b5bdd4` ("Add Georgian chess", 2026-05-23, `id name Fairy-Stockfish 280626
+//! LB`) — which is also the upstream `master` HEAD a fresh `--build` clone
+//! fetches. #189 reported a live divergence that did NOT reproduce here; it was a
+//! stale/differently-built FSF binary, not an mce or harness translation bug, so
+//! no translation change was needed. If a future divergence appears, first
+//! confirm the FSF binary's `id name` / commit against the value above before
+//! suspecting mce or this harness.
+//!
 //! GPL FENCE unchanged: FSF is driven purely as a subprocess (see `uci.rs`); no
 //! GPL code is linked.
 
