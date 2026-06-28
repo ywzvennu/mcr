@@ -21,20 +21,20 @@
 //! §4.4), zero for every non-Duck move.
 //!
 //! ```text
-//! bit:  31 ... 29 | 28 | 27 26 | 25 24 23 22 21 | 20 19 18 17 16 | 15 ... 8 | 7 ... 0
-//!       \-unused-/ \rk/ \gate-/ \----kind-----/ \-----role-----/ \--from--/ \--to--/
+//! bit:  31 ... 29 | 28 | 27 26 | 25 24 23 22 | 21 20 19 18 17 16 | 15 ... 8 | 7 ... 0
+//!       \-unused-/ \rk/ \gate-/ \---kind----/ \-------role------/ \--from--/ \--to--/
 //! ```
 //!
 //! * **`to`** (bits 0..8): destination square index, `0..128`.
 //! * **`from`** (bits 8..16): origin square index, `0..128`. For a drop this is
 //!   redundant (a drop has `from == to`), so the public [`WideMove::from`]
 //!   reports the target square.
-//! * **`role`** (bits 16..21): a [`WideRole`] index `0..COUNT`, used as the
+//! * **`role`** (bits 16..22): a [`WideRole`] index `0..64`, used as the
 //!   promotion role or the dropped role depending on the kind; unused (`0`)
-//!   otherwise.
-//! * **`kind`** (bits 21..26): the [`WideMoveKind`] tag. Five bits leave ample
-//!   room for the future fairy kinds (gating, duck-placement, palace moves)
-//!   beyond the codes used today.
+//!   otherwise. Six bits since the Orda army grew `WideRole::COUNT` past 32.
+//! * **`kind`** (bits 22..26): the [`WideMoveKind`] tag. Four bits hold the nine
+//!   kinds in use with headroom for future fairy kinds (gating, duck-placement,
+//!   palace moves) beyond the codes used today.
 //! * **`gate`** (bits 26..29): the Seirawan gating addendum. Bits 26..28 carry a
 //!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 28
 //!   selects, for a castling base move, whether the reserve gates onto the
@@ -159,13 +159,17 @@ const KIND_DROP: u32 = 8;
 const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
 const ROLE_SHIFT: u32 = 16;
-const KIND_SHIFT: u32 = 21;
+const KIND_SHIFT: u32 = 22;
 const GATE_ROLE_SHIFT: u32 = 26;
 const GATE_ON_ROOK_SHIFT: u32 = 28;
 
 const SQ_MASK: u32 = 0xff;
-const ROLE_MASK: u32 = 0x1f;
-const KIND_MASK: u32 = 0x1f;
+// The role field is **6 bits** (bits 16..22), holding a `WideRole` index `0..64`
+// — widened from 5 bits when the Orda army pushed `WideRole::COUNT` past 32. The
+// kind field below shrank to **4 bits** (codes `0..16`, ample for the nine kinds)
+// to make room; the gate field and the whole high (Duck) word are unchanged.
+const ROLE_MASK: u32 = 0x3f;
+const KIND_MASK: u32 = 0xf;
 const GATE_ROLE_MASK: u32 = 0x3;
 
 // Gated-reserve codes occupying bits 26..28. `0` means no gate.

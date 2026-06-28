@@ -131,6 +131,25 @@ impl Engine {
         self.variants.iter().any(|v| v == name)
     }
 
+    /// Loads an external `variants.ini` (`setoption name VariantPath value <path>`)
+    /// and re-reads the `uci` handshake so the INI-defined variants (e.g. Orda)
+    /// join [`has_variant`](Engine::has_variant). FSF re-emits the full
+    /// `UCI_Variant` combo — now including the INI variants — on the next `uci`.
+    ///
+    /// GPL FENCE unchanged: the INI is a plain data file passed to the FSF
+    /// subprocess; nothing is linked or vendored.
+    pub fn load_variant_path(&mut self, ini_path: &str) -> Result<(), String> {
+        self.send(&format!("setoption name VariantPath value {ini_path}"))?;
+        self.send("isready")?;
+        self.wait_for("readyok")?;
+        // Re-run the handshake to capture the now-expanded variant list.
+        self.send("uci")?;
+        self.variants = self.read_uciok_capturing_variants()?;
+        // Selecting a variant again is required after the option churn.
+        self.current_variant = None;
+        Ok(())
+    }
+
     /// Write one command followed by a newline.
     fn send(&mut self, cmd: &str) -> Result<(), String> {
         writeln!(self.stdin, "{cmd}").map_err(|e| format!("write {cmd:?} failed: {e}"))?;

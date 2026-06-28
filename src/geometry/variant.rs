@@ -321,6 +321,30 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         Bitboard::EMPTY
     }
 
+    /// Returns `true` if a piece of `role`'s [`role_attacks`](WideVariant::role_attacks)
+    /// set is **capture-only** — its squares may be reached **only** by capturing
+    /// an enemy piece there, never as a quiet move to an empty square. The role's
+    /// quiet moves then come **solely** from
+    /// [`quiet_only_targets`](WideVariant::quiet_only_targets).
+    ///
+    /// This is the dual of [`quiet_only_targets`](WideVariant::quiet_only_targets)
+    /// (which adds move-only squares to a role whose `role_attacks` set is normally
+    /// move-and-capture). The canonical case is the Orda Lancer (captures like a
+    /// rook) and Archer (captures like a bishop): each **moves** like a knight (its
+    /// `quiet_only_targets`) but **captures** along a slider line (its
+    /// `role_attacks`), so the slider squares must never be emitted as quiet moves.
+    ///
+    /// The default is `false` for every role; while it is `false` the generator
+    /// emits each `role_attacks` square as a quiet move (empty) or a capture
+    /// (enemy) exactly as before, so every other variant is byte-identical. This
+    /// affects **only** the generator's quiet/capture split; the role's attack
+    /// relation (check, king-danger, `attackers_to`) still uses the full
+    /// `role_attacks` set — a Lancer genuinely threatens to capture along its rook
+    /// lines.
+    fn role_attacks_are_capture_only(_role: WideRole) -> bool {
+        false
+    }
+
     // --- Cannon king-safety (default OFF) ---------------------------------
 
     /// Returns `true` if this variant fields **cannons** (the Xiangqi-style
@@ -685,6 +709,45 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// The default is `false`. Shogi overrides it: a Pawn or Lance on the last
     /// rank, and a Knight on the last two ranks, must promote.
     fn role_promotion_forced(_role: WideRole, _color: Color, _to_rank: u8) -> bool {
+        false
+    }
+
+    // --- Orda flag-win / campmate (default OFF) ---------------------------
+
+    /// Returns `true` if this variant ends the game the instant a **king reaches
+    /// the far rank** — the Orda "flag" / campmate rule: White wins when its king
+    /// reaches the last rank, Black when its king reaches the first rank
+    /// (`flagRegionWhite = *8`, `flagRegionBlack = *1` in Fairy-Stockfish).
+    ///
+    /// The default is `false`; while it is `false` the generic engine never
+    /// consults [`opponent_reached_flag`](WideVariant::opponent_reached_flag), so
+    /// the move generator produces children for every position exactly as before
+    /// and every other variant is byte-identical. When `true`, the **standard**
+    /// generator (Orda is on the single-king fast path) short-circuits to *zero
+    /// moves* at any node where the side to move has already lost — i.e. the
+    /// opponent's king sits on the opponent's goal rank — so a flag win terminates
+    /// perft descent move-for-move with FSF (which counts such a node as terminal
+    /// with no children). The winning side, on its **own** turn, still has moves:
+    /// FSF adjudicates the flag only when the *loser* is to move (`go perft` on
+    /// White-king-on-rank-8 / White-to-move keeps generating, but Black-to-move is
+    /// terminal). This hook expresses exactly that loser-to-move test.
+    fn has_flag_win() -> bool {
+        false
+    }
+
+    /// Returns `true` if, under the Orda flag rule, the side to move (`turn`) has
+    /// **already lost** because its opponent's king has reached the opponent's
+    /// goal rank — White's king on the last rank, Black's on the first. The side
+    /// to move then has no legal move and the node is terminal.
+    ///
+    /// Only consulted when [`has_flag_win`](WideVariant::has_flag_win) is `true`;
+    /// the default is `false` (never terminal by flag), so every other variant is
+    /// byte-identical. The winner, on its own move, is **not** caught here: the
+    /// test is purely "the *opponent* is on its goal rank," matching FSF's flag
+    /// adjudication, which fires only on the losing side's turn.
+    fn opponent_reached_flag(board: &Board<G>, turn: Color) -> bool {
+        let _ = board;
+        let _ = turn;
         false
     }
 

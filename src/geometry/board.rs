@@ -722,8 +722,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_char() {
-        let err = Board::<Chess8x8>::from_fen_placement("ynbqkbnr/8/8/8/8/8/8/8").unwrap_err();
-        assert_eq!(err, ParseBoardError::InvalidChar('y'));
+        // Every ASCII letter now names a role (the alphabet is fully assigned), so
+        // an invalid placement char is a non-letter symbol such as `.`.
+        let err = Board::<Chess8x8>::from_fen_placement(".nbqkbnr/8/8/8/8/8/8/8").unwrap_err();
+        assert_eq!(err, ParseBoardError::InvalidChar('.'));
         // A zero digit is not allowed.
         let err = Board::<Chess8x8>::from_fen_placement("08/8/8/8/8/8/8/8").unwrap_err();
         assert_eq!(err, ParseBoardError::InvalidChar('0'));

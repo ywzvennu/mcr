@@ -40,8 +40,9 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
-    MakrukRules, MinishogiRules, MinixiangqiRules, SeirawanRules, ShakoRules, ShogiRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, WideRole, WideVariant, XiangqiRules,
+    MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, SeirawanRules, ShakoRules,
+    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, WideRole, WideVariant,
+    XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -344,6 +345,30 @@ variant_test!(
         "8/8/8/8/1R6/8/2k2k2/7K b - - 0 1",
         "k7/8/8/8/8/8/4h3/4K3 b - - 0 1",
         "k6k/8/8/8/8/8/4h3/4K3 b - - 0 1",
+    ]
+);
+
+// -- Orda (asymmetric cavalry leapers + flag win, 8x8) ----------------------
+//
+// The Orda Lancer / Archer **move** like a knight but **capture** along a slider
+// line, so their `role_attacks` set (rook / bishop) is the attack relation while
+// their knight jumps are quiet-only (and never enter it). The Yurt is a forward-
+// biased silver general, so it is reverse-projected with the opposite colour
+// (`role_attack_is_directional`). The corpus is reused from `tests/perft_orda.rs`
+// (each FSF-confirmed): the startpos, the developed middlegame, the all-pieces
+// tactic, the White-promoted-Kheshig endgame, and a flag-race position.
+
+variant_test!(
+    orda,
+    Chess8x8,
+    OrdaRules,
+    "orda",
+    [
+        "fwyskywf/8/pppppppp/8/4P3/8/PPPP1PPP/RNBQKBNR b KQ - 0 1",
+        "1wysk1w1/8/p1pppp1p/8/2f2f2/PP4PP/2PPPP2/RNBQKBNR b KQ - 0 1",
+        "4k3/8/3y4/2f1s3/2P1P3/3w4/8/4K3 b - - 0 1",
+        "fwysk1wf/8/8/8/8/8/4W3/4K3 b - - 0 1",
+        "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
     ]
 );
 

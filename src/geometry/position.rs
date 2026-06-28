@@ -824,6 +824,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let us = self.state.turn;
         let them = us.opposite();
         let board = &self.board;
+
+        // Orda flag-win / campmate: if the opponent's king has already reached its
+        // goal rank, the side to move has lost and the node is terminal — no moves.
+        // Gated behind `has_flag_win()` (default-off), so every other variant skips
+        // the check and is byte-identical. This is the single chokepoint both the
+        // materialising generator and the bulk-count leaf path funnel through, so a
+        // flag win terminates perft descent exactly as Fairy-Stockfish does.
+        if V::has_flag_win() && V::opponent_reached_flag(board, us) {
+            return;
+        }
+
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
@@ -887,10 +898,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // Whether this role expands into promote / non-promote variants per
             // target (a hand variant's promotable piece). Inert otherwise.
             let promotable = V::has_hand() && V::role_can_promote(role);
+            // Capture-only roles (Orda Lancer / Archer): their `role_attacks` set
+            // (rook / bishop slide) may be reached only by capturing — never as a
+            // quiet move. Their quiet moves come solely from `quiet_only_targets`
+            // (the knight pattern). Default-off, so inert and byte-identical for
+            // every other role / variant; the attack relation is unaffected.
+            let capture_only = V::role_attacks_are_capture_only(role);
             for from in pieces {
                 let pin_line = pins.line_of(from);
-                let targets =
+                let mut targets =
                     V::role_attacks(role, us, from, occupied) & !our_pieces & check_mask & pin_line;
+                if capture_only {
+                    targets &= their_pieces;
+                }
                 if promotable {
                     self.emit_promotable_targets(out, role, from, targets, their_pieces, us);
                     continue;
