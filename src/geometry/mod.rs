@@ -55,8 +55,9 @@ pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules,
-    Minishogi, MinishogiRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules,
-    Sittuyin, SittuyinRules, Spartan, SpartanRules, Xiangqi, XiangqiRules,
+    Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Seirawan, SeirawanRules, Shako,
+    ShakoRules, Shogi, ShogiRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Xiangqi,
+    XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -257,6 +258,22 @@ geometry!(
     u128,
     9,
     10
+);
+
+geometry!(
+    /// The Minixiangqi board: seven files by seven ranks (49 squares), backed by
+    /// `u128`.
+    ///
+    /// A small odd-width (`7`) `u128` geometry hosting Minixiangqi — a 7x7
+    /// reduction of Xiangqi with no river, advisors, or elephants. It reuses the
+    /// Xiangqi cannon / horse / palace / flying-general machinery on a smaller
+    /// grid: a square index reaches `48`, and edge-masked east/west shifts must
+    /// not wrap past the seventh file. Files run a..g, ranks 1..7. The 3x3 palace
+    /// sits on files c..e (the near three ranks of each side).
+    Minixiangqi7x7,
+    u128,
+    7,
+    7
 );
 
 geometry!(
