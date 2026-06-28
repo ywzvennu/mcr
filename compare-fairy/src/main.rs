@@ -30,6 +30,7 @@ mod locate;
 mod makruk;
 mod seirawan;
 mod sittuyin;
+mod spartan;
 mod uci;
 mod variants;
 
@@ -168,6 +169,7 @@ fn main() {
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
+    let spartan_mismatches = spartan::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -178,6 +180,7 @@ fn main() {
         + grand_mismatches
         + duck_mismatches
         + sittuyin_mismatches
+        + spartan_mismatches
         > 0
     {
         std::process::exit(1);
