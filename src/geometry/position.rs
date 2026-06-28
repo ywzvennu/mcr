@@ -1062,7 +1062,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         });
     }
 
-    /// Generates every legal move for a **cannon** variant (Shako) via
+    /// Generates every legal move for a **cannon** variant (Shako, Xiangqi) via
     /// pseudo-legal generation plus per-move verification.
     ///
     /// Reuses the multi-royal pseudo-move generator — which already emits every
@@ -1073,6 +1073,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// true post-move occupancy. This is the only sound way to handle a cannon's
     /// screen-dependent check and king-danger; gated behind `has_cannons()`, so it
     /// never runs for a non-cannon variant.
+    ///
+    /// Hot-path shape (issue #193): the per-move verify uses **make/unmake** on a
+    /// `Copy` board+state snapshot rather than cloning the whole position into a
+    /// fresh `GenericPosition` per move, and the king-attack test
+    /// ([`king_safe_after`](Self::king_safe_after)) scans only the enemy roles
+    /// **actually fielded** (precomputed once per node) instead of all
+    /// [`WideRole::COUNT`] of them. The produced move set is byte-identical.
     fn generate_cannon_verify_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         // A side whose king has been captured has no royal piece, so there is no
@@ -1086,18 +1093,108 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.gen_multi_royal_pseudo(out, us);
             return;
         }
+        let king = self.board.king_of(us).expect("king present on this branch");
         let mut pseudo = WideMoveList::new();
         self.gen_multi_royal_pseudo(&mut pseudo, us);
+        // The enemy roles in play, computed once for the whole node: the verify
+        // test then projects only these from the king square rather than looping
+        // every `WideRole`. A scratch position drives make/unmake in place.
+        let attackers = EnemyAttackers::new(&self.board, us.opposite());
+
+        // Fast-accept filter (issue #193). When our king is **not currently in
+        // check**, a move that touches no line through the king — its origin and
+        // destination both lie off the king's rank, file, and both diagonals — and
+        // is not itself a king move can neither expose the king to a slider, change
+        // a cannon's screen on it, nor open the generals' file: every attack on the
+        // king travels one of those four lines, and a piece off all of them is
+        // neither a blocker nor a screen for any of them. Such a move is provably
+        // legal and skips the make/unmake + scan entirely. Anything that *could*
+        // matter (a king move, an en-passant's three-square shuffle, a move on a
+        // king line) falls through to the full verify, so the result is identical.
+        let in_check = !self.king_safe_after(king, us.opposite(), &attackers);
+        let king_lines = king_attack_lines::<G>(king);
+
+        let mut scratch = self.clone();
         pseudo.for_each(|mv| {
-            let mut next = self.clone();
-            next.apply(&mv);
-            // `apply` flipped the side to move; our king is now the non-mover's.
-            if let Some(king) = next.board.king_of(us) {
-                if !next.royal_attacked(king, us.opposite(), next.board.occupied()) {
-                    out.push(mv);
-                }
+            if !in_check && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
+                // Provably safe: no apply/unmake, no scan.
+                out.push(mv);
+            } else if scratch.cannon_move_is_legal(self, &mv, us, &attackers) {
+                out.push(mv);
             }
         });
+    }
+
+    /// Returns `true` if the pseudo-legal cannon-variant move `mv` is legal —
+    /// leaves our king unattacked — testing it by **make/unmake** on `self`
+    /// (a scratch position seeded from `base`).
+    ///
+    /// `self` is mutated to the post-move position, the king-safety check runs on
+    /// the true post-move occupancy (including the cannon over-screen captures and
+    /// the flying-general file, via [`king_safe_after`](Self::king_safe_after)),
+    /// and then `self` is restored byte-identically to `base` — so one scratch
+    /// position serves every sibling move with no per-move heap work and no
+    /// `GenericPosition` reconstruction.
+    fn cannon_move_is_legal(
+        &mut self,
+        base: &Self,
+        mv: &WideMove,
+        us: Color,
+        attackers: &EnemyAttackers,
+    ) -> bool {
+        self.apply(mv);
+        // `apply` flipped the side to move; our king is now the non-mover's.
+        let legal = match self.board.king_of(us) {
+            Some(king) => self.king_safe_after(king, us.opposite(), attackers),
+            // A move that captured our own king cannot arise from a legal pseudo
+            // set here (our king is never a capture target of our own move), but
+            // be defensive: no king means nothing to leave en prise.
+            None => true,
+        };
+        // Unmake: restore board + state from the untouched base snapshot. Both are
+        // `Copy`, so this is a plain stack assignment — no allocation, no clone of
+        // the `GenericPosition` wrapper.
+        self.board = base.board;
+        self.state = base.state;
+        legal
+    }
+
+    /// Returns `true` if the royal square `king` is **not** attacked by color `by`
+    /// under the current occupancy, scanning only the enemy roles `attackers`
+    /// records as present (plus the default-off flying-general file).
+    ///
+    /// This is the cannon verify path's hot inner test. It is the negation of
+    /// [`royal_attacked`](Self::royal_attacked) restricted to the fielded enemy
+    /// roles: a role with no enemy piece can never attack the king, so projecting
+    /// it from the king square is wasted work. The set of fielded roles is fixed
+    /// for a node, so it is computed once in [`EnemyAttackers::new`] and reused for
+    /// every sibling move. The result is identical to `!royal_attacked(...)`.
+    #[inline]
+    fn king_safe_after(&self, king: Square<G>, by: Color, attackers: &EnemyAttackers) -> bool {
+        let board = &self.board;
+        let occupied = board.occupied();
+        for &role in attackers.roles() {
+            let pieces = board.pieces(by, role);
+            if pieces.is_empty() {
+                continue;
+            }
+            // Project the role's attack pattern back from the king square (the
+            // opposite color for a directional role, e.g. a pawn), exactly as
+            // `attackers_to` does, and see whether it reaches an enemy piece.
+            let from_king = if V::role_attack_is_directional(role) {
+                V::role_attacks(role, by.opposite(), king, occupied)
+            } else {
+                V::role_attacks(role, by, king, occupied)
+            };
+            if !(from_king & pieces).is_empty() {
+                return false;
+            }
+        }
+        // The Xiangqi flying-general file attack (default-off elsewhere).
+        if V::has_flying_general() && V::extra_royal_attack(board, king, by, occupied) {
+            return false;
+        }
+        true
     }
 
     /// Returns `true` if, in this position, color `who` keeps at least one
@@ -2455,6 +2552,105 @@ impl<G: Geometry> Pins<G> {
         let _ = self.king_sq;
         Bitboard::FULL
     }
+}
+
+/// The enemy roles **actually present** on a board, captured once per node so the
+/// cannon verify path's king-attack test ([`king_safe_after`]) scans only the
+/// roles that can attack rather than all [`WideRole::COUNT`] of them.
+///
+/// On the cannon path every sibling move re-tests "is our king attacked" on a
+/// fresh post-move occupancy. A role with no enemy piece can never be that
+/// attacker, so projecting its pattern from the king is wasted work — and the set
+/// of fielded enemy roles does not change across the siblings of one node (a move
+/// removes a captured enemy piece only on the post-move board the test reads, and
+/// the `pieces(by, role)` mask re-checked there already drops an emptied role).
+/// Recording the present roles once turns a 29-iteration loop into one over the
+/// ~7–9 roles a cannon variant fields. No geometry data rides here (only role
+/// indices), so it is a small `Copy` value built on the node's own stack.
+///
+/// [`king_safe_after`]: GenericPosition::king_safe_after
+/// [`WideRole::COUNT`]: super::role::WideRole::COUNT
+#[derive(Clone, Copy)]
+struct EnemyAttackers {
+    roles: [WideRole; WideRole::COUNT],
+    len: usize,
+}
+
+impl EnemyAttackers {
+    /// Records every role color `by` has at least one piece of on `board`.
+    fn new<G: Geometry>(board: &Board<G>, by: Color) -> EnemyAttackers {
+        let mut roles = [WideRole::King; WideRole::COUNT];
+        let mut len = 0;
+        for role in WideRole::ALL {
+            if !board.pieces(by, role).is_empty() {
+                roles[len] = role;
+                len += 1;
+            }
+        }
+        EnemyAttackers { roles, len }
+    }
+
+    /// The fielded enemy roles (the prefix actually written).
+    #[inline]
+    fn roles(&self) -> &[WideRole] {
+        &self.roles[..self.len]
+    }
+}
+
+/// The set of squares on the king's **rank, file, and two diagonals** — every
+/// line along which a slider, a cannon (over a screen), or the Xiangqi flying
+/// general can attack the king.
+///
+/// A move whose origin and destination both lie *off* this set cannot add or
+/// remove a blocker or screen on any king line, so (out of check, and if it is
+/// not a king move) it cannot change whether the king is attacked. The cannon
+/// verify path uses it as a fast-accept test. Built from the same ray walks the
+/// slider primitives use, so it costs four short walks per node — paid once and
+/// shared by every sibling move.
+#[inline]
+fn king_attack_lines<G: Geometry>(king: Square<G>) -> Bitboard<G> {
+    let mut lines = Bitboard::<G>::EMPTY;
+    for &(df, dr) in &[
+        (1, 0),
+        (0, 1),
+        (1, 1),
+        (1, -1),
+        (-1, 0),
+        (0, -1),
+        (-1, -1),
+        (-1, 1),
+    ] {
+        let mut cur = king.offset(df, dr);
+        while let Some(next) = cur {
+            lines.set(next);
+            cur = next.offset(df, dr);
+        }
+    }
+    lines
+}
+
+/// Returns `true` if the cannon-variant move `mv` is **provably king-safe** by
+/// geometry alone: it is an ordinary board move (not a king move, not an
+/// en-passant) whose origin and destination both lie off [`king_attack_lines`].
+///
+/// Such a move leaves no blocker/screen change on any line through the king, so —
+/// when the side is not currently in check — the king stays unattacked and the
+/// move needs no make/unmake verification. Every other move returns `false` and
+/// is routed to the full verify, keeping the produced set byte-identical.
+#[inline]
+fn cannon_move_off_king_lines<G: Geometry>(
+    mv: &WideMove,
+    king: Square<G>,
+    king_lines: Bitboard<G>,
+) -> bool {
+    let from = mv.from::<G>();
+    // A king move changes the king's own square, and an en-passant removes a third
+    // (captured-pawn) square that may sit on a king line: both need full verify.
+    if from == king || matches!(mv.kind(), WideMoveKind::EnPassant) {
+        return false;
+    }
+    let to = mv.to::<G>();
+    !king_lines.contains(from) && !king_lines.contains(to)
 }
 
 /// The back rank (0-based) of `color`: rank `0` for white, the top rank for
