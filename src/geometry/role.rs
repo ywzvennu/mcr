@@ -252,6 +252,59 @@ pub enum WideRole {
     /// The `compare-fairy` harness maps `*f → f` when driving Ordamirror.
     Falcon = 35,
 
+    // --- Empire (Roman) army (§ Milestone 10, Fairy variants) ------------
+    //
+    // The White "Empire" pieces are four long-range "move-far / capture-close"
+    // compounds: each **moves like a Queen** to an empty square but **captures
+    // only on a short fixed pattern**. They are the long-range analogue of the
+    // Orda cavalry (knight-move / slider-capture). Confirmed square-for-square
+    // against Fairy-Stockfish `UCI_Variant empire` (its `variants.ini` custom
+    // pieces `e:mQcN`, `c:mQcB`, `t:mQcR`, `d:mQcK`). The Empire Soldier reuses
+    // the existing [`WideRole::Soldier`] (forward / sideways stepper) and the
+    // Emperor is a plain royal [`WideRole::King`], so neither needs a new role.
+    //
+    // All four land **past the exhausted single-letter alphabet**, so — like the
+    // Commoner and Shogi Knight — they are **overflow roles** with no bare letter:
+    // each spells itself with the [`OVERFLOW_PREFIX`] (`*`) plus a distinct
+    // recycled base letter (the FSF mnemonic) whose case carries the colour. The
+    // `compare-fairy` harness strips the `*` (e.g. `*e → e`) when driving FSF.
+    /// Eagle (FSF custom `e:mQcN`) — **moves like a Queen** to an empty square but
+    /// **captures like a Knight** (the eight 2-1 leaps). Its quiet Queen slides
+    /// ride [`quiet_only_targets`](super::WideVariant::quiet_only_targets); its
+    /// [`role_attacks`](super::WideVariant::role_attacks) is the knight pattern
+    /// (its only capturing / checking squares). (Empire.) An **overflow role**: its
+    /// FEN token is `*E` (white) / `*e` (black), recycling the Empire Eagle's FSF
+    /// letter `e` (already the Rook+Knight Elephant's bare letter here), and the
+    /// `compare-fairy` harness maps `*e → e` when driving Empire.
+    Eagle = 36,
+    /// Cardinal (FSF custom `c:mQcB`) — **moves like a Queen** to an empty square
+    /// but **captures like a Bishop** (a diagonal slider capture). Like the Eagle
+    /// its quiet Queen slides ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets) and its
+    /// [`role_attacks`](super::WideVariant::role_attacks) is the bishop slide.
+    /// (Empire.) An **overflow role**: its FEN token is `*C` (white) / `*c`
+    /// (black), recycling the FSF letter `c` (already the Cannon's bare letter
+    /// here), and the harness maps `*c → c` when driving Empire.
+    Cardinal = 37,
+    /// Tower (FSF custom `t:mQcR`) — **moves like a Queen** to an empty square but
+    /// **captures like a Rook** (an orthogonal slider capture). Like the Eagle its
+    /// quiet Queen slides ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets) and its
+    /// [`role_attacks`](super::WideVariant::role_attacks) is the rook slide.
+    /// (Empire.) An **overflow role**: its FEN token is `*T` (white) / `*t`
+    /// (black), recycling the FSF letter `t` (already the Spartan Lieutenant's bare
+    /// letter here), and the harness maps `*t → t` when driving Empire.
+    Tower = 38,
+    /// Duke (FSF custom `d:mQcK`) — **moves like a Queen** to an empty square but
+    /// **captures like a King** (the eight one-step squares). Like the Eagle its
+    /// quiet Queen slides ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets) and its
+    /// [`role_attacks`](super::WideVariant::role_attacks) is the king pattern.
+    /// (Empire.) An **overflow role**: its FEN token is `*D` (white) / `*d`
+    /// (black), recycling the FSF letter `d` (already the Spartan/Shinobi General's
+    /// bare letter here), and the harness maps `*d → d` when driving Empire.
+    Duke = 39,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -288,7 +341,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 36;
+    pub const COUNT: usize = 40;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -328,6 +381,10 @@ impl WideRole {
         WideRole::Commoner,
         WideRole::ShogiKnight,
         WideRole::Falcon,
+        WideRole::Eagle,
+        WideRole::Cardinal,
+        WideRole::Tower,
+        WideRole::Duke,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -430,6 +487,19 @@ impl WideRole {
             // board FEN I/O adds the `*` prefix. The `compare-fairy` harness maps
             // `*f` to FSF's `f` when driving Ordamirror.
             WideRole::Falcon => 'f',
+            // Empire (Roman) army — four overflow roles past the exhausted
+            // single-letter alphabet. Like the Commoner / Shogi Knight, each FEN
+            // token is the `*` prefix plus a recycled base letter (the FSF
+            // mnemonic `e`/`c`/`t`/`d`), so `char()` returns the bare base letter
+            // and the board FEN I/O adds the `*` prefix. The `compare-fairy`
+            // harness maps `*e → e`, `*c → c`, `*t → t`, `*d → d` when driving
+            // Empire. (Each base letter is already a single-letter role here — the
+            // Elephant `e`, Cannon `c`, Lieutenant `t`, General `d` — so the `*`
+            // prefix is what distinguishes the Empire piece.)
+            WideRole::Eagle => 'e',
+            WideRole::Cardinal => 'c',
+            WideRole::Tower => 't',
+            WideRole::Duke => 'd',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -509,7 +579,13 @@ impl WideRole {
     pub const fn is_overflow(self) -> bool {
         matches!(
             self,
-            WideRole::Commoner | WideRole::ShogiKnight | WideRole::Falcon
+            WideRole::Commoner
+                | WideRole::ShogiKnight
+                | WideRole::Falcon
+                | WideRole::Eagle
+                | WideRole::Cardinal
+                | WideRole::Tower
+                | WideRole::Duke
         )
     }
 
@@ -539,6 +615,11 @@ impl WideRole {
             'u' => Some(WideRole::Commoner),
             'n' => Some(WideRole::ShogiKnight),
             'f' => Some(WideRole::Falcon),
+            // Empire (Roman) army: recycled FSF mnemonics `e`/`c`/`t`/`d`.
+            'e' => Some(WideRole::Eagle),
+            'c' => Some(WideRole::Cardinal),
+            't' => Some(WideRole::Tower),
+            'd' => Some(WideRole::Duke),
             _ => None,
         }
     }
@@ -641,6 +722,10 @@ impl fmt::Display for WideRole {
             WideRole::Commoner => "commoner",
             WideRole::ShogiKnight => "shogi-knight",
             WideRole::Falcon => "falcon",
+            WideRole::Eagle => "eagle",
+            WideRole::Cardinal => "cardinal",
+            WideRole::Tower => "tower",
+            WideRole::Duke => "duke",
         })
     }
 }
