@@ -305,6 +305,36 @@ pub enum WideRole {
     /// bare letter here), and the harness maps `*d → d` when driving Empire.
     Duke = 39,
 
+    // --- Hoppel-Poppel move≠capture pieces (§ Phase 3, Milestone 10) ---
+    //
+    // Hoppel-Poppel keeps the standard chess army except its "knight" and "bishop"
+    // swap *capture* methods: the knight captures like a bishop, the bishop captures
+    // like a knight (each still *moves* like its own piece). They are two genuinely
+    // distinct move≠capture roles, separate from the standard Knight / Bishop AND
+    // from Orda's Lancer / Archer (which are knight-MOVE / slider-capture). Like the
+    // Commoner they are **overflow roles** past the exhausted single-letter alphabet.
+    /// Knight-Bishop (FSF `KNIBIS`, Betza `mNcB`) — Hoppel-Poppel's "knight":
+    /// **moves like a knight** (the eight 2-1 leaps) to an empty square but
+    /// **captures like a bishop** (a diagonal slide). Its quiet knight jumps ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets) and its
+    /// [`role_attacks`](super::WideVariant::role_attacks) (the attack / capture /
+    /// check relation) is the bishop slide. (Hoppel-Poppel.) An **overflow role**:
+    /// its FEN token is `*H` (white) / `*h` (black) — the base letter `h` (the
+    /// "**H**oppel" mnemonic, since the FSF letter `n` is already the ShogiKnight's
+    /// recycled base), distinct from the bare Hoplite `h`. The `compare-fairy`
+    /// harness maps `*h → n` when driving Hoppel-Poppel.
+    KnightBishop = 40,
+    /// Bishop-Knight (FSF `BISKNI`, Betza `mBcN`) — Hoppel-Poppel's "bishop":
+    /// **moves like a bishop** (a diagonal slide) to an empty square but **captures
+    /// like a knight** (a 2-1 leap). The inverse of the Knight-Bishop: its quiet
+    /// bishop slides ride [`quiet_only_targets`](super::WideVariant::quiet_only_targets)
+    /// and its [`role_attacks`](super::WideVariant::role_attacks) is the knight
+    /// pattern. (Hoppel-Poppel.) An **overflow role**: its FEN token is `*B` (white)
+    /// / `*b` (black), recycling the FSF `BISKNI` letter `b` (distinct from the bare
+    /// Bishop `b` by the `*` prefix). The `compare-fairy` harness maps `*b → b` when
+    /// driving Hoppel-Poppel.
+    BishopKnight = 41,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -341,7 +371,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 40;
+    pub const COUNT: usize = 42;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -385,6 +415,8 @@ impl WideRole {
         WideRole::Cardinal,
         WideRole::Tower,
         WideRole::Duke,
+        WideRole::KnightBishop,
+        WideRole::BishopKnight,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -500,6 +532,16 @@ impl WideRole {
             WideRole::Cardinal => 'c',
             WideRole::Tower => 't',
             WideRole::Duke => 'd',
+            // Hoppel-Poppel move≠capture pieces — two overflow roles past the
+            // exhausted single-letter alphabet. Like the Commoner / Empire pieces,
+            // each FEN token is the `*` prefix plus a recycled base letter, so
+            // `char()` returns the bare base letter and the board FEN I/O adds the
+            // `*` prefix. The Knight-Bishop recycles `h` (the "Hoppel" mnemonic,
+            // since the FSF letter `n` is already the ShogiKnight's base) and the
+            // Bishop-Knight recycles the FSF `BISKNI` letter `b`. The `compare-fairy`
+            // harness maps `*h → n`, `*b → b` when driving Hoppel-Poppel.
+            WideRole::KnightBishop => 'h',
+            WideRole::BishopKnight => 'b',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -586,6 +628,8 @@ impl WideRole {
                 | WideRole::Cardinal
                 | WideRole::Tower
                 | WideRole::Duke
+                | WideRole::KnightBishop
+                | WideRole::BishopKnight
         )
     }
 
@@ -620,6 +664,10 @@ impl WideRole {
             'c' => Some(WideRole::Cardinal),
             't' => Some(WideRole::Tower),
             'd' => Some(WideRole::Duke),
+            // Hoppel-Poppel move≠capture pieces: the Knight-Bishop recycles `h`
+            // (the "Hoppel" mnemonic), the Bishop-Knight the FSF `BISKNI` letter `b`.
+            'h' => Some(WideRole::KnightBishop),
+            'b' => Some(WideRole::BishopKnight),
             _ => None,
         }
     }
@@ -726,6 +774,8 @@ impl fmt::Display for WideRole {
             WideRole::Cardinal => "cardinal",
             WideRole::Tower => "tower",
             WideRole::Duke => "duke",
+            WideRole::KnightBishop => "knight-bishop",
+            WideRole::BishopKnight => "bishop-knight",
         })
     }
 }

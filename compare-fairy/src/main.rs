@@ -27,6 +27,7 @@ mod corpus;
 mod duck;
 mod empire;
 mod grand;
+mod hoppelpoppel;
 mod janggi;
 mod knightmate;
 mod locate;
@@ -199,6 +200,8 @@ fn main() {
     // Empire is an INI variant: empire::run loads FSF's variants.ini (resolved from
     // the located binary) before driving `UCI_Variant empire`.
     let empire_mismatches = empire::run(&mut engine, &located.bin, opts.full);
+    // Hoppel-Poppel is a FSF built-in (no variants.ini needed).
+    let hoppelpoppel_mismatches = hoppelpoppel::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -222,6 +225,7 @@ fn main() {
         + ordamirror_mismatches
         + synochess_mismatches
         + empire_mismatches
+        + hoppelpoppel_mismatches
         > 0
     {
         std::process::exit(1);

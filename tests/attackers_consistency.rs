@@ -40,7 +40,8 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
-    JanggiRules, KnightmateRules, MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules,
+    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, MinishogiRules,
+    MinixiangqiRules, OrdaRules,
     OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
     SpartanRules, Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
@@ -610,5 +611,34 @@ variant_test!(
         "r*ubqkb*ur/pp2pppp/2pp4/8/2PP4/8/PP2PPPP/R*UBQKB*UR w KQkq - 0 1",
         "r3k2r/pppq1ppp/2*up1*u2/2b1p3/2B1P3/2*UP1*U2/PPPQ1PPP/R3K2R w KQkq - 0 1",
         "4k3/1P3P2/8/8/3*u4/8/4r3/4K3 w - - 0 1",
+    ]
+);
+
+// -- Hoppel-Poppel (knight captures like a bishop, bishop like a knight, 8x8) -
+//
+// The Knight-Bishop (`*h`, FSF `mNcB`) **moves** like a knight (quiet-only) but its
+// `role_attacks` set is the bishop slide, so it captures / checks along diagonals
+// and slides in the attack relation (`role_is_slider`). The Bishop-Knight (`*b`,
+// FSF `mBcN`) is the inverse: it **moves** like a bishop (quiet-only) but its attack
+// set is the symmetric knight pattern (a leaper). Both capture sets are
+// geometrically symmetric (bishop / knight), so only the pawn is colour-directional
+// and neither needs leg-asymmetry — this is the guard that those flags match the
+// generator. The corpus FENs are reused from `tests/perft_hoppelpoppel.rs` (each
+// FSF-confirmed): the startpos (both colours), three bishop/knight-rich middlegames,
+// and the tactic+promotion position. The two pieces are overflow roles (tokens
+// `*h` / `*b`, recycling `h` / `b`); the board FEN parser resolves the `*` prefix.
+
+variant_test!(
+    hoppelpoppel,
+    Chess8x8,
+    HoppelPoppelRules,
+    "hoppelpoppel",
+    [
+        "r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1",
+        "r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR b KQkq - 0 1",
+        "r1*bqk*b*hr/pppp1ppp/2*h5/4p3/4P3/2*H5/PPPP1PPP/R1*BQK*B*HR w KQkq - 0 1",
+        "r2qk2r/ppp2ppp/2*hp1*h2/2*b1p1*B1/2*B1P1*b1/2*HP1*H2/PPP2PPP/R2QK2R w KQkq - 0 1",
+        "2kr3r/pp1*h1ppp/2p1p*h2/q7/3P4/2*H*BP*H2/PPQ2PPP/2KR3R w - - 0 1",
+        "4k3/Pp4*h1/8/3*b4/3*H4/8/1p2*H3/4K3 w - - 0 1",
     ]
 );
