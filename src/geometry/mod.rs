@@ -55,7 +55,8 @@ pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan,
-    SeirawanRules, Shako, ShakoRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    SeirawanRules, Shako, ShakoRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Xiangqi,
+    XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -239,6 +240,22 @@ geometry!(
     Grand10x10,
     u128,
     10,
+    10
+);
+
+geometry!(
+    /// The Xiangqi (Chinese chess) board: nine files by ten ranks (90 squares),
+    /// backed by `u128`.
+    ///
+    /// A **third** `u128` geometry and the first whose width and height differ
+    /// with the width an odd non-power-of-two (`9`): a square index reaches `89`,
+    /// the longest file spans ten cells, and edge-masked east/west shifts must not
+    /// wrap past the ninth file. Pieces sit on the cells (not the intersections of
+    /// the traditional board); the engine treats it as a 9-by-10 grid. Files run
+    /// a..i, ranks 1..10.
+    Xiangqi9x10,
+    u128,
+    9,
     10
 );
 

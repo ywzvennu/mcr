@@ -98,6 +98,36 @@ pub enum WideRole {
     /// takes `v`, and the `compare-fairy` harness maps it to FSF's `e` when
     /// driving Shako.
     FersAlfil = 18,
+
+    // --- Xiangqi (Chinese chess) army (§ Phase 3) ---
+    /// Advisor / Guard (仕/士) — a Ferz confined to the palace: one diagonal step.
+    /// (Xiangqi.) FSF spells it `a`, but `a` already names the Hawk here, so the
+    /// Advisor takes the free letter `u` and the `compare-fairy` harness maps it
+    /// to FSF's `a` when driving Xiangqi.
+    Advisor = 19,
+    /// Horse (馬) — a knight whose leap is **blocked by a hobbling leg**: the
+    /// orthogonally-adjacent square in the direction of the leap's long axis. Its
+    /// attack set is occupancy-aware (see
+    /// [`attacks::horse_attacks`](super::attacks::horse_attacks)). (Xiangqi.) FSF
+    /// spells it `n`, but `n` already names the (unobstructed) Knight here, so the
+    /// Horse takes the free letter `h`… occupied — it takes `j`, and the harness
+    /// maps it to FSF's `n`.
+    Horse = 20,
+    /// Elephant / Minister (相/象) — a **blockable** two-diagonal leaper confined
+    /// to its own river-half: it jumps exactly two squares diagonally unless the
+    /// intervening "eye" is occupied (see
+    /// [`attacks::elephant_attacks_blockable`](super::attacks::elephant_attacks_blockable)).
+    /// (Xiangqi.) Distinct from both the Rook+Knight [`WideRole::Elephant`] (`e`)
+    /// and the Shako Fers-Alfil [`WideRole::FersAlfil`] (`v`); FSF spells it `b`,
+    /// already the Bishop here, so it takes the free letter `o` and the harness
+    /// maps it to FSF's `b`.
+    XiangqiElephant = 21,
+    /// Soldier / Pawn (兵/卒) — moves one step straight forward; **after crossing
+    /// the river** it may also step one square sideways. Never backward, no
+    /// double-step, no promotion. (Xiangqi.) FSF spells it `p`, already the Pawn
+    /// here, so the Soldier takes the free letter `z` and the harness maps it to
+    /// FSF's `p`.
+    Soldier = 22,
 }
 
 impl WideRole {
@@ -105,7 +135,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 19;
+    pub const COUNT: usize = 23;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -128,6 +158,10 @@ impl WideRole {
         WideRole::Captain,
         WideRole::Hoplite,
         WideRole::FersAlfil,
+        WideRole::Advisor,
+        WideRole::Horse,
+        WideRole::XiangqiElephant,
+        WideRole::Soldier,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -184,6 +218,14 @@ impl WideRole {
             // Fers-Alfil takes the free letter `v`, and the `compare-fairy`
             // harness maps it to FSF's `e` when driving Shako.
             WideRole::FersAlfil => 'v',
+            // Xiangqi army. FSF spells these `a n b p`, but those letters already
+            // name the Hawk, Knight, Bishop, and Pawn here; the Xiangqi pieces
+            // take distinct free letters (`u j o z`), and the `compare-fairy`
+            // harness maps them to FSF's letters when driving Xiangqi.
+            WideRole::Advisor => 'u',
+            WideRole::Horse => 'j',
+            WideRole::XiangqiElephant => 'o',
+            WideRole::Soldier => 'z',
         }
     }
 
@@ -228,6 +270,10 @@ impl WideRole {
             'i' => Some(WideRole::Captain),
             'h' => Some(WideRole::Hoplite),
             'v' => Some(WideRole::FersAlfil),
+            'u' => Some(WideRole::Advisor),
+            'j' => Some(WideRole::Horse),
+            'o' => Some(WideRole::XiangqiElephant),
+            'z' => Some(WideRole::Soldier),
             _ => None,
         }
     }
@@ -255,6 +301,10 @@ impl fmt::Display for WideRole {
             WideRole::Captain => "captain",
             WideRole::Hoplite => "hoplite",
             WideRole::FersAlfil => "fers-alfil",
+            WideRole::Advisor => "advisor",
+            WideRole::Horse => "horse",
+            WideRole::XiangqiElephant => "xiangqi-elephant",
+            WideRole::Soldier => "soldier",
         })
     }
 }
@@ -319,7 +369,7 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), chars.len(), "role chars must be distinct");
-        // All nineteen roles are named (the six standard plus thirteen fairy).
-        assert_eq!(chars.len(), 19);
+        // Every role is named (the six standard plus the fairy pieces).
+        assert_eq!(chars.len(), WideRole::COUNT);
     }
 }
