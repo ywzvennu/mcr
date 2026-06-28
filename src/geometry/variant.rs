@@ -207,6 +207,23 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         true
     }
 
+    /// Returns the 0-based rank on which `color`'s king and castling rooks
+    /// start — the rank a castle moves along.
+    ///
+    /// The default is the back rank (rank `0` for white, the top rank for black),
+    /// where standard chess and every existing variant keep their king and rooks,
+    /// so this hook is inert and those variants are byte-identical. Shako
+    /// overrides it: its king and rooks sit on **rank 2** (the cannons occupy the
+    /// back rank), so its castle, castling-rights bookkeeping, and the `KQkq` FEN
+    /// rook-file scan all run on rank 2 (white) / rank 9 (black). The generic
+    /// castling code consults this everywhere it previously assumed the back rank.
+    fn castle_rank(color: Color) -> u8 {
+        match color {
+            Color::White => 0,
+            Color::Black => G::HEIGHT - 1,
+        }
+    }
+
     /// Returns the castle destination files `(king_dest_file, rook_dest_file)`
     /// for a castling side (`0` = kingside, `1` = queenside).
     ///
@@ -302,6 +319,28 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         _occupancy: Bitboard<G>,
     ) -> Bitboard<G> {
         Bitboard::EMPTY
+    }
+
+    // --- Cannon king-safety (default OFF) ---------------------------------
+
+    /// Returns `true` if this variant fields **cannons** (the Xiangqi-style
+    /// piece that captures by jumping a single screen) — pieces whose attack
+    /// relationship to the king depends on a *screen* and therefore breaks the
+    /// standard mask-based king-safety fast path.
+    ///
+    /// The default is `false`. While it is `false` the generic engine takes the
+    /// usual single-king path — one precomputed king-danger map, one check mask,
+    /// one pin set — exactly as before, so every non-cannon variant produces
+    /// byte-identical moves and state. When `true`, the engine instead generates
+    /// pseudo-legal moves and keeps each one whose resulting position leaves the
+    /// king unattacked, computing attacks (including the cannon's over-screen
+    /// captures) on the **actual post-move occupancy**. This is required because a
+    /// cannon's check and king-danger are screen-dependent: a king sliding along a
+    /// cannon's ray, or interposing/removing a screen, changes the attack in a way
+    /// the lifted-king danger map and the `between` interpose mask cannot capture.
+    /// Shako is the only such variant so far; future Xiangqi/Janggi reuse it.
+    fn has_cannons() -> bool {
+        false
     }
 
     // --- Duck chess (default OFF) -----------------------------------------

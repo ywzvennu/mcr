@@ -55,7 +55,7 @@ pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan,
-    SeirawanRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    SeirawanRules, Shako, ShakoRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

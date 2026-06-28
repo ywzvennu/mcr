@@ -236,6 +236,104 @@ pub fn queen_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitbo
 }
 
 // ---------------------------------------------------------------------------
+// Cannon primitive (Xiangqi / Janggi / Shako).
+// ---------------------------------------------------------------------------
+
+/// The four orthogonal ray directions a cannon travels along.
+const CANNON_DIRS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+/// Returns the squares a cannon on `sq` may move to **without capturing**: the
+/// empty rook-ray squares, exactly as a rook's quiet moves, stopping one short
+/// of the first piece on each ray.
+///
+/// A cannon slides like a rook over empty squares but does **not** capture the
+/// piece it first meets — for that it needs a screen (see
+/// [`cannon_capture_targets`]). The result therefore contains only empty
+/// squares: every orthogonal square reachable before the first blocker on each
+/// of the four rays. It is the rook quiet-move set, computed directly so the
+/// cannon needs no rook call.
+///
+/// This is geometry-only: no palace, river, or color restriction is applied, so
+/// the same primitive serves the Xiangqi and Janggi cannons (which add those
+/// region masks on top) and the Shako cannon (which adds none).
+///
+/// ```
+/// use mce::geometry::{attacks::cannon_quiet_moves, Chess8x8, Bitboard, Square};
+/// // On an empty 8x8 board a cannon on a1 quietly slides the whole rank and file
+/// // (14 squares), like a rook.
+/// let q = cannon_quiet_moves::<Chess8x8>(Square::new(0), Bitboard::EMPTY);
+/// assert_eq!(q.count(), 14);
+/// ```
+#[must_use]
+pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in &CANNON_DIRS {
+        let mut cur = sq.offset(df, dr);
+        while let Some(next) = cur {
+            if occupied.contains(next) {
+                break; // first piece on the ray: a cannon cannot move onto it.
+            }
+            bb.set(next);
+            cur = next.offset(df, dr);
+        }
+    }
+    bb
+}
+
+/// Returns the squares a cannon on `sq` **threatens / may capture on**: along
+/// each orthogonal ray, the first piece beyond **exactly one** intervening
+/// piece (the "screen" / "mount").
+///
+/// This is the cannon's attack set — the squares it can land a capture on, and
+/// equally the squares from which it gives check. It is *occupancy-aware* and
+/// returns at most one square per ray: walk out to the first piece (the screen),
+/// then continue past it to the next piece (the target). If a ray has no screen,
+/// or nothing beyond the screen, that ray contributes nothing. The result
+/// includes both colours' pieces — the caller masks out friendly occupants, the
+/// same convention the slider primitives use.
+///
+/// Pairs with [`cannon_quiet_moves`] to give the cannon's full move set: quiet
+/// rook-rays plus over-one-screen captures. Pure geometry (no palace / river),
+/// so Xiangqi and Janggi inherit it and add their region masks on top.
+///
+/// ```
+/// use mce::geometry::{attacks::cannon_capture_targets, Chess8x8, Bitboard, Square};
+/// // Screen on a4, enemy on a7: a cannon on a1 captures over the screen onto a7.
+/// let occ = Bitboard::<Chess8x8>::EMPTY
+///     .with(Square::new(24)) // a4 screen
+///     .with(Square::new(48)); // a7 target
+/// let caps = cannon_capture_targets::<Chess8x8>(Square::new(0), occ);
+/// assert!(caps.contains(Square::new(48)));
+/// assert_eq!(caps.count(), 1);
+/// ```
+#[must_use]
+pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in &CANNON_DIRS {
+        // Walk to the first piece on the ray (the screen).
+        let mut cur = sq.offset(df, dr);
+        let screen = loop {
+            match cur {
+                None => break None,
+                Some(next) if occupied.contains(next) => break Some(next),
+                Some(next) => cur = next.offset(df, dr),
+            }
+        };
+        let Some(screen) = screen else { continue };
+        // Walk past the screen to the next piece (the capture target).
+        let mut cur = screen.offset(df, dr);
+        while let Some(next) = cur {
+            if occupied.contains(next) {
+                bb.set(next);
+                break;
+            }
+            cur = next.offset(df, dr);
+        }
+    }
+    bb
+}
+
+// ---------------------------------------------------------------------------
 // Geometry rays: `between` and `line`.
 // ---------------------------------------------------------------------------
 
@@ -439,6 +537,150 @@ mod tests {
         assert_eq!(
             leaper_attacks::<Chess8x8>(Square::new(0), &wazir).count(),
             2
+        );
+    }
+
+    // ----- Cannon primitive (Xiangqi / Janggi / Shako) ------------------------
+
+    #[test]
+    fn cannon_quiet_matches_rook_on_empty_board() {
+        // With no pieces to capture, the cannon's quiet moves are exactly a
+        // rook's slides (no first-blocker capture, since nothing is occupied).
+        for index in 0..64u8 {
+            let sq = Square::<Chess8x8>::new(index);
+            let q = cannon_quiet_moves::<Chess8x8>(sq, Bitboard::EMPTY);
+            assert_eq!(
+                q,
+                rook_attacks::<Chess8x8>(sq, Bitboard::EMPTY),
+                "sq {index}"
+            );
+            // Nothing to capture over: no screen anywhere.
+            assert_eq!(
+                cannon_capture_targets::<Chess8x8>(sq, Bitboard::EMPTY),
+                Bitboard::EMPTY
+            );
+        }
+    }
+
+    #[test]
+    fn cannon_quiet_stops_before_first_piece() {
+        // a1 cannon, blocker on a4 (index 24): quiet a-file moves are a2, a3
+        // only (it stops one short of the blocker and never lands on it).
+        let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24));
+        let q = cannon_quiet_moves::<Chess8x8>(Square::new(0), occ);
+        assert!(q.contains(Square::new(8))); // a2
+        assert!(q.contains(Square::new(16))); // a3
+        assert!(!q.contains(Square::new(24))); // a4 (the blocker) — not quiet
+        assert!(!q.contains(Square::new(32))); // a5 (beyond) — blocked
+                                               // The single blocker is a lone screen with nothing beyond it: no capture.
+        assert_eq!(
+            cannon_capture_targets::<Chess8x8>(Square::new(0), occ),
+            Bitboard::EMPTY
+        );
+    }
+
+    #[test]
+    fn cannon_captures_over_exactly_one_screen() {
+        // a1 cannon, screen on a4, enemy on a7: captures a7 over the screen.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24)) // a4 screen
+            .with(Square::new(48)); // a7 target
+        let caps = cannon_capture_targets::<Chess8x8>(Square::new(0), occ);
+        assert_eq!(caps, Bitboard::EMPTY.with(Square::new(48)));
+        // The screen itself is never a capture target, nor a quiet square.
+        let q = cannon_quiet_moves::<Chess8x8>(Square::new(0), occ);
+        assert!(!q.contains(Square::new(24)));
+        assert!(!q.contains(Square::new(48)));
+    }
+
+    #[test]
+    fn cannon_needs_exactly_one_screen_not_two() {
+        // a1 cannon, two adjacent screens a3+a4, then a gap, then a target a7:
+        // the FIRST piece beyond the (a3) screen is a4 — itself the second
+        // contiguous piece — so the cannon's only target is a4. The shielded a7
+        // is unreachable: a capture lands on the first piece past exactly one
+        // screen, and two pieces sit between the cannon and a7.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(16)) // a3 screen
+            .with(Square::new(24)) // a4 first piece beyond the screen (target)
+            .with(Square::new(48)); // a7 (shielded by the a3+a4 double block)
+        let caps = cannon_capture_targets::<Chess8x8>(Square::new(0), occ);
+        assert_eq!(
+            caps,
+            Bitboard::EMPTY.with(Square::new(24)),
+            "capture is the first piece past one screen; a7 is shielded by two pieces"
+        );
+        assert!(!caps.contains(Square::new(48)), "two pieces shield a7");
+    }
+
+    #[test]
+    fn cannon_capture_is_first_piece_beyond_screen_only() {
+        // a1 cannon, screen a4, then a6 and a8 both occupied: only the FIRST
+        // piece beyond the screen (a6) is a target; a8 is shielded by a6.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24)) // a4 screen
+            .with(Square::new(40)) // a6 first target
+            .with(Square::new(56)); // a8 (shielded)
+        let caps = cannon_capture_targets::<Chess8x8>(Square::new(0), occ);
+        assert_eq!(caps, Bitboard::EMPTY.with(Square::new(40)));
+    }
+
+    #[test]
+    fn cannon_independent_per_ray() {
+        // Central cannon on d4 (index 27) with a screen+target on each of the
+        // four rays captures exactly four squares, one per direction.
+        let d4 = Square::<Chess8x8>::new(27);
+        // North: d6 screen (43), d8 target (59). South: d2 screen (11), d... none
+        // below; use d3 screen (19) and d1 (3) target. East: f4 screen (29), h4
+        // (31) target. West: b4 screen (25), a4 (24) target.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(43))
+            .with(Square::new(59))
+            .with(Square::new(19))
+            .with(Square::new(3))
+            .with(Square::new(29))
+            .with(Square::new(31))
+            .with(Square::new(25))
+            .with(Square::new(24));
+        let caps = cannon_capture_targets::<Chess8x8>(d4, occ);
+        let expect = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(59))
+            .with(Square::new(3))
+            .with(Square::new(31))
+            .with(Square::new(24));
+        assert_eq!(caps, expect);
+    }
+
+    #[test]
+    fn cannon_does_not_wrap_or_leak_off_board() {
+        // On the 10x10 u128 geometry, a cannon's moves and captures stay on the
+        // board and never wrap across the file edges.
+        use crate::geometry::Grand10x10;
+        let off = !Grand10x10::BOARD_MASK;
+        // Dense occupancy: the whole board.
+        let occ = Bitboard::<Grand10x10>(Grand10x10::BOARD_MASK);
+        for index in 0..100u8 {
+            let sq = Square::<Grand10x10>::new(index);
+            assert_eq!(cannon_quiet_moves::<Grand10x10>(sq, occ).0 & off, 0);
+            assert_eq!(cannon_capture_targets::<Grand10x10>(sq, occ).0 & off, 0);
+            // Captures and quiets are disjoint and both lie on rook lines.
+            let q = cannon_quiet_moves::<Grand10x10>(sq, Bitboard::EMPTY);
+            for dest in q {
+                assert!(dest.file() == sq.file() || dest.rank() == sq.rank());
+            }
+        }
+        // Edge wrap: a cannon on the last file (j, file 9) of rank 0 with a
+        // screen+target on the next rank's a-file must NOT capture across the
+        // wrap. Put a screen on i1 (file 8 rank 0) and a target at file 7 rank 0:
+        // capture stays on rank 0.
+        let j1 = Square::<Grand10x10>::from_file_rank(9, 0).unwrap();
+        let occ = Bitboard::<Grand10x10>::EMPTY
+            .with(Square::from_file_rank(8, 0).unwrap()) // i1 screen
+            .with(Square::from_file_rank(7, 0).unwrap()); // h1 target
+        let caps = cannon_capture_targets::<Grand10x10>(j1, occ);
+        assert_eq!(
+            caps,
+            Bitboard::EMPTY.with(Square::from_file_rank(7, 0).unwrap())
         );
     }
 

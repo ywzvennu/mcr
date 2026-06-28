@@ -661,6 +661,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_multi_royal_into(out);
             return;
         }
+        // Cannon variants (Shako): a cannon's check and king-danger are
+        // screen-dependent, so the mask-based single-king fast path (lifted-king
+        // danger map, `between` interpose) is unsound — a king sliding along a
+        // cannon ray, or a move that adds/removes a screen, can leave the king en
+        // prise (or wrongly forbid a safe square). Generate pseudo-legal moves and
+        // verify each against the actual post-move occupancy. Gated behind
+        // `has_cannons()` (default-off), so every other variant takes the standard
+        // path below unchanged.
+        if V::has_cannons() {
+            self.generate_cannon_verify_into(out);
+            return;
+        }
         let us = self.state.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -715,6 +727,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 let targets =
                     V::role_attacks(role, us, from, occupied) & !our_pieces & check_mask & pin_line;
                 emit_targets(out, from, targets, their_pieces);
+                // Quiet-only steps: squares a piece may move to but never capture
+                // on — the cannon's empty rook-rays (its captures are the
+                // over-screen `role_attacks` set above), and the Spartan
+                // Lieutenant's sideways slide. Default-empty, so inert and
+                // byte-identical for every other role and variant. Confined to
+                // empty squares and the same check / pin masks as a normal move.
+                let quiet_only = V::quiet_only_targets(role, us, from, occupied)
+                    & !occupied
+                    & check_mask
+                    & pin_line;
+                for to in quiet_only {
+                    out.push(WideMove::new(from, to, WideMoveKind::Quiet));
+                }
             }
         }
 
@@ -790,7 +815,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // Castling also moves the rook; reflect both squares so the duck never
             // lands on the rook's destination.
             if mv.is_castle() {
-                let rank = back_rank::<G>(us);
+                let rank = V::castle_rank(us);
                 let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
                     KINGSIDE
                 } else {
@@ -893,6 +918,39 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // `apply` flipped the side to move; test our (now non-to-move) kings.
             if next.royals_survive(us) {
                 out.push(mv);
+            }
+        }
+    }
+
+    /// Generates every legal move for a **cannon** variant (Shako) via
+    /// pseudo-legal generation plus per-move verification.
+    ///
+    /// Reuses the multi-royal pseudo-move generator — which already emits every
+    /// role (including the cannon's quiet rook-rays through `quiet_only_targets`
+    /// and its over-screen captures through `role_attacks`), the standard pawns
+    /// with en passant, and castling — then keeps each move whose resulting
+    /// position leaves the (single) king unattacked, with attacks computed on the
+    /// true post-move occupancy. This is the only sound way to handle a cannon's
+    /// screen-dependent check and king-danger; gated behind `has_cannons()`, so it
+    /// never runs for a non-cannon variant.
+    fn generate_cannon_verify_into(&self, out: &mut Vec<WideMove>) {
+        let us = self.state.turn;
+        if self.board.king_of(us).is_none() {
+            return;
+        }
+        let mut pseudo = Vec::new();
+        self.gen_multi_royal_pseudo(&mut pseudo, us);
+        for mv in pseudo {
+            let mut next = self.clone();
+            next.apply(&mv);
+            // `apply` flipped the side to move; our king is now the non-mover's.
+            if let Some(king) = next.board.king_of(us) {
+                if next
+                    .attackers_to(king, us.opposite(), next.board.occupied())
+                    .is_empty()
+                {
+                    out.push(mv);
+                }
             }
         }
     }
@@ -1349,7 +1407,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if !self.state.castling.has_any(us) {
             return;
         }
-        let rank = back_rank::<G>(us);
+        let rank = V::castle_rank(us);
         if king_sq.rank() != rank {
             return;
         }
@@ -1417,7 +1475,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let them = us.opposite();
         let from = mv.from::<G>();
         let to = mv.to::<G>();
-        let rank = back_rank::<G>(us);
+        // The rank a castle's rook sits on (back rank by default; Shako uses
+        // rank 2). Only consulted by the castle arm below.
+        let rank = V::castle_rank(us);
 
         // A drop has no origin piece (the square it names is empty before the
         // drop), so it is handled before the `from`-piece lookup the board moves
@@ -1615,7 +1675,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if self.state.castling.is_empty() {
             return;
         }
-        let rank = back_rank::<G>(color);
+        let rank = V::castle_rank(color);
         if square.rank() != rank {
             return;
         }
@@ -1731,7 +1791,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             parse_castling_and_gating::<G>(castling_field, holdings, &board)?
         } else {
             (
-                parse_castling::<G>(castling_field, &board)?,
+                parse_castling::<G, V>(castling_field, &board)?,
                 GenericGating::NONE,
             )
         };
@@ -1979,7 +2039,7 @@ impl std::error::Error for WideFenError {}
 /// Standard chess uses `K`/`k` for the kingside (rightmost) rook and `Q`/`q` for
 /// the queenside (leftmost) rook of white / black. The rook's start file is the
 /// file of the matching rook on that side's back rank.
-fn parse_castling<G: Geometry>(
+fn parse_castling<G: Geometry, V: WideVariant<G>>(
     field: &str,
     board: &Board<G>,
 ) -> Result<GenericCastling, WideFenError> {
@@ -1995,10 +2055,9 @@ fn parse_castling<G: Geometry>(
             'q' => (Color::Black, QUEENSIDE),
             _ => return Err(WideFenError::BadCastling),
         };
-        let rank = match color {
-            Color::White => 0,
-            Color::Black => G::HEIGHT - 1,
-        };
+        // The rank the king and rooks castle on — the back rank by default, but a
+        // variant (Shako) may place them on a different rank.
+        let rank = V::castle_rank(color);
         // Find the rook on the named side: the outermost friendly rook on the
         // back rank toward the kingside (last file) or queenside (file 0).
         let rooks = board.pieces(color, WideRole::Rook);
