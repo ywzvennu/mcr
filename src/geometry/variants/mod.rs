@@ -11,6 +11,7 @@
 pub mod capablanca;
 pub mod duck;
 pub mod grand;
+pub mod janggi;
 pub mod makruk;
 pub mod minishogi;
 pub mod minixiangqi;
@@ -24,6 +25,7 @@ pub mod xiangqi;
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use duck::{Duck, DuckRules};
 pub use grand::{Grand, GrandRules};
+pub use janggi::{Janggi, JanggiRules};
 pub use makruk::{Makruk, MakrukRules};
 pub use minishogi::{Minishogi, MinishogiRules};
 pub use minixiangqi::{Minixiangqi, MinixiangqiRules};

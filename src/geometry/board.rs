@@ -722,8 +722,8 @@ mod tests {
 
     #[test]
     fn rejects_invalid_char() {
-        let err = Board::<Chess8x8>::from_fen_placement("xnbqkbnr/8/8/8/8/8/8/8").unwrap_err();
-        assert_eq!(err, ParseBoardError::InvalidChar('x'));
+        let err = Board::<Chess8x8>::from_fen_placement("ynbqkbnr/8/8/8/8/8/8/8").unwrap_err();
+        assert_eq!(err, ParseBoardError::InvalidChar('y'));
         // A zero digit is not allowed.
         let err = Board::<Chess8x8>::from_fen_placement("08/8/8/8/8/8/8/8").unwrap_err();
         assert_eq!(err, ParseBoardError::InvalidChar('0'));

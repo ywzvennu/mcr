@@ -129,6 +129,17 @@ pub enum WideRole {
     /// FSF's `p`.
     Soldier = 22,
 
+    // --- Janggi (Korean chess) elephant (§ Phase 3, Milestone 10) ---
+    /// Janggi Elephant (象) — moves one square orthogonally then **two** squares
+    /// diagonally outward (a `(±2,±3)` / `(±3,±2)` leap, longer than the Xiangqi
+    /// elephant's `(±2,±2)`), **blockable** at each intervening square and **not**
+    /// river-bound (see
+    /// [`attacks::janggi_elephant_attacks`](super::attacks::janggi_elephant_attacks)).
+    /// FSF spells it `b`, already the Bishop here, and the Xiangqi elephant already
+    /// took `o`, so the Janggi elephant takes the free letter `x` and the
+    /// `compare-fairy` harness maps it to FSF's `b` when driving Janggi.
+    JanggiElephant = 29,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -165,7 +176,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 29;
+    pub const COUNT: usize = 30;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -198,6 +209,7 @@ impl WideRole {
         WideRole::PromotedSilver,
         WideRole::Dragon,
         WideRole::DragonHorse,
+        WideRole::JanggiElephant,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -262,6 +274,10 @@ impl WideRole {
             WideRole::Horse => 'j',
             WideRole::XiangqiElephant => 'o',
             WideRole::Soldier => 'z',
+            // Janggi elephant. FSF spells it `b` (the Bishop here) and the Xiangqi
+            // elephant already took `o`, so it takes the free letter `x`; the
+            // `compare-fairy` harness maps it to FSF's `b` when driving Janggi.
+            WideRole::JanggiElephant => 'x',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -371,6 +387,7 @@ impl WideRole {
             'j' => Some(WideRole::Horse),
             'o' => Some(WideRole::XiangqiElephant),
             'z' => Some(WideRole::Soldier),
+            'x' => Some(WideRole::JanggiElephant),
             _ => None,
         }
     }
@@ -408,6 +425,7 @@ impl fmt::Display for WideRole {
             WideRole::PromotedSilver => "promoted-silver",
             WideRole::Dragon => "dragon",
             WideRole::DragonHorse => "dragon-horse",
+            WideRole::JanggiElephant => "janggi-elephant",
         })
     }
 }
@@ -463,7 +481,7 @@ mod tests {
             assert_eq!(WideRole::from_char(role.upper_char()), Some(role));
             assert_eq!(role.char().to_ascii_uppercase(), role.upper_char());
         }
-        assert_eq!(WideRole::from_char('x'), None);
+        assert_eq!(WideRole::from_char('y'), None);
         assert_eq!(WideRole::from_char('1'), None);
     }
 

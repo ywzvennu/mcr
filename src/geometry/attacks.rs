@@ -410,6 +410,132 @@ pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>)
 }
 
 // ---------------------------------------------------------------------------
+// Janggi cannon primitive (screen-mandatory, screen/target may not be a cannon).
+// ---------------------------------------------------------------------------
+
+/// Returns the squares a **Janggi cannon** (포) on `sq` may move to **without
+/// capturing**, along the four orthogonal rays, given the full `occupied` set and
+/// the subset `cannons` of squares holding a cannon (either colour).
+///
+/// The Janggi cannon differs fundamentally from the Xiangqi / Shako cannon
+/// ([`cannon_quiet_moves`]): it **cannot move along an empty ray at all** — every
+/// move, quiet or capturing, must jump exactly one **screen** (a non-cannon
+/// piece). So this returns the *empty* squares **beyond the first screen** on each
+/// ray (up to, but not including, the next piece). Crucially the screen **may not
+/// itself be a cannon**: a ray whose first piece is a cannon is dead (no jump).
+///
+/// This is geometry-only on the four orthogonal directions; the palace-diagonal
+/// jump (over a screen on the palace centre) is layered on by the variant, which
+/// owns the palace geometry. Pairs with [`janggi_cannon_capture`] for the full
+/// move set.
+///
+/// ```
+/// use mce::geometry::{attacks::janggi_cannon_quiet, Chess8x8, Bitboard, Square};
+/// // a1 cannon, screen (non-cannon) on a4, nothing beyond: quiet jumps land on
+/// // a5..a8 (the empty squares past the one screen).
+/// let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24)); // a4 screen
+/// let q = janggi_cannon_quiet::<Chess8x8>(Square::new(0), occ, Bitboard::EMPTY);
+/// assert!(q.contains(Square::new(32))); // a5
+/// assert!(!q.contains(Square::new(24))); // the screen is never a destination
+/// ```
+#[must_use]
+#[inline]
+pub fn janggi_cannon_quiet<G: Geometry>(
+    sq: Square<G>,
+    occupied: Bitboard<G>,
+    cannons: Bitboard<G>,
+) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in &CANNON_DIRS {
+        // Walk to the first piece on the ray (the screen).
+        let mut cur = sq.offset(df, dr);
+        let screen = loop {
+            match cur {
+                None => break None,
+                Some(next) if occupied.contains(next) => break Some(next),
+                Some(next) => cur = next.offset(df, dr),
+            }
+        };
+        let Some(screen) = screen else { continue };
+        // The screen may not be a cannon — a cannon cannot use another cannon as
+        // its mount.
+        if cannons.contains(screen) {
+            continue;
+        }
+        // Every empty square beyond the screen, up to the next piece (exclusive).
+        let mut cur = screen.offset(df, dr);
+        while let Some(next) = cur {
+            if occupied.contains(next) {
+                break;
+            }
+            bb.set(next);
+            cur = next.offset(df, dr);
+        }
+    }
+    bb
+}
+
+/// Returns the squares a **Janggi cannon** on `sq` **may capture on** along the
+/// four orthogonal rays: the first piece beyond **exactly one screen**, where the
+/// screen is a non-cannon piece **and** the captured target is itself **not a
+/// cannon**.
+///
+/// This is the cannon's attack set (also the squares from which it gives check).
+/// Two extra restrictions over the plain [`cannon_capture_targets`]: the screen
+/// may not be a cannon (a ray whose first piece is a cannon is dead), and a cannon
+/// may not capture a cannon (a target that is a cannon yields nothing on that
+/// ray). The result includes both colours; the caller masks out friendly pieces.
+///
+/// The palace-diagonal jump is layered on by the variant (it owns the palace
+/// geometry). Pure geometry on the orthogonals here.
+///
+/// ```
+/// use mce::geometry::{attacks::janggi_cannon_capture, Chess8x8, Bitboard, Square};
+/// // a1 cannon, non-cannon screen a4, enemy non-cannon a7: capture lands on a7.
+/// let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24)).with(Square::new(48));
+/// let caps = janggi_cannon_capture::<Chess8x8>(Square::new(0), occ, Bitboard::EMPTY);
+/// assert_eq!(caps, Bitboard::EMPTY.with(Square::new(48)));
+/// ```
+#[must_use]
+#[inline]
+pub fn janggi_cannon_capture<G: Geometry>(
+    sq: Square<G>,
+    occupied: Bitboard<G>,
+    cannons: Bitboard<G>,
+) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in &CANNON_DIRS {
+        // Walk to the first piece on the ray (the screen).
+        let mut cur = sq.offset(df, dr);
+        let screen = loop {
+            match cur {
+                None => break None,
+                Some(next) if occupied.contains(next) => break Some(next),
+                Some(next) => cur = next.offset(df, dr),
+            }
+        };
+        let Some(screen) = screen else { continue };
+        // The screen may not be a cannon.
+        if cannons.contains(screen) {
+            continue;
+        }
+        // Walk past the screen to the next piece (the capture target).
+        let mut cur = screen.offset(df, dr);
+        while let Some(next) = cur {
+            if occupied.contains(next) {
+                // A cannon may not capture another cannon.
+                if !cannons.contains(next) {
+                    bb.set(next);
+                }
+                break;
+            }
+            cur = next.offset(df, dr);
+        }
+    }
+    bb
+}
+
+// ---------------------------------------------------------------------------
 // Blockable-leg leapers (Xiangqi horse and elephant).
 // ---------------------------------------------------------------------------
 
@@ -503,6 +629,75 @@ pub fn elephant_attacks_blockable<G: Geometry>(
             continue;
         };
         if occupied.contains(eye) {
+            continue;
+        }
+        if let Some(dest) = sq.offset(tf, tr) {
+            bb.set(dest);
+        }
+    }
+    bb
+}
+
+/// The eight Janggi-elephant (象) leaps, each paired with the **two intervening
+/// squares** that block the jump when occupied. Each entry is
+/// `(target_df, target_dr, leg1_df, leg1_dr, leg2_df, leg2_dr)`: the elephant
+/// steps **one orthogonal square** (leg 1), then **two diagonal squares**
+/// continuing outward; leg 2 is the first of those diagonal squares. The target
+/// is `(±2,±3)` / `(±3,±2)` — a longer leap than the Xiangqi elephant's `(±2,±2)`.
+///
+/// For an up/down-biased leap (target `(±2,±3)`) leg 1 is the orthogonal step in
+/// the rank direction `(0,±1)`; for a left/right-biased leap (target `(±3,±2)`)
+/// leg 1 is the orthogonal step in the file direction `(±1,0)`. Leg 2 is the
+/// diagonal square one step past leg 1 toward the target.
+const JANGGI_ELEPHANT_LEGS: [(i8, i8, i8, i8, i8, i8); 8] = [
+    // Up-biased (two files, three ranks): ortho step is the rank step (0,±1).
+    (2, 3, 0, 1, 1, 2),
+    (-2, 3, 0, 1, -1, 2),
+    (2, -3, 0, -1, 1, -2),
+    (-2, -3, 0, -1, -1, -2),
+    // Side-biased (three files, two ranks): ortho step is the file step (±1,0).
+    (3, 2, 1, 0, 2, 1),
+    (3, -2, 1, 0, 2, -1),
+    (-3, 2, -1, 0, -2, 1),
+    (-3, -2, -1, 0, -2, -1),
+];
+
+/// Returns the squares a **Janggi elephant** (象) on `sq` attacks given the
+/// `occupied` set: the eight `(±2,±3)` / `(±3,±2)` targets minus any whose path is
+/// blocked.
+///
+/// The Janggi elephant moves **one square orthogonally then two squares
+/// diagonally** outward — a longer leap than the Xiangqi elephant's two-diagonal
+/// jump. The path is **blockable at each intervening square**: the orthogonal step
+/// (leg 1) and the first diagonal step (leg 2). If either is occupied, that leap
+/// is unavailable. Unlike the Xiangqi elephant, the Janggi elephant is **not
+/// river-bound** (it roams the whole board); the variant applies no half-mask.
+///
+/// Geometry-only and occupancy-aware; edges are respected (an off-board target or
+/// leg contributes nothing, and the masked offsets never wrap).
+///
+/// ```
+/// use mce::geometry::{attacks::janggi_elephant_attacks, Bitboard, Square, Xiangqi9x10};
+/// // A central elephant on an empty board reaches all eight long-diagonal squares.
+/// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+/// assert_eq!(janggi_elephant_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 8);
+/// ```
+#[must_use]
+pub fn janggi_elephant_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(tf, tr, l1f, l1r, l2f, l2r) in &JANGGI_ELEPHANT_LEGS {
+        // Leg 1: the orthogonal step must be on the board and empty.
+        let Some(leg1) = sq.offset(l1f, l1r) else {
+            continue;
+        };
+        if occupied.contains(leg1) {
+            continue;
+        }
+        // Leg 2: the first diagonal step must be on the board and empty.
+        let Some(leg2) = sq.offset(l2f, l2r) else {
+            continue;
+        };
+        if occupied.contains(leg2) {
             continue;
         }
         if let Some(dest) = sq.offset(tf, tr) {
@@ -1112,6 +1307,158 @@ mod tests {
             for d in elephant_attacks_blockable::<Xiangqi9x10>(sq, Bitboard::EMPTY) {
                 assert_eq!(d.file(), 2, "a-file elephant wrapped to {d:?}");
             }
+        }
+    }
+
+    // ----- Janggi cannon (screen-mandatory, screen/target may not be a cannon) --
+
+    #[test]
+    fn janggi_cannon_needs_a_screen_no_empty_ray_move() {
+        use crate::geometry::Xiangqi9x10;
+        // A lone cannon on an empty board can neither move nor capture: with no
+        // screen on any ray, both sets are empty (unlike the Xiangqi cannon, whose
+        // quiet set is the full rook rays).
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        assert_eq!(
+            janggi_cannon_quiet::<Xiangqi9x10>(sq, Bitboard::EMPTY, Bitboard::EMPTY),
+            Bitboard::EMPTY
+        );
+        assert_eq!(
+            janggi_cannon_capture::<Xiangqi9x10>(sq, Bitboard::EMPTY, Bitboard::EMPTY),
+            Bitboard::EMPTY
+        );
+    }
+
+    #[test]
+    fn janggi_cannon_jumps_one_screen_quiet_and_capture() {
+        use crate::geometry::Chess8x8;
+        // a1 cannon; a4 a non-cannon screen; a7 a non-cannon enemy. Quiet jumps
+        // land on a5, a6 (empty past the screen, before the target); the capture
+        // lands on a7.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24)) // a4 screen
+            .with(Square::new(48)); // a7 target
+        let q = janggi_cannon_quiet::<Chess8x8>(Square::new(0), occ, Bitboard::EMPTY);
+        assert!(q.contains(Square::new(32))); // a5
+        assert!(q.contains(Square::new(40))); // a6
+        assert!(!q.contains(Square::new(24))); // the screen
+        assert!(!q.contains(Square::new(48))); // the target is a capture, not quiet
+        let caps = janggi_cannon_capture::<Chess8x8>(Square::new(0), occ, Bitboard::EMPTY);
+        assert_eq!(caps, Bitboard::EMPTY.with(Square::new(48)));
+    }
+
+    #[test]
+    fn janggi_cannon_screen_may_not_be_a_cannon() {
+        use crate::geometry::Chess8x8;
+        // a1 cannon; the screen a4 IS a cannon; enemy non-cannon a7. The ray is
+        // dead — no quiet jump and no capture, because a cannon cannot mount over
+        // another cannon.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24)) // a4 screen (a cannon)
+            .with(Square::new(48)); // a7 target
+        let cannons = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24));
+        assert_eq!(
+            janggi_cannon_quiet::<Chess8x8>(Square::new(0), occ, cannons),
+            Bitboard::EMPTY
+        );
+        assert_eq!(
+            janggi_cannon_capture::<Chess8x8>(Square::new(0), occ, cannons),
+            Bitboard::EMPTY
+        );
+    }
+
+    #[test]
+    fn janggi_cannon_may_not_capture_a_cannon() {
+        use crate::geometry::Chess8x8;
+        // a1 cannon; non-cannon screen a4; the target a7 IS a cannon. The capture
+        // is forbidden, but the empty squares between (a5, a6) are still quiet
+        // jumps.
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24)) // a4 screen (not a cannon)
+            .with(Square::new(48)); // a7 target (a cannon)
+        let cannons = Bitboard::<Chess8x8>::EMPTY.with(Square::new(48));
+        assert_eq!(
+            janggi_cannon_capture::<Chess8x8>(Square::new(0), occ, cannons),
+            Bitboard::EMPTY,
+            "a cannon may not capture a cannon"
+        );
+        let q = janggi_cannon_quiet::<Chess8x8>(Square::new(0), occ, cannons);
+        assert!(q.contains(Square::new(32)) && q.contains(Square::new(40)));
+    }
+
+    // ----- Janggi elephant (1 orthogonal + 2 diagonal, blockable at each step) --
+
+    #[test]
+    fn janggi_elephant_open_reaches_eight_long_leaps() {
+        use crate::geometry::Xiangqi9x10;
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        let a = janggi_elephant_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY);
+        assert_eq!(a.count(), 8);
+        for d in a {
+            let df = (d.file() as i8 - sq.file() as i8).abs();
+            let dr = (d.rank() as i8 - sq.rank() as i8).abs();
+            assert!((df, dr) == (2, 3) || (df, dr) == (3, 2), "{d:?}");
+        }
+    }
+
+    #[test]
+    fn janggi_elephant_orthogonal_leg_blocks_two_leaps() {
+        use crate::geometry::Xiangqi9x10;
+        // e5 elephant (file 4, rank 4). The north orthogonal leg (0,+1) is shared
+        // by the two up-biased north leaps to (±2,+3): blocking it removes both,
+        // leaving six.
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        let leg = Bitboard::<Xiangqi9x10>::EMPTY.with(sq.offset(0, 1).unwrap());
+        let a = janggi_elephant_attacks::<Xiangqi9x10>(sq, leg);
+        assert_eq!(a.count(), 6);
+        assert!(!a.contains(sq.offset(2, 3).unwrap()));
+        assert!(!a.contains(sq.offset(-2, 3).unwrap()));
+        // A side-biased leap is unaffected.
+        assert!(a.contains(sq.offset(3, 2).unwrap()));
+    }
+
+    #[test]
+    fn janggi_elephant_diagonal_leg_blocks_one_leap() {
+        use crate::geometry::Xiangqi9x10;
+        // e5 elephant. The NE diagonal leg (+1,+2) lies on the path to only the
+        // (+2,+3) leap: blocking it removes exactly that one leap (seven remain).
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        let leg = Bitboard::<Xiangqi9x10>::EMPTY.with(sq.offset(1, 2).unwrap());
+        let a = janggi_elephant_attacks::<Xiangqi9x10>(sq, leg);
+        assert_eq!(a.count(), 7);
+        assert!(!a.contains(sq.offset(2, 3).unwrap()));
+        // Its mirror (the -2,+3 leap, sharing the same ortho leg but a different
+        // diagonal leg) is still available.
+        assert!(a.contains(sq.offset(-2, 3).unwrap()));
+    }
+
+    #[test]
+    fn janggi_elephant_does_not_wrap_edges() {
+        use crate::geometry::Xiangqi9x10;
+        // An a-file elephant (file 0) may only reach files 2 and 3, never wrap.
+        for rank in 0..10u8 {
+            let sq = Square::<Xiangqi9x10>::from_file_rank(0, rank).unwrap();
+            for d in janggi_elephant_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY) {
+                assert!(d.file() == 2 || d.file() == 3, "a-file elephant to {d:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn janggi_cannon_does_not_wrap_or_leak() {
+        use crate::geometry::Grand10x10;
+        let off = !Grand10x10::BOARD_MASK;
+        let occ = Bitboard::<Grand10x10>(Grand10x10::BOARD_MASK);
+        for index in 0..100u8 {
+            let sq = Square::<Grand10x10>::new(index);
+            assert_eq!(
+                janggi_cannon_quiet::<Grand10x10>(sq, occ, Bitboard::EMPTY).0 & off,
+                0
+            );
+            assert_eq!(
+                janggi_cannon_capture::<Grand10x10>(sq, occ, Bitboard::EMPTY).0 & off,
+                0
+            );
         }
     }
 

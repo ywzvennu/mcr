@@ -26,6 +26,7 @@ mod capablanca;
 mod corpus;
 mod duck;
 mod grand;
+mod janggi;
 mod locate;
 mod makruk;
 mod minishogi;
@@ -177,6 +178,7 @@ fn main() {
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
+    let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
     let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
     let minixiangqi_mismatches = minixiangqi::run(&mut engine, opts.full);
@@ -193,6 +195,7 @@ fn main() {
         + spartan_mismatches
         + shako_mismatches
         + xiangqi_mismatches
+        + janggi_mismatches
         + shogi_mismatches
         + minishogi_mismatches
         + minixiangqi_mismatches

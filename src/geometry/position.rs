@@ -380,6 +380,15 @@ pub struct GenericState<G: Geometry> {
     pub halfmove_clock: u16,
     /// The fullmove number (incremented after a black move).
     pub fullmove_number: u16,
+    /// The number of **consecutive passes** immediately preceding this position
+    /// (Janggi only): `0` after any real move (and at the start of a game), `1`
+    /// after a single pass, `2` after two passes in a row. Two consecutive passes
+    /// **end the game** — a side to move with `consecutive_passes >= 2` has no legal
+    /// move at all (Fairy-Stockfish returns zero). Passes are gated behind
+    /// [`WideVariant::allows_pass`], so for every other variant this stays `0` and
+    /// produced moves, state, and FEN are byte-identical to a build without it. It
+    /// is transient (a freshly parsed FEN resets it to `0`).
+    pub consecutive_passes: u8,
 }
 
 impl<G: Geometry> core::fmt::Debug for GenericState<G> {
@@ -393,6 +402,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("placement", &self.placement)
             .field("halfmove_clock", &self.halfmove_clock)
             .field("fullmove_number", &self.fullmove_number)
+            .field("consecutive_passes", &self.consecutive_passes)
             .finish()
     }
 }
@@ -530,7 +540,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // `sq`.
             if V::role_attack_is_leg_asymmetric(role) {
                 for from in pieces {
-                    if V::role_attacks(role, attacker, from, occupied).contains(sq) {
+                    // A board-aware attacker (the Janggi cannon) projects from its
+                    // own origin against the whole board; the default-off hook
+                    // returns `None` for every other variant, keeping the
+                    // occupancy-only projection byte-identical.
+                    let att = if V::uses_board_attacks() {
+                        V::role_attacks_board(role, attacker, from, b)
+                            .unwrap_or_else(|| V::role_attacks(role, attacker, from, occupied))
+                    } else {
+                        V::role_attacks(role, attacker, from, occupied)
+                    };
+                    if att.contains(sq) {
                         result |= Bitboard::from_square(from);
                     }
                 }
@@ -1191,6 +1211,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// [`WideRole::COUNT`] of them. The produced move set is byte-identical.
     fn generate_cannon_verify_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
+        // Janggi pass terminals — the side to move then has **no legal move at all**
+        // (Fairy-Stockfish returns zero), ending the game:
+        //   * two consecutive passes (a pass right after the opponent passed), or
+        //   * a pass made by the opponent **while the generals face** on an open
+        //     line (the bikjang draw claim) — the facing side then has no move.
+        // Gated behind `allows_pass()` (default-off), so inert for every other
+        // variant.
+        if V::allows_pass()
+            && self.state.consecutive_passes >= 1
+            && (self.state.consecutive_passes >= 2
+                || (V::restricts_facing_general() && generals_face::<G>(&self.board)))
+        {
+            return;
+        }
         // A side whose king has been captured has no royal piece, so there is no
         // self-check to filter: every pseudo-legal move is "legal" (the side has
         // already lost, but perft still enumerates its continuations). Fairy-
@@ -1223,15 +1257,37 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let in_check = !self.king_safe_after(king, us.opposite(), &attackers);
         let king_lines = king_attack_lines::<G>(king);
 
+        // Janggi bikjang: facing the enemy general on an open line is *also* a check
+        // the side to move must resolve. It does not enter `king_safe_after` (it is
+        // not a pinning ray), so test it separately. While it (or an ordinary check)
+        // holds, the geometry fast-accept must be disabled — a move off the king
+        // lines does not resolve a facing check, so it cannot be accepted without
+        // the full per-move facing verify. Default-off elsewhere.
+        let facing_check = V::restricts_facing_general() && generals_face::<G>(&self.board);
+        let must_verify_all = in_check || facing_check;
+
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
-            if !in_check && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
+            if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
             } else if scratch.cannon_move_is_legal(self, &mv, us, &attackers) {
                 out.push(mv);
             }
         });
+
+        // The Janggi pass: a legal null move that only flips the side to move.
+        // Fairy-Stockfish counts it in perft and encodes it as the general "staying
+        // put" (`from == to == the general's square`); it is forbidden while in an
+        // **ordinary** check (but is a valid way to answer a bikjang facing check),
+        // and **two consecutive passes end the game** (handled at the top). Gated
+        // behind `allows_pass()` (default-off), so no other variant ever emits it.
+        // Emitting it as a quiet `king -> king` move makes `apply` remove-then-
+        // replace the general on its own square — a board no-op that advances the
+        // turn and clocks.
+        if V::allows_pass() && !in_check {
+            out.push(WideMove::new(king, king, WideMoveKind::Quiet));
+        }
     }
 
     /// Returns `true` if the pseudo-legal cannon-variant move `mv` is legal —
@@ -1253,13 +1309,36 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     ) -> bool {
         self.apply(mv);
         // `apply` flipped the side to move; our king is now the non-mover's.
-        let legal = match self.board.king_of(us) {
+        let mut legal = match self.board.king_of(us) {
             Some(king) => self.king_safe_after(king, us.opposite(), attackers),
             // A move that captured our own king cannot arise from a legal pseudo
             // set here (our king is never a capture target of our own move), but
             // be defensive: no king means nothing to leave en prise.
             None => true,
         };
+        // The Janggi bikjang general-facing rule (default-off). Facing the enemy
+        // general on an open line is a **check the side to move must resolve**, but
+        // — unlike Xiangqi's flying general — the facing ray does **not** pin a
+        // blocker: a side may freely move a blocker off the line, *creating* a
+        // facing against itself (the resulting check then falls on the opponent, who
+        // is the next to move). So a non-pass move is illegal iff the mover's
+        // general faces **after** it AND either it faced **before** (an existing
+        // facing check it failed to resolve) OR the move was the **general's own**
+        // move (the general may not step into / along a facing). The pass
+        // (`from == to`) always escapes. `self` is the post-move position; `base` is
+        // the pre-move snapshot.
+        if legal && V::restricts_facing_general() {
+            let from = mv.from::<G>();
+            let to = mv.to::<G>();
+            if from != to && generals_face::<G>(&self.board) && generals_face::<G>(&base.board) {
+                // Faced before and still faces after a non-pass move: an existing
+                // bikjang check the move failed to resolve (or the general slid
+                // along the contested line staying faced). Moving *into* a facing
+                // from a non-facing position, and exposing one's own general, both
+                // pass `faced_before == false` and stay legal.
+                legal = false;
+            }
+        }
         // Unmake: restore board + state from the untouched base snapshot. Both are
         // `Copy`, so this is a plain stack assignment — no allocation, no clone of
         // the `GenericPosition` wrapper.
@@ -1291,10 +1370,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // king square tests the wrong leg; detect it forward from each horse,
             // exactly as `attackers_to` does.
             if V::role_attack_is_leg_asymmetric(role) {
-                if pieces
-                    .into_iter()
-                    .any(|from| V::role_attacks(role, by, from, occupied).contains(king))
-                {
+                // A board-aware attacker (the Janggi cannon) is projected from each
+                // origin against the whole board; the king sits on an occupied
+                // square, so it can only fall in the cannon's capture portion. The
+                // default-off hook leaves every other variant byte-identical.
+                let hits = pieces.into_iter().any(|from| {
+                    let att = if V::uses_board_attacks() {
+                        V::role_attacks_board(role, by, from, board)
+                            .unwrap_or_else(|| V::role_attacks(role, by, from, occupied))
+                    } else {
+                        V::role_attacks(role, by, from, occupied)
+                    };
+                    att.contains(king)
+                });
+                if hits {
                     return false;
                 }
                 continue;
@@ -1351,12 +1440,29 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 continue;
             }
             for from in board.pieces(us, role) {
-                let targets = V::role_attacks(role, us, from, occupied) & !our_pieces;
+                // A board-aware role (the Janggi cannon, whose screen/target may
+                // not be a cannon and which may jump the palace diagonal) computes
+                // its set from the whole board; the default-off hook returns `None`
+                // for every other variant/role, so they keep the occupancy-only
+                // path byte-identically. The returned set already folds the
+                // cannon's quiet jumps and over-screen captures together;
+                // `emit_targets` splits them by enemy occupancy.
+                let targets = if V::uses_board_attacks() {
+                    V::role_attacks_board(role, us, from, board)
+                        .unwrap_or_else(|| V::role_attacks(role, us, from, occupied))
+                } else {
+                    V::role_attacks(role, us, from, occupied)
+                } & !our_pieces;
                 pseudo.emit_targets(from, targets, their_pieces);
                 // Quiet-only steps (the Spartan Lieutenant's sideways slide): a
                 // move onto an empty square that can never capture. Default-empty,
                 // so inert for every other role/variant.
-                let quiet_only = V::quiet_only_targets(role, us, from, occupied) & !occupied;
+                let quiet_only = if V::uses_board_attacks() {
+                    V::quiet_targets_board(role, us, from, board)
+                        .unwrap_or_else(|| V::quiet_only_targets(role, us, from, occupied))
+                } else {
+                    V::quiet_only_targets(role, us, from, occupied)
+                } & !occupied;
                 for to in quiet_only {
                     pseudo.push(WideMove::new(from, to, WideMoveKind::Quiet));
                 }
@@ -2143,6 +2249,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if us.is_black() {
             self.state.fullmove_number = self.state.fullmove_number.saturating_add(1);
         }
+        // Janggi pass tracking (default-off): a pass is the only move whose origin
+        // equals its destination (a quiet `general -> general`); a pass increments
+        // the consecutive-pass counter, any real move resets it to zero. Two
+        // consecutive passes end the game (the generator returns no move at a count
+        // of two). For every variant without `allows_pass()` no `from == to` move is
+        // ever generated, so this stays `0` and is byte-identical.
+        if V::allows_pass() {
+            self.state.consecutive_passes = if from == to {
+                self.state.consecutive_passes.saturating_add(1)
+            } else {
+                0
+            };
+        }
         self.state.turn = them;
     }
 
@@ -2353,6 +2472,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             placement: placement_pocket,
             halfmove_clock,
             fullmove_number,
+            consecutive_passes: 0,
         };
         Ok(Self::from_parts(board, state))
     }
@@ -2772,6 +2892,21 @@ fn cannon_move_off_king_lines<G: Geometry>(
     }
     let to = mv.to::<G>();
     !king_lines.contains(from) && !king_lines.contains(to)
+}
+
+/// Returns `true` if both sides have exactly-locatable generals (kings) that
+/// **face each other on an open line**: they share a file or a rank with no piece
+/// strictly between them. The generic test behind the Janggi bikjang rule
+/// (default-off elsewhere).
+#[inline]
+fn generals_face<G: Geometry>(board: &Board<G>) -> bool {
+    let (Some(w), Some(b)) = (board.king_of(Color::White), board.king_of(Color::Black)) else {
+        return false;
+    };
+    if w.file() != b.file() && w.rank() != b.rank() {
+        return false;
+    }
+    (between::<G>(w, b) & board.occupied()).is_empty()
 }
 
 /// The union of [`king_attack_lines`] over every royal square in `kings` — every

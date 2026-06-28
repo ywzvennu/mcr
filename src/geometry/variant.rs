@@ -343,6 +343,88 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Board-aware cannon attacks (default OFF) -------------------------
+
+    /// Returns `true` if this variant computes some role's attack / quiet-move
+    /// sets from the **whole board** rather than from the `(sq, occupancy)` pair
+    /// the [`role_attacks`](WideVariant::role_attacks) /
+    /// [`quiet_only_targets`](WideVariant::quiet_only_targets) hooks receive —
+    /// because the set depends on *which* occupied squares hold *which* pieces.
+    ///
+    /// The canonical case is the **Janggi cannon** (포): it must jump exactly one
+    /// **screen** and may neither use a cannon as a screen nor capture a cannon, so
+    /// its move/attack set needs to know which squares hold cannons (and, for the
+    /// palace-diagonal jump, the palace geometry). The occupancy-only primitive
+    /// cannot express that.
+    ///
+    /// The default is `false`; while it is `false` the generic engine never calls
+    /// [`role_attacks_board`](WideVariant::role_attacks_board) or
+    /// [`quiet_targets_board`](WideVariant::quiet_targets_board), so every other
+    /// variant pays nothing and is byte-identical. Only Janggi overrides this. The
+    /// board hooks are consulted only on the cannon-verify generation path and the
+    /// attacker / king-safety path (both already gated by
+    /// [`has_cannons`](WideVariant::has_cannons)).
+    fn uses_board_attacks() -> bool {
+        false
+    }
+
+    /// A **board-aware** override of [`role_attacks`](WideVariant::role_attacks)
+    /// for a `role` of `color` on `sq`, returning `None` to fall back to the
+    /// occupancy-only hook.
+    ///
+    /// Only consulted when [`uses_board_attacks`](WideVariant::uses_board_attacks)
+    /// is `true`. The default is `None` (no override) for every role, so every
+    /// other variant is byte-identical. Janggi overrides it for the Cannon to
+    /// compute the screen-mandatory, no-cannon-screen, no-cannon-capture set
+    /// (including the palace-diagonal jump) from the live board. The returned set
+    /// is the cannon's combined move-and-attack set: its over-screen capture
+    /// targets **and** the empty squares it may quietly jump to past a screen.
+    /// Fed to the generator it splits into quiet/capture by enemy occupancy; fed to
+    /// the king-safety test it correctly reports a cannon "check" (a royal square is
+    /// occupied, so it can only fall in the capture portion).
+    fn role_attacks_board(
+        _role: WideRole,
+        _color: Color,
+        _sq: Square<G>,
+        _board: &Board<G>,
+    ) -> Option<Bitboard<G>> {
+        None
+    }
+
+    /// A **board-aware** override of the
+    /// [`quiet_only_targets`](WideVariant::quiet_only_targets) set for a `role` of
+    /// `color` on `sq`, returning `None` to fall back to the occupancy-only hook.
+    ///
+    /// Only consulted when [`uses_board_attacks`](WideVariant::uses_board_attacks)
+    /// is `true`. The default is `None`. Janggi folds the cannon's quiet jumps into
+    /// [`role_attacks_board`](WideVariant::role_attacks_board) (the generator's
+    /// `emit_targets` splits quiet from capture by occupancy), so it leaves this at
+    /// the default and the cannon emits no separate quiet-only set.
+    fn quiet_targets_board(
+        _role: WideRole,
+        _color: Color,
+        _sq: Square<G>,
+        _board: &Board<G>,
+    ) -> Option<Bitboard<G>> {
+        None
+    }
+
+    // --- Pass move (default OFF) ------------------------------------------
+
+    /// Returns `true` if this variant lets a side **pass** the turn — a legal
+    /// null move that changes only the side to move (Janggi). The default is
+    /// `false`; while it is `false` the generator never emits a pass, so every
+    /// other variant is byte-identical.
+    ///
+    /// Janggi overrides it to `true`. Fairy-Stockfish counts the pass as a move in
+    /// `go perft` and encodes it as a king "stays put" move (`from == to == the
+    /// general's square`); it is **not** available while the side to move is in
+    /// check. The generic cannon-verify path emits exactly one such pass per node
+    /// (when a royal piece exists and the side is not in check).
+    fn allows_pass() -> bool {
+        false
+    }
+
     // --- Flying-general king-safety (default OFF) -------------------------
 
     /// Returns `true` if this variant has an **extra, geometry-derived attack on
@@ -377,6 +459,31 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         _by: Color,
         _occupied: Bitboard<G>,
     ) -> bool {
+        false
+    }
+
+    // --- Janggi bikjang general-facing (default OFF) ----------------------
+
+    /// Returns `true` if this variant restricts the **general's own move** when the
+    /// two generals face each other on an open line (Janggi bikjang). The default
+    /// is `false`; while it is `false` the engine never evaluates the facing rule,
+    /// so every other variant is byte-identical.
+    ///
+    /// Janggi's facing rule is **narrower** than Xiangqi's flying general: facing
+    /// the enemy general on an open file or rank does **not** make the position an
+    /// ordinary check, and a side may freely **expose** its own general by moving a
+    /// blocking piece off the line (Fairy-Stockfish allows this; Xiangqi forbids
+    /// it). The single restriction is that the **general itself** may not move from
+    /// a facing square to another square that **still** faces the enemy general
+    /// (i.e. it may not slide along the contested line staying faced) — it must
+    /// leave the line or **pass**. So this is *not* modelled through
+    /// [`extra_royal_attack`](WideVariant::extra_royal_attack) (which is ORed into
+    /// every move's king-safety and would wrongly forbid exposure); the engine
+    /// applies it as a dedicated filter on a non-pass general move, using its
+    /// generic open-line facing test (both generals exist, share a file or rank,
+    /// and have no piece strictly between): the move is rejected iff the generals
+    /// faced both **before and after** it. Only Janggi overrides this.
+    fn restricts_facing_general() -> bool {
         false
     }
 
@@ -670,6 +777,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
+            consecutive_passes: 0,
         };
         (board, state)
     }
