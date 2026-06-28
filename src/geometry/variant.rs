@@ -841,6 +841,46 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns the **base role banked into the captor's hand** when a piece of
+    /// `role` is captured under [`captures_to_hand`](WideVariant::captures_to_hand).
+    /// A captured *promoted* piece reverts to its unpromoted base before entering
+    /// the hand (Shogi banks a captured Dragon as a Rook; crazyhouse banks a
+    /// captured queen as a queen).
+    ///
+    /// The default is [`WideRole::promoted_base`] — the Shogi promoted-form
+    /// mapping, with every other role banked as itself, keeping Shogi and
+    /// crazyhouse byte-identical. Shogun overrides it because its promoted forms
+    /// **reuse roles that also exist as full pieces** (a promoted Bishop is the
+    /// Hawk / Archbishop, a promoted Rook the Elephant / Chancellor, a promoted
+    /// Knight the Kheshig / Centaur, a promoted Pawn the Commoner, a promoted Fers
+    /// the Queen), so it cannot rely on the global [`WideRole::promoted_base`] (that
+    /// would mis-bank a crazyhouse queen as a fers). In Shogun every one of those
+    /// promoted forms banks back to its base — Hawk → Bishop, Elephant → Rook,
+    /// Kheshig → Knight, Commoner → Pawn, Queen → Met (fers) — matching FSF, where
+    /// a promoted piece is a `+X` token that sheds its `+` on capture.
+    fn role_hand_base(role: WideRole) -> WideRole {
+        role.promoted_base()
+    }
+
+    /// Returns `true` if a piece of `role` of `color` is **forbidden from
+    /// promoting** in the current `board` because the variant caps the number of
+    /// its promoted form (FSF `promotionLimit`). When `true`, the generic per-piece
+    /// promotion path emits only the non-promoting move on a zone move (it never
+    /// collides with [`role_promotion_forced`] in any variant that uses both, since
+    /// a forced promotion never targets a capped form).
+    ///
+    /// Only consulted when [`has_hand`](WideVariant::has_hand) is `true` and the
+    /// role [`role_can_promote`](WideVariant::role_can_promote)s, on the per-piece
+    /// promotion path. The default is `false` (no cap), keeping Shogi and every
+    /// other hand variant byte-identical. Shogun overrides it: a Knight, Bishop,
+    /// Rook, or Fers may not promote while the side already holds **one** of the
+    /// corresponding Centaur, Archbishop, Chancellor, or Queen on the board
+    /// (`promotionLimit = g:1 a:1 m:1 q:1`); the Commoner (promoted Pawn) is
+    /// uncapped.
+    fn role_promotion_blocked_by_limit(_role: WideRole, _color: Color, _board: &Board<G>) -> bool {
+        false
+    }
+
     // --- reserved fairy hooks (no-ops for standard rules) -----------------
 
     /// Returns the region mask for a [`WideRegion`]. Reserved for Phase 3

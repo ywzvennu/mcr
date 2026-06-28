@@ -1747,22 +1747,33 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let from_in_zone = V::in_promotion_zone(us, from.rank());
         let promoted = V::role_promoted_to(role);
         let mandatory = V::promotion_mandatory_in_zone();
+        // Shogun's per-piece promotion limit (FSF `promotionLimit`): while the side
+        // already holds the cap of this role's promoted form on the board, the
+        // promoting move is suppressed and only the plain move is emitted. Inert
+        // (default `false`) for Shogi / Shinobi, so they stay byte-identical. The
+        // limit never bites a *forced* promotion in any variant that uses both: a
+        // Shogun piece capped at its promoted form is never one that would be
+        // immobile without promoting (only the uncapped-Commoner Pawn is forced).
+        let limited = V::role_promotion_blocked_by_limit(role, us, &self.board);
         for to in targets {
             let capture = their_pieces.contains(to);
             let to_rank = to.rank();
             if from_in_zone || V::in_promotion_zone(us, to_rank) {
-                out.push(WideMove::new(
-                    from,
-                    to,
-                    WideMoveKind::Promotion {
-                        role: promoted,
-                        capture,
-                    },
-                ));
+                if !limited {
+                    out.push(WideMove::new(
+                        from,
+                        to,
+                        WideMoveKind::Promotion {
+                            role: promoted,
+                            capture,
+                        },
+                    ));
+                }
                 // The non-promoting alternative, unless promotion is mandatory in
                 // the zone (Shinobi) or the piece would then have no further move
-                // (Shogi's forced promotion).
-                if !mandatory && !V::role_promotion_forced(role, us, to_rank) {
+                // (Shogi's forced promotion). When the promotion is suppressed by
+                // the limit the plain move is always available.
+                if limited || (!mandatory && !V::role_promotion_forced(role, us, to_rank)) {
                     let kind = if capture {
                         WideMoveKind::Capture
                     } else {
@@ -2276,7 +2287,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // (`captures_to_hand()` is `false`), so their captures bank nothing.
                 if V::has_hand() && V::captures_to_hand() {
                     if let Some(captured) = self.board.piece_at(to) {
-                        self.state.placement.add(us, captured.role.promoted_base());
+                        self.state
+                            .placement
+                            .add(us, V::role_hand_base(captured.role));
                     }
                 }
                 // `to` holds the captured enemy, so `set_piece` clears it first;
@@ -2345,7 +2358,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // replenish — `captures_to_hand()` is `false`).
                 if V::has_hand() && V::captures_to_hand() && capture {
                     if let Some(captured) = self.board.piece_at(to) {
-                        self.state.placement.add(us, captured.role.promoted_base());
+                        self.state
+                            .placement
+                            .add(us, V::role_hand_base(captured.role));
                     }
                 }
                 // `from` holds the known promoting piece (`moving`); `to` may hold a

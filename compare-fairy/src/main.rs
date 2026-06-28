@@ -42,6 +42,7 @@ mod shako;
 mod shatar;
 mod shinobi;
 mod shogi;
+mod shogun;
 mod sittuyin;
 mod spartan;
 mod synochess;
@@ -187,6 +188,10 @@ fn main() {
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
+    // Shogun is an INI variant (like Shinobi): shogun::run loads FSF's
+    // variants.ini (resolved from `$MCE_FSF_VARIANTS_INI`) before driving
+    // `UCI_Variant shogun`.
+    let shogun_mismatches = shogun::run(&mut engine, opts.full);
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
@@ -221,6 +226,7 @@ fn main() {
         + shako_mismatches
         + shatar_mismatches
         + shinobi_mismatches
+        + shogun_mismatches
         + knightmate_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
