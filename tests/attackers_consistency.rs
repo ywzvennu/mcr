@@ -39,11 +39,11 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
-    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess,
-    SynochessRules, WideRole, WideVariant, XiangqiRules,
+    Bitboard, CapablancaRules, ChakRules, DuckRules, EmpireRules, GenericPosition, Geometry,
+    GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules,
+    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules,
+    ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square,
+    StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -719,5 +719,38 @@ variant_test!(
         "r2qk2r/ppp2ppp/2*hp1*h2/2*b1p1*B1/2*B1P1*b1/2*HP1*H2/PPP2PPP/R2QK2R w KQkq - 0 1",
         "2kr3r/pp1*h1ppp/2p1p*h2/q7/3P4/2*H*BP*H2/PPQ2PPP/2KR3R w - - 0 1",
         "4k3/Pp4*h1/8/3*b4/3*H4/8/1p2*H3/4K3 w - - 0 1",
+    ]
+);
+
+// -- Chak (9x9 Mayan) -------------------------------------------------------
+//
+// Three Chak pieces ride the forward-projection (`role_attack_is_leg_asymmetric`)
+// path: the **Quetzal** (`*q`, an eight-direction cannon — its over-screen capture
+// is occupancy-asymmetric) and the region-confined **Shaman** (`*w`) and **Divine
+// Lord** (`*l`) (their attack relation is keyed on the origin's half, so a reverse
+// projection would invent attacks across the centre line). The **Soldier** (`*p`)
+// is colour-directional (forward-diagonal capture). This test is the guard that
+// each piece's `role_attacks` / `role_attacks_board` set and the `attackers_to`
+// reverse-projection agree, on both the king-danger and the `attackers_to` paths.
+// The corpus reuses the FSF-confirmed FENs from `tests/perft_chak.rs` (the
+// startpos, a centred King, a developed middlegame, a Soldier in its promotion
+// half, a Quetzal-active position, a two-royal pseudo-royal position with a Divine
+// Lord and Shaman on the board, and a Divine Lord beside the enemy temple), each in
+// mce dialect with the six new pieces spelled `*s *q *w *l *p *o`.
+
+variant_test!(
+    chak,
+    Shogi9x9,
+    ChakRules,
+    "chak",
+    [
+        "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1",
+        "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/4K4/*P1*P1*P1*P1*P/4*O4/RN*S*Q1*Q*SNR w - - 0 1",
+        "rn*s*qkw*snr/4*o4/*p3*p1*p1*p/2*p6/9/2*P6/*P3*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1",
+        "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/4*P4/9/*P1*P1*P3*P/4*O4/RN*SWK*Q*SNR b - - 0 1",
+        "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/2*P3*P2/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR b - - 0 1",
+        "rn*s*qk1*snr/4*o4/*p1*p1*p1*p1*p/3*L5/9/9/*P1*P1*P1*P1*P/4*O4/RN*S1K*Q*SNR w - - 0 1",
+        "rn*s*qk1*snr/4*o4/*p1*p1*L1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*S1K*Q*SNR w - - 0 1",
+        "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/4*W4/9/4*w4/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1",
     ]
 );

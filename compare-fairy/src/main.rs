@@ -23,6 +23,7 @@
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
 mod capablanca;
+mod chak;
 mod corpus;
 mod duck;
 mod empire;
@@ -212,6 +213,9 @@ fn main() {
     let empire_mismatches = empire::run(&mut engine, &located.bin, opts.full);
     // Hoppel-Poppel is a FSF built-in (no variants.ini needed).
     let hoppelpoppel_mismatches = hoppelpoppel::run(&mut engine, opts.full);
+    // Chak is an INI variant: chak::run loads FSF's variants.ini (resolved from the
+    // located binary) before driving `UCI_Variant chak`.
+    let chak_mismatches = chak::run(&mut engine, &located.bin, opts.full);
 
     engine.quit();
 
@@ -239,6 +243,7 @@ fn main() {
         + synochess_mismatches
         + empire_mismatches
         + hoppelpoppel_mismatches
+        + chak_mismatches
         > 0
     {
         std::process::exit(1);
