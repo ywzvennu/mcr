@@ -128,6 +128,36 @@ pub enum WideRole {
     /// here, so the Soldier takes the free letter `z` and the harness maps it to
     /// FSF's `p`.
     Soldier = 22,
+
+    // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
+    //
+    // A promoted Shogi piece is a **distinct role** from its base: it keeps its
+    // promoted movement on the board but, when captured, reverts to the base role
+    // in the captor's hand. Its FEN token is the base letter with a `+` prefix
+    // (`+P`, `+L`, `+N`, `+S`, `+R`, `+B`), matching FSF; the board FEN parser /
+    // writer handles the prefix, and [`promoted_base`](WideRole::promoted_base)
+    // gives the role to bank on capture.
+    /// Tokin (と) — a promoted Pawn (`+P`). Moves as a Gold General. Reverts to a
+    /// Pawn in hand when captured. (Shogi.)
+    Tokin = 23,
+    /// Promoted Lance (成香, `+L`) — moves as a Gold General; reverts to a Lance
+    /// in hand when captured. (Shogi.)
+    PromotedLance = 24,
+    /// Promoted Knight (成桂, `+N`) — moves as a Gold General; reverts to a Knight
+    /// in hand when captured. (Shogi.)
+    PromotedKnight = 25,
+    /// Promoted Silver (成銀, `+S`) — moves as a Gold General; reverts to a Silver
+    /// in hand when captured. (Shogi.)
+    PromotedSilver = 26,
+    /// Dragon King (龍, `+R`) — a promoted Rook: rook slides **plus** a single
+    /// diagonal step in each direction. Reverts to a Rook in hand when captured.
+    /// (Shogi.)
+    Dragon = 27,
+    /// Dragon Horse (馬, `+B`) — a promoted Bishop: bishop slides **plus** a single
+    /// orthogonal step in each direction. Reverts to a Bishop in hand when
+    /// captured. (Shogi.) Distinct from the Xiangqi [`WideRole::Horse`] (the
+    /// hobbled knight), which already claims the `j` letter.
+    DragonHorse = 28,
 }
 
 impl WideRole {
@@ -135,7 +165,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 23;
+    pub const COUNT: usize = 29;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -162,6 +192,12 @@ impl WideRole {
         WideRole::Horse,
         WideRole::XiangqiElephant,
         WideRole::Soldier,
+        WideRole::Tokin,
+        WideRole::PromotedLance,
+        WideRole::PromotedKnight,
+        WideRole::PromotedSilver,
+        WideRole::Dragon,
+        WideRole::DragonHorse,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -226,6 +262,67 @@ impl WideRole {
             WideRole::Horse => 'j',
             WideRole::XiangqiElephant => 'o',
             WideRole::Soldier => 'z',
+            // Shogi promoted pieces share their base role's letter: their FEN
+            // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
+            // `+R`, `+B`), so the bare `char()` returns the base letter and the
+            // board FEN I/O adds the prefix. They are never dropped (drops are
+            // always the unpromoted base role), so `char()` is used only for the
+            // promoted board-FEN token and display.
+            WideRole::Tokin => 'p',
+            WideRole::PromotedLance => 'l',
+            WideRole::PromotedKnight => 'n',
+            WideRole::PromotedSilver => 's',
+            WideRole::Dragon => 'r',
+            WideRole::DragonHorse => 'b',
+        }
+    }
+
+    /// Returns `true` if this is a Shogi **promoted** role — a piece that moves
+    /// as its promoted form on the board but reverts to a base role in hand when
+    /// captured. Its FEN token carries a `+` prefix.
+    #[must_use]
+    #[inline]
+    pub const fn is_promoted(self) -> bool {
+        matches!(
+            self,
+            WideRole::Tokin
+                | WideRole::PromotedLance
+                | WideRole::PromotedKnight
+                | WideRole::PromotedSilver
+                | WideRole::Dragon
+                | WideRole::DragonHorse
+        )
+    }
+
+    /// For a Shogi promoted role, the **base** role it reverts to when captured
+    /// (and from which it was promoted); for any other role, the role itself.
+    #[must_use]
+    #[inline]
+    pub const fn promoted_base(self) -> WideRole {
+        match self {
+            WideRole::Tokin => WideRole::Pawn,
+            WideRole::PromotedLance => WideRole::Lance,
+            WideRole::PromotedKnight => WideRole::Knight,
+            WideRole::PromotedSilver => WideRole::Silver,
+            WideRole::Dragon => WideRole::Rook,
+            WideRole::DragonHorse => WideRole::Bishop,
+            other => other,
+        }
+    }
+
+    /// For a base Shogi role, the **promoted** role it becomes; for a role that
+    /// has no Shogi promotion, the role itself.
+    #[must_use]
+    #[inline]
+    pub const fn promoted_form(self) -> WideRole {
+        match self {
+            WideRole::Pawn => WideRole::Tokin,
+            WideRole::Lance => WideRole::PromotedLance,
+            WideRole::Knight => WideRole::PromotedKnight,
+            WideRole::Silver => WideRole::PromotedSilver,
+            WideRole::Rook => WideRole::Dragon,
+            WideRole::Bishop => WideRole::DragonHorse,
+            other => other,
         }
     }
 
@@ -305,6 +402,12 @@ impl fmt::Display for WideRole {
             WideRole::Horse => "horse",
             WideRole::XiangqiElephant => "xiangqi-elephant",
             WideRole::Soldier => "soldier",
+            WideRole::Tokin => "tokin",
+            WideRole::PromotedLance => "promoted-lance",
+            WideRole::PromotedKnight => "promoted-knight",
+            WideRole::PromotedSilver => "promoted-silver",
+            WideRole::Dragon => "dragon",
+            WideRole::DragonHorse => "dragon-horse",
         })
     }
 }
@@ -345,9 +448,15 @@ mod tests {
 
     #[test]
     fn char_round_trips_for_named_roles() {
-        // Every role now names a distinct letter (the four former reserved slots
-        // became the Spartan army), so each round-trips through its character.
+        // Every non-promoted role names a distinct letter, so each round-trips
+        // through its character. The Shogi promoted roles share their base role's
+        // letter (their FEN token is `+`-prefixed and handled by the board parser),
+        // so `from_char` maps the bare letter back to the *base* role, not the
+        // promoted one — they are excluded from this round-trip.
         for role in WideRole::ALL {
+            if role.is_promoted() {
+                continue;
+            }
             let ch = role.char();
             assert_ne!(ch, '?', "every role has a letter");
             assert_eq!(WideRole::from_char(ch), Some(role));
@@ -359,9 +468,38 @@ mod tests {
     }
 
     #[test]
+    fn promoted_roles_revert_to_base() {
+        // Each Shogi promoted role reverts to its base, and the base promotes to
+        // it; non-Shogi roles are their own base and promoted form.
+        let pairs = [
+            (WideRole::Tokin, WideRole::Pawn),
+            (WideRole::PromotedLance, WideRole::Lance),
+            (WideRole::PromotedKnight, WideRole::Knight),
+            (WideRole::PromotedSilver, WideRole::Silver),
+            (WideRole::Dragon, WideRole::Rook),
+            (WideRole::DragonHorse, WideRole::Bishop),
+        ];
+        for (promoted, base) in pairs {
+            assert!(promoted.is_promoted());
+            assert!(!base.is_promoted());
+            assert_eq!(promoted.promoted_base(), base);
+            assert_eq!(base.promoted_form(), promoted);
+            // A promoted role and its base share a FEN letter.
+            assert_eq!(promoted.char(), base.char());
+        }
+        // A role with no Shogi promotion is its own base and form.
+        assert_eq!(WideRole::King.promoted_base(), WideRole::King);
+        assert_eq!(WideRole::King.promoted_form(), WideRole::King);
+    }
+
+    #[test]
     fn named_role_chars_are_distinct() {
+        // Every non-promoted role names a distinct letter. The Shogi promoted
+        // roles deliberately reuse their base role's letter (FEN `+`-prefix), so
+        // they are excluded from the distinctness check.
         let chars: Vec<char> = WideRole::ALL
             .into_iter()
+            .filter(|r| !r.is_promoted())
             .map(WideRole::char)
             .filter(|&c| c != '?')
             .collect();
@@ -369,7 +507,5 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), chars.len(), "role chars must be distinct");
-        // Every role is named (the six standard plus the fairy pieces).
-        assert_eq!(chars.len(), WideRole::COUNT);
     }
 }

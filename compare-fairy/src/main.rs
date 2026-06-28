@@ -30,6 +30,7 @@ mod locate;
 mod makruk;
 mod seirawan;
 mod shako;
+mod shogi;
 mod sittuyin;
 mod spartan;
 mod uci;
@@ -174,6 +175,7 @@ fn main() {
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
+    let shogi_mismatches = shogi::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -187,6 +189,7 @@ fn main() {
         + spartan_mismatches
         + shako_mismatches
         + xiangqi_mismatches
+        + shogi_mismatches
         > 0
     {
         std::process::exit(1);
