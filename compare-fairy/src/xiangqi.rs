@@ -78,6 +78,26 @@ const CASES: &[Case] = &[
         fen: "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
         depth: 4,
     },
+    // Soldier guards the square ahead (issue #201): a white soldier on e7 guards
+    // e8, so the black general on d8 may step only to d9. The old `attackers_to`
+    // reverse-projected the Soldier's color-directional forward attack without the
+    // color flip and missed the guard; FSF and mce now agree (perft 1 = 1, 4 = 53).
+    Case {
+        label: "soldier-guard-fwd",
+        fen: "9/9/3k5/4Z4/9/9/9/9/9/4K4 b - - 0 1",
+        depth: 4,
+    },
+    // Crossed soldier guards sideways (issue #201, post-river): a white soldier on
+    // e8 has crossed the river and guards d8/f8 sideways as well as e9 forward, so
+    // the black general on d9 may step only to d10. A plain color-flipped reverse-
+    // projection flips the color-dependent river threshold and misses the crossed
+    // soldier; forward projection via `role_attack_is_leg_asymmetric` fixes it.
+    // FSF and mce now agree (perft 1 = 1, 4 = 26).
+    Case {
+        label: "soldier-guard-side",
+        fen: "9/3k5/4Z4/9/9/9/9/9/9/4K4 b - - 0 1",
+        depth: 4,
+    },
 ];
 
 /// Rewrite an mce-dialect Xiangqi FEN into the FSF dialect: the Advisor `u`/`U`,

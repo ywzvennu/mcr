@@ -79,6 +79,30 @@ const FLYING_GENERAL: &str = "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1";
 /// FSF-confirmed (mce dialect of FSF's `4k4/9/9/9/9/9/9/4n4/3A5/3K5 w`).
 const HORSE_CHECK: &str = "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1";
 
+/// A **soldier-guards-the-square-ahead** position, black to move (issue #201):
+/// a white soldier on e7 guards e8, and the black general on d8 may step only to
+/// d9 — the palace square e8 is illegal because it is attacked by the soldier.
+/// The old corpus never had an enemy king try to step in front of a soldier, so
+/// `attackers_to`'s reverse-projection bug (the Soldier's forward attack is
+/// color-directional, but the default `role_attack_is_directional` covers only
+/// Pawn/Hoplite) went undetected: mce wrongly read `is_attacked(e8, White) ==
+/// false` and let the general step into capture, inflating perft (depth 1 was 2,
+/// not 1). FSF-confirmed (`9/9/3k5/4P4/9/9/9/9/9/4K4 b` — only general + soldier,
+/// soldier rewritten `P`->`Z` for the mce dialect).
+const SOLDIER_GUARD_FWD: &str = "9/9/3k5/4Z4/9/9/9/9/9/4K4 b - - 0 1";
+
+/// A **crossed-soldier-guards-sideways** position, black to move (issue #201):
+/// a white soldier on e8 has crossed the river, so besides e9 (forward) it also
+/// guards d8 and f8 (sideways). The black general on d9 may step only to d10 —
+/// both e9 (forward-guarded) and d8 (sideways-guarded) are illegal. This is the
+/// post-river case a plain color-flipped reverse-projection cannot catch (the
+/// river threshold is color-dependent, so flipping the color flips the crossing
+/// state and misses the crossed soldier); forward projection from the soldier via
+/// `role_attack_is_leg_asymmetric` is required. Without the fix mce let the
+/// general step to d8, inflating perft (depth 1 was 2, not 1). FSF-confirmed
+/// (`9/3k5/4P4/9/9/9/9/9/9/4K4 b`, soldier `P`->`Z`).
+const SOLDIER_GUARD_SIDE: &str = "9/3k5/4Z4/9/9/9/9/9/9/4K4 b - - 0 1";
+
 /// Asserts the generic Xiangqi perft equals each pinned `(depth, nodes)` count.
 /// Every number here also matched FSF xiangqi `go perft` on the same position.
 fn check(fen: &str, cases: &[(u32, u64)]) {
@@ -167,4 +191,34 @@ fn horse_check_cheap() {
 #[ignore = "deep perft; run with --release --include-ignored"]
 fn horse_check_deep() {
     check(HORSE_CHECK, &[(4, 50), (5, 175), (6, 786)]);
+}
+
+// -- Soldier guards the square ahead (FSF-confirmed; the blind spot of #201) ---
+
+#[test]
+fn soldier_guard_forward_cheap() {
+    // Depth 1 was 2 before the #201 fix (missed the soldier guarding e8); FSF
+    // says 1 — the black general may step only to d9.
+    check(SOLDIER_GUARD_FWD, &[(1, 1), (2, 5), (3, 10)]);
+}
+
+#[test]
+#[ignore = "deep perft; run with --release --include-ignored"]
+fn soldier_guard_forward_deep() {
+    check(SOLDIER_GUARD_FWD, &[(4, 53), (5, 88)]);
+}
+
+// -- Crossed soldier guards sideways too (FSF-confirmed; post-river case) ------
+
+#[test]
+fn soldier_guard_sideways_cheap() {
+    // Depth 1 was 2 before the #201 fix (missed the crossed soldier guarding d8
+    // sideways); FSF says 1 — the black general may step only to d10.
+    check(SOLDIER_GUARD_SIDE, &[(1, 1), (2, 5), (3, 5)]);
+}
+
+#[test]
+#[ignore = "deep perft; run with --release --include-ignored"]
+fn soldier_guard_sideways_deep() {
+    check(SOLDIER_GUARD_SIDE, &[(4, 26)]);
 }
