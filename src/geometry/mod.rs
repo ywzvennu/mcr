@@ -54,9 +54,9 @@ pub use role::WideRole;
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
-    Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules, Seirawan,
-    SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Xiangqi, XiangqiRules,
+    Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Makruk, MakrukRules,
+    Minishogi, MinishogiRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules,
+    Sittuyin, SittuyinRules, Spartan, SpartanRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -271,6 +271,21 @@ geometry!(
     u128,
     9,
     9
+);
+
+geometry!(
+    /// The Minishogi board: five files by five ranks (25 squares), backed by
+    /// `u64`.
+    ///
+    /// The smallest fairy geometry so far and the first odd non-power-of-two
+    /// width (`5`) on a `u64` backing: a square index reaches `24`, and
+    /// edge-masked east/west shifts must not wrap past the fifth file. Files run
+    /// a..e, ranks 1..5. It hosts Minishogi, which reuses Shogi's persistent
+    /// capture-fed hand, drops, and far-rank promotion on a smaller board.
+    Minishogi5x5,
+    u64,
+    5,
+    5
 );
 
 #[cfg(test)]
