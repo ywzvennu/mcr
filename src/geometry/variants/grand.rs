@@ -101,6 +101,7 @@ impl WideVariant<Grand10x10> for GrandRules {
             placement: GenericPlacement::NONE,
             halfmove_clock: 0,
             fullmove_number: 1,
+            consecutive_passes: 0,
         };
         (board, state)
     }
