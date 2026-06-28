@@ -214,6 +214,15 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         }
     }
 
+    fn role_attack_is_leg_asymmetric(role: WideRole) -> bool {
+        // The Horse's leap is hobbled by the leg adjacent to the *horse* toward the
+        // leap — a per-leap geometric asymmetry that reverse-projection from the
+        // target cannot resolve, so attacker detection must project forward from
+        // each horse. The Elephant's eye is symmetric (the intervening diagonal is
+        // the same square from either end), so it needs no special handling.
+        matches!(role, WideRole::Horse)
+    }
+
     fn role_is_slider(role: WideRole) -> bool {
         // Only the Chariot (rook) is a line slider that can pin. The Cannon is not
         // (it needs a screen to capture); the Horse, Elephant, Advisor, General,

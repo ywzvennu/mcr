@@ -519,8 +519,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // A pawn's (and a Berolina Hoplite's) "attack" pattern is
             // direction-dependent, so to find the squares *from which* such a
             // piece of `attacker` hits `sq`, project the *opposing*-colour
-            // pattern back from `sq`. Every other role's attack set is symmetric
-            // (a attacks b iff b attacks a under the same occupancy).
+            // pattern back from `sq`. Every other *symmetric* role's attack set is
+            // symmetric (a attacks b iff b attacks a under the same occupancy).
+            //
+            // The Xiangqi Horse is the exception: its hobbling leg is adjacent to
+            // the *horse* and points toward the leap, so reverse-projecting from
+            // `sq` would test the wrong leg and miss real attacks. For such a
+            // leg-asymmetric role, detect attackers the way the generator does —
+            // project forward from each candidate origin and keep those that hit
+            // `sq`.
+            if V::role_attack_is_leg_asymmetric(role) {
+                for from in pieces {
+                    if V::role_attacks(role, attacker, from, occupied).contains(sq) {
+                        result |= Bitboard::from_square(from);
+                    }
+                }
+                continue;
+            }
             let from_sq = if V::role_attack_is_directional(role) {
                 V::role_attacks(role, attacker.opposite(), sq, occupied)
             } else {
@@ -1176,6 +1191,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         for &role in attackers.roles() {
             let pieces = board.pieces(by, role);
             if pieces.is_empty() {
+                continue;
+            }
+            // The Xiangqi Horse's leg is asymmetric, so reverse-projecting from the
+            // king square tests the wrong leg; detect it forward from each horse,
+            // exactly as `attackers_to` does.
+            if V::role_attack_is_leg_asymmetric(role) {
+                if pieces
+                    .into_iter()
+                    .any(|from| V::role_attacks(role, by, from, occupied).contains(king))
+                {
+                    return false;
+                }
                 continue;
             }
             // Project the role's attack pattern back from the king square (the

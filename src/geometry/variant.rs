@@ -532,6 +532,31 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         matches!(role, WideRole::Pawn | WideRole::Hoplite)
     }
 
+    /// Returns `true` if a piece of `role` has a **geometrically asymmetric,
+    /// occupancy-dependent** attack set — one where "a attacks b" is *not* the same
+    /// as "b attacks a" under the same occupancy, so it cannot be detected by
+    /// reverse-projecting the role's pattern from the target square.
+    ///
+    /// The canonical case is the Xiangqi / Minixiangqi **Horse**: its leap is
+    /// hobbled by the leg square *adjacent to the horse* toward the leap, which is a
+    /// *different* square than the leg adjacent to the target toward the horse. A
+    /// reverse-projection from the target therefore tests the wrong leg and misses
+    /// (or invents) horse attacks. For such a role the generic
+    /// [`attackers_to`](super::position::GenericPosition::attackers_to) and the
+    /// cannon-verify king-safety test instead detect attackers by projecting the
+    /// role's attack set **forward from each candidate origin square** and asking
+    /// whether it reaches the target — i.e. consistent with the move generator.
+    ///
+    /// This is independent of [`role_attack_is_directional`]: that hook only flips
+    /// the color used for the projection (a pawn's diagonal capture is symmetric
+    /// *geometrically*, just color-mirrored), which cannot fix a per-leap geometric
+    /// asymmetry. The default is `false`; Xiangqi overrides it for the Horse.
+    ///
+    /// [`role_attack_is_directional`]: WideVariant::role_attack_is_directional
+    fn role_attack_is_leg_asymmetric(_role: WideRole) -> bool {
+        false
+    }
+
     /// Returns `true` if a piece of `role` **may promote** by a move that starts
     /// or ends in the promotion zone. Only consulted when
     /// [`has_hand`](WideVariant::has_hand) is `true` (the generic per-piece
