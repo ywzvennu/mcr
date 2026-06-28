@@ -24,7 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use super::attacks::{between, line};
+use super::attacks::{between, king_attack_lines, line};
 use super::role::WideRole;
 use super::variant::{WideEndReason, WideVariant};
 use super::{
@@ -2836,38 +2836,6 @@ impl EnemyAttackers {
     fn roles(&self) -> &[WideRole] {
         &self.roles[..self.len]
     }
-}
-
-/// The set of squares on the king's **rank, file, and two diagonals** — every
-/// line along which a slider, a cannon (over a screen), or the Xiangqi flying
-/// general can attack the king.
-///
-/// A move whose origin and destination both lie *off* this set cannot add or
-/// remove a blocker or screen on any king line, so (out of check, and if it is
-/// not a king move) it cannot change whether the king is attacked. The cannon
-/// verify path uses it as a fast-accept test. Built from the same ray walks the
-/// slider primitives use, so it costs four short walks per node — paid once and
-/// shared by every sibling move.
-#[inline]
-fn king_attack_lines<G: Geometry>(king: Square<G>) -> Bitboard<G> {
-    let mut lines = Bitboard::<G>::EMPTY;
-    for &(df, dr) in &[
-        (1, 0),
-        (0, 1),
-        (1, 1),
-        (1, -1),
-        (-1, 0),
-        (0, -1),
-        (-1, -1),
-        (-1, 1),
-    ] {
-        let mut cur = king.offset(df, dr);
-        while let Some(next) = cur {
-            lines.set(next);
-            cur = next.offset(df, dr);
-        }
-    }
-    lines
 }
 
 /// Returns `true` if the cannon-variant move `mv` is **provably king-safe** by
