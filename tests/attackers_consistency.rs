@@ -41,8 +41,8 @@
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
     MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, SeirawanRules, ShakoRules,
-    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, WideRole,
-    WideVariant, XiangqiRules,
+    ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
+    WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -506,5 +506,28 @@ variant_test!(
         "rnv*uk1nr/8/1c4c1/8/3PP3/8/PPP2PPP/RNBQKBNR[zz] b KQ - 0 1",
         "8/8/8/8/K7/8/4k3/8 b - - 0 1",
         "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
+    ]
+);
+
+// -- Shinobi (fixed-reserve hand + drops, forward Shogi-Knight/Lance, mandatory
+// per-piece promotion zone, flag win, 8x8) ---------------------------------
+//
+// Exercises the forward-directional Shogi Knight and Lance (which must
+// reverse-project with the opposite color in `attackers_to`), the Commoner,
+// Bers (= General), Archbishop (= Hawk), and Fers (= Met). The corpus FENs are
+// reused from `tests/perft_shinobi.rs` (each FSF-confirmed): the startpos and
+// three middlegames with drop reserves and pieces near the promotion zone. The
+// Shogi Knight and Commoner are overflow roles (tokens `*N` / `*U`, recycling
+// `n` / `u`); the board FEN parser resolves the `*` prefix.
+
+variant_test!(
+    shinobi,
+    Chess8x8,
+    ShinobiRules,
+    "shinobi",
+    [
+        "r1bqkbnr/ppp2ppp/2n5/3p4/2Lp4/3M*N3/PPPPPPPP/L*N1*UK1*NL[AM] w kq - 0 5",
+        "r1bqk2r/ppp1bppp/2n1p2n/2p2*N2/3M4/8/PPPPPPPP/L*N1*UK1*NL[LAM] w kq - 0 7",
+        "r1bqk2r/1pppbppp/p1n1pn2/P7/L7/1*NM5/1PPPPPPP/1*N1*UK1*NL[LADM] w kq - 2 6",
     ]
 );

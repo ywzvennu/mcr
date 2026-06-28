@@ -895,7 +895,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // pawn captures straight ahead, not diagonally) — and skips the diagonal-
         // capture `gen_pawn_moves` path below. Every other variant keeps the Pawn
         // on the dedicated pawn generator, byte-identically.
-        let pawn_is_stepper = V::has_hand();
+        let pawn_is_stepper = V::pawn_is_stepper();
         for role in WideRole::ALL {
             if role == WideRole::King || (role == WideRole::Pawn && !pawn_is_stepper) {
                 continue;
@@ -1713,7 +1713,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         us: Color,
     ) {
         let from_in_zone = V::in_promotion_zone(us, from.rank());
-        let promoted = role.promoted_form();
+        let promoted = V::role_promoted_to(role);
+        let mandatory = V::promotion_mandatory_in_zone();
         for to in targets {
             let capture = their_pieces.contains(to);
             let to_rank = to.rank();
@@ -1726,9 +1727,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         capture,
                     },
                 ));
-                // The non-promoting alternative, unless the piece would then have
-                // no further move (forced promotion).
-                if !V::role_promotion_forced(role, us, to_rank) {
+                // The non-promoting alternative, unless promotion is mandatory in
+                // the zone (Shinobi) or the piece would then have no further move
+                // (Shogi's forced promotion).
+                if !mandatory && !V::role_promotion_forced(role, us, to_rank) {
                     let kind = if capture {
                         WideMoveKind::Capture
                     } else {
@@ -2238,8 +2240,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // A hand variant (Shogi) banks the captured piece — flipped to the
                 // captor's side and reverted to its base role — before it is
                 // overwritten. Default-off, so inert for every other variant.
-                // Synochess has a hand but a fixed pocket (`captures_to_hand()` is
-                // `false`), so its captures bank nothing.
+                // Synochess and Shinobi both have a hand but a fixed pocket
+                // (`captures_to_hand()` is `false`), so their captures bank nothing.
                 if V::has_hand() && V::captures_to_hand() {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state.placement.add(us, captured.role.promoted_base());
@@ -2307,7 +2309,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 reset_clock = capture || is_pawn_move;
                 // A hand variant (Shogi) banks the captured piece on a capturing
                 // promotion too. Default-off, so inert for every other variant
-                // (and for Synochess, whose fixed pocket never replenishes).
+                // (and for Synochess / Shinobi, whose fixed pockets never
+                // replenish — `captures_to_hand()` is `false`).
                 if V::has_hand() && V::captures_to_hand() && capture {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state.placement.add(us, captured.role.promoted_base());
@@ -3408,9 +3411,21 @@ fn parse_holdings(holdings: &str) -> Result<([bool; 2], [bool; 2]), WideFenError
 /// `s`). Any letter that is not a known role is rejected.
 fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenError> {
     let mut pocket = GenericPlacement::NONE;
-    for ch in holdings.chars() {
-        let role = WideRole::from_char(ch).ok_or(WideFenError::BadCastling)?;
-        let counts = if ch.is_ascii_uppercase() {
+    let mut chars = holdings.chars();
+    while let Some(ch) = chars.next() {
+        // An overflow role's token is `*` + a recycled base letter whose case
+        // carries the colour (e.g. Shinobi's Shogi Knight `*N` / `*n`), mirroring
+        // the board placement's overflow handling. A bare letter is an ordinary
+        // role.
+        let (role, white) = if ch == crate::geometry::role::OVERFLOW_PREFIX {
+            let base = chars.next().ok_or(WideFenError::BadCastling)?;
+            let role = WideRole::overflow_from_base(base).ok_or(WideFenError::BadCastling)?;
+            (role, base.is_ascii_uppercase())
+        } else {
+            let role = WideRole::from_char(ch).ok_or(WideFenError::BadCastling)?;
+            (role, ch.is_ascii_uppercase())
+        };
+        let counts = if white {
             &mut pocket.white
         } else {
             &mut pocket.black
@@ -3435,6 +3450,12 @@ fn write_placement_holdings(placement: GenericPlacement, out: &mut String) {
                 role.char()
             };
             for _ in 0..n {
+                // An overflow role (e.g. Shinobi's Shogi Knight `*N`) has no bare
+                // letter: its token is the `*` prefix plus the recycled base
+                // letter, the case already encoded in `ch` above.
+                if role.is_overflow() {
+                    out.push(crate::geometry::role::OVERFLOW_PREFIX);
+                }
                 out.push(ch);
             }
         }

@@ -132,9 +132,10 @@ impl Engine {
     }
 
     /// Loads an external `variants.ini` (`setoption name VariantPath value <path>`)
-    /// and re-reads the `uci` handshake so the INI-defined variants (e.g. Orda)
-    /// join [`has_variant`](Engine::has_variant). FSF re-emits the full
-    /// `UCI_Variant` combo — now including the INI variants — on the next `uci`.
+    /// and re-reads the `uci` handshake so the INI-defined variants (e.g. Orda,
+    /// Synochess, Shinobi — none of them FSF built-ins) join
+    /// [`has_variant`](Engine::has_variant). FSF re-emits the full `UCI_Variant`
+    /// combo — now including the INI variants — on the next `uci`.
     ///
     /// GPL FENCE unchanged: the INI is a plain data file passed to the FSF
     /// subprocess; nothing is linked or vendored.

@@ -56,8 +56,8 @@ pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, Wid
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Janggi, JanggiRules, Makruk,
     MakrukRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules,
-    Seirawan, SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules, Sittuyin, SittuyinRules,
-    Spartan, SpartanRules, Synochess, SynochessRules, Xiangqi, XiangqiRules,
+    Seirawan, SeirawanRules, Shako, ShakoRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Sittuyin,
+    SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

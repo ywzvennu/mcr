@@ -667,10 +667,53 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// taken piece to the captor's side and adds it to the hand. Synochess sets a
     /// hand for its **fixed** Black soldier reinforcement pocket, but that pocket
     /// is never replenished (FSF `capturesToHand = false`): it overrides this to
-    /// `false` so a capture drops nothing into either hand. Keeping the default
-    /// `true` leaves every hand-banking site byte-identical for Shogi/crazyhouse.
+    /// `false` so a capture drops nothing into either hand. Shinobi likewise has a
+    /// **fixed starting reserve** consumed only by drops, so it too overrides this
+    /// to `false`. Keeping the default `true` leaves every hand-banking site
+    /// byte-identical for Shogi / crazyhouse.
     fn captures_to_hand() -> bool {
         true
+    }
+
+    /// Returns `true` if a piece of this variant's **Pawn moves as a forward
+    /// stepper** (the Shogi pawn: one square straight forward, capturing straight
+    /// ahead) rather than as a standard chess pawn (double push, diagonal capture,
+    /// en passant). Only consulted when [`has_hand`](WideVariant::has_hand) is
+    /// `true`.
+    ///
+    /// The default mirrors the pre-hook behaviour: a hand variant's Pawn is a
+    /// forward stepper (`has_hand()`), keeping Shogi byte-identical. Shinobi
+    /// overrides it to `false` — it has a hand and drops, but its Pawn is an
+    /// ordinary chess pawn (it promotes into a Commoner on entering the far zone).
+    fn pawn_is_stepper() -> bool {
+        Self::has_hand()
+    }
+
+    /// Returns the role a promotable piece of `role` **becomes** when it promotes.
+    /// Only consulted when [`has_hand`](WideVariant::has_hand) is `true` and the
+    /// role [`role_can_promote`](WideVariant::role_can_promote)s, on the generic
+    /// per-piece promotion path.
+    ///
+    /// The default is [`WideRole::promoted_form`] — the Shogi mapping (Pawn→Tokin,
+    /// Rook→Dragon, …), keeping Shogi byte-identical. Shinobi overrides it: a Fers
+    /// promotes to a Bishop, a Shogi Knight to a Knight, and a Lance to a Rook
+    /// (its Pawn promotes via the standard pawn path, not here).
+    fn role_promoted_to(role: WideRole) -> WideRole {
+        role.promoted_form()
+    }
+
+    /// Returns `true` if a promotable piece **must** promote on any move that
+    /// starts or ends in the promotion zone — there is no non-promoting
+    /// alternative. Only consulted when [`has_hand`](WideVariant::has_hand) is
+    /// `true`, on the generic per-piece promotion path.
+    ///
+    /// The default is `false`: Shogi promotion is *optional* in the zone (the
+    /// generator emits both the promoting and the non-promoting move) except where
+    /// [`role_promotion_forced`](WideVariant::role_promotion_forced) makes it
+    /// compulsory. Shinobi overrides it to `true`, matching FSF's
+    /// `mandatoryPiecePromotion = true`: a zone move is always the promoting form.
+    fn promotion_mandatory_in_zone() -> bool {
+        false
     }
 
     /// Returns the squares onto which `color` may **drop** a held `role`, given
