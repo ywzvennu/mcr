@@ -70,6 +70,14 @@ const CASES: &[Case] = &[
         fen: "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1",
         depth: 4,
     },
+    // Horse gives check (issue #198): a black horse on e3 checks the white general
+    // on d1 with its leg e2 empty. The old `attackers_to` reverse-projection missed
+    // this check; FSF and mce now agree (perft 3 = 14, 4 = 50).
+    Case {
+        label: "horse-check",
+        fen: "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
+        depth: 4,
+    },
 ];
 
 /// Rewrite an mce-dialect Xiangqi FEN into the FSF dialect: the Advisor `u`/`U`,

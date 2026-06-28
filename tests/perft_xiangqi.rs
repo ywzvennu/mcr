@@ -68,6 +68,17 @@ const EYE: &str = "r1oukuo1r/9/1c2c4/z3z3z/2z3z2/2Z3Z2/Z3Z3Z/1C2C4/9/R1OUKUO1R w
 /// has only chariots and generals).
 const FLYING_GENERAL: &str = "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1";
 
+/// A **horse-gives-check** position, white to move and **in check** (issue #198):
+/// a black horse on e3 leaps onto the white general on d1, its hobbling leg e2
+/// being empty. The old corpus never exercised a horse check, so `attackers_to`'s
+/// reverse-projection bug (it tested the leg adjacent to the *target*, d2, which is
+/// occupied by the white advisor, instead of the leg adjacent to the *horse*, e2)
+/// went undetected: mce wrongly read `is_attacked(d1, Black) == false` and let
+/// non-evasions through, inflating perft (depth 3 was 17, not 14). White's only
+/// replies are the king step d1->e1 and the advisor capture d2xe3.
+/// FSF-confirmed (mce dialect of FSF's `4k4/9/9/9/9/9/9/4n4/3A5/3K5 w`).
+const HORSE_CHECK: &str = "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1";
+
 /// Asserts the generic Xiangqi perft equals each pinned `(depth, nodes)` count.
 /// Every number here also matched FSF xiangqi `go perft` on the same position.
 fn check(fen: &str, cases: &[(u32, u64)]) {
@@ -142,4 +153,18 @@ fn flying_general_pin() {
         FLYING_GENERAL,
         &[(1, 10), (2, 16), (3, 290), (4, 262), (5, 4734)],
     );
+}
+
+// -- Horse gives check (FSF-confirmed; the corpus blind spot of #198) ---------
+
+#[test]
+fn horse_check_cheap() {
+    // Depth 3 was 17 before the #198 fix (missed horse check); FSF says 14.
+    check(HORSE_CHECK, &[(1, 2), (2, 5), (3, 14)]);
+}
+
+#[test]
+#[ignore = "deep perft; run with --release --include-ignored"]
+fn horse_check_deep() {
+    check(HORSE_CHECK, &[(4, 50), (5, 175), (6, 786)]);
 }
