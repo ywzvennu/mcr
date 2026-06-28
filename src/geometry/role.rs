@@ -358,6 +358,83 @@ pub enum WideRole {
     /// prefix). The `compare-fairy` harness maps `*m → m` when driving Manchu.
     Banner = 42,
 
+    // --- Chak (9x9 Mayan) army (§ Milestone 10, Fairy variants) ----------
+    //
+    // Chak (Couch Tomato, https://www.pychess.org/variants/chak) is a 9x9 Mayan
+    // variant on the [`Shogi9x9`](super::Shogi9x9) geometry. Confirmed
+    // square-for-square against Fairy-Stockfish `UCI_Variant chak` (its
+    // `variants.ini` custom pieces). Two of its eight piece kinds reuse existing
+    // roles — the **Vulture** (`v`) is a plain [`WideRole::Knight`] and the
+    // **Jaguar** (`j`) is a King + Knight centaur, exactly the Orda
+    // [`WideRole::Kheshig`]; the **King** (`k`) is a plain royal
+    // [`WideRole::King`] (it promotes to the Divine Lord) — so neither needs a new
+    // role. The remaining six pieces are genuinely new and, landing **past the
+    // exhausted single-letter alphabet**, are all **overflow roles** spelled with
+    // the [`OVERFLOW_PREFIX`] (`*`) plus a recycled base letter whose case carries
+    // the colour. The `compare-fairy` harness strips the `*` (e.g. `*s → s`) when
+    // driving FSF.
+    /// Serpent (FSF `customPiece1 = s:FvW`) — a leaper to the **four diagonals**
+    /// (Ferz) **and** one step straight forward or backward (vertical Wazir): six
+    /// targets, no sideways step. (Chak.) An **overflow role**: its FEN token is
+    /// `*S` (white) / `*s` (black), recycling the FSF letter `s` (already the
+    /// Silver's bare letter here), and the `compare-fairy` harness maps `*s → s`
+    /// when driving Chak.
+    Serpent = 43,
+    /// Quetzal (FSF `customPiece2 = q:pQ`) — an **eight-direction cannon**: it
+    /// moves and captures like a Queen but **only by hopping exactly one screen**
+    /// (a piece of either colour) along a rank, file, or diagonal, landing on any
+    /// empty square or the first enemy beyond the screen; it has no move on an
+    /// unobstructed line and cannot land on the screen. Its full occupancy-aware
+    /// set is computed from the live board via
+    /// [`role_attacks_board`](super::WideVariant::role_attacks_board) (the capture
+    /// part lands only beyond a screen, so the relation is occupancy-asymmetric).
+    /// (Chak.) An **overflow role**: its FEN token is `*Q` (white) / `*q` (black),
+    /// recycling the FSF letter `q` (already the Queen's bare letter here), and the
+    /// `compare-fairy` harness maps `*q → q` when driving Chak.
+    Quetzal = 44,
+    /// Shaman (FSF `customPiece6 = w:FvW`) — moves exactly like the Serpent (four
+    /// diagonals plus a vertical Wazir step) but is **confined to its own half of
+    /// the board** (White ranks 5-9, Black ranks 1-5; FSF `mobilityRegion…`), so
+    /// it never moves or captures across the centre line. It is the **promoted
+    /// form of the Soldier**. (Chak.) An **overflow role**: its FEN token is `*W`
+    /// (white) / `*w` (black), recycling the FSF letter `w` (already the Kheshig's
+    /// bare letter here, distinct by the `*` prefix), and the `compare-fairy`
+    /// harness maps `*w → w` when driving Chak.
+    Shaman = 45,
+    /// Divine Lord (FSF `customPiece3 = d:mQ2cQ2`) — moves and captures like a
+    /// **Queen limited to two squares** (a blockable range-2 slider), **confined
+    /// to its own half** (White ranks 5-9, Black ranks 1-5) exactly like the
+    /// Shaman, and is the **promoted form of the King**. It is **royal** (the
+    /// promoted King): a side that loses *both* its King and its Lord has lost
+    /// (FSF `extinctionPieceTypes = kd`, `extinctionPseudoRoyal`), and a Lord
+    /// reaching the enemy temple square wins (FSF `flagPiece = d`). (Chak.) An
+    /// **overflow role**: its FEN token is `*L` (white) / `*l` (black), the base
+    /// letter `l` (the "**L**ord" mnemonic, since the FSF letter `d` is already the
+    /// General's recycled base), and the `compare-fairy` harness maps `*l → d` when
+    /// driving Chak.
+    DivineLord = 46,
+    /// Chak Soldier (FSF `customPiece4 = p:fsmWfceF`) — **moves** one step
+    /// forward or to either side (a forward/sideways Wazir, never backward) but
+    /// **captures** only one step diagonally forward (a forward Ferz), unlike the
+    /// Xiangqi [`WideRole::Soldier`] (`z`) which moves and captures alike. It
+    /// **promotes to a Shaman** on reaching its own half. A move≠capture piece:
+    /// its quiet forward/sideways steps ride
+    /// [`quiet_targets_board`](super::WideVariant::quiet_targets_board) and its
+    /// [`role_attacks`](super::WideVariant::role_attacks) is the forward-diagonal
+    /// capture pattern. (Chak.) An **overflow role**: its FEN token is `*P` (white)
+    /// / `*p` (black), recycling the FSF letter `p` (already the Pawn's bare letter
+    /// here), and the `compare-fairy` harness maps `*p → p` when driving Chak.
+    ChakSoldier = 47,
+    /// Temple (FSF `immobile = o`) — the pyramid that sits on each side's central
+    /// rank-2/rank-8 square: it **never moves**, but it can be **captured** like
+    /// any other piece, and the square it sits on is the goal a Divine Lord wins
+    /// by reaching. Its [`role_attacks`](super::WideVariant::role_attacks) set is
+    /// always empty (it neither moves nor threatens). (Chak.) An **overflow role**:
+    /// its FEN token is `*O` (white) / `*o` (black), recycling the FSF letter `o`
+    /// (already the Xiangqi Elephant's bare letter here, distinct by the `*`
+    /// prefix), and the `compare-fairy` harness maps `*o → o` when driving Chak.
+    Temple = 48,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -394,7 +471,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 43;
+    pub const COUNT: usize = 49;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -441,6 +518,12 @@ impl WideRole {
         WideRole::KnightBishop,
         WideRole::BishopKnight,
         WideRole::Banner,
+        WideRole::Serpent,
+        WideRole::Quetzal,
+        WideRole::Shaman,
+        WideRole::DivineLord,
+        WideRole::ChakSoldier,
+        WideRole::Temple,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -573,6 +656,24 @@ impl WideRole {
             // FSF's letter `m` (the bare Met's letter, distinguished by the `*`
             // prefix). The `compare-fairy` harness maps `*m → m` when driving Manchu.
             WideRole::Banner => 'm',
+            // Chak (9x9 Mayan) army — six overflow roles past the exhausted
+            // single-letter alphabet. Like the Commoner / Empire pieces, each FEN
+            // token is the `*` prefix plus a recycled base letter, so `char()`
+            // returns the bare base letter and the board FEN I/O adds the `*`
+            // prefix. The Serpent / Quetzal / Soldier recycle the FSF mnemonics
+            // `s` / `q` / `p`; the Shaman recycles the FSF letter `w` (the
+            // Kheshig's bare letter, distinct by the `*` prefix); the Divine Lord
+            // takes `l` (the FSF letter `d` being already the General's recycled
+            // base); the Temple recycles the FSF letter `o` (the Xiangqi
+            // Elephant's bare letter, distinct by the `*` prefix). The
+            // `compare-fairy` harness maps `*s → s`, `*q → q`, `*w → w`,
+            // `*l → d`, `*p → p`, `*o → o` when driving Chak.
+            WideRole::Serpent => 's',
+            WideRole::Quetzal => 'q',
+            WideRole::Shaman => 'w',
+            WideRole::DivineLord => 'l',
+            WideRole::ChakSoldier => 'p',
+            WideRole::Temple => 'o',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -662,6 +763,12 @@ impl WideRole {
                 | WideRole::KnightBishop
                 | WideRole::BishopKnight
                 | WideRole::Banner
+                | WideRole::Serpent
+                | WideRole::Quetzal
+                | WideRole::Shaman
+                | WideRole::DivineLord
+                | WideRole::ChakSoldier
+                | WideRole::Temple
         )
     }
 
@@ -702,6 +809,15 @@ impl WideRole {
             'b' => Some(WideRole::BishopKnight),
             // Manchu super-piece: recycles FSF's Banner letter `m`.
             'm' => Some(WideRole::Banner),
+            // Chak (9x9 Mayan) army: recycled FSF mnemonics `s`/`q`/`p`, the
+            // Kheshig's letter `w` (Shaman), the "Lord" letter `l` (Divine Lord),
+            // and the Xiangqi Elephant's letter `o` (Temple).
+            's' => Some(WideRole::Serpent),
+            'q' => Some(WideRole::Quetzal),
+            'w' => Some(WideRole::Shaman),
+            'l' => Some(WideRole::DivineLord),
+            'p' => Some(WideRole::ChakSoldier),
+            'o' => Some(WideRole::Temple),
             _ => None,
         }
     }
@@ -811,6 +927,12 @@ impl fmt::Display for WideRole {
             WideRole::KnightBishop => "knight-bishop",
             WideRole::BishopKnight => "bishop-knight",
             WideRole::Banner => "banner",
+            WideRole::Serpent => "serpent",
+            WideRole::Quetzal => "quetzal",
+            WideRole::Shaman => "shaman",
+            WideRole::DivineLord => "divine-lord",
+            WideRole::ChakSoldier => "chak-soldier",
+            WideRole::Temple => "temple",
         })
     }
 }
@@ -945,7 +1067,8 @@ mod tests {
         assert!(WideRole::Commoner.is_overflow());
         assert_eq!(WideRole::Commoner.char(), 'u');
         assert_eq!(WideRole::overflow_from_base('u'), Some(WideRole::Commoner));
-        // A base letter that names no overflow role yields `None`.
-        assert_eq!(WideRole::overflow_from_base('p'), None);
+        // A base letter that names no overflow role yields `None`. (`g` — the
+        // Gold's letter — is not recycled by any overflow role.)
+        assert_eq!(WideRole::overflow_from_base('g'), None);
     }
 }

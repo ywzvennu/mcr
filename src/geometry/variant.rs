@@ -279,6 +279,25 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if **every** royal piece must be left safe by a move — the
+    /// strict pseudo-royal rule where a side may not leave *any* king (or extra
+    /// royal piece) en prise (Chak: royals are the King and the promoted Divine
+    /// Lord, FSF `extinctionPseudoRoyal`). Only consulted on the multi-royal path
+    /// (with [`multi_royal`](WideVariant::multi_royal) `true`).
+    ///
+    /// The default is `false`: Spartan's duple-check rule instead keeps a side
+    /// legal while **at least one** royal survives (a side may sacrifice a king and
+    /// play on with the survivor). While it is `false` the multi-royal path is
+    /// byte-identical to Spartan. When `true`, "in check" means *any* royal is
+    /// attacked and a legal move must leave *every* royal unattacked — exactly a
+    /// generalisation of single-king check to a set of royals that must *all*
+    /// survive. For Chak the side always has exactly one royal in a reachable
+    /// position, so this only differs from the default on artificial multi-royal
+    /// positions, but it matches Fairy-Stockfish's pseudo-royal rule on those too.
+    fn royals_all_must_survive() -> bool {
+        false
+    }
+
     /// Returns the **forward step** a Berolina-style pawn (the Spartan Hoplite)
     /// uses for its *non-capturing* move: a diagonal advance. Returns the two
     /// diagonal-forward landing squares from `from` for `color`, or
@@ -887,6 +906,57 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// region confinement; the default is the full board (no confinement).
     fn region_mask(_region: WideRegion) -> Bitboard<G> {
         Bitboard::FULL
+    }
+
+    // --- Chak per-piece promotion without a hand (default OFF) ------------
+
+    /// Returns `true` if this variant promotes non-pawn pieces by a move that
+    /// **ends in the promotion zone**, *without* a hand (Chak: the King promotes
+    /// to the Divine Lord and the Soldier to the Shaman). The default is `false`.
+    ///
+    /// While it is `false` the generic engine never expands a non-pawn move into a
+    /// promotion on the multi-royal pseudo path, so every other variant is
+    /// byte-identical. When `true`, a move of a [`role_can_promote`] piece whose
+    /// destination [`in_promotion_zone`] is emitted as a promotion to
+    /// [`role_promoted_to`] (plus the non-promoting alternative unless
+    /// [`promotion_mandatory_in_zone`]). This is the no-hand analogue of the
+    /// hand-variant per-piece promotion (which stays gated behind [`has_hand`]);
+    /// Chak rides the multi-royal verify path, where the King's promotion to the
+    /// (also-royal) Divine Lord is naturally re-verified for king safety.
+    ///
+    /// [`role_can_promote`]: WideVariant::role_can_promote
+    /// [`in_promotion_zone`]: WideVariant::in_promotion_zone
+    /// [`role_promoted_to`]: WideVariant::role_promoted_to
+    /// [`promotion_mandatory_in_zone`]: WideVariant::promotion_mandatory_in_zone
+    /// [`has_hand`]: WideVariant::has_hand
+    fn has_piece_promotion() -> bool {
+        false
+    }
+
+    // --- Chak temple win (default OFF) -----------------------------------
+
+    /// Returns `true` if this variant is won by moving a **Divine Lord** onto the
+    /// enemy **temple square** (Chak; FSF `flagPiece = d`, `flagRegion…`). The
+    /// default is `false`.
+    ///
+    /// While it is `false` the engine never evaluates the rule, so every other
+    /// variant is byte-identical. When `true`, a position in which some side's
+    /// Divine Lord stands on its [`temple_goal`](WideVariant::temple_goal) square
+    /// is **terminal**: the move generator short-circuits to *zero moves* (the node
+    /// is a perft leaf, exactly as Fairy-Stockfish truncates it), and the win is
+    /// reported as a [`WideEndReason::VariantWin`]. Chak rides the multi-royal
+    /// verify path, whose single chokepoint funnels the truncation the same way
+    /// FSF does.
+    fn has_temple_win() -> bool {
+        false
+    }
+
+    /// Returns the goal **temple square(s)** a Divine Lord of `color` wins by
+    /// reaching (Chak: the enemy side's central temple). Only consulted while
+    /// [`has_temple_win`](WideVariant::has_temple_win) is `true`; the default is
+    /// the empty board (no goal).
+    fn temple_goal(_color: Color) -> Bitboard<G> {
+        Bitboard::EMPTY
     }
 
     /// Hook for variant-specific terminal conditions (king-capture wins, race

@@ -610,10 +610,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return false;
         }
         let attacked = |sq| self.royal_attacked(sq, them, occ);
-        if V::multi_royal() {
-            // Duple check: in check only when no royal is left unattacked.
+        if V::multi_royal() && !V::royals_all_must_survive() {
+            // Spartan duple check: in check only when no royal is left unattacked.
             royals.into_iter().all(attacked)
         } else {
+            // Single-royal, and Chak's all-royals-must-survive rule: in check when
+            // any royal is attacked.
             royals.into_iter().any(attacked)
         }
     }
@@ -1127,9 +1129,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// royal's safety. The produced move set is byte-identical.
     fn generate_multi_royal_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
-        let kings = self.board.kings_of(us);
-        // A side with no kings has already lost (its last king was captured on the
-        // previous ply): no moves.
+        // The temple-win terminal (Chak): if the opponent's Divine Lord already
+        // stands on its goal temple square, the opponent has won and the side to
+        // move has no legal continuation — the node is a perft leaf, exactly as
+        // Fairy-Stockfish truncates it. Gated behind `has_temple_win()`
+        // (default-off), so every other multi-royal variant (Spartan) is
+        // byte-identical.
+        if V::has_temple_win() && self.temple_win_reached(us.opposite()) {
+            return;
+        }
+        // The side's royal squares — its kings, plus any extra royal piece type the
+        // variant declares (Chak's Divine Lord). For every existing variant
+        // `royal_squares` is exactly `kings_of`, so this is byte-identical.
+        let kings = V::royal_squares(&self.board, us);
+        // A side with no royal pieces has already lost (its last royal was captured
+        // on the previous ply): no moves.
         if kings.is_empty() {
             return;
         }
@@ -1160,14 +1174,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // move must be verified, since legality then requires the move to *create*
         // a surviving king.)
         let occ = self.board.occupied();
-        let in_duple_check = !kings
-            .into_iter()
-            .any(|k| !self.royal_attacked(k, them, occ));
+        // The fast-accept is disabled while the side is "in check": for Spartan's
+        // duple-check rule that means **every** royal is attacked (a move off the
+        // lines cannot create a surviving king); for Chak's all-must-survive rule it
+        // means **any** royal is attacked (a move off the lines cannot resolve the
+        // attack on the en-prise royal). In both cases an unsafe-now situation must
+        // fall through to the full per-move verify.
+        let no_fast_accept = if V::royals_all_must_survive() {
+            kings.into_iter().any(|k| self.royal_attacked(k, them, occ))
+        } else {
+            !kings
+                .into_iter()
+                .any(|k| !self.royal_attacked(k, them, occ))
+        };
         let royal_lines = multi_royal_attack_lines::<G>(kings);
 
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
-            if !in_duple_check && multi_royal_move_off_lines::<G>(&mv, kings, royal_lines) {
+            if !no_fast_accept && multi_royal_move_off_lines::<G>(&mv, kings, royal_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
             } else if scratch.multi_royal_move_is_legal(self, &mv, us, &attackers) {
@@ -1221,14 +1245,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// the fielded enemy roles via [`king_safe_after`](Self::king_safe_after), and
     /// is identical to it in result.
     fn royals_survive_after(&self, who: Color, attackers: &EnemyAttackers) -> bool {
-        let kings = self.board.kings_of(who);
+        let kings = V::royal_squares(&self.board, who);
         if kings.is_empty() {
             return false;
         }
         let them = who.opposite();
-        kings
-            .into_iter()
-            .any(|k| self.king_safe_after(k, them, attackers))
+        // Spartan's duple-check rule keeps a side legal while **at least one** royal
+        // survives. Chak's pseudo-royal rule (`royals_all_must_survive`) instead
+        // requires **every** royal to be safe — a move may not leave any king or
+        // Divine Lord en prise. Default is the at-least-one rule, so Spartan is
+        // byte-identical.
+        if V::royals_all_must_survive() {
+            kings
+                .into_iter()
+                .all(|k| self.king_safe_after(k, them, attackers))
+        } else {
+            kings
+                .into_iter()
+                .any(|k| self.king_safe_after(k, them, attackers))
+        }
     }
 
     /// Generates every legal move for a **cannon** variant (Shako, Xiangqi) via
@@ -1549,15 +1584,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// unattacked king — i.e. `who` is not in (duple) check. A side with no king
     /// at all returns `false` (it has been eliminated).
     fn royals_survive(&self, who: Color) -> bool {
-        let kings = self.board.kings_of(who);
+        let kings = V::royal_squares(&self.board, who);
         if kings.is_empty() {
             return false;
         }
         let occ = self.board.occupied();
         let them = who.opposite();
-        kings
-            .into_iter()
-            .any(|k| self.attackers_to(k, them, occ).is_empty())
+        // See `royals_survive_after`: Chak requires every royal safe, Spartan only
+        // one. Default (at-least-one) keeps Spartan byte-identical.
+        if V::royals_all_must_survive() {
+            kings
+                .into_iter()
+                .all(|k| self.attackers_to(k, them, occ).is_empty())
+        } else {
+            kings
+                .into_iter()
+                .any(|k| self.attackers_to(k, them, occ).is_empty())
+        }
     }
 
     /// Pushes the pseudo-legal base moves for a multi-king side into `pseudo`
@@ -1577,32 +1620,48 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if role == WideRole::Pawn || role == WideRole::Hoplite {
                 continue;
             }
+            // Whether this role expands into a promotion on a move that ends in the
+            // promotion zone (Chak's King → Divine Lord and Soldier → Shaman).
+            // Gated behind `has_piece_promotion()` (default-off), so every other
+            // multi-royal variant skips it and is byte-identical.
+            let promotable = V::has_piece_promotion() && V::role_can_promote(role);
             for from in board.pieces(us, role) {
                 // A board-aware role (the Janggi cannon, whose screen/target may
-                // not be a cannon and which may jump the palace diagonal) computes
-                // its set from the whole board; the default-off hook returns `None`
-                // for every other variant/role, so they keep the occupancy-only
-                // path byte-identically. The returned set already folds the
-                // cannon's quiet jumps and over-screen captures together;
-                // `emit_targets` splits them by enemy occupancy.
+                // not be a cannon and which may jump the palace diagonal; Chak's
+                // Quetzal cannon and move≠capture Soldier) computes its set from the
+                // whole board; the default-off hook returns `None` for every other
+                // variant/role, so they keep the occupancy-only path
+                // byte-identically. The returned set already folds the cannon's
+                // quiet jumps and over-screen captures together; `emit_targets`
+                // splits them by enemy occupancy.
                 let targets = if V::uses_board_attacks() {
                     V::role_attacks_board(role, us, from, board)
                         .unwrap_or_else(|| V::role_attacks(role, us, from, occupied))
                 } else {
                     V::role_attacks(role, us, from, occupied)
                 } & !our_pieces;
-                pseudo.emit_targets(from, targets, their_pieces);
-                // Quiet-only steps (the Spartan Lieutenant's sideways slide): a
-                // move onto an empty square that can never capture. Default-empty,
-                // so inert for every other role/variant.
+                if promotable {
+                    Self::emit_piece_promotion(pseudo, role, from, targets, their_pieces, us);
+                } else {
+                    pseudo.emit_targets(from, targets, their_pieces);
+                }
+                // Quiet-only steps (the Spartan Lieutenant's sideways slide; Chak's
+                // Soldier's forward/sideways move): a move onto an empty square that
+                // can never capture. Default-empty, so inert for every other
+                // role/variant.
                 let quiet_only = if V::uses_board_attacks() {
                     V::quiet_targets_board(role, us, from, board)
                         .unwrap_or_else(|| V::quiet_only_targets(role, us, from, occupied))
                 } else {
                     V::quiet_only_targets(role, us, from, occupied)
                 } & !occupied;
+                let from_in_zone = promotable && V::in_promotion_zone(us, from.rank());
                 for to in quiet_only {
-                    pseudo.push(WideMove::new(from, to, WideMoveKind::Quiet));
+                    if promotable && (from_in_zone || V::in_promotion_zone(us, to.rank())) {
+                        Self::emit_piece_promotion_one(pseudo, role, from, to, false, us);
+                    } else {
+                        pseudo.push(WideMove::new(from, to, WideMoveKind::Quiet));
+                    }
                 }
             }
         }
@@ -1724,6 +1783,76 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             out.push(WideMove::new(from, to, WideMoveKind::Quiet));
         }
+    }
+
+    /// Emits a single non-pawn piece move from `from` to `to` (Chak's King /
+    /// Soldier), expanding it into the promotion form(s) when `to` is in the
+    /// promotion zone. A capture/quiet split is given by `capture`. Used by the
+    /// multi-royal pseudo generator under [`WideVariant::has_piece_promotion`].
+    ///
+    /// When the destination is in the zone the piece promotes to
+    /// [`WideVariant::role_promoted_to`]; the non-promoting alternative is emitted
+    /// too unless promotion is [`WideVariant::promotion_mandatory_in_zone`] there.
+    fn emit_piece_promotion_one<S: WideSink>(
+        out: &mut S,
+        role: WideRole,
+        from: Square<G>,
+        to: Square<G>,
+        capture: bool,
+        us: Color,
+    ) {
+        if V::in_promotion_zone(us, from.rank()) || V::in_promotion_zone(us, to.rank()) {
+            out.push(WideMove::new(
+                from,
+                to,
+                WideMoveKind::Promotion {
+                    role: V::role_promoted_to(role),
+                    capture,
+                },
+            ));
+            if !V::promotion_mandatory_in_zone() {
+                let kind = if capture {
+                    WideMoveKind::Capture
+                } else {
+                    WideMoveKind::Quiet
+                };
+                out.push(WideMove::new(from, to, kind));
+            }
+        } else {
+            let kind = if capture {
+                WideMoveKind::Capture
+            } else {
+                WideMoveKind::Quiet
+            };
+            out.push(WideMove::new(from, to, kind));
+        }
+    }
+
+    /// Emits every move of a promotable non-pawn piece (Chak's King / Soldier)
+    /// from `from` to each square in `targets`, expanding the promotion in the
+    /// zone. The capture/quiet split is read from `their_pieces`, exactly as
+    /// [`WideSink::emit_targets`]. Used by the multi-royal pseudo generator under
+    /// [`WideVariant::has_piece_promotion`].
+    fn emit_piece_promotion<S: WideSink>(
+        out: &mut S,
+        role: WideRole,
+        from: Square<G>,
+        targets: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+        us: Color,
+    ) {
+        for to in targets {
+            let capture = their_pieces.contains(to);
+            Self::emit_piece_promotion_one(out, role, from, to, capture, us);
+        }
+    }
+
+    /// Returns `true` if color `who` has a **Divine Lord** standing on its goal
+    /// **temple square** — the Chak win condition (FSF `flagPiece = d`,
+    /// `flagRegion…`). Only meaningful while [`WideVariant::has_temple_win`] is
+    /// `true`; the caller gates on it.
+    fn temple_win_reached(&self, who: Color) -> bool {
+        !(self.board.pieces(who, WideRole::DivineLord) & V::temple_goal(who)).is_empty()
     }
 
     /// Emits the moves of a promotable hand-variant piece (Shogi) from `from` to
@@ -2520,6 +2649,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         {
             return Some(WideEndReason::VariantWin);
         }
+        // Temple win (Chak): a Divine Lord standing on the enemy temple square is a
+        // win for that side, even though it is now the loser's turn. Gated behind
+        // `has_temple_win()` (default-off). Reported as a variant win; `outcome`
+        // resolves the winner from the board (the temple-reaching side is the side
+        // *not* to move).
+        if V::has_temple_win()
+            && (self.temple_win_reached(Color::White) || self.temple_win_reached(Color::Black))
+        {
+            return Some(WideEndReason::VariantWin);
+        }
         // Bare-king "Robado" draw (Shatar): a side reduced to its lone king draws
         // the game immediately. Gated behind `has_bare_king_draw()` (default-off).
         // Reported before the checkmate/stalemate test so a bare-king node — which
@@ -2552,12 +2691,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // Flag-rank "campmate" (Synochess) is won by the side whose king
                 // stands on its goal rank — the side *not* to move. Other variant
                 // wins (reserved) credit the side to move.
-                let winner =
-                    if V::has_flag_win() && self.flag_win_reached(self.state.turn.opposite()) {
-                        self.state.turn.opposite()
-                    } else {
-                        self.state.turn
-                    };
+                let winner = if (V::has_flag_win()
+                    && self.flag_win_reached(self.state.turn.opposite()))
+                    || (V::has_temple_win() && self.temple_win_reached(self.state.turn.opposite()))
+                {
+                    self.state.turn.opposite()
+                } else {
+                    self.state.turn
+                };
                 WideOutcome::Decisive { winner }
             }
             // Stalemate is a loss for the side to move in variants that say so
