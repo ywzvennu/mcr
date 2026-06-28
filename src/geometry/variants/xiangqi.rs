@@ -215,12 +215,29 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
     }
 
     fn role_attack_is_leg_asymmetric(role: WideRole) -> bool {
-        // The Horse's leap is hobbled by the leg adjacent to the *horse* toward the
-        // leap — a per-leap geometric asymmetry that reverse-projection from the
-        // target cannot resolve, so attacker detection must project forward from
-        // each horse. The Elephant's eye is symmetric (the intervening diagonal is
-        // the same square from either end), so it needs no special handling.
-        matches!(role, WideRole::Horse)
+        // Two roles cannot be detected by reverse-projecting their pattern from the
+        // target square, so attacker detection must instead project each piece's
+        // attack set *forward* from its own origin (exactly as the move generator
+        // does):
+        //
+        // * **Horse** — its leap is hobbled by the leg adjacent to the *horse*
+        //   toward the leap, a different square than the leg adjacent to the target
+        //   toward the horse. Reverse-projection tests the wrong leg. (#198.)
+        // * **Soldier** — its attack set is forward-biased *and* its sideways step
+        //   unlocks only past the **river**, a rank threshold that is *color-
+        //   dependent* (White crosses at rank 6, Black at rank 5). A simple color-
+        //   flipped reverse-projection (the `role_attack_is_directional` path that
+        //   suffices for the *riverless* Minixiangqi soldier, #200) flips that
+        //   threshold along with the color, so it would test the wrong crossing
+        //   state and miss a crossed soldier guarding a square *beside* it. Forward
+        //   projection from each soldier — keyed on the soldier's *own* rank and
+        //   color — matches the soldier's real attack geometry (forward always,
+        //   sideways after the river) exactly. Without it `attackers_to` lets the
+        //   enemy king step in front of (or, post-river, beside) a soldier.
+        //
+        // The Elephant's eye is symmetric (the intervening diagonal is the same
+        // square from either end), so it needs no special handling.
+        matches!(role, WideRole::Horse | WideRole::Soldier)
     }
 
     fn role_is_slider(role: WideRole) -> bool {
