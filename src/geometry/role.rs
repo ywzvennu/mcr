@@ -74,15 +74,21 @@ pub enum WideRole {
     /// Lance — a forward-only rook slider (Shogi).
     Lance = 13,
 
-    // --- a small reserved range for variants not yet implemented ---
-    /// Reserved role slot 0; meaning assigned when a future variant lands.
-    Reserved0 = 14,
-    /// Reserved role slot 1.
-    Reserved1 = 15,
-    /// Reserved role slot 2.
-    Reserved2 = 16,
-    /// Reserved role slot 3.
-    Reserved3 = 17,
+    // --- Spartan army (the Spartan/black asymmetric pieces, §4.4) ---
+    /// Lieutenant — a Spartan leaper: one step sideways or diagonally (the six
+    /// squares one file away) plus a two-square diagonal jump. No straight
+    /// forward/backward step. (Spartan chess.)
+    Lieutenant = 14,
+    /// General — Rook + Ferz: orthogonal slides plus a single diagonal step.
+    /// (Spartan chess.)
+    General = 15,
+    /// Captain — Wazir + Dabbaba: a single orthogonal step plus a two-square
+    /// orthogonal jump. (Spartan chess.)
+    Captain = 16,
+    /// Hoplite — the Spartan Berolina pawn: moves one square diagonally forward
+    /// (two from its start rank), captures one square straight forward. (Spartan
+    /// chess.) The Warlord (Bishop + Knight) reuses [`WideRole::Hawk`].
+    Hoplite = 17,
 }
 
 impl WideRole {
@@ -108,10 +114,10 @@ impl WideRole {
         WideRole::Elephant,
         WideRole::Cannon,
         WideRole::Lance,
-        WideRole::Reserved0,
-        WideRole::Reserved1,
-        WideRole::Reserved2,
-        WideRole::Reserved3,
+        WideRole::Lieutenant,
+        WideRole::General,
+        WideRole::Captain,
+        WideRole::Hoplite,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -155,10 +161,14 @@ impl WideRole {
             WideRole::Elephant => 'e',
             WideRole::Cannon => 'c',
             WideRole::Lance => 'l',
-            WideRole::Reserved0
-            | WideRole::Reserved1
-            | WideRole::Reserved2
-            | WideRole::Reserved3 => '?',
+            // Spartan army. FSF's `spartan` uses `l g c w h`, but `g`, `c`, and
+            // `l` already name the Gold, Cannon, and Lance here; the Spartan
+            // pieces take distinct free letters (`t d i h`), and the
+            // `compare-fairy` harness maps them to FSF's letters when driving it.
+            WideRole::Lieutenant => 't',
+            WideRole::General => 'd',
+            WideRole::Captain => 'i',
+            WideRole::Hoplite => 'h',
         }
     }
 
@@ -198,6 +208,10 @@ impl WideRole {
             'e' => Some(WideRole::Elephant),
             'c' => Some(WideRole::Cannon),
             'l' => Some(WideRole::Lance),
+            't' => Some(WideRole::Lieutenant),
+            'd' => Some(WideRole::General),
+            'i' => Some(WideRole::Captain),
+            'h' => Some(WideRole::Hoplite),
             _ => None,
         }
     }
@@ -220,10 +234,10 @@ impl fmt::Display for WideRole {
             WideRole::Elephant => "elephant",
             WideRole::Cannon => "cannon",
             WideRole::Lance => "lance",
-            WideRole::Reserved0 => "reserved0",
-            WideRole::Reserved1 => "reserved1",
-            WideRole::Reserved2 => "reserved2",
-            WideRole::Reserved3 => "reserved3",
+            WideRole::Lieutenant => "lieutenant",
+            WideRole::General => "general",
+            WideRole::Captain => "captain",
+            WideRole::Hoplite => "hoplite",
         })
     }
 }
@@ -264,23 +278,14 @@ mod tests {
 
     #[test]
     fn char_round_trips_for_named_roles() {
+        // Every role now names a distinct letter (the four former reserved slots
+        // became the Spartan army), so each round-trips through its character.
         for role in WideRole::ALL {
             let ch = role.char();
-            if ch == '?' {
-                // Reserved roles have no character and do not parse.
-                assert!(matches!(
-                    role,
-                    WideRole::Reserved0
-                        | WideRole::Reserved1
-                        | WideRole::Reserved2
-                        | WideRole::Reserved3
-                ));
-                assert_eq!(WideRole::from_char(ch), None);
-            } else {
-                assert_eq!(WideRole::from_char(ch), Some(role));
-                assert_eq!(WideRole::from_char(role.upper_char()), Some(role));
-                assert_eq!(role.char().to_ascii_uppercase(), role.upper_char());
-            }
+            assert_ne!(ch, '?', "every role has a letter");
+            assert_eq!(WideRole::from_char(ch), Some(role));
+            assert_eq!(WideRole::from_char(role.upper_char()), Some(role));
+            assert_eq!(role.char().to_ascii_uppercase(), role.upper_char());
         }
         assert_eq!(WideRole::from_char('x'), None);
         assert_eq!(WideRole::from_char('1'), None);
@@ -297,7 +302,7 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), chars.len(), "role chars must be distinct");
-        // Fourteen named roles (the six standard plus eight fairy).
-        assert_eq!(chars.len(), 14);
+        // All eighteen roles are named (the six standard plus twelve fairy).
+        assert_eq!(chars.len(), 18);
     }
 }

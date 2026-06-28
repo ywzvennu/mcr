@@ -241,6 +241,69 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         board.kings_of(color)
     }
 
+    // --- Spartan multi-king / duple-check (default OFF) -------------------
+
+    /// Returns `true` if this variant can give a side **more than one royal
+    /// king** at once, so "in check" generalises to a *set* of royal squares and
+    /// the single-king legality fast path no longer applies
+    /// (`docs/fairy-variants-architecture.md` §4.4). Spartan is the only such
+    /// variant (Black starts with two kings).
+    ///
+    /// The default is `false`. While it is `false` the generic engine takes the
+    /// single-king legality path — one king square, one check mask, one pin set —
+    /// exactly as before, so every other variant produces byte-identical moves and
+    /// state. When `true`, the engine instead generates pseudo-legal moves and
+    /// keeps each one whose result leaves **at least one** of the side's kings
+    /// unattacked: a side with several kings is "in check" only when **every** king
+    /// is attacked (duple check, for two kings), and may otherwise leave a king en
+    /// prise — losing it and continuing with the survivor. This matches
+    /// Fairy-Stockfish's `spartan` king rule move-for-move.
+    fn multi_royal() -> bool {
+        false
+    }
+
+    /// Returns the **forward step** a Berolina-style pawn (the Spartan Hoplite)
+    /// uses for its *non-capturing* move: a diagonal advance. Returns the two
+    /// diagonal-forward landing squares from `from` for `color`, or
+    /// [`Bitboard::EMPTY`] for a variant whose pawn pushes straight.
+    ///
+    /// The default is `EMPTY` — the standard pawn pushes straight (handled by the
+    /// generic pawn generator), so this hook is inert and every non-Berolina
+    /// variant is byte-identical. Spartan overrides it so the Hoplite's quiet
+    /// move is the diagonal one (and a two-square diagonal jump from the start
+    /// rank), while its capture stays the straight-forward square.
+    fn berolina_push_targets(_color: Color, _from: Square<G>) -> Bitboard<G> {
+        Bitboard::EMPTY
+    }
+
+    /// Returns `true` if the side-to-move pawns move as **Berolina** pawns
+    /// (diagonal advance, straight capture) — the Spartan Hoplite. The default is
+    /// `false` (standard straight-push / diagonal-capture pawns), keeping every
+    /// other variant on the standard pawn path.
+    fn has_berolina_pawns() -> bool {
+        false
+    }
+
+    /// Returns the squares a piece of `role` of `color` on `sq` may move to but
+    /// **never capture on** — non-capturing "quiet-only" steps that the role's
+    /// [`role_attacks`](WideVariant::role_attacks) set deliberately omits (so they
+    /// do not threaten the enemy king or count as attacks).
+    ///
+    /// The default is [`Bitboard::EMPTY`] — every standard and existing-variant
+    /// move can also capture, so this hook is inert and consulted only on the
+    /// multi-king generation path (itself default-off). Spartan uses it for the
+    /// Lieutenant's sideways step, which slides onto an empty square but cannot
+    /// capture. The generic generator emits each returned square as a quiet move
+    /// only if it is empty.
+    fn quiet_only_targets(
+        _role: WideRole,
+        _color: Color,
+        _sq: Square<G>,
+        _occupancy: Bitboard<G>,
+    ) -> Bitboard<G> {
+        Bitboard::EMPTY
+    }
+
     // --- Duck chess (default OFF) -----------------------------------------
 
     /// Returns `true` if this variant has the neutral Duck: a single blocker

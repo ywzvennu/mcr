@@ -14,6 +14,7 @@ pub mod grand;
 pub mod makruk;
 pub mod seirawan;
 pub mod sittuyin;
+pub mod spartan;
 
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use duck::{Duck, DuckRules};
@@ -21,3 +22,4 @@ pub use grand::{Grand, GrandRules};
 pub use makruk::{Makruk, MakrukRules};
 pub use seirawan::{Seirawan, SeirawanRules};
 pub use sittuyin::{Sittuyin, SittuyinRules};
+pub use spartan::{Spartan, SpartanRules};

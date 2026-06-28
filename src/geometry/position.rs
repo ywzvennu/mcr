@@ -497,8 +497,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // (a attacks b iff b attacks a under the same occupancy), so we can
             // project from `sq` with the inverse pawn color and the role's own
             // pattern otherwise.
-            let from_sq = if role == WideRole::Pawn {
-                V::role_attacks(WideRole::Pawn, attacker.opposite(), sq, occupied)
+            // A pawn's (and a Berolina Hoplite's) "attack" pattern is
+            // direction-dependent, so to find the squares *from which* such a
+            // piece of `attacker` hits `sq`, project the *opposing*-colour
+            // pattern back from `sq`. Every other role's attack set is symmetric
+            // (a attacks b iff b attacks a under the same occupancy).
+            let from_sq = if role == WideRole::Pawn || role == WideRole::Hoplite {
+                V::role_attacks(role, attacker.opposite(), sq, occupied)
             } else {
                 V::role_attacks(role, attacker, sq, occupied)
             };
@@ -514,17 +519,31 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         !self.attackers_to(sq, by, self.board.occupied()).is_empty()
     }
 
-    /// Returns `true` if the side to move is in check (any of its royal squares
-    /// is attacked by the opponent).
+    /// Returns `true` if the side to move is in check.
+    ///
+    /// For a single-royal side (standard chess and every variant with one king)
+    /// this is "the king's square is attacked." For a **multi-king** variant
+    /// (Spartan, [`WideVariant::multi_royal`]) a side is in check only under
+    /// **duple check** — when *every* royal king is attacked at once — since it
+    /// may otherwise leave a king en prise and play on; this mirrors the
+    /// multi-royal legality the move generator enforces. A side with no royal
+    /// squares (Duck) is never in check.
     #[must_use]
     pub fn is_check(&self) -> bool {
         let us = self.state.turn;
         let them = us.opposite();
         let occ = self.board.occupied();
         let royals = V::royal_squares(&self.board, us);
-        royals
-            .into_iter()
-            .any(|sq| !self.attackers_to(sq, them, occ).is_empty())
+        if royals.is_empty() {
+            return false;
+        }
+        let attacked = |sq| !self.attackers_to(sq, them, occ).is_empty();
+        if V::multi_royal() {
+            // Duple check: in check only when no royal is left unattacked.
+            royals.into_iter().all(attacked)
+        } else {
+            royals.into_iter().any(attacked)
+        }
     }
 
     /// Returns the squares attacked by color `by` under `occupied` — the
@@ -630,6 +649,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // standard path below unchanged.
         if V::has_placement() && self.state.placement.any(self.state.turn) {
             self.generate_placement_into(out);
+            return;
+        }
+        // Multi-king variants (Spartan): a side can hold several royal kings, so
+        // "in check" generalises to a set of royal squares and the single-king
+        // legality fast path (one king, one check mask, one pin set) no longer
+        // applies. Generate pseudo-legal moves and keep those that leave at least
+        // one king unattacked. Gated behind `multi_royal()` (default-off), so
+        // every other variant takes the standard single-king path below unchanged.
+        if V::multi_royal() {
+            self.generate_multi_royal_into(out);
             return;
         }
         let us = self.state.turn;
@@ -835,6 +864,200 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // check, so pass an empty danger set.
         if V::has_castling() {
             self.gen_castles(base, us, occupied, Bitboard::EMPTY, king_sq);
+        }
+    }
+
+    /// Generates every legal move for a **multi-king** side (Spartan): each
+    /// pseudo-legal base move, kept only if it leaves at least one of the side's
+    /// kings unattacked (`docs/fairy-variants-architecture.md` §4.4).
+    ///
+    /// A side with several kings is "in check" only when **every** king is
+    /// attacked at once (duple check, for two kings); otherwise it is free to
+    /// move — even to leave a king en prise, sacrificing it and continuing with
+    /// the survivor. So legality is exactly "not all my kings are attacked after
+    /// the move," which the [`Self::royals_survive`] predicate tests on the
+    /// applied position. This unifies both colours: white (one king) reduces to
+    /// the standard "king not in check," black (two kings) to "not duple check."
+    fn generate_multi_royal_into(&self, out: &mut Vec<WideMove>) {
+        let us = self.state.turn;
+        // A side with no kings has already lost (its last king was captured on the
+        // previous ply): no moves.
+        if self.board.kings_of(us).is_empty() {
+            return;
+        }
+        let mut pseudo = Vec::new();
+        self.gen_multi_royal_pseudo(&mut pseudo, us);
+        for mv in pseudo {
+            let mut next = self.clone();
+            next.apply(&mv);
+            // `apply` flipped the side to move; test our (now non-to-move) kings.
+            if next.royals_survive(us) {
+                out.push(mv);
+            }
+        }
+    }
+
+    /// Returns `true` if, in this position, color `who` keeps at least one
+    /// unattacked king — i.e. `who` is not in (duple) check. A side with no king
+    /// at all returns `false` (it has been eliminated).
+    fn royals_survive(&self, who: Color) -> bool {
+        let kings = self.board.kings_of(who);
+        if kings.is_empty() {
+            return false;
+        }
+        let occ = self.board.occupied();
+        let them = who.opposite();
+        kings
+            .into_iter()
+            .any(|k| self.attackers_to(k, them, occ).is_empty())
+    }
+
+    /// Pushes the pseudo-legal base moves for a multi-king side into `pseudo`
+    /// (no self-check filtering — that is done by the caller per move). Kings,
+    /// every other piece, the Berolina/standard pawns, and castling are all
+    /// emitted with a full board mask and no pins.
+    fn gen_multi_royal_pseudo(&self, pseudo: &mut Vec<WideMove>, us: Color) {
+        let board = &self.board;
+        let occupied = board.occupied();
+        let our_pieces = board.by_color(us);
+        let their_pieces = board.by_color(us.opposite());
+        let full = Bitboard::FULL;
+
+        // Every non-pawn role (including the king): its attack set minus friendly
+        // pieces. No check mask, no pin lines — the per-move filter handles safety.
+        for role in WideRole::ALL {
+            if role == WideRole::Pawn || role == WideRole::Hoplite {
+                continue;
+            }
+            for from in board.pieces(us, role) {
+                let targets = V::role_attacks(role, us, from, occupied) & !our_pieces;
+                emit_targets(pseudo, from, targets, their_pieces);
+                // Quiet-only steps (the Spartan Lieutenant's sideways slide): a
+                // move onto an empty square that can never capture. Default-empty,
+                // so inert for every other role/variant.
+                let quiet_only = V::quiet_only_targets(role, us, from, occupied) & !occupied;
+                for to in quiet_only {
+                    pseudo.push(WideMove::new(from, to, WideMoveKind::Quiet));
+                }
+            }
+        }
+
+        // Pawns: the standard straight-push pawn (`WideRole::Pawn`) and, when the
+        // variant fields them, the Berolina Hoplite (`WideRole::Hoplite`). A side
+        // holds only one kind (Spartan: White has Pawns, Black has Hoplites), so
+        // running both emitters yields exactly that side's pawn moves. A king
+        // square is only needed by the standard generator for en passant; the
+        // multi-king variant sets no ep target, so any king will do.
+        let king_sq = board.king_of(us).unwrap_or_else(|| Square::new(0));
+        let pins = Pins::empty(king_sq);
+        self.gen_pawn_moves(pseudo, us, occupied, their_pieces, full, &pins, king_sq);
+        if V::has_berolina_pawns() {
+            self.gen_berolina_moves(pseudo, us, occupied, their_pieces, full, &pins);
+        }
+
+        // Castling: only the single-king side (white, in Spartan) ever has it, and
+        // it must not be in check / pass through an attacked square. Compute the
+        // enemy danger map with our king lifted, exactly as the standard path, and
+        // require the side not currently in check.
+        if V::has_castling() && self.state.castling.has_any(us) {
+            if let Some(ksq) = board.king_of(us) {
+                let occ_without_king = occupied.without(ksq);
+                let king_danger = self.attacked_by(us.opposite(), occ_without_king);
+                if self.attackers_to(ksq, us.opposite(), occupied).is_empty() {
+                    self.gen_castles(pseudo, us, occupied, king_danger, ksq);
+                }
+            }
+        }
+    }
+
+    /// Generates the side-to-move's **Berolina** pawn moves (the Spartan
+    /// Hoplite): a diagonal-forward quiet advance (two squares from the start
+    /// rank), a straight-forward capture, and last-rank promotion. There is no
+    /// en passant (FSF's Spartan sets no ep target for the Hoplite double move).
+    ///
+    /// The `check_mask` / `pins` are accepted for symmetry with the standard
+    /// generator but are full / empty under the multi-king path (the caller
+    /// filters each move for self-check), so this stays a pure pseudo-legal
+    /// emitter there.
+    #[allow(clippy::too_many_arguments)]
+    fn gen_berolina_moves(
+        &self,
+        out: &mut Vec<WideMove>,
+        us: Color,
+        occupied: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+        check_mask: Bitboard<G>,
+        pins: &Pins<G>,
+    ) {
+        let board = &self.board;
+        let hoplites = board.pieces(us, WideRole::Hoplite);
+        if hoplites.is_empty() {
+            return;
+        }
+        let forward: i8 = if us.is_white() { 1 } else { -1 };
+        let start_rank = V::double_push_rank(us);
+        let promo_roles = V::promotion_targets(us, board);
+
+        for from in hoplites {
+            let pin_line = pins.line_of(from);
+
+            // Quiet advance along each forward diagonal. The single step requires
+            // its own landing square empty. The double step (only from the start
+            // rank) is a **jump**: it requires only its landing square empty — the
+            // intervening square may be occupied (FSF's Spartan Hoplite leaps it).
+            for one in V::berolina_push_targets(us, from) {
+                let df = (one.file() as i8) - (from.file() as i8);
+                if !occupied.contains(one) && check_mask.contains(one) && pin_line.contains(one) {
+                    Self::emit_pawn_dest(out, from, one, &promo_roles, false, us);
+                }
+                if from.rank() == start_rank {
+                    if let Some(two) = from.offset(2 * df, 2 * forward) {
+                        if !occupied.contains(two)
+                            && check_mask.contains(two)
+                            && pin_line.contains(two)
+                        {
+                            // A Hoplite double advance creates **no en-passant
+                            // target** (FSF's Spartan sets none), so it is a plain
+                            // quiet move, not a `DoublePawnPush` — `apply` then
+                            // leaves `ep_square` clear.
+                            out.push(WideMove::new(from, two, WideMoveKind::Quiet));
+                        }
+                    }
+                }
+            }
+
+            // Capture: one square straight forward onto an enemy piece.
+            if let Some(cap) = from.offset(0, forward) {
+                if their_pieces.contains(cap) && check_mask.contains(cap) && pin_line.contains(cap)
+                {
+                    Self::emit_pawn_dest(out, from, cap, &promo_roles, true, us);
+                }
+            }
+        }
+    }
+
+    /// Emits a pawn/Hoplite move to `to`, expanding to the promotion roles when
+    /// `to` is in the promotion zone, otherwise a single quiet or capture move.
+    fn emit_pawn_dest(
+        out: &mut Vec<WideMove>,
+        from: Square<G>,
+        to: Square<G>,
+        promo_roles: &[WideRole],
+        capture: bool,
+        us: Color,
+    ) {
+        if V::in_promotion_zone(us, to.rank()) {
+            for &role in promo_roles {
+                out.push(WideMove::new(
+                    from,
+                    to,
+                    WideMoveKind::Promotion { role, capture },
+                ));
+            }
+        } else if capture {
+            out.push(WideMove::new(from, to, WideMoveKind::Capture));
+        } else {
+            out.push(WideMove::new(from, to, WideMoveKind::Quiet));
         }
     }
 
