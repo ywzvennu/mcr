@@ -42,8 +42,8 @@ use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
     HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules, MinishogiRules,
     MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
-    WideRole, WideVariant, XiangqiRules,
+    ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess,
+    SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -607,6 +607,33 @@ variant_test!(
         "r1bqkbnr/ppp2ppp/2n5/3p4/2Lp4/3M*N3/PPPPPPPP/L*N1*UK1*NL[AM] w kq - 0 5",
         "r1bqk2r/ppp1bppp/2n1p2n/2p2*N2/3M4/8/PPPPPPPP/L*N1*UK1*NL[LAM] w kq - 0 7",
         "r1bqk2r/1pppbppp/p1n1pn2/P7/L7/1*NM5/1PPPPPPP/1*N1*UK1*NL[LADM] w kq - 2 6",
+    ]
+);
+
+// -- Shogun (crazyhouse hand + drops, optional capped per-piece promotion zone,
+// standard chess army, 8x8) ------------------------------------------------
+//
+// Exercises the promoted compounds — Centaur (= Kheshig, King + Knight),
+// Archbishop (= Hawk, Bishop + Knight), Chancellor (= Elephant, Rook + Knight),
+// Queen (the promoted Fers), and Commoner (= king-stepper) — alongside the bare
+// Met (Fers) and the standard army. Every Shogun role is color-symmetric except
+// the standard Pawn (the trait default already classifies it as directional), so
+// this is the guard that `attackers_to`'s reverse projection of the compounds
+// matches the generator. The corpus FENs are reused from `tests/perft_shogun.rs`
+// (each FSF-confirmed): the drops-and-promotions position, the promotion-cap
+// position (Centaur token `W`), and the captures-feeding-the-hand midgame (the
+// `q` "queens" being promoted Fers). The Centaur and Commoner are overflow roles
+// (tokens `W` / `*U`, recycling `w` / `u`); the board FEN parser resolves them.
+
+variant_test!(
+    shogun,
+    Chess8x8,
+    ShogunRules,
+    "shogun",
+    [
+        "r3k3/8/4N3/8/8/8/8/3RK3[NPbp] w - - 0 1",
+        "6k1/8/4N3/8/8/8/8/W5K1[Nn] w - - 0 1",
+        "rnbqkbnr/ppp2ppp/8/3pp3/3PP3/8/PPP2PPP/RNBQKBNR[Pp] w KQkq - 0 4",
     ]
 );
 

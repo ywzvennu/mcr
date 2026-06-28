@@ -58,8 +58,8 @@ pub use variants::{
     HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Knightmate, KnightmateRules, Makruk,
     MakrukRules, Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules,
     Orda, OrdaRules, Ordamirror, OrdamirrorRules, Seirawan, SeirawanRules, Shako, ShakoRules,
-    Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Sittuyin, SittuyinRules,
-    Spartan, SpartanRules, Synochess, SynochessRules, Xiangqi, XiangqiRules,
+    Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules, Sittuyin,
+    SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
