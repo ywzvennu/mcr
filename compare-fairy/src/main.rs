@@ -25,6 +25,7 @@
 mod capablanca;
 mod corpus;
 mod duck;
+mod empire;
 mod grand;
 mod janggi;
 mod locate;
@@ -193,6 +194,9 @@ fn main() {
     // (resolved from the located binary) before driving `UCI_Variant ordamirror`.
     let ordamirror_mismatches = ordamirror::run(&mut engine, &located.bin, opts.full);
     let synochess_mismatches = synochess::run(&mut engine, opts.full);
+    // Empire is an INI variant: empire::run loads FSF's variants.ini (resolved from
+    // the located binary) before driving `UCI_Variant empire`.
+    let empire_mismatches = empire::run(&mut engine, &located.bin, opts.full);
 
     engine.quit();
 
@@ -214,6 +218,7 @@ fn main() {
         + orda_mismatches
         + ordamirror_mismatches
         + synochess_mismatches
+        + empire_mismatches
         > 0
     {
         std::process::exit(1);

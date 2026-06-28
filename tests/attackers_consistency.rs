@@ -39,10 +39,10 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
-    MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
-    ShakoRules, ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess,
-    SynochessRules, WideRole, WideVariant, XiangqiRules,
+    Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
+    JanggiRules, MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
+    SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square,
+    StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -554,5 +554,36 @@ variant_test!(
         "r1bqkbnr/ppp2ppp/2n5/3p4/2Lp4/3M*N3/PPPPPPPP/L*N1*UK1*NL[AM] w kq - 0 5",
         "r1bqk2r/ppp1bppp/2n1p2n/2p2*N2/3M4/8/PPPPPPPP/L*N1*UK1*NL[LAM] w kq - 0 7",
         "r1bqk2r/1pppbppp/p1n1pn2/P7/L7/1*NM5/1PPPPPPP/1*N1*UK1*NL[LADM] w kq - 2 6",
+    ]
+);
+
+// -- Empire (asymmetric: standard Black vs the White Empire "move-Queen /
+//    capture-short" army + flag win + flying general, 8x8) --
+//
+// Each Empire piece (Eagle / Cardinal / Tower / Duke) *moves* like a Queen onto an
+// empty square but its *attack* (capture / check) set is a short pattern (knight /
+// bishop / rook / king) — so its threat set is **not** its move set. They ride the
+// board-aware verify path (`role_attacks_board` returns the quiet-Queen ∪
+// short-capture set), and `attackers_to` / king-safety project that set forward
+// from each piece (flagged via `role_attack_is_leg_asymmetric`); this is the guard
+// that the projection matches the generator. The White Soldier is forward-
+// directional (`role_attack_is_directional`). The corpus FENs are reused from
+// `tests/perft_empire.rs` (each FSF-confirmed): the startpos (both colors), the
+// developed middlegame, the all-capture-patterns tactic, the flag race, and the
+// flying-general faceoff. The Empire pieces are overflow roles (tokens
+// `*T *E *C *D`, recycling `t e c d`); the board FEN parser resolves the `*` prefix.
+
+variant_test!(
+    empire,
+    Chess8x8,
+    EmpireRules,
+    "empire",
+    [
+        "rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T w kq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T b kq - 0 1",
+        "rnbqkbnr/pp1ppppp/8/2p5/3P*E3/2P2P2/PP2Z1PP/*T1*C*DK1*E*T w kq - 0 1",
+        "4k3/8/2n1n3/3rb3/3*E*C*T2/3q4/3P4/4K3 w - - 0 1",
+        "4k3/8/8/8/8/8/4K3/8 w - - 0 1",
+        "8/8/3k4/8/8/8/3K4/8 w - - 0 1",
     ]
 );

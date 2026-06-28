@@ -10,6 +10,7 @@
 
 pub mod capablanca;
 pub mod duck;
+pub mod empire;
 pub mod grand;
 pub mod janggi;
 pub mod makruk;
@@ -28,6 +29,7 @@ pub mod xiangqi;
 
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use duck::{Duck, DuckRules};
+pub use empire::{Empire, EmpireRules};
 pub use grand::{Grand, GrandRules};
 pub use janggi::{Janggi, JanggiRules};
 pub use makruk::{Makruk, MakrukRules};
