@@ -382,6 +382,109 @@ pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>)
 }
 
 // ---------------------------------------------------------------------------
+// Blockable-leg leapers (Xiangqi horse and elephant).
+// ---------------------------------------------------------------------------
+
+/// The eight Xiangqi-horse leaps paired with their **hobbling leg** — the
+/// orthogonally-adjacent square in the direction of the leap's long axis, which
+/// blocks the leap when occupied. Each entry is `(target_df, target_dr, leg_df,
+/// leg_dr)`: a knight target `(±1,±2)` / `(±2,±1)` whose leg is the single
+/// orthogonal step toward it `(0,±1)` / `(±1,0)`.
+const HORSE_LEGS: [(i8, i8, i8, i8); 8] = [
+    (1, 2, 0, 1),
+    (-1, 2, 0, 1),
+    (1, -2, 0, -1),
+    (-1, -2, 0, -1),
+    (2, 1, 1, 0),
+    (2, -1, 1, 0),
+    (-2, 1, -1, 0),
+    (-2, -1, -1, 0),
+];
+
+/// Returns the squares a Xiangqi **horse** on `sq` attacks given the `occupied`
+/// set: the knight targets minus any whose **hobbling leg** is occupied.
+///
+/// A horse leaps like a knight, but each of its eight leaps is blocked ("the
+/// horse's leg is hobbled") if the orthogonally-adjacent square one step toward
+/// the leap's long axis is occupied — a non-symmetric, occupancy-aware rule. For
+/// a leap that moves two ranks (`(±1,±2)`) the leg is the square one rank toward
+/// it `(0,±1)`; for one that moves two files (`(±2,±1)`) the leg is one file
+/// toward it `(±1,0)`. Edges are respected: a leap whose target or leg falls off
+/// the board contributes nothing, and the masked shifts never wrap.
+///
+/// ```
+/// use mce::geometry::{attacks::horse_attacks, Bitboard, Square, Xiangqi9x10};
+/// // A horse in the open reaches all eight knight squares with no leg blocked.
+/// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+/// assert_eq!(horse_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 8);
+/// ```
+#[must_use]
+pub fn horse_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(tf, tr, lf, lr) in &HORSE_LEGS {
+        // The leg must be on the board and empty for the leap to be available.
+        let Some(leg) = sq.offset(lf, lr) else {
+            continue;
+        };
+        if occupied.contains(leg) {
+            continue;
+        }
+        if let Some(dest) = sq.offset(tf, tr) {
+            bb.set(dest);
+        }
+    }
+    bb
+}
+
+/// The four Xiangqi-elephant leaps paired with their **eye** — the intervening
+/// diagonal square that blocks the two-step jump when occupied. Each entry is
+/// `(target_df, target_dr, eye_df, eye_dr)`: a two-diagonal target `(±2,±2)`
+/// whose eye is the one-diagonal square halfway to it `(±1,±1)`.
+const ELEPHANT_EYES: [(i8, i8, i8, i8); 4] = [
+    (2, 2, 1, 1),
+    (2, -2, 1, -1),
+    (-2, 2, -1, 1),
+    (-2, -2, -1, -1),
+];
+
+/// Returns the squares a Xiangqi **elephant** on `sq` attacks given the
+/// `occupied` set: the four two-square-diagonal targets minus any whose **eye**
+/// (the intervening diagonal square) is occupied.
+///
+/// An elephant jumps exactly two squares diagonally, but the jump is blocked
+/// ("blocking the elephant's eye") if the single diagonal square between `sq` and
+/// the target is occupied. This is geometry-only and occupancy-aware; the
+/// **river** confinement (an elephant may not cross to the far half) is *not*
+/// applied here — the variant masks the result to the elephant's own half, the
+/// same way it adds palace and river masks on top of the other primitives.
+///
+/// ```
+/// use mce::geometry::{attacks::elephant_attacks_blockable, Bitboard, Square, Xiangqi9x10};
+/// // A central elephant on an empty board reaches all four two-diagonal squares.
+/// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+/// assert_eq!(elephant_attacks_blockable::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 4);
+/// ```
+#[must_use]
+pub fn elephant_attacks_blockable<G: Geometry>(
+    sq: Square<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(tf, tr, ef, er) in &ELEPHANT_EYES {
+        let Some(eye) = sq.offset(ef, er) else {
+            continue;
+        };
+        if occupied.contains(eye) {
+            continue;
+        }
+        if let Some(dest) = sq.offset(tf, tr) {
+            bb.set(dest);
+        }
+    }
+    bb
+}
+
+// ---------------------------------------------------------------------------
 // Geometry rays: `between` and `line`.
 // ---------------------------------------------------------------------------
 
@@ -886,6 +989,102 @@ mod tests {
         // The rank ray reaches file 0 of rank 0 (index 0) without leaking up.
         assert!(attacks.contains(Square::new(0)));
         assert!(!attacks.contains(Square::new(10)), "wrapped onto rank 1");
+    }
+
+    // ----- Xiangqi blockable-leg leapers (horse, elephant) --------------------
+
+    #[test]
+    fn horse_unobstructed_reaches_eight_in_open() {
+        use crate::geometry::Xiangqi9x10;
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        let a = horse_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY);
+        assert_eq!(a.count(), 8);
+        // Every target is a knight leap from `sq`.
+        for d in a {
+            let df = (d.file() as i8 - sq.file() as i8).abs();
+            let dr = (d.rank() as i8 - sq.rank() as i8).abs();
+            assert!((df, dr) == (1, 2) || (df, dr) == (2, 1), "{d:?}");
+        }
+    }
+
+    #[test]
+    fn horse_each_leg_blocks_exactly_two_leaps() {
+        use crate::geometry::Xiangqi9x10;
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap(); // e5, index 40
+                                                                       // North leg (0,+1): blocks the two north leaps (±1,+2) -> d7,f7.
+        let leg_n = Bitboard::<Xiangqi9x10>::EMPTY.with(sq.offset(0, 1).unwrap());
+        let an = horse_attacks::<Xiangqi9x10>(sq, leg_n);
+        assert_eq!(an.count(), 6);
+        assert!(!an.contains(sq.offset(-1, 2).unwrap()));
+        assert!(!an.contains(sq.offset(1, 2).unwrap()));
+        // The east leg (+1,0) and the other leaps stay available.
+        assert!(an.contains(sq.offset(2, 1).unwrap()));
+
+        // East leg (+1,0): blocks the two east leaps (+2,±1).
+        let leg_e = Bitboard::<Xiangqi9x10>::EMPTY.with(sq.offset(1, 0).unwrap());
+        let ae = horse_attacks::<Xiangqi9x10>(sq, leg_e);
+        assert_eq!(ae.count(), 6);
+        assert!(!ae.contains(sq.offset(2, 1).unwrap()));
+        assert!(!ae.contains(sq.offset(2, -1).unwrap()));
+        // The north leaps remain.
+        assert!(ae.contains(sq.offset(1, 2).unwrap()));
+    }
+
+    #[test]
+    fn horse_does_not_wrap_edges() {
+        use crate::geometry::Xiangqi9x10;
+        // A horse on the a-file (file 0) must not leap to the i-file (file 8).
+        for rank in 0..10u8 {
+            let sq = Square::<Xiangqi9x10>::from_file_rank(0, rank).unwrap();
+            for d in horse_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY) {
+                assert!(d.file() <= 2, "a-file horse wrapped to {d:?}");
+            }
+            let sq = Square::<Xiangqi9x10>::from_file_rank(8, rank).unwrap();
+            for d in horse_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY) {
+                assert!(d.file() >= 6, "i-file horse wrapped to {d:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn elephant_unobstructed_reaches_four_in_open() {
+        use crate::geometry::Xiangqi9x10;
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        let a = elephant_attacks_blockable::<Xiangqi9x10>(sq, Bitboard::EMPTY);
+        assert_eq!(a.count(), 4);
+        for d in a {
+            let df = (d.file() as i8 - sq.file() as i8).abs();
+            let dr = (d.rank() as i8 - sq.rank() as i8).abs();
+            assert_eq!((df, dr), (2, 2), "{d:?}");
+        }
+    }
+
+    #[test]
+    fn elephant_each_eye_blocks_one_leap() {
+        use crate::geometry::Xiangqi9x10;
+        let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
+        // Block the NE eye (+1,+1): removes only the NE target (+2,+2).
+        let eye = Bitboard::<Xiangqi9x10>::EMPTY.with(sq.offset(1, 1).unwrap());
+        let a = elephant_attacks_blockable::<Xiangqi9x10>(sq, eye);
+        assert_eq!(a.count(), 3);
+        assert!(!a.contains(sq.offset(2, 2).unwrap()));
+        // The other three eyes are clear, so their targets remain.
+        assert!(a.contains(sq.offset(-2, 2).unwrap()));
+        assert!(a.contains(sq.offset(2, -2).unwrap()));
+        assert!(a.contains(sq.offset(-2, -2).unwrap()));
+    }
+
+    #[test]
+    fn elephant_does_not_wrap_edges() {
+        use crate::geometry::Xiangqi9x10;
+        // An elephant on the a-file may only reach the c-file (file 2), never the
+        // far side by wrapping.
+        for rank in 0..10u8 {
+            let sq = Square::<Xiangqi9x10>::from_file_rank(0, rank).unwrap();
+            for d in elephant_attacks_blockable::<Xiangqi9x10>(sq, Bitboard::EMPTY) {
+                assert_eq!(d.file(), 2, "a-file elephant wrapped to {d:?}");
+            }
+        }
     }
 
     #[test]

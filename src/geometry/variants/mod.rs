@@ -16,6 +16,7 @@ pub mod seirawan;
 pub mod shako;
 pub mod sittuyin;
 pub mod spartan;
+pub mod xiangqi;
 
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use duck::{Duck, DuckRules};
@@ -25,3 +26,4 @@ pub use seirawan::{Seirawan, SeirawanRules};
 pub use shako::{Shako, ShakoRules};
 pub use sittuyin::{Sittuyin, SittuyinRules};
 pub use spartan::{Spartan, SpartanRules};
+pub use xiangqi::{Xiangqi, XiangqiRules};

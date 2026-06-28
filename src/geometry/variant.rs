@@ -343,6 +343,43 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Flying-general king-safety (default OFF) -------------------------
+
+    /// Returns `true` if this variant has an **extra, geometry-derived attack on
+    /// a royal square** that the per-role [`role_attacks`](WideVariant::role_attacks)
+    /// vocabulary does not express — namely the Xiangqi **flying general**: the
+    /// two generals may not face each other on an otherwise-empty file, and a
+    /// general gives "check" down such an open file.
+    ///
+    /// The default is `false`; while it is `false` the generic king-safety code
+    /// never calls [`extra_royal_attack`](WideVariant::extra_royal_attack), so
+    /// every other variant is byte-identical. When `true`, the engine ORs that
+    /// hook into every test of "is this royal square attacked," so a move leaving
+    /// the generals facing is rejected (illegal), and a general down an open file
+    /// counts as a checker. Only Xiangqi (and future Janggi) override this.
+    fn has_flying_general() -> bool {
+        false
+    }
+
+    /// Returns `true` if, under `occupied`, the royal square `sq` of the side
+    /// **not** equal to `by` is subject to an extra geometry-derived attack from
+    /// color `by` — the Xiangqi flying-general confrontation: `by`'s general faces
+    /// `sq` down a file with no piece between them.
+    ///
+    /// Only consulted when [`has_flying_general`](WideVariant::has_flying_general)
+    /// is `true`; the default is `false` (no extra attack), so every other variant
+    /// is unaffected. The engine ORs this into the attacked-square test on the
+    /// king-safety verify path and in `is_check`, exactly modelling the rule that
+    /// the generals may never see each other down an open file.
+    fn extra_royal_attack(
+        _board: &Board<G>,
+        _sq: Square<G>,
+        _by: Color,
+        _occupied: Bitboard<G>,
+    ) -> bool {
+        false
+    }
+
     // --- Duck chess (default OFF) -----------------------------------------
 
     /// Returns `true` if this variant has the neutral Duck: a single blocker

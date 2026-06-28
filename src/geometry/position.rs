@@ -519,6 +519,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         !self.attackers_to(sq, by, self.board.occupied()).is_empty()
     }
 
+    /// Returns `true` if the royal square `sq` is attacked by color `by` under
+    /// `occupied`, **including** any variant-specific extra royal attack.
+    ///
+    /// This is the per-role [`attackers_to`](Self::attackers_to) test ORed with
+    /// the default-off [`WideVariant::extra_royal_attack`] hook — the Xiangqi
+    /// flying-general confrontation (the two generals facing down an open file).
+    /// For every variant without that hook (`has_flying_general() == false`) the
+    /// extra term is skipped and this is exactly `attackers_to(...).is_empty()`
+    /// negated, so those variants are byte-identical.
+    #[must_use]
+    #[inline]
+    fn royal_attacked(&self, sq: Square<G>, by: Color, occupied: Bitboard<G>) -> bool {
+        if !self.attackers_to(sq, by, occupied).is_empty() {
+            return true;
+        }
+        V::has_flying_general() && V::extra_royal_attack(&self.board, sq, by, occupied)
+    }
+
     /// Returns `true` if the side to move is in check.
     ///
     /// For a single-royal side (standard chess and every variant with one king)
@@ -537,7 +555,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if royals.is_empty() {
             return false;
         }
-        let attacked = |sq| !self.attackers_to(sq, them, occ).is_empty();
+        let attacked = |sq| self.royal_attacked(sq, them, occ);
         if V::multi_royal() {
             // Duple check: in check only when no royal is left unattacked.
             royals.into_iter().all(attacked)
@@ -1019,7 +1037,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// never runs for a non-cannon variant.
     fn generate_cannon_verify_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
+        // A side whose king has been captured has no royal piece, so there is no
+        // self-check to filter: every pseudo-legal move is "legal" (the side has
+        // already lost, but perft still enumerates its continuations). Fairy-
+        // Stockfish does this for Xiangqi — a cannon may capture the enemy general
+        // over a screen, and the kingless side then enumerates its pseudo-moves —
+        // so emit the pseudo-legal set unverified. (Unreachable in a Shako legal
+        // tree, where standard check rules forbid ever leaving the king en prise.)
         if self.board.king_of(us).is_none() {
+            self.gen_multi_royal_pseudo(out, us);
             return;
         }
         let mut pseudo = WideMoveList::new();
@@ -1029,10 +1055,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             next.apply(&mv);
             // `apply` flipped the side to move; our king is now the non-mover's.
             if let Some(king) = next.board.king_of(us) {
-                if next
-                    .attackers_to(king, us.opposite(), next.board.occupied())
-                    .is_empty()
-                {
+                if !next.royal_attacked(king, us.opposite(), next.board.occupied()) {
                     out.push(mv);
                 }
             }
