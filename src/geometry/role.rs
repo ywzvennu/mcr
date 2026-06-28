@@ -335,6 +335,29 @@ pub enum WideRole {
     /// driving Hoppel-Poppel.
     BishopKnight = 41,
 
+    // --- Manchu super-piece (§ Phase 3, Milestone 10) ---
+    //
+    // Manchu (yipaisanxianqi) is an asymmetric Xiangqi: one side keeps a full
+    // Xiangqi army, the other replaces its rook/cannon/horse cluster with a single
+    // SUPER-PIECE — the "Banner" (FSF `BANNER`, Betza `RcpRnN`), which combines the
+    // Chariot's rook slide, the Cannon's over-screen capture, and the Horse's
+    // hobbled knight leap in one piece. It is an **overflow role** like the
+    // Commoner: it has no bare letter and spells itself with the [`OVERFLOW_PREFIX`]
+    // (`*`) plus the recycled base letter `m` (FSF's `m`, distinct from the bare
+    // Makruk Met `m` by the `*` prefix). The `compare-fairy` harness maps `*m → m`
+    // when driving Manchu.
+    /// Banner (FSF `BANNER`, Betza `RcpRnN`) — the Manchu super-piece: it **moves
+    /// and captures like a Chariot** (a rook slide), **captures like a Cannon** (a
+    /// jump over exactly one screen onto the next piece), and **moves and captures
+    /// like a Horse** (a knight leap hobbled by an occupied leg). Its full
+    /// occupancy-dependent attack-and-move set is computed from the live board via
+    /// [`role_attacks_board`](super::WideVariant::role_attacks_board) (the cannon
+    /// part lands only on an occupied square, so the set is occupancy-asymmetric).
+    /// (Manchu.) An **overflow role**: its FEN token is `*M` (white) / `*m` (black),
+    /// recycling FSF's Banner letter `m` (distinct from the bare Met `m` by the `*`
+    /// prefix). The `compare-fairy` harness maps `*m → m` when driving Manchu.
+    Banner = 42,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -371,7 +394,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 42;
+    pub const COUNT: usize = 43;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -417,6 +440,7 @@ impl WideRole {
         WideRole::Duke,
         WideRole::KnightBishop,
         WideRole::BishopKnight,
+        WideRole::Banner,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -542,6 +566,13 @@ impl WideRole {
             // harness maps `*h → n`, `*b → b` when driving Hoppel-Poppel.
             WideRole::KnightBishop => 'h',
             WideRole::BishopKnight => 'b',
+            // Manchu super-piece — an overflow role past the exhausted single-letter
+            // alphabet. Like the Commoner / Empire pieces, its FEN token is the `*`
+            // prefix plus a recycled base letter, so `char()` returns the bare base
+            // letter and the board FEN I/O adds the `*` prefix. The Banner recycles
+            // FSF's letter `m` (the bare Met's letter, distinguished by the `*`
+            // prefix). The `compare-fairy` harness maps `*m → m` when driving Manchu.
+            WideRole::Banner => 'm',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -630,6 +661,7 @@ impl WideRole {
                 | WideRole::Duke
                 | WideRole::KnightBishop
                 | WideRole::BishopKnight
+                | WideRole::Banner
         )
     }
 
@@ -668,6 +700,8 @@ impl WideRole {
             // (the "Hoppel" mnemonic), the Bishop-Knight the FSF `BISKNI` letter `b`.
             'h' => Some(WideRole::KnightBishop),
             'b' => Some(WideRole::BishopKnight),
+            // Manchu super-piece: recycles FSF's Banner letter `m`.
+            'm' => Some(WideRole::Banner),
             _ => None,
         }
     }
@@ -776,6 +810,7 @@ impl fmt::Display for WideRole {
             WideRole::Duke => "duke",
             WideRole::KnightBishop => "knight-bishop",
             WideRole::BishopKnight => "bishop-knight",
+            WideRole::Banner => "banner",
         })
     }
 }
