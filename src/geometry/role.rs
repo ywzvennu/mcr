@@ -208,6 +208,29 @@ pub enum WideRole {
     /// driving Synochess.
     Commoner = 33,
 
+    // --- Shinobi clan pieces (§ Phase 3, Milestone 10) ---
+    //
+    // Shinobi's Black "clan" reuses the existing Commoner (the king-stepping
+    // non-royal of Synochess, role 33 / token `*u`) for its own commoner, and
+    // its Bers reuses [`WideRole::General`] (Rook + Ferz) and its Archbishop
+    // reuses [`WideRole::Hawk`] (Bishop + Knight). The only genuinely new piece
+    // is the forward Shogi Knight.
+    /// Shogi Knight — a forward-only 2-1 leaper: it jumps two squares forward and
+    /// one to the side (two targets), leaping over any piece, and never moves
+    /// backward or sideways. (Shinobi; FSF's `shogiKnight`.) Distinct from the
+    /// standard [`WideRole::Knight`] (Black's army keeps ordinary knights), so it
+    /// is a separate role. It promotes into a standard Knight.
+    ///
+    /// Landing past the single-letter alphabet (every `a..=z` already names a
+    /// role), the Shogi Knight is an **overflow role** like the Commoner: it has
+    /// no bare letter and spells itself with the [`OVERFLOW_PREFIX`] (`*`)
+    /// followed by a recycled base letter whose case carries the colour. FSF
+    /// spells it `h`, but the recycled token reuses the forward-leap mnemonic `n`
+    /// (the Knight's letter, free for recycling), so its token is `*N` (white) /
+    /// `*n` (black); the `compare-fairy` harness maps `*n → h` when driving
+    /// Shinobi.
+    ShogiKnight = 34,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -244,7 +267,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 34;
+    pub const COUNT: usize = 35;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -282,6 +305,7 @@ impl WideRole {
         WideRole::Kheshig,
         WideRole::Archer,
         WideRole::Commoner,
+        WideRole::ShogiKnight,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -369,6 +393,13 @@ impl WideRole {
             // prefix. The `compare-fairy` harness maps `*u` to FSF's `a` when
             // driving Synochess.
             WideRole::Commoner => 'u',
+            // Shinobi's Shogi Knight — an overflow role past the exhausted
+            // single-letter alphabet. Like the Commoner its FEN token is the `*`
+            // prefix plus a recycled base letter (here `n`, the Knight's), so
+            // `char()` returns the bare base letter and the board FEN I/O adds the
+            // `*` prefix. The `compare-fairy` harness maps `*n` to FSF's `h` when
+            // driving Shinobi.
+            WideRole::ShogiKnight => 'n',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -446,7 +477,7 @@ impl WideRole {
     #[must_use]
     #[inline]
     pub const fn is_overflow(self) -> bool {
-        matches!(self, WideRole::Commoner)
+        matches!(self, WideRole::Commoner | WideRole::ShogiKnight)
     }
 
     /// For an overflow role, the **recycled base letter** its FEN token reuses
@@ -473,6 +504,7 @@ impl WideRole {
     pub const fn overflow_from_base(ch: char) -> Option<WideRole> {
         match ch.to_ascii_lowercase() {
             'u' => Some(WideRole::Commoner),
+            'n' => Some(WideRole::ShogiKnight),
             _ => None,
         }
     }
@@ -526,10 +558,11 @@ impl WideRole {
             'x' => Some(WideRole::JanggiElephant),
             'f' => Some(WideRole::Lancer),
             'y' => Some(WideRole::Archer),
-            // The Commoner has no bare single letter: it is an overflow role whose
-            // FEN token is `*u` (see `is_overflow` / `overflow_form`). Its base
-            // letter `u` deliberately still parses to the Advisor here; the board
-            // FEN parser resolves the `*` prefix to the overflow role.
+            // The Commoner and Shinobi's Shogi Knight have no bare single letter:
+            // they are overflow roles whose FEN tokens are `*u` / `*n` (see
+            // `is_overflow` / `overflow_from_base`). Their base letters `u` / `n`
+            // deliberately still parse to the Advisor / Knight here; the board FEN
+            // parser resolves the `*` prefix to the overflow role.
             _ => None,
         }
     }
@@ -572,6 +605,7 @@ impl fmt::Display for WideRole {
             WideRole::Kheshig => "kheshig",
             WideRole::Archer => "archer",
             WideRole::Commoner => "commoner",
+            WideRole::ShogiKnight => "shogi-knight",
         })
     }
 }
@@ -637,6 +671,7 @@ mod tests {
         assert_eq!(WideRole::Wazir.char(), '?');
         assert_eq!(WideRole::from_char('?'), None);
         assert_eq!(WideRole::from_char('1'), None);
+        assert_eq!(WideRole::from_char('?'), None);
     }
 
     #[test]

@@ -34,6 +34,7 @@ mod minixiangqi;
 mod orda;
 mod seirawan;
 mod shako;
+mod shinobi;
 mod shogi;
 mod sittuyin;
 mod spartan;
@@ -141,7 +142,6 @@ fn main() {
             "default"
         }
     );
-    println!();
 
     // ---- run the corpus through both engines ------------------------------
     let mut rows: Vec<Row> = Vec::with_capacity(CASES.len());
@@ -179,6 +179,7 @@ fn main() {
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
+    let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
@@ -200,6 +201,7 @@ fn main() {
         + sittuyin_mismatches
         + spartan_mismatches
         + shako_mismatches
+        + shinobi_mismatches
         + xiangqi_mismatches
         + janggi_mismatches
         + shogi_mismatches
