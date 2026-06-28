@@ -287,6 +287,9 @@ mod tests {
             ("cannon-cap", 373),
             ("elephant-eye", 1066),
             ("flying-general", 16),
+            ("horse-check", 5),
+            ("soldier-guard-fwd", 5),
+            ("soldier-guard-side", 5),
         ];
         for case in CASES {
             let pos = Xiangqi::from_fen(case.fen).expect("corpus FEN parses");

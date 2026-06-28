@@ -95,7 +95,14 @@ const CASES: &[Case] = &[
 /// **before** the Archer would re-read a `y`, so each source letter is rewritten
 /// exactly once via a single simultaneous `match`.
 fn to_fsf_dialect(fen: &str) -> String {
-    fen.chars()
+    // Only the placement field (before the first space) holds piece letters; the
+    // side-to-move / castling / en-passant fields must be left intact (otherwise
+    // a white-to-move `w` would be mangled into the Kheshig's `h`).
+    let mut parts = fen.splitn(2, ' ');
+    let placement: String = parts
+        .next()
+        .unwrap_or("")
+        .chars()
         .map(|c| match c {
             'f' => 'l',
             'F' => 'L',
@@ -107,7 +114,11 @@ fn to_fsf_dialect(fen: &str) -> String {
             'S' => 'Y',
             other => other,
         })
-        .collect()
+        .collect();
+    match parts.next() {
+        Some(rest) => format!("{placement} {rest}"),
+        None => placement,
+    }
 }
 
 /// Resolve the FSF `variants.ini` path: `$MCE_FSF_VARIANTS_INI`, then a sibling
