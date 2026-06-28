@@ -464,6 +464,86 @@ pub enum WideRole {
     /// captured. (Shogi.) Distinct from the Xiangqi [`WideRole::Horse`] (the
     /// hobbled knight), which already claims the `j` letter.
     DragonHorse = 28,
+
+    // --- Tori Shogi (bird shogi, 7x7) army (§ Milestone 10, Fairy variants) ---
+    //
+    // Tori Shogi replaces the Shogi army with seven bird pieces on a 7x7 board.
+    // Every one is a genuinely-new movement (confirmed square-for-square against
+    // Fairy-Stockfish `UCI_Variant torishogi`), so each lands **past the
+    // exhausted single-letter alphabet** as an **overflow role** like the
+    // Commoner / Empire pieces: it has no bare letter and spells itself with the
+    // [`OVERFLOW_PREFIX`] (`*`) plus a **distinct** recycled base letter whose
+    // case carries the colour. FSF spells Tori pieces `s` (swallow), `f` (falcon,
+    // already the Ordamirror Falcon's overflow base here), `c` (crane, the
+    // Cannon's bare letter and the Empire Cardinal's overflow base), `l`/`r`
+    // (quails) and `p` (pheasant); the promoted swallow and falcon are the `+S`
+    // (goose) and `+F` (eagle) tokens. mce gives each its own overflow base,
+    // chosen distinct from every other overflow role (the Chak army already
+    // recycles `s`, `o`, `l` and `p`, so Tori cannot reuse them) — `y` swallow,
+    // `g` goose, `a` falcon, `i` eagle, `k` crane, `v` left quail, `r` right
+    // quail, `z` pheasant — and the `compare-fairy` harness rewrites each
+    // `*<base>` to FSF's letter (`*y → s`, `*g → +S`, `*a → f`, `*i → +F`,
+    // `*k → c`, `*v → l`, `*r → r`, `*z → p`) when driving FSF. The goose and
+    // eagle are the *promoted* forms of the swallow and falcon: they move as a
+    // distinct piece on the board but revert to the base (swallow / falcon) in
+    // hand when captured. That base reversion is expressed by the variant's
+    // [`role_hand_base`](super::WideVariant::role_hand_base) hook (as for Shogun's
+    // role-reusing promotions), not by the global Shogi `+`-token machinery, so no
+    // Tori role is [`is_promoted`](WideRole::is_promoted).
+    /// Swallow (燕, FSF `s`) — moves one square straight **forward** (it both moves
+    /// and captures there, like the Shogi pawn). Promotes to a Goose. (Tori
+    /// Shogi.) An **overflow role**: its FEN token is `*Y` (white) / `*y` (black) —
+    /// the base `s` being already claimed by the Chak Serpent — and the
+    /// `compare-fairy` harness maps `*y → s` when driving Tori Shogi.
+    Swallow = 49,
+    /// Goose (雁, FSF `+S`) — the promoted Swallow: leaps two squares diagonally
+    /// **forward** (a forward Alfil, jumping the intervening square) or two squares
+    /// straight **backward** (a backward Dabbaba jump). Reverts to a Swallow in
+    /// hand when captured. (Tori Shogi.) An **overflow role**: its FEN token is
+    /// `*G` (white) / `*g` (black); the harness maps `*g → +S` when driving Tori.
+    Goose = 50,
+    /// Falcon (鷹, FSF `f`) — the Tori falcon: steps to all four diagonals (a Ferz)
+    /// and one square **forward** or **sideways** orthogonally (every King step
+    /// except the backward orthogonal one). Promotes to an Eagle. (Tori Shogi.)
+    /// Distinct from the Ordamirror [`WideRole::Falcon`] (`mQcN`), which already
+    /// claims the `f` overflow base; this one takes `a`. An **overflow role**: its
+    /// FEN token is `*A` (white) / `*a` (black); the harness maps `*a → f`.
+    ToriFalcon = 51,
+    /// Eagle (鵰, FSF `+F`) — the promoted Falcon: a King step in every direction,
+    /// a **backward** Rook slide, a **forward** Bishop slide, and a **backward**
+    /// diagonal slide of up to two squares. Reverts to a Falcon in hand when
+    /// captured. (Tori Shogi.) Distinct from the Empire [`WideRole::Eagle`]
+    /// (`mQcN`), which already claims the `e` overflow base; this one takes `i`. An
+    /// **overflow role**: its FEN token is `*I` (white) / `*i` (black); the harness
+    /// maps `*i → +F`.
+    ToriEagle = 52,
+    /// Crane (鶴, FSF `c`) — steps to all four diagonals (a Ferz) and one square
+    /// straight **forward** or **backward** orthogonally (every King step except
+    /// the two sideways ones). (Tori Shogi.) Distinct from the Cannon (`c`), the
+    /// Empire [`WideRole::Cardinal`] (`c` overflow base) and the Chak Temple (`o`);
+    /// this one takes `k`. An **overflow role**: its FEN token is `*K` (white) /
+    /// `*k` (black); the harness maps `*k → c`.
+    Crane = 53,
+    /// Left Quail (鶉, FSF `l`) — an **asymmetric** bird: a **forward** Rook slide,
+    /// a **right-backward** Bishop slide, and one square **left-backward**
+    /// diagonally. Its move set is *not* left-right symmetric (it is the mirror of
+    /// the Right Quail). (Tori Shogi.) Distinct from the Chak Divine Lord, which
+    /// already claims the `l` overflow base; this one takes `v`. An **overflow
+    /// role**: its FEN token is `*V` (white) / `*v` (black); the harness maps
+    /// `*v → l`.
+    LeftQuail = 54,
+    /// Right Quail (鶉, FSF `r`) — the mirror of the Left Quail: a **forward** Rook
+    /// slide, a **left-backward** Bishop slide, and one square **right-backward**
+    /// diagonally. Its move set is *not* left-right symmetric. (Tori Shogi.) An
+    /// **overflow role**: its FEN token is `*R` (white) / `*r` (black); the harness
+    /// maps `*r → r`.
+    RightQuail = 55,
+    /// Pheasant (雉, FSF `p`) — leaps two squares straight **forward** (a forward
+    /// Dabbaba jump) and steps one square **backward** diagonally (a backward
+    /// Ferz). (Tori Shogi.) Distinct from the Chak Soldier, which already claims
+    /// the `p` overflow base; this one takes `z`. An **overflow role**: its FEN
+    /// token is `*Z` (white) / `*z` (black); the harness maps `*z → p`.
+    Pheasant = 56,
 }
 
 impl WideRole {
@@ -471,7 +551,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 49;
+    pub const COUNT: usize = 57;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -524,6 +604,14 @@ impl WideRole {
         WideRole::DivineLord,
         WideRole::ChakSoldier,
         WideRole::Temple,
+        WideRole::Swallow,
+        WideRole::Goose,
+        WideRole::ToriFalcon,
+        WideRole::ToriEagle,
+        WideRole::Crane,
+        WideRole::LeftQuail,
+        WideRole::RightQuail,
+        WideRole::Pheasant,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -674,6 +762,24 @@ impl WideRole {
             WideRole::DivineLord => 'l',
             WideRole::ChakSoldier => 'p',
             WideRole::Temple => 'o',
+            // Tori Shogi birds — overflow roles past the exhausted single-letter
+            // alphabet. Like the Commoner / Empire pieces, each FEN token is the
+            // `*` prefix plus a distinct recycled base letter, so `char()` returns
+            // the bare base letter and the board FEN I/O adds the `*` prefix. The
+            // bases (`y`/`g`/`a`/`i`/`k`/`v`/`r`/`z`) are distinct from every other
+            // overflow base — the Chak army already claims `s`, `o`, `l` and `p`,
+            // so the swallow / crane / left-quail / pheasant take `y` / `k` / `v` /
+            // `z` instead; the `compare-fairy` harness rewrites each to FSF's
+            // letter (`*y → s`, `*g → +S`, `*a → f`, `*i → +F`, `*k → c`, `*v → l`,
+            // `*r → r`, `*z → p`) when driving Tori Shogi.
+            WideRole::Swallow => 'y',
+            WideRole::Goose => 'g',
+            WideRole::ToriFalcon => 'a',
+            WideRole::ToriEagle => 'i',
+            WideRole::Crane => 'k',
+            WideRole::LeftQuail => 'v',
+            WideRole::RightQuail => 'r',
+            WideRole::Pheasant => 'z',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -769,6 +875,14 @@ impl WideRole {
                 | WideRole::DivineLord
                 | WideRole::ChakSoldier
                 | WideRole::Temple
+                | WideRole::Swallow
+                | WideRole::Goose
+                | WideRole::ToriFalcon
+                | WideRole::ToriEagle
+                | WideRole::Crane
+                | WideRole::LeftQuail
+                | WideRole::RightQuail
+                | WideRole::Pheasant
         )
     }
 
@@ -818,6 +932,18 @@ impl WideRole {
             'l' => Some(WideRole::DivineLord),
             'p' => Some(WideRole::ChakSoldier),
             'o' => Some(WideRole::Temple),
+            // Tori Shogi birds — distinct recycled bases chosen clear of every
+            // other overflow role (the Chak army already claims `s`/`o`/`l`/`p`, so
+            // the swallow / crane / left-quail / pheasant take `y`/`k`/`v`/`z`); the
+            // `compare-fairy` harness rewrites each `*<base>` to FSF's spelling.
+            'y' => Some(WideRole::Swallow),
+            'g' => Some(WideRole::Goose),
+            'a' => Some(WideRole::ToriFalcon),
+            'i' => Some(WideRole::ToriEagle),
+            'k' => Some(WideRole::Crane),
+            'v' => Some(WideRole::LeftQuail),
+            'r' => Some(WideRole::RightQuail),
+            'z' => Some(WideRole::Pheasant),
             _ => None,
         }
     }
@@ -933,6 +1059,14 @@ impl fmt::Display for WideRole {
             WideRole::DivineLord => "divine-lord",
             WideRole::ChakSoldier => "chak-soldier",
             WideRole::Temple => "temple",
+            WideRole::Swallow => "swallow",
+            WideRole::Goose => "goose",
+            WideRole::ToriFalcon => "tori-falcon",
+            WideRole::ToriEagle => "tori-eagle",
+            WideRole::Crane => "crane",
+            WideRole::LeftQuail => "left-quail",
+            WideRole::RightQuail => "right-quail",
+            WideRole::Pheasant => "pheasant",
         })
     }
 }
@@ -1067,8 +1201,8 @@ mod tests {
         assert!(WideRole::Commoner.is_overflow());
         assert_eq!(WideRole::Commoner.char(), 'u');
         assert_eq!(WideRole::overflow_from_base('u'), Some(WideRole::Commoner));
-        // A base letter that names no overflow role yields `None`. (`g` — the
-        // Gold's letter — is not recycled by any overflow role.)
-        assert_eq!(WideRole::overflow_from_base('g'), None);
+        // A base letter that names no overflow role yields `None` (`j` is free —
+        // no overflow role recycles it).
+        assert_eq!(WideRole::overflow_from_base('j'), None);
     }
 }
