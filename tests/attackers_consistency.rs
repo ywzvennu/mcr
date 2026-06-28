@@ -41,9 +41,9 @@
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
     HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, ManchuRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules,
-    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, WideRole,
-    WideVariant, XiangqiRules,
+    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules,
+    ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
+    WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -258,6 +258,33 @@ variant_test!(
     [
         "rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSKMSNR b - - 0 2",
         "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 4",
+    ]
+);
+
+// -- Shatar (Mongolian, 8x8) ------------------------------------------------
+//
+// The only non-standard piece is the Bers (`d`, reusing `WideRole::General` =
+// Rook + Ferz), whose attack set is geometrically symmetric (rook slide + ferz
+// step), so it needs no directional / leg-asymmetric flag — only the pawn is
+// colour-directional, exactly as standard chess. This test is the guard that the
+// Bers's `role_attacks` set and `attackers_to` reverse-projection agree, so a
+// Bers check is detected on both the forward (king-danger) and reverse
+// (`attackers_to`) paths. The corpus FENs are reused from `tests/perft_shatar.rs`
+// (each FSF-confirmed, in mce dialect with the Bers spelled `d`): the startpos,
+// the Bers-active and open middlegames, and the Robado-exercising position. (A
+// bare-king node generates zero moves but `attackers_to` is still defined and
+// must stay consistent, so the corpus keeps both sides armed.)
+
+variant_test!(
+    shatar,
+    Chess8x8,
+    ShatarRules,
+    "shatar",
+    [
+        "rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1",
+        "r3k2r/p1ppdpb1/bn2pnp1/3PN3/1p2P3/2N3p1/PPPBBPPP/R3K2R w - - 0 1",
+        "4k3/8/8/3d4/3D4/8/4P3/4K3 w - - 0 1",
+        "4k3/4p3/8/8/8/8/3D4/4K3 w - - 0 1",
     ]
 );
 
