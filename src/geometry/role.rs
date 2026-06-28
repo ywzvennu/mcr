@@ -59,7 +59,11 @@ pub enum WideRole {
     /// Gold-general mover — the three forward squares, the two sideways, and one
     /// straight back (Shogi).
     Gold = 8,
-    /// Wazir — one orthogonal step.
+    /// Wazir — one orthogonal step. A **letterless reserved** census role: it was
+    /// never fielded by any variant (the Spartan Captain is "Wazir + Dabbaba" but
+    /// is its own [`WideRole::Captain`] role, not built from this one), so it
+    /// carries no FEN letter — its slot is kept only to preserve the stable role
+    /// indices. Its letter `w` was reclaimed for the Orda [`WideRole::Kheshig`].
     Wazir = 9,
     /// Hawk — Bishop + Knight compound (a.k.a. Archbishop / Cardinal / Janus;
     /// Seirawan's hawk, Capablanca's archbishop).
@@ -140,6 +144,42 @@ pub enum WideRole {
     /// `compare-fairy` harness maps it to FSF's `b` when driving Janggi.
     JanggiElephant = 29,
 
+    // --- Orda (Mongolian) army (§ Milestone 10) --------------------------
+    //
+    // The Black "Orda" cavalry pieces: every one **moves like a knight** to an
+    // empty square but **captures along a slider line** (Lancer = knight-move /
+    // rook-capture; Archer = knight-move / bishop-capture), plus the Kheshig, a
+    // King+Knight leaper that moves and captures alike. The Yurt is a plain
+    // silver-general and reuses [`WideRole::Silver`], so it needs no new role. All
+    // were confirmed against Fairy-Stockfish `UCI_Variant orda`.
+    /// Lancer (FSF `kniroo`, letter `l`) — **moves like a knight** to an empty
+    /// square but **captures like a rook** (an orthogonal slider capture). Its
+    /// quiet jumps ride [`WideVariant::quiet_only_targets`](super::WideVariant::quiet_only_targets)
+    /// (the knight pattern); its [`role_attacks`](super::WideVariant::role_attacks)
+    /// is the rook slide (the only squares it captures / checks on). (Orda.) FSF's
+    /// `l` already names the Lance here, so the Lancer takes the free letter `f`
+    /// and the `compare-fairy` harness maps it to FSF's `l` when driving Orda.
+    Lancer = 30,
+    /// Kheshig (FSF `centaur`, letter `h`) — a **King + Knight** leaper: it moves
+    /// and captures to the eight king-adjacent squares **and** the eight knight
+    /// squares (sixteen targets), all as a non-sliding leaper. (Orda; also the
+    /// piece a promoting pawn may become, see the Orda promotion targets.) FSF's
+    /// `h` already names the Hoplite here; the single-letter alphabet is otherwise
+    /// exhausted, so the Kheshig reclaims the letter `w` — freed by retiring the
+    /// never-fielded census [`WideRole::Wazir`] placeholder to a letterless
+    /// reserved role (no variant ever used the Wazir, see its doc) — and the
+    /// `compare-fairy` harness maps the Kheshig to FSF's `h` when driving Orda.
+    Kheshig = 31,
+    /// Archer (FSF `knibis`, letter `a`) — **moves like a knight** to an empty
+    /// square but **captures like a bishop** (a diagonal slider capture). Like the
+    /// Lancer its quiet jumps ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets) (the knight
+    /// pattern) and its [`role_attacks`](super::WideVariant::role_attacks) is the
+    /// bishop slide (the only squares it captures / checks on). (Orda.) FSF's `a`
+    /// already names the Hawk here, so the Archer takes the free letter `y` and the
+    /// `compare-fairy` harness maps it to FSF's `a` when driving Orda.
+    Archer = 32,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -176,7 +216,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 30;
+    pub const COUNT: usize = 33;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -210,6 +250,9 @@ impl WideRole {
         WideRole::Dragon,
         WideRole::DragonHorse,
         WideRole::JanggiElephant,
+        WideRole::Lancer,
+        WideRole::Kheshig,
+        WideRole::Archer,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -248,7 +291,9 @@ impl WideRole {
             WideRole::Met => 'm',
             WideRole::Silver => 's',
             WideRole::Gold => 'g',
-            WideRole::Wazir => 'w',
+            // Wazir is a letterless reserved census role (see its doc); its `w`
+            // was reclaimed by the Orda Kheshig.
+            WideRole::Wazir => '?',
             WideRole::Hawk => 'a',
             WideRole::Elephant => 'e',
             WideRole::Cannon => 'c',
@@ -278,6 +323,15 @@ impl WideRole {
             // elephant already took `o`, so it takes the free letter `x`; the
             // `compare-fairy` harness maps it to FSF's `b` when driving Janggi.
             WideRole::JanggiElephant => 'x',
+            // Orda cavalry. FSF spells these `l h a` (kniroo, centaur, knibis),
+            // but `l`, `h`, and `a` already name the Lance, Hoplite, and Hawk here;
+            // the Orda pieces take the free letters `f` and `y` plus the `w`
+            // reclaimed from the retired Wazir, and the `compare-fairy` harness maps
+            // them to FSF's letters when driving Orda. The Yurt is a plain Silver
+            // (`s`) and needs no letter of its own.
+            WideRole::Lancer => 'f',
+            WideRole::Kheshig => 'w',
+            WideRole::Archer => 'y',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -373,7 +427,8 @@ impl WideRole {
             'm' => Some(WideRole::Met),
             's' => Some(WideRole::Silver),
             'g' => Some(WideRole::Gold),
-            'w' => Some(WideRole::Wazir),
+            // 'w' is the Orda Kheshig (reclaimed from the now-letterless Wazir).
+            'w' => Some(WideRole::Kheshig),
             'a' => Some(WideRole::Hawk),
             'e' => Some(WideRole::Elephant),
             'c' => Some(WideRole::Cannon),
@@ -388,6 +443,8 @@ impl WideRole {
             'o' => Some(WideRole::XiangqiElephant),
             'z' => Some(WideRole::Soldier),
             'x' => Some(WideRole::JanggiElephant),
+            'f' => Some(WideRole::Lancer),
+            'y' => Some(WideRole::Archer),
             _ => None,
         }
     }
@@ -426,6 +483,9 @@ impl fmt::Display for WideRole {
             WideRole::Dragon => "dragon",
             WideRole::DragonHorse => "dragon-horse",
             WideRole::JanggiElephant => "janggi-elephant",
+            WideRole::Lancer => "lancer",
+            WideRole::Kheshig => "kheshig",
+            WideRole::Archer => "archer",
         })
     }
 }
@@ -472,16 +532,22 @@ mod tests {
         // so `from_char` maps the bare letter back to the *base* role, not the
         // promoted one — they are excluded from this round-trip.
         for role in WideRole::ALL {
-            if role.is_promoted() {
+            // The Shogi promoted roles share a base letter (handled by the `+`
+            // FEN prefix), and the Wazir is a letterless reserved census role
+            // (its `w` was reclaimed by the Orda Kheshig); both are excluded.
+            if role.is_promoted() || role == WideRole::Wazir {
                 continue;
             }
             let ch = role.char();
-            assert_ne!(ch, '?', "every role has a letter");
+            assert_ne!(ch, '?', "every fielded role has a letter");
             assert_eq!(WideRole::from_char(ch), Some(role));
             assert_eq!(WideRole::from_char(role.upper_char()), Some(role));
             assert_eq!(role.char().to_ascii_uppercase(), role.upper_char());
         }
-        assert_eq!(WideRole::from_char('y'), None);
+        // The Wazir is letterless: its `char()` is the sentinel `'?'`, which does
+        // not parse back to it (or to anything).
+        assert_eq!(WideRole::Wazir.char(), '?');
+        assert_eq!(WideRole::from_char('?'), None);
         assert_eq!(WideRole::from_char('1'), None);
     }
 

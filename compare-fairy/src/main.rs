@@ -31,6 +31,7 @@ mod locate;
 mod makruk;
 mod minishogi;
 mod minixiangqi;
+mod orda;
 mod seirawan;
 mod shako;
 mod shogi;
@@ -182,6 +183,9 @@ fn main() {
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
     let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
     let minixiangqi_mismatches = minixiangqi::run(&mut engine, opts.full);
+    // Orda is an INI variant: orda::run loads FSF's variants.ini (resolved from the
+    // located binary) before driving `UCI_Variant orda`.
+    let orda_mismatches = orda::run(&mut engine, &located.bin, opts.full);
 
     engine.quit();
 
@@ -199,6 +203,7 @@ fn main() {
         + shogi_mismatches
         + minishogi_mismatches
         + minixiangqi_mismatches
+        + orda_mismatches
         > 0
     {
         std::process::exit(1);
