@@ -197,6 +197,27 @@ impl Engine {
         self.wait_for("readyok")
     }
 
+    /// Load a Fairy-Stockfish `variants.ini` so the binary learns the variants it
+    /// defines (e.g. `synochess`, which is **not** a built-in), then re-read the
+    /// `uci` handshake to capture the now-extended `UCI_Variant` list. A no-op if
+    /// `path` is empty. Errors (never panics) so the caller can skip gracefully.
+    pub fn load_variants(&mut self, path: &str) -> Result<(), String> {
+        if path.is_empty() {
+            return Ok(());
+        }
+        self.send(&format!("load {path}"))?;
+        self.send("isready")?;
+        self.wait_for("readyok")?;
+        // Re-advertise: after `load`, a fresh `uci` lists the ini variants too.
+        self.send("uci")?;
+        self.variants = self.read_uciok_capturing_variants()?;
+        self.send("isready")?;
+        self.wait_for("readyok")?;
+        // Force the next `set_variant` to re-send the option.
+        self.current_variant = None;
+        Ok(())
+    }
+
     /// Set the position from a (FSF-dialect) FEN.
     pub fn set_position(&mut self, fen: &str) -> Result<(), String> {
         self.send(&format!("position fen {fen}"))

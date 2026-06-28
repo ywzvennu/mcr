@@ -41,8 +41,8 @@
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
     MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, SeirawanRules, ShakoRules,
-    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, WideRole, WideVariant,
-    XiangqiRules,
+    ShogiRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, WideRole,
+    WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -480,5 +480,31 @@ variant_test!(
         "5k3/9/3Z5/9/9/4Z4/9/9/9/1K7 w - - 0 1",
         "9/1k7/9/9/9/9/4z4/9/4K4/9 w - - 0 1",
         "9/1k7/9/9/9/9/9/4z4/4K4/9 w - - 0 1",
+    ]
+);
+
+// -- Synochess (asymmetric: standard White vs Janggi-cannon / Soldier / Commoner
+//    / Fers-Alfil Black, 8x8) --
+//
+// The Janggi cannon is board-aware (screen ≠ cannon, may not capture a cannon),
+// so `forward_attacks_to` projects it from `role_attacks_board`. The Soldier is
+// forward-directional and the cannon occupancy-asymmetric (both flagged via
+// `role_attack_is_leg_asymmetric`), so this is the guard that those flags match
+// the generator. The corpus FENs are reused from `tests/perft_synochess.rs` (each
+// FSF-confirmed): the startpos (both colors), an asymmetric middlegame, the
+// drop-heavy position, and the two campmate endgames.
+
+variant_test!(
+    synochess,
+    Chess8x8,
+    SynochessRules,
+    "synochess",
+    [
+        "rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1",
+        "rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] b KQ - 0 1",
+        "rnv*uk1nr/8/1c4c1/3zz3/2zP4/5N2/PPP1PPPP/RNBQKB1R[zz] w KQ - 0 1",
+        "rnv*uk1nr/8/1c4c1/8/3PP3/8/PPP2PPP/RNBQKBNR[zz] b KQ - 0 1",
+        "8/8/8/8/K7/8/4k3/8 b - - 0 1",
+        "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
     ]
 );

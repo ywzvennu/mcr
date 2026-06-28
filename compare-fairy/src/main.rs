@@ -37,6 +37,7 @@ mod shako;
 mod shogi;
 mod sittuyin;
 mod spartan;
+mod synochess;
 mod uci;
 mod variants;
 mod xiangqi;
@@ -186,6 +187,7 @@ fn main() {
     // Orda is an INI variant: orda::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant orda`.
     let orda_mismatches = orda::run(&mut engine, &located.bin, opts.full);
+    let synochess_mismatches = synochess::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -204,6 +206,7 @@ fn main() {
         + minishogi_mismatches
         + minixiangqi_mismatches
         + orda_mismatches
+        + synochess_mismatches
         > 0
     {
         std::process::exit(1);

@@ -374,6 +374,32 @@ impl<G: Geometry> Board<G> {
                     board.set_piece(square, WidePiece::new(base.color, promoted));
                     file += 1;
                     i += 1;
+                } else if b as char == crate::geometry::role::OVERFLOW_PREFIX {
+                    // A `*` prefix marks an overflow role (added past the exhausted
+                    // single-letter alphabet): the following letter is a recycled
+                    // base letter whose case carries the colour, resolved to the
+                    // overflow role via `WideRole::overflow_from_base` (`*U` =
+                    // white Commoner, `*u` = black). A `*` before a letter that
+                    // names no overflow role is rejected.
+                    i += 1;
+                    let next = bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
+                        crate::geometry::role::OVERFLOW_PREFIX,
+                    ))?;
+                    let role = WideRole::overflow_from_base(next as char).ok_or(
+                        ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
+                    )?;
+                    let color = if (next as char).is_ascii_uppercase() {
+                        Color::White
+                    } else {
+                        Color::Black
+                    };
+                    if file >= width {
+                        return Err(ParseBoardError::RankTooLong(rank + 1));
+                    }
+                    let square = Square::new(rank * G::WIDTH + file as u8);
+                    board.set_piece(square, WidePiece::new(color, role));
+                    file += 1;
+                    i += 1;
                 } else if let Some(piece) = WidePiece::from_char(b as char) {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
@@ -436,6 +462,11 @@ impl<G: Geometry> Board<G> {
                         // for a promoted role, so only the prefix is added.
                         if piece.role.is_promoted() {
                             fen.push('+');
+                        } else if piece.role.is_overflow() {
+                            // An overflow role renders as the `*` prefix plus its
+                            // recycled base letter; `char()` returns that base
+                            // letter and `piece.char()` applies the colour case.
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
                         }
                         fen.push(piece.char());
                     }
