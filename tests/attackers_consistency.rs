@@ -40,9 +40,9 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
-    JanggiRules, MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
-    SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
+    JanggiRules, KnightmateRules, MakrukRules, MinishogiRules, MinixiangqiRules, OrdaRules,
+    OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
+    SpartanRules, Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -585,5 +585,30 @@ variant_test!(
         "4k3/8/2n1n3/3rb3/3*E*C*T2/3q4/3P4/4K3 w - - 0 1",
         "4k3/8/8/8/8/8/4K3/8 w - - 0 1",
         "8/8/3k4/8/8/8/3K4/8 w - - 0 1",
+    ]
+);
+
+// -- Knightmate (royal Knight + non-royal Commoner, 8x8) --------------------
+//
+// The royal piece is `WideRole::King` given the **knight** attack set, so this is
+// the guard that a non-king-stepping royal still satisfies the attacker/king-safety
+// consistency property: the forward king-danger projection and the reverse-
+// projecting `attackers_to` must agree on the royal Knight's check, and on the
+// Commoner's king-steps. Both are symmetric leapers, so no directional/leg-
+// asymmetric flag is set — this test confirms that choice. The corpus FENs are
+// reused from `tests/perft_knightmate.rs` (each FSF-confirmed): the closed-pawn and
+// castling-ready middlegames, and the royal-Knight-in-check + promotion position.
+// The Commoner is the overflow role `*U` (recycling `u`); the board FEN parser
+// resolves the `*` prefix.
+
+variant_test!(
+    knightmate,
+    Chess8x8,
+    KnightmateRules,
+    "knightmate",
+    [
+        "r*ubqkb*ur/pp2pppp/2pp4/8/2PP4/8/PP2PPPP/R*UBQKB*UR w KQkq - 0 1",
+        "r3k2r/pppq1ppp/2*up1*u2/2b1p3/2B1P3/2*UP1*U2/PPPQ1PPP/R3K2R w KQkq - 0 1",
+        "4k3/1P3P2/8/8/3*u4/8/4r3/4K3 w - - 0 1",
     ]
 );
