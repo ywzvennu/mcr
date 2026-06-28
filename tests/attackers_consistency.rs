@@ -39,9 +39,9 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, MakrukRules,
-    MinishogiRules, MinixiangqiRules, SeirawanRules, ShakoRules, ShogiRules, SittuyinRules,
-    SpartanRules, Square, StandardChess, WideRole, WideVariant, XiangqiRules,
+    Bitboard, CapablancaRules, DuckRules, GenericPosition, Geometry, GrandRules, JanggiRules,
+    MakrukRules, MinishogiRules, MinixiangqiRules, SeirawanRules, ShakoRules, ShogiRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
@@ -78,13 +78,23 @@ const SEEDS: [u64; 6] = [
 
 /// Computes the FORWARD attack set of color `c` under the position's current
 /// occupancy, **independently** of `attackers_to`: for every occupied square `s`
-/// holding a piece of color `c`, it ORs in that piece's own
-/// [`WideVariant::role_attacks`] set. The result is the set of squares some piece
-/// of `c` attacks.
+/// holding a piece of color `c`, it ORs in that piece's own forward attack set.
+/// The result is the set of squares some piece of `c` attacks.
 ///
-/// This is the same per-piece forward projection the move generator uses to build
-/// each piece's targets, so it is the ground truth `attackers_to` (the reverse
-/// projection) must reproduce.
+/// For most roles the forward set is the occupancy-only
+/// [`WideVariant::role_attacks`] — the same per-piece projection the move
+/// generator uses. But a role whose attack set depends on *which* occupied
+/// squares hold *which* pieces (the Janggi screen-cannon: screen ≠ cannon, may
+/// not capture a cannon, plus the palace-diagonal jump) is computed from the
+/// **whole board** via the board-aware [`WideVariant::role_attacks_board`] hook.
+/// When the variant sets [`WideVariant::uses_board_attacks`] and that hook
+/// returns `Some` for the role, this uses it — exactly as the generator and the
+/// cannon-verify king-safety path do — so the board-aware role is forward-projected
+/// correctly. The hook returns `None` for every other role (and the default-off
+/// variants never set `uses_board_attacks`), so the 13 existing cases keep using
+/// the plain `role_attacks` path unchanged.
+///
+/// This is the ground truth `attackers_to` (the reverse projection) must reproduce.
 fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
     pos: &GenericPosition<G, V>,
     target: Square<G>,
@@ -92,6 +102,7 @@ fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
     occupied: Bitboard<G>,
 ) -> Bitboard<G> {
     let board = pos.board();
+    let board_aware = V::uses_board_attacks();
     let mut sources = Bitboard::EMPTY;
     for role in WideRole::ALL {
         let pieces = board.pieces(by, role);
@@ -99,7 +110,15 @@ fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
             continue;
         }
         for from in pieces {
-            if V::role_attacks(role, by, from, occupied).contains(target) {
+            // Prefer the board-aware set for any role the variant computes from the
+            // whole board (Janggi's cannon); fall back to the occupancy-only set.
+            let attacks = if board_aware {
+                V::role_attacks_board(role, by, from, board)
+                    .unwrap_or_else(|| V::role_attacks(role, by, from, occupied))
+            } else {
+                V::role_attacks(role, by, from, occupied)
+            };
+            if attacks.contains(target) {
                 sources |= Bitboard::from_square(from);
             }
         }
@@ -409,5 +428,32 @@ variant_test!(
         "4k/4S/5/5/4K[] w - - 0 1",
         "2k2/5/R3r/5/2K2[Pp] w - - 0 1",
         "2k2/5/P4/5/2K2[P] w - - 0 1",
+    ]
+);
+
+// -- Janggi (board-aware screen-cannon + palace diagonals + soldier, 9x10) --
+//
+// The cannon's attack set depends on which occupied squares hold cannons (and on
+// the palace geometry), so `forward_attacks_to` projects it from the board-aware
+// `role_attacks_board` hook above — without that, the cannon and palace-diagonal
+// rows would spuriously mismatch. The corpus FENs are reused from
+// `tests/perft_janggi.rs` (each FSF-confirmed): the startpos, the screen-cannon,
+// the cannon palace-diagonal jump, the palace diagonals, the long elephant, the
+// sideways/diagonal soldier, and the pass / in-check positions.
+
+variant_test!(
+    janggi,
+    Xiangqi9x10,
+    JanggiRules,
+    "janggi",
+    [
+        "rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1",
+        "9/1k7/r1r3c2/9/9/9/J1C3J2/9/4K4/C1C3C2 w - - 0 1",
+        "9/1k7/9/9/9/9/9/3K1r3/4J4/3C5 w - - 0 1",
+        "9/4k4/9/9/9/9/9/3U5/9/3K1R3 w - - 0 1",
+        "9/4k4/9/9/4Z4/3ZX4/9/9/9/1K7 w - - 0 1",
+        "5k3/9/3Z5/9/9/4Z4/9/9/9/1K7 w - - 0 1",
+        "9/1k7/9/9/9/9/4z4/9/4K4/9 w - - 0 1",
+        "9/1k7/9/9/9/9/9/4z4/4K4/9 w - - 0 1",
     ]
 );

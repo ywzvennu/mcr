@@ -346,7 +346,29 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
         // * Cannon — its attack depends on a screen and on which pieces are
         //   cannons (the board hook), so it must be projected forward from each
         //   cannon, exactly as the generator computes it.
-        matches!(role, WideRole::Horse | WideRole::Soldier | WideRole::Cannon)
+        // * King / Advisor (General / Guard) — `general_targets` masks the reachable
+        //   set by the *destination* being inside the palace, but does **not**
+        //   require the origin to be: from a square just outside the palace the
+        //   pattern still reaches palace squares. The attack relation is therefore
+        //   asymmetric (a palace-edge piece attacks inward but not outward), so a
+        //   reverse projection from the target would invent attacks the piece cannot
+        //   make. Project forward from each general/guard origin, exactly as the
+        //   generator does.
+        // * JanggiElephant — its long `(±2,±3)/(±3,±2)` leap is blocked at the two
+        //   intervening squares **adjacent to the origin** and pointing toward the
+        //   destination (the same hobbling-leg class as the Horse). Those blockers
+        //   differ from the ones a reverse leap from the target would test, so the
+        //   relation is asymmetric under occupancy; project forward from each
+        //   elephant origin.
+        matches!(
+            role,
+            WideRole::Horse
+                | WideRole::Soldier
+                | WideRole::Cannon
+                | WideRole::King
+                | WideRole::Advisor
+                | WideRole::JanggiElephant
+        )
     }
 
     fn role_is_slider(role: WideRole) -> bool {
