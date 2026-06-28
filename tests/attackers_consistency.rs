@@ -43,10 +43,10 @@ use mce::geometry::{
     Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules,
     ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
     ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
+    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Xiangqi9x10,
+    Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Xiangqi9x10,
 };
 use mce::Color;
 
@@ -552,6 +552,30 @@ variant_test!(
         "4k/4S/5/5/4K[] w - - 0 1",
         "2k2/5/R3r/5/2K2[Pp] w - - 0 1",
         "2k2/5/P4/5/2K2[P] w - - 0 1",
+    ]
+);
+
+// -- Tori Shogi (bird shogi: asymmetric quails + forward birds, 7x7) --------
+//
+// Every Tori bird's attack set is geometrically asymmetric (forward-biased, and
+// the two quails are not even left-right symmetric), so the variant routes them
+// all through the leg-asymmetric forward-projection path in `attackers_to`. This
+// corpus — the startpos, a quail-active midgame (both asymmetric quails plus a
+// crane of each colour), a promoted-piece midgame (Goose / Eagle of each colour),
+// and a drop/promotion midgame — exercises that path against the generator. The
+// FENs are reused from `tests/perft_torishogi.rs` (each FSF-confirmed).
+
+variant_test!(
+    torishogi,
+    Tori7x7,
+    ToriRules,
+    "torishogi",
+    [
+        "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/2*y1*Y2/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[] w - - 0 1",
+        "3k3/7/2*v*r3/7/3*V*R2/7/3K3[*Y*y*A*a] w - - 0 1",
+        "3k3/2*G4/7/3*I3/7/2*i4/3K3[*Y*y] w - - 0 1",
+        "2k4/1*Y5/7/3*A3/7/5*y1/4K2[*Y*A*y*a] w - - 0 1",
+        "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/7/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[*Y*y] w - - 0 1",
     ]
 );
 

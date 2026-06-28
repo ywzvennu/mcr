@@ -48,6 +48,7 @@ mod shogun;
 mod sittuyin;
 mod spartan;
 mod synochess;
+mod tori;
 mod uci;
 mod variants;
 mod xiangqi;
@@ -220,6 +221,7 @@ fn main() {
     // Chak is an INI variant: chak::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant chak`.
     let chak_mismatches = chak::run(&mut engine, &located.bin, opts.full);
+    let tori_mismatches = tori::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -249,6 +251,7 @@ fn main() {
         + empire_mismatches
         + hoppelpoppel_mismatches
         + chak_mismatches
+        + tori_mismatches
         > 0
     {
         std::process::exit(1);

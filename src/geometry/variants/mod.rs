@@ -32,6 +32,7 @@ pub mod shogun;
 pub mod sittuyin;
 pub mod spartan;
 pub mod synochess;
+pub mod tori;
 pub mod xiangqi;
 
 pub use cambodian::{Cambodian, CambodianRules};
@@ -58,4 +59,5 @@ pub use shogun::{Shogun, ShogunRules};
 pub use sittuyin::{Sittuyin, SittuyinRules};
 pub use spartan::{Spartan, SpartanRules};
 pub use synochess::{Synochess, SynochessRules};
+pub use tori::{Tori, ToriRules};
 pub use xiangqi::{Xiangqi, XiangqiRules};

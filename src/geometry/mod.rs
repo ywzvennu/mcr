@@ -60,7 +60,7 @@ pub use variants::{
     MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
     Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi,
     ShogiRules, Shogun, ShogunRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess,
-    SynochessRules, Xiangqi, XiangqiRules,
+    SynochessRules, Tori, ToriRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -306,6 +306,24 @@ geometry!(
     u64,
     5,
     5
+);
+
+geometry!(
+    /// The Tori Shogi (bird shogi) board: seven files by seven ranks (49 squares),
+    /// backed by `u128`.
+    ///
+    /// A small odd-width (`7`) `u128` geometry hosting Tori Shogi — a 7x7
+    /// bird-themed shogi with the full Shogi persistent capture-fed hand, drops,
+    /// and far-zone promotion, but a bird army (swallow, goose, falcon, eagle,
+    /// crane, two quails, pheasant) in place of the Shogi pieces. The same board
+    /// size as [`Minixiangqi7x7`] but a distinct geometry, so the Tori army never
+    /// shares masks with the Xiangqi-on-7x7 palace/river machinery. A square index
+    /// reaches `48`, and edge-masked east/west shifts must not wrap past the
+    /// seventh file. Files run a..g, ranks 1..7.
+    Tori7x7,
+    u128,
+    7,
+    7
 );
 
 #[cfg(test)]
