@@ -22,6 +22,7 @@
 //! If no FSF binary can be obtained, the harness SKIPS gracefully with install
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
+mod cambodian;
 mod capablanca;
 mod chak;
 mod corpus;
@@ -180,6 +181,9 @@ fn main() {
     // `AnyVariant` corpus above), so each has its own comparison loop. Fold their
     // mismatches into the exit status.
     let makruk_mismatches = makruk::run(&mut engine, opts.full);
+    // Cambodian is a FSF built-in (no variants.ini needed), like makruk; it rides
+    // the same generic engine.
+    let cambodian_mismatches = cambodian::run(&mut engine, opts.full);
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
@@ -221,6 +225,7 @@ fn main() {
 
     if mismatches
         + makruk_mismatches
+        + cambodian_mismatches
         + capablanca_mismatches
         + seirawan_mismatches
         + grand_mismatches

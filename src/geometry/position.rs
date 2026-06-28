@@ -966,6 +966,26 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.gen_castles(out, us, occupied, king_danger, king_sq);
         }
 
+        // One-time first-move leaps (Cambodian): the king's forward-knight leap
+        // and the queen/Met's two-square advance, each offered only while its
+        // home-square piece still holds its leap right. The king leap (like
+        // castling) is offered only when not in check; the Met leap is an ordinary
+        // piece move confined by the check mask and its pin line. Default-off, so
+        // every other variant skips this entirely and is byte-identical.
+        if V::has_first_move_leaps() {
+            self.gen_first_move_leaps(
+                out,
+                us,
+                occupied,
+                our_pieces,
+                king_danger,
+                king_sq,
+                num_checkers,
+                check_mask,
+                &pins,
+            );
+        }
+
         self.append_drops(out);
 
         // Seirawan gating: a back-rank piece's first move (and the king/rook of a
@@ -2343,6 +2363,80 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
     }
 
+    /// Generates the Cambodian one-time first-move leaps (`has_first_move_leaps()`
+    /// variants only).
+    ///
+    /// The two leap rights are carried in the [`GenericCastling`] field: the
+    /// **kingside** slot holds the king's leap right and the **queenside** slot the
+    /// queen/Met's, each keyed by its piece's home file on the back rank. A leap is
+    /// offered only while its right is present *and* its piece still stands on that
+    /// home square; both the right (revoked on the piece's first move) and the
+    /// home-square check guard against re-use.
+    ///
+    /// * **King leap** — the forward-knight squares ([`king_leap_offsets`]). It
+    ///   jumps any intervening piece, lands only on an empty square outside the
+    ///   king-danger map, and (like castling) is offered only when not in check.
+    /// * **Met leap** — the two-square straight advance ([`met_leap_offsets`]). An
+    ///   ordinary quiet piece move: it jumps the square in front, lands only on an
+    ///   empty square, and is confined by the check mask and the Met's pin line.
+    ///
+    /// [`king_leap_offsets`]: WideVariant::king_leap_offsets
+    /// [`met_leap_offsets`]: WideVariant::met_leap_offsets
+    #[allow(clippy::too_many_arguments)]
+    fn gen_first_move_leaps<S: WideSink>(
+        &self,
+        out: &mut S,
+        us: Color,
+        occupied: Bitboard<G>,
+        our_pieces: Bitboard<G>,
+        king_danger: Bitboard<G>,
+        king_sq: Square<G>,
+        num_checkers: u32,
+        check_mask: Bitboard<G>,
+        pins: &Pins<G>,
+    ) {
+        let rank = V::castle_rank(us);
+
+        // King leap: offered only when not in check and the king sits on its home
+        // square (the kingside-slot file on the castle rank). Targets are empty
+        // squares clear of the king-danger map.
+        if num_checkers == 0 {
+            if let Some(home_file) = self.state.castling.rook_file(us, KINGSIDE) {
+                if Square::<G>::from_file_rank(home_file, rank) == Some(king_sq) {
+                    for &(df, dr) in V::king_leap_offsets(us) {
+                        if let Some(dest) = king_sq.offset(df, dr) {
+                            if !occupied.contains(dest) && !king_danger.contains(dest) {
+                                out.push(WideMove::new(king_sq, dest, WideMoveKind::Quiet));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Met leap: an ordinary piece move from the Met's home square (the
+        // queenside-slot file). Confined by the check mask and the Met's pin line,
+        // and landing only on an empty square.
+        if let Some(home_file) = self.state.castling.rook_file(us, QUEENSIDE) {
+            if let Some(met_home) = Square::<G>::from_file_rank(home_file, rank) {
+                if self.board.piece_at(met_home) == Some(WidePiece::new(us, WideRole::Met)) {
+                    let pin_line = pins.line_of(met_home);
+                    for &(df, dr) in V::met_leap_offsets(us) {
+                        if let Some(dest) = met_home.offset(df, dr) {
+                            if !occupied.contains(dest)
+                                && !our_pieces.contains(dest)
+                                && check_mask.contains(dest)
+                                && pin_line.contains(dest)
+                            {
+                                out.push(WideMove::new(met_home, dest, WideMoveKind::Quiet));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // -- Make move ---------------------------------------------------------
 
     /// Applies `mv` and returns the resulting position. The move must be legal.
@@ -2504,13 +2598,31 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
         }
 
-        // Castling-right updates.
-        if moving.role == WideRole::King {
+        // Castling-right updates. A king move clears *both* of its side's castling
+        // rights — but only for a castling variant. A first-move-leap variant
+        // (Cambodian) instead carries two independent per-piece leap rights in the
+        // same field (king in the kingside slot, Met in the queenside slot), so a
+        // king move must clear only the king's right; that is handled uniformly by
+        // the home-square revocation below (the king leaving its home file clears
+        // exactly its slot, leaving the Met's right intact).
+        if moving.role == WideRole::King && V::has_castling() {
             self.state.castling.revoke_color(us);
         }
         self.revoke_rights_for_square(from, us);
         if mv.is_capture() && !matches!(mv.kind(), WideMoveKind::EnPassant) {
             self.revoke_rights_for_square(to, them);
+        }
+
+        // Cambodian king-leap revocation (default-off, so every other variant
+        // skips this and is byte-identical). FSF models the king leap like a
+        // castling right whose `castlingRightsMask` covers the king's entire home
+        // rank and file, so an *enemy rook* arriving on any square that shares the
+        // king's home rank or file clears that king's leap right — even though the
+        // king itself never moved. A non-rook piece, or a friendly rook, is inert;
+        // the mover `us` is the enemy of the opponent, so this revokes only the
+        // opponent's king leap right.
+        if V::has_first_move_leaps() && moving.role == WideRole::Rook {
+            self.revoke_king_leap_for_square(to, them);
         }
 
         // Seirawan gating-state update (default-off). A piece leaving a
@@ -2624,6 +2736,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     self.state.castling.set(color, side, None);
                 }
             }
+        }
+    }
+
+    /// Revokes `owner`'s king leap right when an enemy rook arrives on `square`
+    /// and that square shares the king's home rank or file
+    /// (`has_first_move_leaps()` variants only). A king's leap right lives in the
+    /// kingside castling slot keyed by the king's home file; its home rank is the
+    /// castle rank. This mirrors FSF's `castlingRightsMask` over the king's whole
+    /// rank and file.
+    fn revoke_king_leap_for_square(&mut self, square: Square<G>, owner: Color) {
+        if self.state.castling.is_empty() {
+            return;
+        }
+        let Some(home_file) = self.state.castling.rook_file(owner, KINGSIDE) else {
+            return;
+        };
+        let home_rank = V::castle_rank(owner);
+        if square.file() == home_file || square.rank() == home_rank {
+            self.state.castling.set(owner, KINGSIDE, None);
         }
     }
 
@@ -2772,6 +2903,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // any non-`KQkq` letter, exactly as before.
         let (castling, gating) = if V::supports_gating() {
             parse_castling_and_gating::<G>(castling_field, holdings, &board)?
+        } else if V::has_first_move_leaps() {
+            // A first-move-leap variant (Cambodian) folds its two per-side leap
+            // rights into the castling field as home-file letters (`DEde`),
+            // delegating the dialect to the variant. Default-off, so every other
+            // non-gating variant keeps the plain `KQkq` parser below.
+            (
+                V::parse_first_move_rights(castling_field).ok_or(WideFenError::BadCastling)?,
+                GenericGating::NONE,
+            )
         } else {
             (
                 parse_castling::<G, V>(castling_field, &board)?,
@@ -2837,6 +2977,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 self.board.king_of(Color::Black),
             ];
             write_castling_and_gating::<G>(self.state.castling, self.state.gating, kings, &mut out);
+        } else if V::has_first_move_leaps() {
+            V::write_first_move_rights(self.state.castling, &mut out);
         } else {
             write_castling(self.state.castling, &mut out);
         }

@@ -996,6 +996,70 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     fn initial_gating() -> GenericGating<G> {
         GenericGating::NONE
     }
+
+    /// Returns `true` if this variant grants its king and queen a one-time
+    /// first-move leap (Cambodian / Ouk Chaktrang).
+    ///
+    /// The default is `false`. While it is `false` the generic engine emits no
+    /// leap moves and never revokes a leap right, so the king's castling-right
+    /// revocation stays the standard "any king move clears both rights" — every
+    /// other variant is byte-identical. Cambodian overrides this to `true`,
+    /// reusing the [`GenericCastling`](crate::geometry::position::GenericCastling)
+    /// rights field to carry the two per-side leap rights: the **kingside** slot
+    /// holds the king's leap right (its home file) and the **queenside** slot the
+    /// queen/Met's leap right (its home file). A right is revoked the first time
+    /// its piece leaves home (the standard
+    /// [`revoke_rights_for_square`](crate::geometry::position) path), exactly as
+    /// Fairy-Stockfish's `cambodianMoves` rights behave.
+    fn has_first_move_leaps() -> bool {
+        false
+    }
+
+    /// The king's one-time leap offsets `(file_delta, rank_delta)` from its home
+    /// square, color-relative (forward is toward the far rank). Consulted only
+    /// when [`has_first_move_leaps`](Self::has_first_move_leaps) is `true` and the
+    /// king still holds its leap right; the default is empty.
+    ///
+    /// In Cambodian the king leaps to the two forward knight squares (it jumps
+    /// over any intervening piece and may land only on an empty square), and the
+    /// leap is offered only when the king is not in check — the same restriction
+    /// FSF applies.
+    fn king_leap_offsets(_color: Color) -> &'static [(i8, i8)] {
+        &[]
+    }
+
+    /// The queen/Met's one-time leap offsets `(file_delta, rank_delta)` from its
+    /// home square, color-relative. Consulted only when
+    /// [`has_first_move_leaps`](Self::has_first_move_leaps) is `true` and the Met
+    /// still holds its leap right; the default is empty.
+    ///
+    /// In Cambodian the Met (Neang) makes a single two-square straight advance
+    /// (jumping the square in front, landing only on an empty square). Unlike the
+    /// king leap this is an ordinary piece move, confined by the check mask and
+    /// the Met's pin line.
+    fn met_leap_offsets(_color: Color) -> &'static [(i8, i8)] {
+        &[]
+    }
+
+    /// Parses the FEN castling-field encoding of the first-move leap rights into
+    /// the [`GenericCastling`] slots, for a `has_first_move_leaps()` variant.
+    ///
+    /// Cambodian encodes each right by its piece's home **file letter**
+    /// (uppercase white, lowercase black; the `DEde` field). The default returns
+    /// `None` (unsupported) and is consulted only when
+    /// [`has_first_move_leaps`](Self::has_first_move_leaps) is `true`, so every
+    /// other variant keeps the plain `KQkq` castling parser unchanged.
+    fn parse_first_move_rights(_field: &str) -> Option<GenericCastling> {
+        None
+    }
+
+    /// Serializes the first-move leap rights into the FEN castling field, for a
+    /// `has_first_move_leaps()` variant — the inverse of
+    /// [`parse_first_move_rights`](Self::parse_first_move_rights). The default is
+    /// a no-op (consulted only when [`has_first_move_leaps`] is `true`).
+    ///
+    /// [`has_first_move_leaps`]: Self::has_first_move_leaps
+    fn write_first_move_rights(_rights: GenericCastling, _out: &mut alloc::string::String) {}
 }
 
 /// The reason a wide game ended, the generic analogue of
