@@ -734,6 +734,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let special = V::has_duck()
             || V::multi_royal()
             || V::has_cannons()
+            || V::has_flying_general()
             || V::supports_gating()
             || V::has_hand()
             || (V::has_placement() && self.state.placement.any(self.state.turn));
@@ -752,7 +753,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_placement_into(out);
         } else if V::multi_royal() {
             self.generate_multi_royal_into(out);
-        } else if V::has_cannons() {
+        } else if V::has_cannons() || V::has_flying_general() {
             self.generate_cannon_verify_into(out);
         } else {
             // The standard path with the gating / drop addenda a count sink
@@ -801,7 +802,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // verify each against the actual post-move occupancy. Gated behind
         // `has_cannons()` (default-off), so every other variant takes the standard
         // path below unchanged.
-        if V::has_cannons() {
+        // Cannon variants and the flying-general / flag-win variants (Synochess)
+        // share this per-move verify path: a flying-general confrontation is a
+        // king-danger source the mask path never computes, and the flag-rank
+        // ("campmate") rule forbids a king move that the standard generator would
+        // otherwise emit. Gated behind the default-off hooks, so every other
+        // variant takes the standard path below unchanged.
+        if V::has_cannons() || V::has_flying_general() {
             self.generate_cannon_verify_into(out);
             return;
         }
@@ -825,13 +832,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let them = us.opposite();
         let board = &self.board;
 
-        // Orda flag-win / campmate: if the opponent's king has already reached its
-        // goal rank, the side to move has lost and the node is terminal — no moves.
-        // Gated behind `has_flag_win()` (default-off), so every other variant skips
-        // the check and is byte-identical. This is the single chokepoint both the
+        // Flag-win / campmate (Orda's "flag", Synochess's "campmate" on the
+        // standard path): if the opponent's king has already reached its goal rank,
+        // the side to move has lost and the node is terminal — no moves. Gated
+        // behind `has_flag_win()` (default-off), so every other variant skips the
+        // check and is byte-identical. This is the single chokepoint both the
         // materialising generator and the bulk-count leaf path funnel through, so a
         // flag win terminates perft descent exactly as Fairy-Stockfish does.
-        if V::has_flag_win() && V::opponent_reached_flag(board, us) {
+        // `flag_win_reached(opp)` ≡ "the opponent's king is on its goal rank."
+        if V::has_flag_win() && self.flag_win_reached(us.opposite()) {
             return;
         }
 
@@ -1245,6 +1254,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         {
             return;
         }
+        // Flag-rank "campmate" (Synochess): if the opponent's king already stands
+        // on its goal rank, the opponent has won and the side to move has no legal
+        // continuation — Fairy-Stockfish returns zero here, so the node is a perft
+        // leaf. Gated behind `has_flag_win()` (default-off).
+        if V::has_flag_win() && self.flag_win_reached(us.opposite()) {
+            return;
+        }
         // A side whose king has been captured has no royal piece, so there is no
         // self-check to filter: every pseudo-legal move is "legal" (the side has
         // already lost, but perft still enumerates its continuations). Fairy-
@@ -1286,8 +1302,31 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let facing_check = V::restricts_facing_general() && generals_face::<G>(&self.board);
         let must_verify_all = in_check || facing_check;
 
+        // Flag-rank "campmate" (Synochess): a king may not step **onto** its own
+        // goal rank while the enemy king already occupies that rank (the flag is
+        // contested) — the only flag-rank king move then allowed is to capture the
+        // enemy king itself, which clears the contest. Precompute the contested
+        // flag rank once; `None` when the rule is off or the flag is uncontested.
+        // A move off the king lines can never be such a king move, so the
+        // fast-accept path stays correct.
+        let contested_flag_rank = self.contested_flag_rank(us);
+
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
+            if let Some(rank) = contested_flag_rank {
+                let to = mv.to::<G>();
+                if mv.from::<G>() == king
+                    && to.rank() == rank
+                    && self
+                        .board
+                        .piece_at(to)
+                        .is_none_or(|p| p.role != WideRole::King)
+                {
+                    // King stepping onto an empty/non-king square of the contested
+                    // flag rank: forbidden.
+                    return;
+                }
+            }
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
@@ -1295,6 +1334,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 out.push(mv);
             }
         });
+
+        // Synochess soldier-reinforcement drops: the side to move places a pocketed
+        // piece onto a permitted empty square. A drop only ever *adds* a friendly
+        // blocker, so it cannot expose the king to a slider; the sole legality
+        // concern is failing to resolve an existing check — including a
+        // flying-general confrontation, which `gen_hand_drops`' `attackers_to`
+        // mask does not see. So generate the pocket's drops, then keep each one
+        // that leaves the king safe under the same post-move verify the board moves
+        // use. Gated behind `has_hand()` (default-off), so no cannon-only variant
+        // emits drops.
+        if V::has_hand() {
+            let mut drops = WideMoveList::new();
+            self.gen_hand_drops(&mut drops);
+            drops.for_each(|mv| {
+                if scratch.cannon_move_is_legal(self, &mv, us, &attackers) {
+                    out.push(mv);
+                }
+            });
+        }
 
         // The Janggi pass: a legal null move that only flips the side to move.
         // Fairy-Stockfish counts it in perft and encodes it as the general "staying
@@ -1425,6 +1483,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return false;
         }
         true
+    }
+
+    /// Returns `true` if color `who` has a king standing on its flag
+    /// ("campmate") goal rank — the Synochess win condition. Only meaningful while
+    /// [`WideVariant::has_flag_win`] is `true`; the caller gates on it.
+    fn flag_win_reached(&self, who: Color) -> bool {
+        let rank = V::flag_rank(who);
+        self.board
+            .kings_of(who)
+            .into_iter()
+            .any(|k| k.rank() == rank)
+    }
+
+    /// Returns the flag goal rank of the side to move (`us`) when it is
+    /// **contested** — i.e. the enemy king already stands on it, so `us`'s king may
+    /// not step onto that rank (except to capture the enemy king there). Returns
+    /// `None` when the flag rule is off or the rank is uncontested.
+    fn contested_flag_rank(&self, us: Color) -> Option<u8> {
+        if !V::has_flag_win() {
+            return None;
+        }
+        let rank = V::flag_rank(us);
+        let enemy_on_rank = self
+            .board
+            .kings_of(us.opposite())
+            .into_iter()
+            .any(|k| k.rank() == rank);
+        enemy_on_rank.then_some(rank)
     }
 
     /// Returns `true` if, in this position, color `who` keeps at least one
@@ -2152,7 +2238,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // A hand variant (Shogi) banks the captured piece — flipped to the
                 // captor's side and reverted to its base role — before it is
                 // overwritten. Default-off, so inert for every other variant.
-                if V::has_hand() {
+                // Synochess has a hand but a fixed pocket (`captures_to_hand()` is
+                // `false`), so its captures bank nothing.
+                if V::has_hand() && V::captures_to_hand() {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state.placement.add(us, captured.role.promoted_base());
                     }
@@ -2218,8 +2306,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             WideMoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
                 // A hand variant (Shogi) banks the captured piece on a capturing
-                // promotion too. Default-off, so inert for every other variant.
-                if V::has_hand() && capture {
+                // promotion too. Default-off, so inert for every other variant
+                // (and for Synochess, whose fixed pocket never replenishes).
+                if V::has_hand() && V::captures_to_hand() && capture {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state.placement.add(us, captured.role.promoted_base());
                     }
@@ -2371,6 +2460,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if let Some(reason) = V::extra_terminal(&self.board, &self.state) {
             return Some(reason);
         }
+        // Flag-rank "campmate" (Synochess): a king on its goal rank is a win for
+        // that side, even though it is now the loser's turn. Gated behind
+        // `has_flag_win()` (default-off). Reported as a variant win; `outcome`
+        // resolves the winner from the board, since the campmate-reaching side is
+        // the side *not* to move.
+        if V::has_flag_win()
+            && (self.flag_win_reached(Color::White) || self.flag_win_reached(Color::Black))
+        {
+            return Some(WideEndReason::VariantWin);
+        }
         if self.legal_moves().is_empty() {
             if self.is_check() {
                 Some(WideEndReason::Checkmate)
@@ -2391,8 +2490,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             WideEndReason::Checkmate => WideOutcome::Decisive {
                 winner: self.state.turn.opposite(),
             },
-            WideEndReason::VariantWin => WideOutcome::Decisive {
-                winner: self.state.turn,
+            WideEndReason::VariantWin => {
+                // Flag-rank "campmate" (Synochess) is won by the side whose king
+                // stands on its goal rank — the side *not* to move. Other variant
+                // wins (reserved) credit the side to move.
+                let winner =
+                    if V::has_flag_win() && self.flag_win_reached(self.state.turn.opposite()) {
+                        self.state.turn.opposite()
+                    } else {
+                        self.state.turn
+                    };
+                WideOutcome::Decisive { winner }
+            }
+            // Stalemate is a loss for the side to move in variants that say so
+            // (Synochess); otherwise the usual draw.
+            WideEndReason::Stalemate if V::stalemate_is_loss() => WideOutcome::Decisive {
+                winner: self.state.turn.opposite(),
             },
             WideEndReason::Stalemate
             | WideEndReason::InsufficientMaterial

@@ -50,14 +50,14 @@ pub use position::{
     perft, perft_divide, GenericCastling, GenericGating, GenericPlacement, GenericPosition,
     GenericState, WideFenError, WideOutcome,
 };
-pub use role::WideRole;
+pub use role::{WideRole, OVERFLOW_PREFIX};
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
     Capablanca, CapablancaRules, Duck, DuckRules, Grand, GrandRules, Janggi, JanggiRules, Makruk,
     MakrukRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules,
     Seirawan, SeirawanRules, Shako, ShakoRules, Shogi, ShogiRules, Sittuyin, SittuyinRules,
-    Spartan, SpartanRules, Xiangqi, XiangqiRules,
+    Spartan, SpartanRules, Synochess, SynochessRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

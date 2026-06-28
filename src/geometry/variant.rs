@@ -486,6 +486,56 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Flag-rank "campmate" / flag win (default OFF) -------------------
+
+    /// Returns `true` if this variant is won when a king reaches the **opponent's
+    /// far rank** — the Synochess "campmate" and the Orda "flag". The default is
+    /// `false`; while it is `false` the engine never evaluates the flag rule, so
+    /// every other variant is byte-identical.
+    ///
+    /// When `true`, a king of color `c` that stands on
+    /// [`flag_rank(c)`](WideVariant::flag_rank) has won: on the **opponent's** turn
+    /// the move generator short-circuits to *zero moves* (the node is a perft leaf,
+    /// exactly as Fairy-Stockfish truncates it — the winner, on its **own** turn,
+    /// still has moves), and the win is reported as a
+    /// [`WideEndReason::VariantWin`](WideEndReason). This single hook serves both
+    /// flag variants regardless of which generator they ride: Orda is on the
+    /// standard single-king fast path and Synochess (with cannons + flying general)
+    /// on the per-move verify path, and each consults this gate on its own path.
+    ///
+    /// Synochess additionally forbids a king from **moving onto** its own flag rank
+    /// while the enemy king already occupies it (the flag is contested) — capturing
+    /// the enemy king there is the only flag-rank move then permitted; that
+    /// contested-flag restriction is enforced only on the verify path Synochess
+    /// already takes for its cannons / flying general, so it never affects Orda.
+    fn has_flag_win() -> bool {
+        false
+    }
+
+    /// The rank a king of `color` wins by reaching, when
+    /// [`has_flag_win`](WideVariant::has_flag_win) is `true`. The default is the
+    /// opponent's back rank — rank `HEIGHT-1` for White, rank `0` for Black — which
+    /// is both the Synochess "campmate" and the Orda "flag" goal, so neither
+    /// variant overrides it. Only consulted while `has_flag_win()`.
+    fn flag_rank(color: Color) -> u8 {
+        if color.is_white() {
+            G::HEIGHT - 1
+        } else {
+            0
+        }
+    }
+
+    /// Returns `true` if **stalemate is a loss** for the stalemated side rather
+    /// than a draw (Synochess `stalemateValue = loss`). The default is `false`
+    /// (the standard draw). This affects only the reported [outcome]; it has no
+    /// effect on move generation or perft, since a stalemated node already
+    /// generates zero moves regardless.
+    ///
+    /// [outcome]: super::position::GenericPosition::outcome
+    fn stalemate_is_loss() -> bool {
+        false
+    }
+
     // --- Janggi bikjang general-facing (default OFF) ----------------------
 
     /// Returns `true` if this variant restricts the **general's own move** when the
@@ -610,6 +660,19 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if a captured piece is **banked into the captor's hand**.
+    ///
+    /// Only consulted when [`has_hand`](WideVariant::has_hand) is `true`. The
+    /// default is `true` — the Shogi / crazyhouse rule, where a capture flips the
+    /// taken piece to the captor's side and adds it to the hand. Synochess sets a
+    /// hand for its **fixed** Black soldier reinforcement pocket, but that pocket
+    /// is never replenished (FSF `capturesToHand = false`): it overrides this to
+    /// `false` so a capture drops nothing into either hand. Keeping the default
+    /// `true` leaves every hand-banking site byte-identical for Shogi/crazyhouse.
+    fn captures_to_hand() -> bool {
+        true
+    }
+
     /// Returns the squares onto which `color` may **drop** a held `role`, given
     /// the current `board`. Only consulted when [`has_hand`](WideVariant::has_hand)
     /// is `true`.
@@ -709,45 +772,6 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// The default is `false`. Shogi overrides it: a Pawn or Lance on the last
     /// rank, and a Knight on the last two ranks, must promote.
     fn role_promotion_forced(_role: WideRole, _color: Color, _to_rank: u8) -> bool {
-        false
-    }
-
-    // --- Orda flag-win / campmate (default OFF) ---------------------------
-
-    /// Returns `true` if this variant ends the game the instant a **king reaches
-    /// the far rank** — the Orda "flag" / campmate rule: White wins when its king
-    /// reaches the last rank, Black when its king reaches the first rank
-    /// (`flagRegionWhite = *8`, `flagRegionBlack = *1` in Fairy-Stockfish).
-    ///
-    /// The default is `false`; while it is `false` the generic engine never
-    /// consults [`opponent_reached_flag`](WideVariant::opponent_reached_flag), so
-    /// the move generator produces children for every position exactly as before
-    /// and every other variant is byte-identical. When `true`, the **standard**
-    /// generator (Orda is on the single-king fast path) short-circuits to *zero
-    /// moves* at any node where the side to move has already lost — i.e. the
-    /// opponent's king sits on the opponent's goal rank — so a flag win terminates
-    /// perft descent move-for-move with FSF (which counts such a node as terminal
-    /// with no children). The winning side, on its **own** turn, still has moves:
-    /// FSF adjudicates the flag only when the *loser* is to move (`go perft` on
-    /// White-king-on-rank-8 / White-to-move keeps generating, but Black-to-move is
-    /// terminal). This hook expresses exactly that loser-to-move test.
-    fn has_flag_win() -> bool {
-        false
-    }
-
-    /// Returns `true` if, under the Orda flag rule, the side to move (`turn`) has
-    /// **already lost** because its opponent's king has reached the opponent's
-    /// goal rank — White's king on the last rank, Black's on the first. The side
-    /// to move then has no legal move and the node is terminal.
-    ///
-    /// Only consulted when [`has_flag_win`](WideVariant::has_flag_win) is `true`;
-    /// the default is `false` (never terminal by flag), so every other variant is
-    /// byte-identical. The winner, on its own move, is **not** caught here: the
-    /// test is purely "the *opponent* is on its goal rank," matching FSF's flag
-    /// adjudication, which fires only on the losing side's turn.
-    fn opponent_reached_flag(board: &Board<G>, turn: Color) -> bool {
-        let _ = board;
-        let _ = turn;
         false
     }
 

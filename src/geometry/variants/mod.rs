@@ -21,6 +21,7 @@ pub mod shako;
 pub mod shogi;
 pub mod sittuyin;
 pub mod spartan;
+pub mod synochess;
 pub mod xiangqi;
 
 pub use capablanca::{Capablanca, CapablancaRules};
@@ -36,4 +37,5 @@ pub use shako::{Shako, ShakoRules};
 pub use shogi::{Shogi, ShogiRules};
 pub use sittuyin::{Sittuyin, SittuyinRules};
 pub use spartan::{Spartan, SpartanRules};
+pub use synochess::{Synochess, SynochessRules};
 pub use xiangqi::{Xiangqi, XiangqiRules};

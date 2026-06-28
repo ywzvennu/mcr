@@ -39,8 +39,9 @@
 //! positional** — a king on its goal rank wins even while in check — and FSF
 //! adjudicates it on the **losing** side's turn: a node where the side to move's
 //! opponent already stands on its goal rank is terminal (no children), exactly as
-//! the [`WideVariant::has_flag_win`] / [`WideVariant::opponent_reached_flag`] hooks
-//! express. This is what makes mce's perft match FSF's `go perft` at a flag node.
+//! the [`WideVariant::has_flag_win`] / [`WideVariant::flag_rank`] hooks express
+//! (the engine's shared `flag_win_reached` test). This is what makes mce's perft
+//! match FSF's `go perft` at a flag node.
 //!
 //! ## Confirmed starting FEN
 //!
@@ -217,21 +218,10 @@ impl WideVariant<Chess8x8> for OrdaRules {
         true
     }
 
-    fn opponent_reached_flag(board: &Board<Chess8x8>, turn: Color) -> bool {
-        // The side to move has lost iff its opponent's king is on the opponent's
-        // goal rank: White's goal is the last rank (HEIGHT - 1), Black's is the
-        // first (rank 0). FSF adjudicates the flag on the loser's turn, so this is
-        // exactly "the opponent already reached its goal."
-        let opponent = turn.opposite();
-        let goal_rank = match opponent {
-            Color::White => Chess8x8::HEIGHT - 1,
-            Color::Black => 0,
-        };
-        board
-            .kings_of(opponent)
-            .into_iter()
-            .any(|sq| sq.rank() == goal_rank)
-    }
+    // The flag goal ranks (White's last rank, Black's first) are exactly the
+    // generic `flag_rank` default, so Orda does not override it: the engine's
+    // shared `flag_win_reached` check handles the loser-to-move termination on the
+    // standard single-king path.
 }
 
 /// Orda as a [`GenericPosition`] over the 8x8 [`Chess8x8`] geometry.

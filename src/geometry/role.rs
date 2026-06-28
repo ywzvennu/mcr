@@ -16,6 +16,14 @@
 
 use core::fmt;
 
+/// The FEN prefix marking an **overflow** role — a fairy role added after the
+/// single-letter alphabet (`a..=z`) was exhausted. The token is this prefix
+/// followed by a recycled base letter whose case carries the colour (e.g. `*U` /
+/// `*u` for the Synochess [`WideRole::Commoner`]). It is the overflow analogue of
+/// the `+` prefix the Shogi promoted roles use, and is reserved: no role's bare
+/// letter is `*`. See [`WideRole::is_overflow`].
+pub const OVERFLOW_PREFIX: char = '*';
+
 /// An extended piece role for the generic board.
 ///
 /// The discriminant doubles as the array index used by [`Board<G>`] for its
@@ -180,6 +188,26 @@ pub enum WideRole {
     /// `compare-fairy` harness maps it to FSF's `a` when driving Orda.
     Archer = 32,
 
+    // --- Synochess (§ Milestone 10, Fairy variants) ---
+    /// Commoner / Man — a non-royal piece that **moves and captures exactly like a
+    /// king** (one step in any of the eight directions) but may itself be captured.
+    /// This is Synochess's Black "Advisor", which — unlike the palace-confined
+    /// Xiangqi [`WideRole::Advisor`] (`u`) — roams the whole board. FSF spells it
+    /// `a` (already the Hawk here).
+    ///
+    /// The Commoner is the **first role past the single-letter alphabet**: by the
+    /// time it lands the Orda army has claimed the last free letters (`f y` plus
+    /// the reclaimed `w`), so every one of `a..=z` already names a role. Rather
+    /// than reshuffle the exhausted alphabet, the Commoner takes an **overflow FEN
+    /// token** — the prefix [`OVERFLOW_PREFIX`] (`*`) followed by a recycled base
+    /// letter that carries the colour via its case, exactly mirroring how the Shogi
+    /// promoted roles spell themselves with the `+` prefix (see
+    /// [`is_overflow`](WideRole::is_overflow) / [`overflow_base_char`](WideRole::overflow_base_char)).
+    /// The Commoner recycles the Advisor's base letter `u`, so its token is `*U`
+    /// (white) / `*u` (black); the `compare-fairy` harness maps `*u → a` when
+    /// driving Synochess.
+    Commoner = 33,
+
     // --- Shogi promoted pieces (§ Phase 3, Milestone 10) ---
     //
     // A promoted Shogi piece is a **distinct role** from its base: it keeps its
@@ -216,7 +244,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 33;
+    pub const COUNT: usize = 34;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -253,6 +281,7 @@ impl WideRole {
         WideRole::Lancer,
         WideRole::Kheshig,
         WideRole::Archer,
+        WideRole::Commoner,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -332,6 +361,14 @@ impl WideRole {
             WideRole::Lancer => 'f',
             WideRole::Kheshig => 'w',
             WideRole::Archer => 'y',
+            // Synochess commoner ("Advisor") — an overflow role past the exhausted
+            // single-letter alphabet. Its FEN token is the `*` prefix plus the
+            // recycled base letter `u` (the Advisor's), so `char()` returns the
+            // bare base letter and the board FEN I/O adds the `*` prefix — exactly
+            // as the Shogi promoted roles share a base letter under their `+`
+            // prefix. The `compare-fairy` harness maps `*u` to FSF's `a` when
+            // driving Synochess.
+            WideRole::Commoner => 'u',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -396,6 +433,50 @@ impl WideRole {
         }
     }
 
+    /// Returns `true` if this is an **overflow** role — a fairy role added after
+    /// the single-letter FEN alphabet (`a..=z`) was exhausted. Like a Shogi
+    /// promoted role it has **no bare letter of its own**: its FEN token is the
+    /// [`OVERFLOW_PREFIX`] (`*`) followed by a recycled base letter (returned by
+    /// [`char`](WideRole::char)) whose **case carries the colour**, and the board
+    /// FEN parser / writer handle the prefix (see [`overflow_base_char`] and
+    /// [`overflow_from_base`]).
+    ///
+    /// [`overflow_base_char`]: WideRole::overflow_base_char
+    /// [`overflow_from_base`]: WideRole::overflow_from_base
+    #[must_use]
+    #[inline]
+    pub const fn is_overflow(self) -> bool {
+        matches!(self, WideRole::Commoner)
+    }
+
+    /// For an overflow role, the **recycled base letter** its FEN token reuses
+    /// (the same value [`char`](WideRole::char) returns); for any other role,
+    /// `None`. The full token is [`OVERFLOW_PREFIX`] + this letter, the letter's
+    /// case encoding the colour.
+    #[must_use]
+    #[inline]
+    pub const fn overflow_base_char(self) -> Option<char> {
+        if self.is_overflow() {
+            Some(self.char())
+        } else {
+            None
+        }
+    }
+
+    /// Maps a recycled base letter (after an [`OVERFLOW_PREFIX`]) back to its
+    /// overflow role, returning `None` if the letter does not name one. The
+    /// inverse of [`overflow_base_char`](WideRole::overflow_base_char); used by
+    /// the board FEN parser when it sees a `*`-prefixed token. Accepts either
+    /// case (the case carries colour, handled by the caller).
+    #[must_use]
+    #[inline]
+    pub const fn overflow_from_base(ch: char) -> Option<WideRole> {
+        match ch.to_ascii_lowercase() {
+            'u' => Some(WideRole::Commoner),
+            _ => None,
+        }
+    }
+
     /// Returns the uppercase FEN/SAN character for this role.
     #[must_use]
     #[inline]
@@ -445,6 +526,10 @@ impl WideRole {
             'x' => Some(WideRole::JanggiElephant),
             'f' => Some(WideRole::Lancer),
             'y' => Some(WideRole::Archer),
+            // The Commoner has no bare single letter: it is an overflow role whose
+            // FEN token is `*u` (see `is_overflow` / `overflow_form`). Its base
+            // letter `u` deliberately still parses to the Advisor here; the board
+            // FEN parser resolves the `*` prefix to the overflow role.
             _ => None,
         }
     }
@@ -486,6 +571,7 @@ impl fmt::Display for WideRole {
             WideRole::Lancer => "lancer",
             WideRole::Kheshig => "kheshig",
             WideRole::Archer => "archer",
+            WideRole::Commoner => "commoner",
         })
     }
 }
@@ -533,9 +619,11 @@ mod tests {
         // promoted one — they are excluded from this round-trip.
         for role in WideRole::ALL {
             // The Shogi promoted roles share a base letter (handled by the `+`
-            // FEN prefix), and the Wazir is a letterless reserved census role
-            // (its `w` was reclaimed by the Orda Kheshig); both are excluded.
-            if role.is_promoted() || role == WideRole::Wazir {
+            // FEN prefix), the overflow roles share a recycled base letter
+            // (handled by the `*` prefix), and the Wazir is a letterless reserved
+            // census role (its `w` was reclaimed by the Orda Kheshig); all are
+            // excluded from the bare-letter round-trip.
+            if role.is_promoted() || role.is_overflow() || role == WideRole::Wazir {
                 continue;
             }
             let ch = role.char();
@@ -578,12 +666,13 @@ mod tests {
 
     #[test]
     fn named_role_chars_are_distinct() {
-        // Every non-promoted role names a distinct letter. The Shogi promoted
-        // roles deliberately reuse their base role's letter (FEN `+`-prefix), so
-        // they are excluded from the distinctness check.
+        // Every non-promoted, non-overflow role names a distinct letter. The Shogi
+        // promoted roles reuse their base role's letter (FEN `+`-prefix) and the
+        // overflow roles reuse a recycled base letter (FEN `*`-prefix), so both are
+        // excluded from the distinctness check.
         let chars: Vec<char> = WideRole::ALL
             .into_iter()
-            .filter(|r| !r.is_promoted())
+            .filter(|r| !r.is_promoted() && !r.is_overflow())
             .map(WideRole::char)
             .filter(|&c| c != '?')
             .collect();
@@ -591,5 +680,32 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), chars.len(), "role chars must be distinct");
+    }
+
+    #[test]
+    fn overflow_roles_round_trip_through_the_prefix_token() {
+        // An overflow role has no bare letter: its `char()` is a recycled base
+        // letter that still parses to the base role, while `overflow_from_base`
+        // maps that base letter back to the overflow role (what the board FEN
+        // parser does after a `*` prefix). The Commoner recycles the Advisor's `u`.
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow()) {
+            let base = role.overflow_base_char().expect("overflow role has a base");
+            assert_eq!(role.char(), base);
+            assert_ne!(base, '?', "overflow base letter is real");
+            // The bare base letter parses to the *base* role, not the overflow one.
+            assert_ne!(WideRole::from_char(base), Some(role));
+            // The prefix-resolver maps the base letter (either case) to the role.
+            assert_eq!(WideRole::overflow_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+        }
+        // The Commoner is the only overflow role today, spelled `*u`.
+        assert!(WideRole::Commoner.is_overflow());
+        assert_eq!(WideRole::Commoner.char(), 'u');
+        assert_eq!(WideRole::overflow_from_base('u'), Some(WideRole::Commoner));
+        // A base letter that names no overflow role yields `None`.
+        assert_eq!(WideRole::overflow_from_base('p'), None);
     }
 }
