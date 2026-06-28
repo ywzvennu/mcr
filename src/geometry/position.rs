@@ -623,11 +623,70 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         out
     }
 
-    /// Returns the number of legal moves (perft depth-1 leaf count). Materializes
-    /// the list; correctness-first.
+    /// Returns the number of legal moves (perft depth-1 leaf count).
+    ///
+    /// On the **standard single-king path** (every variant whose legality is the
+    /// default king-safety discipline: standard chess, Makruk, Capablanca, Grand,
+    /// …) this counts the legal moves *without materialising them* — the same bulk
+    /// leaf-count the concrete engine uses at a perft leaf, where each per-target
+    /// loop collapses to a population count. The result is exactly
+    /// `legal_moves().len()` because the standard generator only ever pushes legal
+    /// moves (no post-filter). The variant paths that filter pseudo-legal moves
+    /// (multi-royal, cannon) or read the buffer back (Seirawan gating) cannot be
+    /// bulk-counted soundly, so they materialise into a reusable list and return
+    /// its length — byte-identical to before.
     #[must_use]
     pub fn legal_move_count(&self) -> usize {
-        self.legal_moves().len()
+        if self.uses_standard_path() {
+            let mut sink = WideCountSink::default();
+            self.generate_standard_into(&mut sink);
+            sink.count() as usize
+        } else {
+            let mut list = WideMoveList::new();
+            self.generate_special_into(&mut list);
+            list.len()
+        }
+    }
+
+    /// Returns `true` if this position takes the **standard single-king
+    /// legality fast path** — the path on which every pushed move is already
+    /// legal, so the move set may be bulk-counted without materialising it.
+    ///
+    /// This is the negation of every default-off variant hook that diverts
+    /// [`generate_into`](Self::generate_into) to a special generator (duck,
+    /// active placement phase, multi-royal, cannon) or that adds moves a count
+    /// sink cannot tally by population count (Seirawan gating, variant drops).
+    /// For standard chess and every standard-king-safety variant it is `true`.
+    #[inline]
+    fn uses_standard_path(&self) -> bool {
+        let special = V::has_duck()
+            || V::multi_royal()
+            || V::has_cannons()
+            || V::supports_gating()
+            || (V::has_placement() && self.state.placement.any(self.state.turn));
+        !special
+    }
+
+    /// Drives the generator into `out` for a variant **not** on the standard
+    /// path. Mirrors [`generate_into`](Self::generate_into)'s dispatch but is
+    /// generic over the destination buffer (`Vec<WideMove>` or [`WideMoveList`]),
+    /// so the reusable-buffer perft recursion can reuse one allocation across
+    /// sibling nodes for these variants too. Never reached on the standard path.
+    fn generate_special_into<S: WideSink>(&self, out: &mut S) {
+        if V::has_duck() {
+            self.generate_duck_into(out);
+        } else if V::has_placement() && self.state.placement.any(self.state.turn) {
+            self.generate_placement_into(out);
+        } else if V::multi_royal() {
+            self.generate_multi_royal_into(out);
+        } else if V::has_cannons() {
+            self.generate_cannon_verify_into(out);
+        } else {
+            // The standard path with the gating / drop addenda a count sink
+            // cannot tally; materialise it through the same body the public
+            // `generate_into` uses.
+            self.generate_standard_into(out);
+        }
     }
 
     /// Pushes every legal move into `out`.
@@ -673,6 +732,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_cannon_verify_into(out);
             return;
         }
+        self.generate_standard_into(out);
+    }
+
+    /// The **standard single-king** move generator, generic over the destination
+    /// [`WideSink`] (`Vec<WideMove>` / [`WideMoveList`] to materialise, or
+    /// [`WideCountSink`] to bulk-count at a perft leaf).
+    ///
+    /// Every move this pushes is already legal — the king-danger map, check mask,
+    /// and pin lines confine each piece's targets before they are emitted, so the
+    /// list never needs a post-filter. That invariant is what makes the bulk count
+    /// sound: through a [`WideCountSink`] each `emit_targets` collapses to a
+    /// population count, yielding exactly `legal_moves().len()` without building a
+    /// single move. It is reached only on the standard path (see
+    /// [`uses_standard_path`](Self::uses_standard_path)); the gating / drop addenda
+    /// at the tail are inert there and only fire on the materialising fallthrough.
+    fn generate_standard_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         let them = us.opposite();
         let board = &self.board;
@@ -697,7 +772,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // check).
         let king_targets =
             V::role_attacks(WideRole::King, us, king_sq, occupied) & !our_pieces & !king_danger;
-        emit_targets(out, king_sq, king_targets, their_pieces);
+        out.emit_targets(king_sq, king_targets, their_pieces);
 
         if num_checkers >= 2 {
             // Double check: only king moves are legal.
@@ -717,16 +792,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let pins = self.compute_pins(king_sq, us, them, occupied);
 
         // Every non-king, non-pawn role: its attack set minus friendly pieces,
-        // confined by the check mask and (if pinned) its pin line.
+        // confined by the check mask and (if pinned) its pin line. Roles the
+        // variant does not field have an empty piece mask, so their loop body
+        // never runs — the `is_empty` guard skips the per-role `role_attacks`
+        // dispatch and (for a count sink) keeps the inner loop branch-light.
         for role in WideRole::ALL {
             if role == WideRole::King || role == WideRole::Pawn {
                 continue;
             }
-            for from in board.pieces(us, role) {
+            let pieces = board.pieces(us, role);
+            if pieces.is_empty() {
+                continue;
+            }
+            for from in pieces {
                 let pin_line = pins.line_of(from);
                 let targets =
                     V::role_attacks(role, us, from, occupied) & !our_pieces & check_mask & pin_line;
-                emit_targets(out, from, targets, their_pieces);
+                out.emit_targets(from, targets, their_pieces);
                 // Quiet-only steps: squares a piece may move to but never capture
                 // on — the cannon's empty rook-rays (its captures are the
                 // over-screen `role_attacks` set above), and the Spartan
@@ -774,7 +856,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// the enemy king, which is the win). After the base move, the **Duck** is
     /// moved to any square that is then empty and different from where it sits
     /// now, forming the second half of the one ply.
-    fn generate_duck_into(&self, out: &mut Vec<WideMove>) {
+    fn generate_duck_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         let board = &self.board;
         // If the side to move has no king, its king was captured on the previous
@@ -872,7 +954,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
             for from in board.pieces(us, role) {
                 let targets = V::role_attacks(role, us, from, occupied) & !our_pieces & not_duck;
-                emit_targets(base, from, targets, their_pieces);
+                base.emit_targets(from, targets, their_pieces);
             }
         }
 
@@ -903,23 +985,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// the move," which the [`Self::royals_survive`] predicate tests on the
     /// applied position. This unifies both colours: white (one king) reduces to
     /// the standard "king not in check," black (two kings) to "not duple check."
-    fn generate_multi_royal_into(&self, out: &mut Vec<WideMove>) {
+    fn generate_multi_royal_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         // A side with no kings has already lost (its last king was captured on the
         // previous ply): no moves.
         if self.board.kings_of(us).is_empty() {
             return;
         }
-        let mut pseudo = Vec::new();
+        // Pseudo-legal moves into a stack-backed buffer (no per-node heap
+        // allocation), then verified one at a time.
+        let mut pseudo = WideMoveList::new();
         self.gen_multi_royal_pseudo(&mut pseudo, us);
-        for mv in pseudo {
+        pseudo.for_each(|mv| {
             let mut next = self.clone();
             next.apply(&mv);
             // `apply` flipped the side to move; test our (now non-to-move) kings.
             if next.royals_survive(us) {
                 out.push(mv);
             }
-        }
+        });
     }
 
     /// Generates every legal move for a **cannon** variant (Shako) via
@@ -933,14 +1017,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// true post-move occupancy. This is the only sound way to handle a cannon's
     /// screen-dependent check and king-danger; gated behind `has_cannons()`, so it
     /// never runs for a non-cannon variant.
-    fn generate_cannon_verify_into(&self, out: &mut Vec<WideMove>) {
+    fn generate_cannon_verify_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         if self.board.king_of(us).is_none() {
             return;
         }
-        let mut pseudo = Vec::new();
+        let mut pseudo = WideMoveList::new();
         self.gen_multi_royal_pseudo(&mut pseudo, us);
-        for mv in pseudo {
+        pseudo.for_each(|mv| {
             let mut next = self.clone();
             next.apply(&mv);
             // `apply` flipped the side to move; our king is now the non-mover's.
@@ -952,7 +1036,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     out.push(mv);
                 }
             }
-        }
+        });
     }
 
     /// Returns `true` if, in this position, color `who` keeps at least one
@@ -974,7 +1058,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// (no self-check filtering — that is done by the caller per move). Kings,
     /// every other piece, the Berolina/standard pawns, and castling are all
     /// emitted with a full board mask and no pins.
-    fn gen_multi_royal_pseudo(&self, pseudo: &mut Vec<WideMove>, us: Color) {
+    fn gen_multi_royal_pseudo<S: WideSink>(&self, pseudo: &mut S, us: Color) {
         let board = &self.board;
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
@@ -989,7 +1073,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
             for from in board.pieces(us, role) {
                 let targets = V::role_attacks(role, us, from, occupied) & !our_pieces;
-                emit_targets(pseudo, from, targets, their_pieces);
+                pseudo.emit_targets(from, targets, their_pieces);
                 // Quiet-only steps (the Spartan Lieutenant's sideways slide): a
                 // move onto an empty square that can never capture. Default-empty,
                 // so inert for every other role/variant.
@@ -1038,9 +1122,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// filters each move for self-check), so this stays a pure pseudo-legal
     /// emitter there.
     #[allow(clippy::too_many_arguments)]
-    fn gen_berolina_moves(
+    fn gen_berolina_moves<S: WideSink>(
         &self,
-        out: &mut Vec<WideMove>,
+        out: &mut S,
         us: Color,
         occupied: Bitboard<G>,
         their_pieces: Bitboard<G>,
@@ -1096,8 +1180,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// Emits a pawn/Hoplite move to `to`, expanding to the promotion roles when
     /// `to` is in the promotion zone, otherwise a single quiet or capture move.
-    fn emit_pawn_dest(
-        out: &mut Vec<WideMove>,
+    fn emit_pawn_dest<S: WideSink>(
+        out: &mut S,
         from: Square<G>,
         to: Square<G>,
         promo_roles: &[WideRole],
@@ -1120,8 +1204,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     }
 
     /// Appends any variant drop moves (reserved; standard chess emits none).
-    fn append_drops(&self, out: &mut Vec<WideMove>) {
-        V::emit_drops(&self.board, &self.state, out);
+    ///
+    /// The [`WideVariant::emit_drops`] hook writes into a `Vec<WideMove>`; no
+    /// variant overrides it yet, so the temporary is always empty and this is a
+    /// no-op on every path (the standard generator's [`WideSink`] never sees a
+    /// drop). When a drop variant lands, its moves are forwarded into the sink.
+    fn append_drops<S: WideSink>(&self, out: &mut S) {
+        let mut drops: Vec<WideMove> = Vec::new();
+        V::emit_drops(&self.board, &self.state, &mut drops);
+        for mv in drops {
+            out.push(mv);
+        }
     }
 
     /// Generates the side-to-move's **placement-phase** drops (Sittuyin): for
@@ -1130,7 +1223,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// during placement, so the drops are emitted directly. Only reached while
     /// [`WideVariant::has_placement`] is `true` and the side's pocket is
     /// non-empty.
-    fn generate_placement_into(&self, out: &mut Vec<WideMove>) {
+    fn generate_placement_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
         for role in WideRole::ALL {
             if self.state.placement.count(us, role) == 0 {
@@ -1151,7 +1244,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// The base moves stay in the list (gating is optional), so this only *adds*
     /// the gated alternatives. It reads only the eligible set and the reserves
     /// from the gating state.
-    fn append_gating_moves(&self, out: &mut Vec<WideMove>, us: Color) {
+    fn append_gating_moves<S: WideSink>(&self, out: &mut S, us: Color) {
         let gating = self.state.gating;
         if !gating.any_reserve(us) {
             return;
@@ -1169,7 +1262,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // are gating candidates (we must not gate an already-gated move).
         let base_len = out.len();
         for i in 0..base_len {
-            let mv = out[i];
+            let mv = out.get(i);
             if mv.is_castle() {
                 // Castling vacates the king origin (mv.from) and the rook origin.
                 let king_from = mv.from::<G>();
@@ -1208,9 +1301,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// diagonal captures, en passant, and promotions, under the check mask and
     /// pins.
     #[allow(clippy::too_many_arguments)]
-    fn gen_pawn_moves(
+    fn gen_pawn_moves<S: WideSink>(
         &self,
-        out: &mut Vec<WideMove>,
+        out: &mut S,
         us: Color,
         occupied: Bitboard<G>,
         their_pieces: Bitboard<G>,
@@ -1396,9 +1489,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Generates standard castling moves (king on the home e-file, rook on its
     /// recorded start file), gated by the not-in-check / clear-path / safe-walk
     /// conditions.
-    fn gen_castles(
+    fn gen_castles<S: WideSink>(
         &self,
-        out: &mut Vec<WideMove>,
+        out: &mut S,
         us: Color,
         occupied: Bitboard<G>,
         king_danger: Bitboard<G>,
@@ -1513,17 +1606,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         match mv.kind() {
             WideMoveKind::Quiet => {
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                // `from` holds `moving` and `to` is empty (a quiet move never
+                // lands on a piece), so the masks can be edited directly without
+                // re-scanning either square for an occupant.
+                self.board.remove_known(from, moving);
+                self.board.set_empty(to, moving);
             }
             WideMoveKind::Capture => {
                 reset_clock = true;
-                self.board.remove_piece(from);
+                // `to` holds the captured enemy, so `set_piece` clears it first;
+                // `from`'s occupant is the known `moving` piece.
+                self.board.remove_known(from, moving);
                 self.board.set_piece(to, moving);
             }
             WideMoveKind::DoublePawnPush => {
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                self.board.remove_known(from, moving);
+                self.board.set_empty(to, moving);
                 // The ep target is the square the pawn skipped.
                 let mid = if us.is_white() {
                     from.offset(0, 1)
@@ -1534,10 +1632,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
             WideMoveKind::EnPassant => {
                 reset_clock = true;
-                self.board.remove_piece(from);
-                self.board.set_piece(to, moving);
+                // The ep landing square is empty (the enemy pawn skipped it); the
+                // captured pawn sits on `to`'s file at `from`'s rank and is a known
+                // enemy pawn, so it too can be cleared without a scan.
+                self.board.remove_known(from, moving);
+                self.board.set_empty(to, moving);
                 if let Some(captured) = Square::<G>::from_file_rank(to.file(), from.rank()) {
-                    self.board.remove_piece(captured);
+                    self.board
+                        .remove_known(captured, WidePiece::new(them, WideRole::Pawn));
                 }
             }
             WideMoveKind::CastleKingside | WideMoveKind::CastleQueenside => {
@@ -1560,15 +1662,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 let rook_to = Square::<G>::from_file_rank(rook_dest_file, rank)
                     .expect("rook dest file is on the board");
                 let rook = WidePiece::new(us, WideRole::Rook);
-                self.board.remove_piece(from);
-                self.board.remove_piece(rook_from);
+                // Both origins hold their known pieces (the king `moving` and the
+                // rook); clear them by mask. The destinations are set with the
+                // scanning `set_piece` since on some castle geometries a dest may
+                // coincide with the other piece's just-cleared origin.
+                self.board.remove_known(from, moving);
+                self.board.remove_known(rook_from, rook);
                 self.board.set_piece(to, moving);
                 self.board.set_piece(rook_to, rook);
                 castle_rook_from = Some(rook_from);
             }
             WideMoveKind::Promotion { role, capture } => {
                 reset_clock = capture || is_pawn_move;
-                self.board.remove_piece(from);
+                // `from` holds the known promoting pawn (`moving`); `to` may hold a
+                // captured enemy (capturing promotion), so it keeps `set_piece`.
+                self.board.remove_known(from, moving);
                 self.board.set_piece(to, WidePiece::new(us, role));
             }
             WideMoveKind::Drop { .. } => {
@@ -1881,11 +1989,226 @@ pub enum WideOutcome {
     Draw,
 }
 
+// -- Move sink (materialise vs bulk-count) ----------------------------------
+
+/// The destination for the standard generator's emitted moves.
+///
+/// The generic analogue of the concrete [`MoveSink`](crate::position): the
+/// standard single-king generator pushes each candidate move into a sink rather
+/// than a fixed buffer, so one generator body serves both the *materialising*
+/// callers (a `Vec<WideMove>` or a stack-backed [`WideMoveList`], which record
+/// every move) and the *bulk leaf-counting* caller a perft leaf wants
+/// ([`WideCountSink`], which only tallies how many moves there are). Because a
+/// perft leaf needs the *number* of legal moves and never the moves themselves,
+/// the counting sink replaces each per-target loop with a single population
+/// count, skipping move construction entirely.
+///
+/// Every implementor must treat [`emit_targets`](WideSink::emit_targets)
+/// identically in *count*: it is exactly `targets.count()` single moves, one per
+/// set bit. The default body materialises; [`WideCountSink`] overrides it with
+/// the population count. `len` / `get` are needed only by the Seirawan gating
+/// pass, which reads the base moves back by index; the count sink never reaches
+/// that path, so its `get` is `unreachable!`.
+pub(crate) trait WideSink {
+    /// Records a single fully-formed move.
+    fn push(&mut self, mv: WideMove);
+
+    /// Records one move from `from` to each square in `targets`, tagging each as
+    /// a [`Capture`](WideMoveKind::Capture) when the target is in `their_pieces`
+    /// and [`Quiet`](WideMoveKind::Quiet) otherwise.
+    ///
+    /// The materialising sinks iterate the targets and build a [`WideMove`] per
+    /// bit; the counting sink replaces the whole loop with one population count
+    /// (the capture/quiet split does not change *how many* moves there are) — the
+    /// core of the perft bulk-count speedup.
+    #[inline]
+    fn emit_targets<G: Geometry>(
+        &mut self,
+        from: Square<G>,
+        targets: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+    ) {
+        for to in targets {
+            let kind = if their_pieces.contains(to) {
+                WideMoveKind::Capture
+            } else {
+                WideMoveKind::Quiet
+            };
+            self.push(WideMove::new(from, to, kind));
+        }
+    }
+
+    /// The number of moves recorded so far (the gating pass's base-move count).
+    fn len(&self) -> usize;
+
+    /// The move at `index` (the gating pass reads the base moves back by index).
+    fn get(&self, index: usize) -> WideMove;
+}
+
+impl WideSink for Vec<WideMove> {
+    #[inline]
+    fn push(&mut self, mv: WideMove) {
+        Vec::push(self, mv);
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+    #[inline]
+    fn get(&self, index: usize) -> WideMove {
+        self[index]
+    }
+}
+
+/// A [`WideSink`] that only counts the moves it is given, never materialising
+/// any — the bulk leaf-counting destination for perft at depth 1 on the standard
+/// single-king path.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct WideCountSink {
+    count: u64,
+}
+
+impl WideCountSink {
+    /// The number of moves recorded so far.
+    #[inline]
+    fn count(self) -> u64 {
+        self.count
+    }
+}
+
+impl WideSink for WideCountSink {
+    #[inline]
+    fn push(&mut self, _mv: WideMove) {
+        self.count += 1;
+    }
+    #[inline]
+    fn emit_targets<G: Geometry>(
+        &mut self,
+        _from: Square<G>,
+        targets: Bitboard<G>,
+        _their_pieces: Bitboard<G>,
+    ) {
+        // The whole per-target loop collapses to a single population count.
+        self.count += u64::from(targets.count());
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        self.count as usize
+    }
+    fn get(&self, _index: usize) -> WideMove {
+        // Reached only by the Seirawan gating pass, which never runs on the
+        // standard path a count sink drives.
+        unreachable!("a counting sink never materialises moves to read back")
+    }
+}
+
+/// A fixed-capacity, stack-backed list of [`WideMove`]s with heap spill on
+/// overflow — the generic analogue of the concrete [`MoveList`](crate::position),
+/// so the reusable-buffer perft recursion allocates no per-node `Vec`.
+///
+/// Move generation runs once per perft node; collecting each node's moves into a
+/// fresh `Vec<WideMove>` is a heap allocation (and free) at every node. This
+/// stores the first [`WideMoveList::INLINE`] moves in an inline `[WideMove; N]`
+/// array with a length cursor and spills any overflow to a heap `Vec`, so the
+/// common path is allocation-free. Standard chess has a proven 218-move maximum;
+/// the large-board variants stay well under the inline capacity, and the spill
+/// keeps the type total and safe for any adversarial position. A [`WideMove`] is
+/// a `Copy` `u64`, so the buffer needs no `unsafe`, no `MaybeUninit`: the inline
+/// tail is value-initialised with a sentinel that is never read (only the first
+/// `inline_len` slots are exposed, each overwritten by a real push first).
+#[derive(Clone)]
+pub(crate) struct WideMoveList {
+    inline: [WideMove; Self::INLINE],
+    inline_len: usize,
+    spill: Vec<WideMove>,
+}
+
+impl WideMoveList {
+    /// The inline capacity. Covers the 218-move standard-chess maximum and the
+    /// large-board variants' move counts with margin; rare overflow spills.
+    pub(crate) const INLINE: usize = 256;
+
+    /// A sentinel used to value-initialise the unused inline tail; never read.
+    const NULL: WideMove = WideMove::null();
+
+    /// An empty list.
+    #[inline]
+    pub(crate) fn new() -> WideMoveList {
+        WideMoveList {
+            inline: [Self::NULL; Self::INLINE],
+            inline_len: 0,
+            spill: Vec::new(),
+        }
+    }
+
+    /// The number of moves in the list (inline plus spill).
+    #[inline]
+    pub(crate) fn len(&self) -> usize {
+        self.inline_len + self.spill.len()
+    }
+
+    /// Removes all moves, keeping the spill allocation for reuse.
+    #[inline]
+    pub(crate) fn clear(&mut self) {
+        self.inline_len = 0;
+        self.spill.clear();
+    }
+
+    /// Calls `f` on each move in push order. On the common path (no spill) this
+    /// is a tight loop over one contiguous slice — the shape the perft inner loop
+    /// wants.
+    #[inline]
+    pub(crate) fn for_each(&self, mut f: impl FnMut(WideMove)) {
+        for &mv in &self.inline[..self.inline_len] {
+            f(mv);
+        }
+        for &mv in &self.spill {
+            f(mv);
+        }
+    }
+}
+
+impl WideSink for WideMoveList {
+    #[inline]
+    fn push(&mut self, mv: WideMove) {
+        if self.inline_len < Self::INLINE {
+            self.inline[self.inline_len] = mv;
+            self.inline_len += 1;
+        } else {
+            self.spill.push(mv);
+        }
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        WideMoveList::len(self)
+    }
+    #[inline]
+    fn get(&self, index: usize) -> WideMove {
+        if index < self.inline_len {
+            self.inline[index]
+        } else {
+            self.spill[index - self.inline_len]
+        }
+    }
+}
+
+/// The inline capacity of [`Pins`]: at most one pin per king ray (≤ 8 rays), so
+/// sixteen slots cover every position with margin and the line array never spills.
+const PINS_INLINE: usize = 16;
+
 /// The pinned pieces of the side to move and, per pinned piece, the line it is
-/// confined to. Recorded inline (no allocation per node beyond this small vec).
+/// confined to.
+///
+/// Recorded **inline** with no per-node heap allocation: a king has at most eight
+/// ray directions and a ray can pin at most one piece, so a position has at most
+/// eight pinned pieces; the [`INLINE`](Pins::INLINE) array of sixteen covers that
+/// with margin. The `pinned` bitboard answers "is this piece pinned?" in one mask
+/// test before the (tiny, bounded) linear scan for its line. The empty-pins case
+/// (the common one) touches neither the array nor a scan.
 struct Pins<G: Geometry> {
     pinned: Bitboard<G>,
-    lines: Vec<(Square<G>, Bitboard<G>)>,
+    lines: [(Square<G>, Bitboard<G>); PINS_INLINE],
+    len: usize,
     king_sq: Square<G>,
 }
 
@@ -1893,23 +2216,31 @@ impl<G: Geometry> Pins<G> {
     fn empty(king_sq: Square<G>) -> Pins<G> {
         Pins {
             pinned: Bitboard::EMPTY,
-            lines: Vec::new(),
+            // A king square is a valid sentinel for the unused tail; never read
+            // (only the first `len` entries, each written before any read).
+            lines: [(king_sq, Bitboard::FULL); PINS_INLINE],
+            len: 0,
             king_sq,
         }
     }
 
     fn add(&mut self, square: Square<G>, l: Bitboard<G>) {
         self.pinned.set(square);
-        self.lines.push((square, l));
+        if self.len < PINS_INLINE {
+            self.lines[self.len] = (square, l);
+            self.len += 1;
+        }
     }
 
     /// The line a piece is confined to: its pin line if pinned, else the full
-    /// board (unconfined).
+    /// board (unconfined). The `pinned` mask short-circuits the unpinned common
+    /// case before the bounded scan.
+    #[inline]
     fn line_of(&self, square: Square<G>) -> Bitboard<G> {
         if !self.pinned.contains(square) {
             return Bitboard::FULL;
         }
-        for &(sq, l) in &self.lines {
+        for &(sq, l) in &self.lines[..self.len] {
             if sq == square {
                 return l;
             }
@@ -1917,24 +2248,6 @@ impl<G: Geometry> Pins<G> {
         // Should be unreachable: `pinned` and `lines` stay in sync.
         let _ = self.king_sq;
         Bitboard::FULL
-    }
-}
-
-/// Emits one move per target square from `from`, tagging captures by whether the
-/// target holds an enemy piece.
-fn emit_targets<G: Geometry>(
-    out: &mut Vec<WideMove>,
-    from: Square<G>,
-    targets: Bitboard<G>,
-    their_pieces: Bitboard<G>,
-) {
-    for to in targets {
-        let kind = if their_pieces.contains(to) {
-            WideMoveKind::Capture
-        } else {
-            WideMoveKind::Quiet
-        };
-        out.push(WideMove::new(from, to, kind));
     }
 }
 
@@ -1948,27 +2261,77 @@ fn back_rank<G: Geometry>(color: Color) -> u8 {
     }
 }
 
+impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+    /// Generates every legal move into a stack-backed [`WideMoveList`], dispatching
+    /// to the standard or the special generator exactly as
+    /// [`generate_into`](Self::generate_into) does. The reusable-buffer perft
+    /// recursion fills one such list per ply and reuses it across sibling nodes,
+    /// so it allocates no per-node `Vec`.
+    #[inline]
+    fn generate_list(&self, out: &mut WideMoveList) {
+        if self.uses_standard_path() {
+            self.generate_standard_into(out);
+        } else {
+            self.generate_special_into(out);
+        }
+    }
+}
+
 // -- Free perft functions ---------------------------------------------------
 
 /// Counts the leaf nodes of the legal-move game tree below `position` at the
 /// given `depth` — the generic analogue of [`crate::perft`].
 ///
-/// `perft(pos, 0) == 1`. Correctness-first: it materializes the move list at
-/// every interior node and recurses; the concrete engine's bulk-count and
-/// stack-buffer optimizations are deferred to a later perf pass.
+/// `perft(pos, 0) == 1`. The recursion runs **allocation-free**: each interior
+/// ply fills one caller-owned stack-backed [`WideMoveList`] and reuses it across
+/// every sibling node it visits, and the leaf ply (`depth == 1`) is **bulk
+/// leaf-counted** — the legal moves are tallied by population count through a
+/// [`WideCountSink`] without ever being materialised (on the standard
+/// single-king path; the variant filter paths fall back to counting a reused
+/// list). The node counts are byte-identical to the correctness-first reference;
+/// only the cost changes.
 #[must_use]
 pub fn perft<G: Geometry, V: WideVariant<G>>(position: &GenericPosition<G, V>, depth: u32) -> u64 {
     if depth == 0 {
         return 1;
     }
-    let moves = position.legal_moves();
+    // One move buffer per ply, threaded down the recursion and reused across
+    // sibling nodes; standard positions never spill, so this allocates nothing
+    // below the root.
+    let mut buf = WideMoveList::new();
+    perft_inner(position, depth, &mut buf)
+}
+
+/// Recursive core of [`perft`]. The caller owns `buf` (this ply's move buffer)
+/// and reuses it across sibling nodes; each frame creates one child buffer on its
+/// own stack and threads it down.
+fn perft_inner<G: Geometry, V: WideVariant<G>>(
+    position: &GenericPosition<G, V>,
+    depth: u32,
+    buf: &mut WideMoveList,
+) -> u64 {
+    // Bulk leaf counting: at the last ply perft wants only *how many* legal moves
+    // there are, so count them directly (population counts over the generators'
+    // target masks) instead of building each move and taking the length.
+    // `legal_move_count()` drives the identical legal generator, so the count
+    // equals `legal_moves().len()` exactly.
     if depth == 1 {
-        return moves.len() as u64;
+        return position.legal_move_count() as u64;
     }
+    buf.clear();
+    position.generate_list(buf);
+    if depth == 2 {
+        // Every child is a leaf: bulk-count it directly, no child buffer needed.
+        let mut nodes = 0;
+        buf.for_each(|mv| nodes += position.play(&mv).legal_move_count() as u64);
+        return nodes;
+    }
+    // One child buffer on this frame's stack, reused for every child node.
+    let mut child = WideMoveList::new();
     let mut nodes = 0;
-    for mv in moves {
-        nodes += perft(&position.play(&mv), depth - 1);
-    }
+    buf.for_each(|mv| {
+        nodes += perft_inner(&position.play(&mv), depth - 1, &mut child);
+    });
     nodes
 }
 

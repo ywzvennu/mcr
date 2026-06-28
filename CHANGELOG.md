@@ -44,6 +44,13 @@ or published; everything below is unreleased and the public API may change.
 - Stack-allocated `MoveList`, allocation-free perft, packed 16-bit `Move`,
   compact `Position`, fast-legality generators for every variant, perft bulk
   leaf-counting, and bulk bitboard-shift pawn/king-danger generation.
+- Generic large-board engine (`GenericPosition<G, V>`) tuning: a stack-backed
+  reusable move buffer with allocation-free perft, perft bulk leaf-counting on
+  the standard single-king path (population counts in place of materialised move
+  lists), a scan-free make-move board mutation, closed-form / fill-based slider
+  line masks in place of per-square ray walks, and an inline pin set. The large
+  board variants stay perft byte-identical while running materially faster — the
+  10×8 Capablanca / 10×10 Grand / Shako hot paths.
 - Optional `magic` cargo feature: magic-bitboard sliders (default build keeps
   the lean hyperbola tables). With `magic`, move generation outperforms the
   reference engine on every variant while the default build stays the leaner of

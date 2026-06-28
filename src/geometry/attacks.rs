@@ -133,38 +133,86 @@ pub fn king_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
 // ---------------------------------------------------------------------------
 
 /// The full file through `sq` (every square sharing its file).
+///
+/// Computed by arithmetic, not a per-rank loop: the first-file mask
+/// ([`Geometry::FILE_A_MASK`], one bit per rank) shifted left by the file index
+/// places one bit on every rank of `sq`'s file. The hot slider path calls this
+/// once per rook/queen/elephant per node, so the closed form matters.
+#[inline]
 fn file_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
-    let file = sq.file();
-    let mut bb = Bitboard::EMPTY;
-    let mut rank = 0u8;
-    while rank < G::HEIGHT {
-        bb.set(Square::new(rank * G::WIDTH + file));
-        rank += 1;
-    }
-    bb
+    Bitboard(G::FILE_A_MASK) << sq.file() as u32
 }
 
 /// The full rank through `sq` (every square sharing its rank).
+///
+/// Computed by arithmetic: a contiguous run of the `WIDTH` low bits (the first
+/// rank) shifted up to `sq`'s rank, with no per-file loop. The first-rank run is
+/// derived once from the geometry's width.
+#[inline]
 fn rank_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
-    let rank = sq.rank();
-    let mut bb = Bitboard::EMPTY;
-    let mut file = 0u8;
-    while file < G::WIDTH {
-        bb.set(Square::new(rank * G::WIDTH + file));
-        file += 1;
-    }
-    bb
+    let first_rank = Bitboard::<G>(first_rank_mask::<G>());
+    first_rank << (sq.rank() as u32 * G::WIDTH as u32)
+}
+
+/// The `WIDTH` low bits set: the first-rank run of a board of geometry `G`,
+/// as the backing integer. `(ONE << WIDTH) - ONE` via `wrapping_sub`, valid for
+/// any width `< Bits::BITS` (every supported geometry: 8 or 10 over 64/128 bits).
+#[inline]
+fn first_rank_mask<G: Geometry>() -> G::Bits {
+    (G::Bits::ONE << G::WIDTH as u32).wrapping_sub(G::Bits::ONE)
 }
 
 /// The diagonal (north-east / south-west, constant `rank - file`) through `sq`.
+///
+/// Built by a directional **fill** rather than a step-by-step ray walk: starting
+/// from `sq`'s bit, the set is repeatedly grown by its own north-east and
+/// south-west neighbours — the geometry's edge-masked diagonal shifts, which clip
+/// at the file edges for free so the fill never wraps. Each round extends the run
+/// by one cell in each direction, so `HEIGHT - 1` rounds complete a diagonal
+/// (which spans at most `HEIGHT` ranks). Bit-identical to the old per-step ray
+/// walk (the slider equivalence tests sweep every square against an independent
+/// ray scan, on both the 8x8 and the `u128` geometries), but it advances both
+/// rays of every diagonal on the board in lock-step rather than walking one
+/// square at a time.
+#[inline]
 fn diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
-    walk_line(sq, 1, 1)
+    diagonal_fill(
+        Bitboard::from_square(sq),
+        Bitboard::north_east,
+        Bitboard::south_west,
+    )
 }
 
 /// The anti-diagonal (north-west / south-east, constant `rank + file`) through
-/// `sq`.
+/// `sq`. Built by the same fill as [`diag_mask`], along the NW/SE directions.
+#[inline]
 fn anti_diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
-    walk_line(sq, -1, 1)
+    diagonal_fill(
+        Bitboard::from_square(sq),
+        Bitboard::north_west,
+        Bitboard::south_east,
+    )
+}
+
+/// Grows `seed` into the full (anti-)diagonal it lies on by repeatedly unioning it
+/// with its `pos` / `neg` diagonal neighbours, each an **edge-masked** directional
+/// shift (so a cell on a file edge contributes nothing across it — no wrap).
+///
+/// A diagonal spans at most `HEIGHT` ranks, so `HEIGHT - 1` single-step rounds
+/// reach every cell from any starting square on it. Correct for any geometry up to
+/// the 128-bit backing, and equivalent to the per-square ray walk it replaces.
+#[inline]
+fn diagonal_fill<G: Geometry>(
+    mut bb: Bitboard<G>,
+    pos: fn(Bitboard<G>) -> Bitboard<G>,
+    neg: fn(Bitboard<G>) -> Bitboard<G>,
+) -> Bitboard<G> {
+    // `HEIGHT - 1` rounds reach the two ends of any diagonal from any seed on it.
+    let rounds = G::HEIGHT.saturating_sub(1);
+    for _ in 0..rounds {
+        bb = bb | pos(bb) | neg(bb);
+    }
+    bb
 }
 
 /// Builds the full line through `sq` in the `(df, dr)` direction and its
@@ -742,6 +790,54 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn grand10x10_sliders_match_ray_scan() {
+        // Grand chess is ten ranks as well as ten files, so its longest diagonal
+        // spans all ten cells — the case that exercises the diagonal fill past the
+        // eight-cell diagonals of `Cap10x8`. Cross-check every square and a basket
+        // of occupancies against an independent ray scan.
+        use crate::geometry::Grand10x10;
+        let mut next = rng();
+        let board = Grand10x10::BOARD_MASK;
+        let mut occs: Vec<u128> = Vec::new();
+        occs.push(0);
+        occs.push(board);
+        for _ in 0..32 {
+            let lo = next() as u128;
+            let hi = (next() as u128) << 64;
+            occs.push((lo | hi) & board);
+        }
+        for index in 0..100u8 {
+            let sq = Square::<Grand10x10>::new(index);
+            for &raw in &occs {
+                let occ = Bitboard::<Grand10x10>(raw);
+                assert_eq!(
+                    rook_attacks::<Grand10x10>(sq, occ),
+                    scan_rays(sq, occ, &[(0, 1), (0, -1), (1, 0), (-1, 0)]),
+                    "rook {index} occ {raw:#x}"
+                );
+                assert_eq!(
+                    bishop_attacks::<Grand10x10>(sq, occ),
+                    scan_rays(sq, occ, &[(1, 1), (1, -1), (-1, 1), (-1, -1)]),
+                    "bishop {index} occ {raw:#x}"
+                );
+            }
+        }
+        // The full main diagonal (a1..j10) and anti-diagonal (a10..j1) span ten
+        // cells; on an empty board a corner bishop must reach all nine others.
+        let a1 = Square::<Grand10x10>::from_file_rank(0, 0).unwrap();
+        let diag = bishop_attacks::<Grand10x10>(a1, Bitboard::EMPTY);
+        assert!(
+            diag.contains(Square::from_file_rank(9, 9).unwrap()),
+            "a1 bishop must see the far corner j10 along the full ten-cell diagonal"
+        );
+        assert_eq!(
+            diag.count(),
+            9,
+            "a1 bishop sees the other nine diagonal cells"
+        );
     }
 
     #[test]

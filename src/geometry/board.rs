@@ -271,6 +271,34 @@ impl<G: Geometry> Board<G> {
         let _ = self.remove_piece(square);
     }
 
+    /// Clears `square` knowing the exact `piece` standing on it, touching only
+    /// that piece's color and role masks instead of scanning for the occupant.
+    ///
+    /// Equivalent to [`remove_piece`](Self::remove_piece) when `piece` is the
+    /// actual occupant of `square` (the only contract the make-move hot path needs,
+    /// since it reads the piece off the board first): the same two masks are
+    /// cleared, so the board stays consistent and the result is byte-identical.
+    /// It skips the [`piece_at`](Self::piece_at) lookup `remove_piece` performs —
+    /// up to a full role-mask scan per call.
+    #[inline]
+    pub(crate) fn remove_known(&mut self, square: Square<G>, piece: WidePiece) {
+        self.by_color[color_index(piece.color)].clear(square);
+        self.by_role[piece.role.index()].clear(square);
+    }
+
+    /// Places `piece` on `square` knowing it is **empty**, skipping the
+    /// occupant-clearing scan [`set_piece`](Self::set_piece) does first.
+    ///
+    /// The caller guarantees `square` holds no piece (a quiet move's destination, a
+    /// capture's destination *after* the captured piece was removed, a castle's
+    /// vacated-then-refilled squares). Under that contract the result is identical
+    /// to `set_piece`; it merely avoids the redundant [`remove_piece`](Self::remove_piece).
+    #[inline]
+    pub(crate) fn set_empty(&mut self, square: Square<G>, piece: WidePiece) {
+        self.by_color[color_index(piece.color)].set(square);
+        self.by_role[piece.role.index()].set(square);
+    }
+
     /// Parses a board from a FEN piece-placement field over the geometry `G`.
     ///
     /// The field lists the ranks from the top (`HEIGHT - 1`) down to `0`,

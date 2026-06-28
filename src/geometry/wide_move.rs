@@ -261,6 +261,16 @@ impl WideMove {
         )
     }
 
+    /// A throwaway sentinel move (a quiet `0 -> 0`) used by the stack-backed
+    /// [`WideMoveList`](super::position) to value-initialise its unused inline
+    /// tail. It is never read: only the filled prefix is exposed, and each slot
+    /// is overwritten by a real push before any read.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn null() -> WideMove {
+        WideMove::pack(0, 0, 0, KIND_QUIET)
+    }
+
     /// Creates a move from its origin, destination, and kind, for a board of
     /// geometry `G`.
     ///
