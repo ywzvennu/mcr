@@ -844,6 +844,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
 
+        // Bare-king "Robado" draw (Shatar): if either side has been stripped to
+        // its lone king, the game is already an immediate draw and the node is
+        // terminal — no moves. Gated behind `has_bare_king_draw()` (default-off),
+        // so every other variant skips the check and is byte-identical. This is
+        // the single chokepoint both the materialising generator and the
+        // bulk-count leaf path funnel through, so the draw truncates perft descent
+        // exactly as Fairy-Stockfish's extinction rule does.
+        if V::has_bare_king_draw() && self.bare_king_present() {
+            return;
+        }
+
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
@@ -1261,6 +1272,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_flag_win() && self.flag_win_reached(us.opposite()) {
             return;
         }
+        // Bare-king "Robado" draw (Shatar): a side reduced to its lone king ends
+        // the game in an immediate draw, so the node is a terminal perft leaf with
+        // no continuation. Gated behind `has_bare_king_draw()` (default-off), so
+        // inert for every other variant. (Shatar takes the standard path; this
+        // mirrors the standard-path chokepoint for any future bare-king variant
+        // that rides the verify path.)
+        if V::has_bare_king_draw() && self.bare_king_present() {
+            return;
+        }
         // A side whose king has been captured has no royal piece, so there is no
         // self-check to filter: every pseudo-legal move is "legal" (the side has
         // already lost, but perft still enumerates its continuations). Fairy-
@@ -1494,6 +1514,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             .kings_of(who)
             .into_iter()
             .any(|k| k.rank() == rank)
+    }
+
+    /// Returns `true` if **either** side has been reduced to a lone king (its
+    /// only remaining piece) — the Shatar "Robado" terminal-draw condition. Only
+    /// meaningful while [`WideVariant::has_bare_king_draw`] is `true`; the caller
+    /// gates on it. A side is bare-king when its colour mask holds exactly one
+    /// piece, which (every side always having a king on a legal board) is the
+    /// king alone.
+    #[must_use]
+    pub fn bare_king_present(&self) -> bool {
+        self.board.by_color(Color::White).count() == 1
+            || self.board.by_color(Color::Black).count() == 1
     }
 
     /// Returns the flag goal rank of the side to move (`us`) when it is
@@ -2472,6 +2504,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             && (self.flag_win_reached(Color::White) || self.flag_win_reached(Color::Black))
         {
             return Some(WideEndReason::VariantWin);
+        }
+        // Bare-king "Robado" draw (Shatar): a side reduced to its lone king draws
+        // the game immediately. Gated behind `has_bare_king_draw()` (default-off).
+        // Reported before the checkmate/stalemate test so a bare-king node — which
+        // generates zero moves — is classified as the draw it is, not a (spurious)
+        // checkmate or stalemate.
+        if V::has_bare_king_draw() && self.bare_king_present() {
+            return Some(WideEndReason::VariantDraw);
         }
         if self.legal_moves().is_empty() {
             if self.is_check() {

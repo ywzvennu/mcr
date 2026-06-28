@@ -525,6 +525,29 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         }
     }
 
+    // --- Bare-king "Robado" draw (default OFF) ---------------------------
+
+    /// Returns `true` if this variant draws the instant **either side is reduced
+    /// to a lone king** — the Shatar "Robado" rule (Mongolian chess: a side
+    /// stripped of every piece but its king is "robbed", and the game is an
+    /// immediate draw). The default is `false`; while it is `false` the engine
+    /// never evaluates the rule, so every other variant is byte-identical.
+    ///
+    /// When `true`, a position in which some side's only remaining piece is its
+    /// king is **terminal**: on **either** side's turn the move generator
+    /// short-circuits to *zero moves* (the node is a perft leaf, exactly as
+    /// Fairy-Stockfish truncates it — FSF's `extinctionValue = VALUE_DRAW` with
+    /// `extinctionPieceCount = 1` over all piece types reports the game over
+    /// before generating any move), and the draw is reported as a
+    /// [`WideEndReason::VariantDraw`](WideEndReason). The single
+    /// [`bare_king_present`](super::position::GenericPosition::bare_king_present)
+    /// chokepoint both the standard generator and the bulk-count leaf path funnel
+    /// through truncates the perft descent the same way FSF does. Only Shatar
+    /// overrides this so far.
+    fn has_bare_king_draw() -> bool {
+        false
+    }
+
     /// Returns `true` if **stalemate is a loss** for the stalemated side rather
     /// than a draw (Synochess `stalemateValue = loss`). The default is `false`
     /// (the standard draw). This affects only the reported [outcome]; it has no
