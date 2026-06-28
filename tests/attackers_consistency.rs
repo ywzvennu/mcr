@@ -40,9 +40,8 @@
 
 use mce::geometry::{
     Bitboard, CapablancaRules, DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules,
-    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules,
-    OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
+    HoppelPoppelRules, JanggiRules, KnightmateRules, MakrukRules, MinishogiRules, MinixiangqiRules,
+    OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
     SpartanRules, Square, StandardChess, SynochessRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
