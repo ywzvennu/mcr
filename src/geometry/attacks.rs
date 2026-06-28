@@ -339,6 +339,7 @@ const CANNON_DIRS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 /// assert_eq!(q.count(), 14);
 /// ```
 #[must_use]
+#[inline]
 pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
     let mut bb = Bitboard::EMPTY;
     for &(df, dr) in &CANNON_DIRS {
@@ -381,6 +382,7 @@ pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> 
 /// assert_eq!(caps.count(), 1);
 /// ```
 #[must_use]
+#[inline]
 pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
     let mut bb = Bitboard::EMPTY;
     for &(df, dr) in &CANNON_DIRS {
