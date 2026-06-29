@@ -40,17 +40,17 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
-    CapahouseRules, ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules,
-    GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules,
-    JanggiRules, KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
-    ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
-    PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules,
-    ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    CapahouseRules, ChakRules, ChennisRules, DobutsuRules, DragonRules, DuckRules, EmpireRules,
+    FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
+    HoppelPoppelRules, JanggiRules, KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules,
+    MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules,
+    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules,
+    ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
+    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
-    Tori7x7, Xiangqi9x10,
+    Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
+    Minixiangqi7x7, Shogi9x9, Tori7x7, Xiangqi9x10,
 };
 use mce::Color;
 
@@ -1184,5 +1184,33 @@ variant_test!(
         "9/k8/2+B1+R1**I2/9/2**S1W1*U2/9/9/9/4K4[Nn] w - - 0 1",
         "1k7/9/9/9/4**A4/9/9/9/4K4[] w - - 0 1",
         "rnb**akqane/9/ppp2pppp/3pP4/9/9/PPPP1PPPP/9/ENAQK**ABNR[P] b - - 0 3",
+    ]
+);
+
+// -- Chennis (7x7 tennis-themed flipping variant: hand + dual-form drops, per-move
+// flip, king mobility region) ----------------------------------------------
+//
+// The colour-directional attackers are the new Chennis Pawn (`**p`, a chess pawn
+// that captures forward-diagonally, `role_attack_is_directional`) and the Soldier
+// (`z`, forward / sideways). The leg-asymmetric attackers are the Cannon (`c`, its
+// over-screen capture lands only on an occupied square) and the King (`k`, masked
+// to its mobility region by origin), both forward-projected. The Ferz (= Met `m`),
+// Commoner (`*u`), Knight (`n`), Rook (`r`) and Bishop (`b`) are colour-symmetric,
+// so this guards that every role's `role_attacks` / `role_attacks_board` set and
+// the `attackers_to` projection agree on both the king-danger and `attackers_to`
+// paths. The corpus reuses the FSF-confirmed FENs from `tests/perft_chennis.rs`:
+// the startpos, the flipping middlegame (a promoted Rook / Bishop / Cannon on the
+// board), and the two drop swarms, each in mce dialect (Ferz `m`, Soldier `z`,
+// Commoner `*u`, Pawn `**p`).
+variant_test!(
+    chennis,
+    Chennis7x7,
+    ChennisRules,
+    "chennis",
+    [
+        "1mk*u3/1**p1z3/7/7/7/3Z1**P1/3*UKM1[] w - - 0 1",
+        "1mk*u3/3z3/1r5/7/3B3/5**PC/3*UK2[] b - - 4 2",
+        "3k3/7/7/7/7/7/3K3[**PMZ*U**pmz*u] w - - 0 1",
+        "3k3/7/7/7/7/7/3K3[**P**p] w - - 0 1",
     ]
 );

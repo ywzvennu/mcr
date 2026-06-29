@@ -58,11 +58,11 @@ pub use variant::{
 pub use variants::{
     Alice, AliceRules, Asean, AseanRules, Bughouse, BughouseRules, Cambodian, CambodianRules,
     CannonShogi, CannonShogiRules, Capablanca, CapablancaRules, Capahouse, CapahouseRules, Chak,
-    ChakRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Empire, EmpireRules,
-    FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Grand, GrandRules, Grandhouse,
-    GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Khans, KhansRules,
-    Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk,
-    MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules,
+    ChakRules, Chennis, ChennisRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules,
+    Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Grand, GrandRules,
+    Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Khans,
+    KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules,
+    Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules,
     Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement,
     PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj,
     ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun,
@@ -362,6 +362,25 @@ geometry!(
     u64,
     5,
     6
+);
+
+geometry!(
+    /// The Chennis board: seven files by seven ranks (49 squares), backed by
+    /// `u128`.
+    ///
+    /// A small odd-width (`7`) `u128` geometry hosting Chennis — a tennis-themed
+    /// Kyoto-Shogi-like flipping variant with a persistent capture-fed **hand**,
+    /// **dual-form drops**, and a **king mobility region** (each side's King is
+    /// confined to files b..f on its own and the two central ranks). The same
+    /// board size as [`Minixiangqi7x7`] / [`Tori7x7`] but a distinct geometry, so
+    /// the Chennis army never shares masks with the Xiangqi-on-7x7 palace/river or
+    /// the Tori bird machinery. A square index reaches `48`, and edge-masked
+    /// east/west shifts must not wrap past the seventh file. Files run a..g, ranks
+    /// 1..7.
+    Chennis7x7,
+    u128,
+    7,
+    7
 );
 
 #[cfg(test)]

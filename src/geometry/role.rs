@@ -763,6 +763,32 @@ pub enum WideRole {
     /// immobile). (Khan's Chess.) An **overflow-3 role**: its FEN token is `=S`
     /// (white) / `=s` (black); the harness maps `=s → s`.
     KhanSoldier = 71,
+    // --- Chennis (7x7 tennis-themed flipping variant) army (§ Milestone 10) ---
+    //
+    // Chennis (Couch Tomato, https://www.pychess.org/variants/chennis) is a 7x7
+    // Kyoto-Shogi-like flipping variant on the [`Chennis7x7`](super::Chennis7x7)
+    // geometry: a crazyhouse-style **captures-to-hand** with **dual-form drops**
+    // (`dropPromoted`), and the Kyoto **per-move flip** — every non-royal piece
+    // toggles between its two forms on each move. Confirmed square-for-square
+    // against Fairy-Stockfish `UCI_Variant chennis`. Its four flipping pairs reuse
+    // existing roles for seven of the eight forms — the Rook (`p`↔`r`), the Cannon
+    // (`f`↔`c`, the [`WideRole::Met`] ferz flipping to the [`WideRole::Cannon`]),
+    // the Bishop (`s`↔`b`, the [`WideRole::Soldier`] flipping to the Bishop) and
+    // the Knight (`m`↔`n`, the [`WideRole::Commoner`] flipping to the Knight) — so
+    // only the base **pawn** is genuinely new (a chess pawn: a forward quiet step
+    // and a forward-diagonal capture, with no double-step / en passant / zone
+    // promotion). The single-`*` and most of the doubled-`**` banks are spoken
+    // for, so it lands in the **second** overflow bank (`**p`).
+    /// Chennis Pawn (FSF `customPiece1 = p:fmWfceF`, letter `p`) — a chess-style
+    /// pawn: it **moves** one step straight forward onto an empty square (a forward
+    /// move-only Wazir) and **captures** one step diagonally forward (a forward
+    /// capture-only Ferz), with no double-step, en passant, or zone promotion. On
+    /// every move it **flips** to a [`WideRole::Rook`] (and a Rook flips back to a
+    /// Chennis Pawn), the Kyoto per-move mechanic. (Chennis.) A **second-bank
+    /// overflow role**: its FEN token is the doubled prefix `**` plus the recycled
+    /// pawn letter `p`, `**P` (white) / `**p` (black); the `compare-fairy` harness
+    /// maps `**p → p` when driving Chennis.
+    ChennisPawn = 72,
 }
 
 impl WideRole {
@@ -770,7 +796,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 72;
+    pub const COUNT: usize = 73;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -846,6 +872,7 @@ impl WideRole {
         WideRole::Ship,
         WideRole::Khan,
         WideRole::KhanSoldier,
+        WideRole::ChennisPawn,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1048,6 +1075,12 @@ impl WideRole {
             WideRole::Angel => 'a',
             WideRole::Rhino => 'i',
             WideRole::Ship => 's',
+            // Chennis Pawn — a **second-bank** overflow role. Its FEN token is the
+            // doubled prefix `**` plus the recycled pawn letter `p` (returned here),
+            // the board FEN I/O adding the prefix; distinct from the single-`*`
+            // Chak Soldier `*p` by the doubled prefix. The `compare-fairy` harness
+            // maps `**p → p` when driving Chennis.
+            WideRole::ChennisPawn => 'p',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -1267,6 +1300,7 @@ impl WideRole {
                 | WideRole::Angel
                 | WideRole::Rhino
                 | WideRole::Ship
+                | WideRole::ChennisPawn
         )
     }
 
@@ -1290,6 +1324,9 @@ impl WideRole {
             'a' => Some(WideRole::Angel),
             'i' => Some(WideRole::Rhino),
             's' => Some(WideRole::Ship),
+            // Chennis: the Pawn recycles its own FSF letter `p` (distinct from the
+            // single-`*` Chak Soldier `*p` by the doubled prefix).
+            'p' => Some(WideRole::ChennisPawn),
             _ => None,
         }
     }
@@ -1485,6 +1522,7 @@ impl fmt::Display for WideRole {
             WideRole::Ship => "ship",
             WideRole::Khan => "khan",
             WideRole::KhanSoldier => "khan-soldier",
+            WideRole::ChennisPawn => "chennis-pawn",
         })
     }
 }
