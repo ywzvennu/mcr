@@ -41,10 +41,10 @@
 use mce::geometry::{
     Bitboard, CambodianRules, CapablancaRules, ChakRules, DobutsuRules, DuckRules, EmpireRules,
     GenericPosition, Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
-    KyotoshogiRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules,
-    OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
-    WideVariant, XiangqiRules,
+    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
+    OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules,
+    ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
+    WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
@@ -259,6 +259,29 @@ variant_test!(
     "makruk",
     [
         "rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSKMSNR b - - 0 2",
+        "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 4",
+    ]
+);
+
+// -- Makpong (8x8) ----------------------------------------------------------
+//
+// Makpong reuses Makruk's entire piece set and `role_attacks` relation — the
+// only colour-directional attacker is the Khon (Silver), exactly as Makruk — and
+// changes only **king-in-check legality** (the king may not flee). That rule
+// filters which king *moves* are emitted; it never touches the forward/reverse
+// attack agreement this test guards, so the consistency check is the same shape
+// as Makruk's. The corpus keeps two genuinely-in-check FENs (a rook check and a
+// pawn check) so `attackers_to(king, enemy)` is exercised on check-bearing nodes
+// too, alongside the developed midgame.
+
+variant_test!(
+    makpong,
+    Chess8x8,
+    MakpongRules,
+    "makpong",
+    [
+        "rnsmksnr/8/1pp1ppp1/p6p/3r4/PPP1PPPP/8/RNSK1SNR w - - 0 4",
+        "rnsmksnr/8/ppp1ppp1/7p/8/PP1PPPPP/2pP4/RNSK1SNR w - - 0 5",
         "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 4",
     ]
 );
