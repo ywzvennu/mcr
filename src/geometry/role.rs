@@ -733,6 +733,36 @@ pub enum WideRole {
     /// (black); the `compare-fairy` harness maps `**s → +M` (FSF's promoted
     /// Marshal) when driving Mansindam.
     Ship = 69,
+
+    // --- Khan's Chess (Orda-family asymmetric army, 8x8, § Milestone 10) -------
+    //
+    // Khan's Chess fields a standard White army against a Black **Khan** army that
+    // reuses the Orda Lancer (`f`, kniroo), Kheshig (`w`, centaur) and Archer (`y`,
+    // knibis), and adds two genuinely-new movers (confirmed square-for-square
+    // against Fairy-Stockfish `UCI_Variant khans`): the **Khan** (FSF `t`, `mNcK`)
+    // and the **Khan soldier** (FSF `s`, `mfhNcfW`). The single-letter alphabet,
+    // every `*`-prefixed overflow base and the doubled-`**` second tier are all in
+    // play, so both spell themselves with the **third** overflow prefix
+    // [`OVERFLOW_PREFIX_3`] (`=`) plus a recycled base letter whose case carries the
+    // colour (resolved by [`is_overflow3`](WideRole::is_overflow3) /
+    // [`overflow3_from_base`](WideRole::overflow3_from_base)). They recycle FSF's
+    // own mnemonics `t` / `s` — free within the `=` tier (the Cannon Shogi army
+    // claims `a`/`c`/`i`/`u`/`w`/`f`/`e`). The `compare-fairy` harness rewrites each
+    // `=<base>` to FSF's spelling.
+    /// Khan (FSF `t`, Betza `mNcK`) — **moves** like a knight to an empty square but
+    /// **captures** like a king (one step to any of the eight adjacent squares).
+    /// The promotion target of the [`WideRole::KhanSoldier`]. (Khan's Chess.) An
+    /// **overflow-3 role**: its FEN token is `=T` (white) / `=t` (black); the
+    /// harness maps `=t → t`.
+    Khan = 70,
+    /// Khan soldier (FSF `s`, Betza `mfhNcfW`) — **moves** like a forward
+    /// half-knight (the four knight leaps with a forward component, to an empty
+    /// square) but **captures** one square straight forward (a forward Wazir step).
+    /// It never double-steps and has no en passant. On reaching the last rank it
+    /// **promotes** to a [`WideRole::Khan`] (forced — it would otherwise be
+    /// immobile). (Khan's Chess.) An **overflow-3 role**: its FEN token is `=S`
+    /// (white) / `=s` (black); the harness maps `=s → s`.
+    KhanSoldier = 71,
 }
 
 impl WideRole {
@@ -740,7 +770,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 70;
+    pub const COUNT: usize = 72;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -814,6 +844,8 @@ impl WideRole {
         WideRole::Angel,
         WideRole::Rhino,
         WideRole::Ship,
+        WideRole::Khan,
+        WideRole::KhanSoldier,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1045,6 +1077,13 @@ impl WideRole {
             WideRole::PromotedRookCannon => 'w',
             WideRole::PromotedBishopCannon => 'f',
             WideRole::PromotedBishopHopper => 'e',
+            // Khan's Chess movers — overflow-3 roles recycling FSF's mnemonics
+            // `t` / `s` (free within the `=` tier), so `char()` returns the bare
+            // base letter and the board FEN I/O adds the `=` prefix. The
+            // `compare-fairy` harness maps `=t → t`, `=s → s` when driving Khan's
+            // Chess.
+            WideRole::Khan => 't',
+            WideRole::KhanSoldier => 's',
         }
     }
 
@@ -1278,6 +1317,8 @@ impl WideRole {
                 | WideRole::PromotedRookCannon
                 | WideRole::PromotedBishopCannon
                 | WideRole::PromotedBishopHopper
+                | WideRole::Khan
+                | WideRole::KhanSoldier
         )
     }
 
@@ -1302,6 +1343,10 @@ impl WideRole {
             'w' => Some(WideRole::PromotedRookCannon),
             'f' => Some(WideRole::PromotedBishopCannon),
             'e' => Some(WideRole::PromotedBishopHopper),
+            // Khan's Chess: the Khan and Khan soldier recycle FSF's mnemonics
+            // `t` / `s`, free within the `=` tier.
+            't' => Some(WideRole::Khan),
+            's' => Some(WideRole::KhanSoldier),
             _ => None,
         }
     }
@@ -1438,6 +1483,8 @@ impl fmt::Display for WideRole {
             WideRole::Angel => "angel",
             WideRole::Rhino => "rhino",
             WideRole::Ship => "ship",
+            WideRole::Khan => "khan",
+            WideRole::KhanSoldier => "khan-soldier",
         })
     }
 }

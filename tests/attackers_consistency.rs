@@ -42,11 +42,11 @@ use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
     CapahouseRules, ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules,
     GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules,
-    JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
-    MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules,
-    SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules,
-    ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
-    ToriRules, WideRole, WideVariant, XiangqiRules,
+    JanggiRules, KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
+    ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
+    PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules,
+    ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square,
+    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -652,6 +652,34 @@ variant_test!(
         "1wysk1w1/8/p1pppp1p/8/2f2f2/PP4PP/2PPPP2/RNBQKBNR b KQ - 0 1",
         "4k3/8/3y4/2f1s3/2P1P3/3w4/8/4K3 b - - 0 1",
         "fwysk1wf/8/8/8/8/8/4W3/4K3 b - - 0 1",
+        "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
+    ]
+);
+
+// -- Khan's Chess (Orda-family asymmetric army + soldier promotion + flag, 8x8) -
+//
+// The Khan army reuses the Orda Lancer / Archer (knight *move*, rook / bishop
+// *capture* — `role_attacks` is the slider attack relation, the knight jumps are
+// quiet-only) and Kheshig (King + Knight), and adds the **Khan** (knight *move*,
+// **king** *capture* — its king-step `role_attacks` is the symmetric attack
+// relation, its knight jumps are quiet-only) and the **Khan soldier** (forward
+// half-knight *move*, straight-forward Wazir *capture* — its single forward-step
+// `role_attacks` is the forward-biased attack relation, reverse-projected with the
+// opposite colour via `role_attack_is_directional`; its half-knight leaps are
+// quiet-only). The corpus is reused from `tests/perft_khans.rs` (each
+// FSF-confirmed): the all-pieces tactic, the captures position, the developed
+// middlegame, the soldier-promotion race, and a flag-race position.
+
+variant_test!(
+    khans,
+    Chess8x8,
+    KhansRules,
+    "khans",
+    [
+        "4k3/8/3=t4/2f1=s3/2P1P3/3w1y2/8/4K3 b - - 0 1",
+        "4k3/8/8/3=t4/2PPP3/3=s4/3P4/4K3 b - - 0 1",
+        "f1y=tkywf/1=s=s=s=s=s1=s/2=s5/8/2P1P3/5N2/PP1P1PPP/RNBQKB1R b KQ - 0 1",
+        "4k3/8/8/8/8/8/2=s1=s3/4K3 b - - 0 1",
         "8/4K3/8/8/8/8/4k3/8 w - - 0 1",
     ]
 );

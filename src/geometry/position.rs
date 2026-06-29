@@ -1113,8 +1113,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 continue;
             }
             // Whether this role expands into promote / non-promote variants per
-            // target (a hand variant's promotable piece). Inert otherwise.
-            let promotable = V::has_hand() && V::role_can_promote(role);
+            // target: a hand variant's promotable piece (Shogi), or a no-hand
+            // piece-promotion variant's promotable mover (Khan's Chess's
+            // KhanSoldier, which promotes to a Khan on the last rank). Both gates
+            // are default-off, so every other role / variant is byte-identical.
+            let promotable =
+                (V::has_hand() || V::has_piece_promotion()) && V::role_can_promote(role);
             // Capture-only roles (Orda Lancer / Archer): their `role_attacks` set
             // (rook / bishop slide) may be reached only by capturing — never as a
             // quiet move. Their quiet moves come solely from `quiet_only_targets`
@@ -1130,6 +1134,29 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
                 if promotable {
                     self.emit_promotable_targets(out, role, from, targets, their_pieces, us);
+                    // A hand variant's promotable pieces draw every move from
+                    // `role_attacks` (their `quiet_only_targets` is empty), so they
+                    // skip the quiet-only pass exactly as before — byte-identical.
+                    if V::has_hand() {
+                        continue;
+                    }
+                    // A no-hand piece-promotion variant (Khan's KhanSoldier) draws
+                    // its quiet leaps from `quiet_only_targets` and must emit them
+                    // here, promoting those that end in the promotion zone (to
+                    // `role_promoted_to`). Confined to empty squares and the same
+                    // check / pin masks as a normal move.
+                    let quiet_only = V::quiet_only_targets(role, us, from, occupied)
+                        & !occupied
+                        & check_mask
+                        & pin_line;
+                    let from_in_zone = V::in_promotion_zone(us, from.rank());
+                    for to in quiet_only {
+                        if from_in_zone || V::in_promotion_zone(us, to.rank()) {
+                            Self::emit_piece_promotion_one(out, role, from, to, false, us);
+                        } else {
+                            out.push(WideMove::new(from, to, WideMoveKind::Quiet));
+                        }
+                    }
                     continue;
                 }
                 out.emit_targets(from, targets, their_pieces);
