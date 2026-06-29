@@ -255,7 +255,7 @@ impl WideVariant<Grand10x10> for ShakoRules {
 /// Construct the starting position with
 /// [`Shako::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Shako::from_fen`](GenericPosition::from_fen). The Cannon uses the reusable
-/// cannon primitive in [`attacks`](crate::geometry::attacks); the Elephant is a
+/// cannon primitive in [`attacks`]; the Elephant is a
 /// Fers-Alfil leaper. Everything else is standard chess on a wider board, with
 /// castling on rank 2 / 9.
 pub type Shako = GenericPosition<Grand10x10, ShakoRules>;

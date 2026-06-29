@@ -156,13 +156,13 @@ fn splitmix64(state: &mut u64) -> u64 {
 }
 
 /// A side's **remaining hidden pool**: the multiset of yet-unrevealed identities,
-/// starting as the Xiangqi army minus the General (see [`HIDDEN_ARMY`]). A reveal
+/// starting as the Xiangqi army minus the General (see `HIDDEN_ARMY`). A reveal
 /// **draws without replacement** from this pool, so a seeded sequence of draws is
 /// a deterministic permutation of the army and the multiset is conserved.
 ///
 /// This is the explicit, testable reveal model: it carries **no** randomness of
 /// its own — [`Pool::draw_at`] is a pure index into the remaining expansion, and
-/// [`Pool::draw`] turns a caller-supplied seed into that index via [`splitmix64`].
+/// [`Pool::draw`] turns a caller-supplied seed into that index via `splitmix64`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pool {
     /// Remaining count of each [`HIDDEN_ARMY`] kind, in that canonical order.
@@ -207,7 +207,7 @@ impl Pool {
     /// expansion of the remaining pool, **removing** it. Pure and deterministic —
     /// no RNG. Returns `None` if `index >= remaining()`.
     ///
-    /// The expansion lists the [`HIDDEN_ARMY`] kinds in order, each repeated by its
+    /// The expansion lists the `HIDDEN_ARMY` kinds in order, each repeated by its
     /// remaining count, so the same `index` always names the same kind for a given
     /// pool state.
     #[must_use = "draw_at returns the drawn identity; ignoring it discards the reveal"]
@@ -225,7 +225,7 @@ impl Pool {
     }
 
     /// Draws a uniformly-random identity from the remaining pool, **without
-    /// replacement**, advancing the caller's explicit `seed` ([`splitmix64`]).
+    /// replacement**, advancing the caller's explicit `seed` (`splitmix64`).
     /// Deterministic for a given seed (no clock / OS randomness). Returns `None`
     /// once the pool is exhausted.
     #[must_use = "draw returns the drawn identity; ignoring it discards the reveal"]

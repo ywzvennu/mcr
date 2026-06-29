@@ -257,7 +257,7 @@ pub enum GateSquare {
 /// 8-bit `to` (covering `0..128`), and a [`WideMoveKind`] carrying a
 /// [`WideRole`] index for promotions and drops.
 ///
-/// Stored as a packed `u32` (see the [module docs](self#bit-layout-u32)). The
+/// Stored as a packed `u32` (see the module docs). The
 /// concrete 8x8 [`crate::Move`] is untouched; this is the parallel wide move.
 ///
 /// ```

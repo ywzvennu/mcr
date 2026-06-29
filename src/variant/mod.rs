@@ -246,7 +246,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// standard-castling path ([`Variant::USES_FAST_LEGALITY`] true and
     /// [`Variant::VARIANT_CASTLING`] false), adds no [`Variant::extra_moves`], and
     /// applies no [`Variant::filter_forced`]. Then the leaf count is precisely
-    /// [`Position::count_legal`]. A variant whose *outcome* rules differ but whose
+    /// `Position::count_legal`. A variant whose *outcome* rules differ but whose
     /// *move set* is identical (king-of-the-hill, three-check) is still bulk-
     /// countable, since perft counts moves, not terminal states.
     ///
@@ -269,7 +269,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     ///
     /// Chess960 overrides this: its legal set is the fast non-castling generator
     /// plus its own arbitrary-geometry castles, both of which the core can count
-    /// through a population-count sink ([`Position::count_legal_960`]), so it gets
+    /// through a population-count sink (`Position::count_legal_960`), so it gets
     /// the same leaf speedup standard chess gets from [`Variant::BULK_COUNTABLE`]
     /// — even though its castle geometry keeps it off the standard bulk path.
     #[must_use]
@@ -506,7 +506,7 @@ pub trait Variant: Clone + fmt::Debug + PartialEq + Eq + 'static {
     /// Fills `out` with the variant's king-safety-filtered move set — every move
     /// that is legal *before* the variant's [`Variant::extra_moves`] and
     /// [`Variant::filter_forced`] stages run on top of it. This is the single
-    /// seam through which [`VariantPosition::generate_legal_into`] obtains its
+    /// seam through which `VariantPosition::generate_legal_into` obtains its
     /// base move set, so a variant can replace the entire king-safety stage at
     /// once rather than only its slow-path inner loop.
     ///

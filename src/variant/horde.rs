@@ -105,7 +105,7 @@ impl Variant for HordeRules {
     ///   double-push) and keep them all — no filtering.
     /// - **Black to move (standard army).** Black has a normal king and white
     ///   pieces give check in the ordinary way, so the core's fast pin/check-mask
-    ///   generator ([`Position::generate_into`]) produces exactly black's legal
+    ///   generator (`Position::generate_into`) produces exactly black's legal
     ///   moves. White's first-rank double-push rule never applies to a black move,
     ///   so the standard fast generator is correct as-is.
     ///

@@ -8,7 +8,7 @@
 //!
 //! Every piece is a standard chess piece — King, Queen, two Rooks, two Bishops,
 //! two Knights, eight Pawns per side — so Placement adds **no new role** and
-//! reuses [`StandardChess`]'s movement, promotion, en passant, and castling
+//! reuses [`StandardChess`](crate::geometry::StandardChess)'s movement, promotion, en passant, and castling
 //! wholesale. The only departures from standard chess are the opening deployment
 //! and how castling rights are conferred by it.
 //!
@@ -34,7 +34,7 @@
 //!
 //! The phase is **per side**: a side that has emptied its pocket plays normally
 //! even while the opponent is still deploying. The pocket rides in
-//! [`GenericPlacement`](crate::geometry::position::GenericPlacement), and the drop
+//! [`GenericPlacement`], and the drop
 //! path is gated behind [`WideVariant::has_placement`] (default-off), so every
 //! other variant is byte-identical.
 //!

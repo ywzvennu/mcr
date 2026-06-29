@@ -293,9 +293,9 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// king is legal.
     ///
     /// The default is `false`, so every other variant keeps its existing path
-    /// (Duck rides its own generator off [`royal_squares`] alone, and the
+    /// (Duck rides its own generator off [`royal_squares`](WideVariant::royal_squares) alone, and the
     /// single-king / multi-royal / cannon paths are unchanged). A variant that sets
-    /// this `true` should also return an empty [`royal_squares`] set. Only the
+    /// this `true` should also return an empty [`royal_squares`](WideVariant::royal_squares) set. Only the
     /// hand-path routing consults this hook, so non-hand non-royal variants (Duck)
     /// stay byte-identical.
     fn non_royal_king() -> bool {
@@ -891,7 +891,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// Returns `true` if this variant has a **persistent hand**: a captured piece
     /// flips side and enters the captor's hand, from which it may later be
     /// **dropped** back onto an empty square as the captor's own piece (Shogi,
-    /// crazyhouse). The hand rides in [`GenericPlacement`](super::position::GenericPlacement)
+    /// crazyhouse). The hand rides in [`GenericPlacement`]
     /// — the same per-color, per-role count store the Sittuyin placement pocket
     /// uses — but here it persists for the whole game and is fed by captures.
     ///
@@ -1212,7 +1212,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// promoting** in the current `board` because the variant caps the number of
     /// its promoted form (FSF `promotionLimit`). When `true`, the generic per-piece
     /// promotion path emits only the non-promoting move on a zone move (it never
-    /// collides with [`role_promotion_forced`] in any variant that uses both, since
+    /// collides with [`role_promotion_forced`](WideVariant::role_promotion_forced) in any variant that uses both, since
     /// a forced promotion never targets a capped form).
     ///
     /// Only consulted when [`has_hand`](WideVariant::has_hand) is `true` and the
@@ -1307,7 +1307,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// position history for this variant so its repetition / perpetual-check rules
     /// can fire. The default is `false`: no history is kept, the repetition hooks
     /// are never consulted, and the game wrapper behaves like a thin
-    /// [`GenericPosition`] driver. Shogi, Xiangqi, and Janggi override it.
+    /// [`GenericPosition`](crate::geometry::GenericPosition) driver. Shogi, Xiangqi, and Janggi override it.
     fn tracks_repetition() -> bool {
         false
     }
@@ -1403,7 +1403,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     }
 
     /// Returns `true` if a gate deploys a piece drawn from the variant's
-    /// **crazyhouse hand** ([`GenericPlacement`](super::position::GenericPlacement))
+    /// **crazyhouse hand** ([`GenericPlacement`])
     /// rather than from the fixed [`GenericGating`] Hawk/Elephant reserve — so
     /// **any** held non-pawn, non-king role may be gated, and the gate consumes it
     /// from the same hand its drops do. Only consulted when
@@ -1440,7 +1440,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// leap moves and never revokes a leap right, so the king's castling-right
     /// revocation stays the standard "any king move clears both rights" — every
     /// other variant is byte-identical. Cambodian overrides this to `true`,
-    /// reusing the [`GenericCastling`](crate::geometry::position::GenericCastling)
+    /// reusing the [`GenericCastling`]
     /// rights field to carry the two per-side leap rights: the **kingside** slot
     /// holds the king's leap right (its home file) and the **queenside** slot the
     /// queen/Met's leap right (its home file). A right is revoked the first time

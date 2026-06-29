@@ -40,7 +40,7 @@
 //!
 //! The phase is **per side**: a side that has emptied its pocket plays normally
 //! even while the opponent is still deploying. The pocket rides in
-//! [`GenericPlacement`](crate::geometry::position::GenericPlacement), and the drop
+//! [`GenericPlacement`], and the drop
 //! path is gated behind [`WideVariant::has_placement`] (default-off), so every
 //! other variant is byte-identical.
 //!

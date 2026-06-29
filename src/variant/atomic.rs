@@ -222,7 +222,7 @@ impl Variant for AtomicRules {
     /// chess legality (with the atomic twist that the enemy king gives no check
     /// and the kings may stand adjacent). Those moves therefore come straight
     /// from the fast pin/check-mask generator via
-    /// [`Position::atomic_noncapture_legal_into`], skipping the per-candidate
+    /// `Position::atomic_noncapture_legal_into`, skipping the per-candidate
     /// make-move filter entirely. Only *captures* — which detonate — need the
     /// explosion-aware legality test, so they alone go through the
     /// pseudo-legal + make-move-and-explode filter.
@@ -249,7 +249,7 @@ impl Variant for AtomicRules {
     /// H3: whether the side to move is in check, under atomic king safety.
     ///
     /// The side-to-move's king is in check iff it is *not* safe by the atomic
-    /// rule [`king_is_safe`]: the enemy king is excluded as an attacker (it would
+    /// rule `king_is_safe`: the enemy king is excluded as an attacker (it would
     /// explode itself), and a king adjacent to the enemy king is immune. The
     /// standard [`Position::is_check`] counts both the neighbouring enemy king
     /// and attacks that exist only because the kings stand adjacent, so it would
@@ -272,7 +272,7 @@ impl Variant for AtomicRules {
 
     /// Atomic FEN validation of the side *not* to move's king safety.
     ///
-    /// Reuses the atomic king-safety rule [`king_is_safe`]: the enemy king (here
+    /// Reuses the atomic king-safety rule `king_is_safe`: the enemy king (here
     /// the side *to* move) gives no executable check, and a king adjacent to it
     /// is immune. Without this override the standard `is_attacked` would reject
     /// legal atomic positions in which the two kings stand adjacent — positions

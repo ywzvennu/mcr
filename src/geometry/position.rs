@@ -8,7 +8,7 @@
 //!
 //! [`GenericPosition<Chess8x8, StandardChess>`](GenericPosition) is the
 //! reference instantiation; its perft equals the concrete
-//! [`crate::Position::perft`] exactly (see `tests/perft_generic.rs`). The
+//! [`crate::perft`] exactly (see `tests/perft_generic.rs`). The
 //! concrete 8x8 path is untouched — this is a separate, additive layer.
 //!
 //! ## Correctness over speed
@@ -127,7 +127,7 @@ const RESERVE_ELEPHANT: u8 = 0b10;
 /// still holds in hand and the squares from which a piece may still gate one in.
 ///
 /// This is the one piece of variant state the generic engine threads through
-/// move generation and [`apply`](GenericPosition::apply). For every non-gating
+/// move generation and `apply`. For every non-gating
 /// variant it is [`GenericGating::NONE`] — an empty eligible set and no reserves —
 /// so the gating code paths, all guarded behind
 /// [`WideVariant::supports_gating`], never fire and the produced moves and state
@@ -4746,10 +4746,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 /// given `depth` — the generic analogue of [`crate::perft`].
 ///
 /// `perft(pos, 0) == 1`. The recursion runs **allocation-free**: each interior
-/// ply fills one caller-owned stack-backed [`WideMoveList`] and reuses it across
+/// ply fills one caller-owned stack-backed `WideMoveList` and reuses it across
 /// every sibling node it visits, and the leaf ply (`depth == 1`) is **bulk
 /// leaf-counted** — the legal moves are tallied by population count through a
-/// [`WideCountSink`] without ever being materialised (on the standard
+/// `WideCountSink` without ever being materialised (on the standard
 /// single-king path; the variant filter paths fall back to counting a reused
 /// list). The node counts are byte-identical to the correctness-first reference;
 /// only the cost changes.

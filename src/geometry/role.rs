@@ -40,7 +40,7 @@ pub const OVERFLOW_PREFIX_3: char = '=';
 
 /// An extended piece role for the generic board.
 ///
-/// The discriminant doubles as the array index used by [`Board<G>`] for its
+/// The discriminant doubles as the array index used by [`Board<G>`](crate::geometry::Board) for its
 /// per-role occupancy masks, so the values are stable and contiguous from `0`.
 /// The first six match the concrete [`crate::Role`] ordering (pawn first, king
 /// last) so an 8x8 board reads identically; the rest are the fairy pieces named
