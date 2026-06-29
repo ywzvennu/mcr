@@ -1,0 +1,619 @@
+//! Runtime fairy-variant dispatch: [`AnyWideVariant`], a type-erased enum wrapper
+//! over the geometry layer's monomorphized [`GenericPosition<G, V>`](super::GenericPosition).
+//!
+//! Each shipped fairy variant is a distinct compile-time type
+//! [`GenericPosition<G, V>`](super::GenericPosition): `G` is its board geometry
+//! (Chess8x8, Shogi9x9, Xiangqi9x10, …) and `V` a zero-sized rule layer, so every
+//! hook is monomorphized — exactly what a consumer that knows its variant at
+//! compile time wants. But a CLI, a binding, or a server often picks the variant
+//! from a string at runtime and cannot name `G`/`V`, and — unlike the concrete
+//! 8x8 engine — the geometries differ, so a single generic position type cannot
+//! span them.
+//!
+//! [`AnyWideVariant`] closes that gap: a plain enum with one arm per shipped fairy
+//! variant, each wrapping that variant's concrete position alias, plus a runtime
+//! dispatch (a single `match`) for the common surface. It adds no state beyond the
+//! wrapped position and introduces no `unsafe` or trait-object indirection; the
+//! per-variant fast paths inside [`GenericPosition`](super::GenericPosition) are
+//! untouched. The companion [`WideVariantId`] is the string-addressable selector
+//! ([`FromStr`] from a canonical name or a common alias).
+
+use alloc::{string::String, vec::Vec};
+use core::str::FromStr;
+
+use super::{
+    perft, Alice, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse, Chak, Chennis,
+    Dobutsu, Dragon, Duck, Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Grand,
+    Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk,
+    Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako,
+    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori,
+    WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+};
+use crate::Color;
+
+/// The error returned by [`WideVariantId::from_str`] when a name is not a
+/// recognized fairy variant or alias.
+///
+/// The wrapped [`String`] is the offending input, lowercased and trimmed exactly
+/// as it was matched, so callers can echo it back in a diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownWideVariant(pub String);
+
+impl core::fmt::Display for UnknownWideVariant {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "unknown wide variant: {:?}", self.0)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for UnknownWideVariant {}
+
+/// Renders `mv` as UCI long algebraic notation for the geometry of `pos`.
+///
+/// [`WideMove::to_uci`] needs the board geometry as a type argument; this helper
+/// recovers it from the position type so the runtime [`AnyWideVariant`] dispatch
+/// can forward without naming `G`.
+fn move_to_uci<G: Geometry, V: WideVariant<G>>(
+    _pos: &GenericPosition<G, V>,
+    mv: &WideMove,
+) -> String {
+    mv.to_uci::<G>()
+}
+
+/// Parses a UCI move string against `pos` by matching it against the position's
+/// own legal-move renderings, returning the matching [`WideMove`] or `None`.
+///
+/// This is the geometry-aware counterpart of [`move_to_uci`]: there is no
+/// `parse_uci` on [`GenericPosition`](super::GenericPosition), so a UCI string is
+/// resolved against the legal moves it could name — guaranteeing the result is
+/// both legal and renders back to the same string.
+fn find_uci<G: Geometry, V: WideVariant<G>>(
+    pos: &GenericPosition<G, V>,
+    uci: &str,
+) -> Option<WideMove> {
+    pos.legal_moves()
+        .into_iter()
+        .find(|m| m.to_uci::<G>() == uci)
+}
+
+/// Generates the [`WideVariantId`] selector and the [`AnyWideVariant`] runtime
+/// wrapper from a single table of `Variant, ConcreteAlias, "canonical" [, "alias"…]`
+/// rows, keeping the two enums and every forwarding `match` exhaustively in sync.
+macro_rules! wide_variants {
+    ( $( $variant:ident, $alias:ty, $name:literal $( , $alt:literal )* ; )+ ) => {
+        /// A stable, string-addressable identifier for a shipped fairy variant.
+        ///
+        /// Parse one from a name or alias with [`FromStr`] (case-insensitive,
+        /// surrounding whitespace ignored), render it back with [`as_str`] /
+        /// [`Display`], and enumerate them all with [`WideVariantId::ALL`]. Feed
+        /// it to [`AnyWideVariant::startpos`] / [`AnyWideVariant::from_fen`] to
+        /// build a runtime position.
+        ///
+        /// [`as_str`]: WideVariantId::as_str
+        /// [`Display`]: core::fmt::Display
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        pub enum WideVariantId {
+            $(
+                #[doc = concat!("The `", $name, "` variant.")]
+                $variant,
+            )+
+        }
+
+        impl WideVariantId {
+            /// Every shipped fairy-variant identifier, in declaration order. The
+            /// canonical entry point for bindings, a CLI variant list, or docs.
+            pub const ALL: &'static [WideVariantId] = &[ $( WideVariantId::$variant ),+ ];
+
+            /// The canonical lowercase name, the inverse of the canonical-name
+            /// branch of [`FromStr`]: `id.as_str().parse() == Ok(id)`.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $( WideVariantId::$variant => $name, )+
+                }
+            }
+        }
+
+        impl core::fmt::Display for WideVariantId {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl FromStr for WideVariantId {
+            type Err = UnknownWideVariant;
+
+            /// Parses a [`WideVariantId`] from its canonical name or a common
+            /// alias. Matching is case-insensitive and ignores surrounding
+            /// whitespace.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`UnknownWideVariant`] (carrying the normalized input) when
+            /// the name matches no variant.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let normalized = s.trim().to_ascii_lowercase();
+                let id = match normalized.as_str() {
+                    $( $name $( | $alt )* => WideVariantId::$variant, )+
+                    _ => return Err(UnknownWideVariant(normalized)),
+                };
+                Ok(id)
+            }
+        }
+
+        /// A fairy-chess position whose variant is chosen at runtime: a thin enum
+        /// wrapper with one arm per shipped variant, each holding that variant's
+        /// concrete [`GenericPosition<G, V>`](super::GenericPosition) alias.
+        ///
+        /// Construct one with [`AnyWideVariant::startpos`] or
+        /// [`AnyWideVariant::from_fen`] from a [`WideVariantId`] (which a string
+        /// yields via [`WideVariantId::from_str`]), then use the uniform surface —
+        /// [`legal_moves`](AnyWideVariant::legal_moves),
+        /// [`play`](AnyWideVariant::play), [`perft`](AnyWideVariant::perft),
+        /// [`to_fen`](AnyWideVariant::to_fen),
+        /// [`outcome`](AnyWideVariant::outcome), … — without naming the variant's
+        /// geometry or rule type. Every method forwards through a single `match`
+        /// to the inner generic position, so it is exactly as correct as the
+        /// underlying [`GenericPosition<G, V>`](super::GenericPosition) and pays
+        /// only one branch.
+        // The arms wrap positions of differing board geometries (`u64` vs `u128`
+        // backings, 3x4 up to 10x10) so their sizes genuinely differ; this runtime
+        // facade deliberately stores them inline rather than boxing every arm.
+        #[allow(clippy::large_enum_variant)]
+        #[derive(Clone, Debug)]
+        pub enum AnyWideVariant {
+            $(
+                #[doc = concat!("The `", $name, "` variant.")]
+                $variant($alias),
+            )+
+        }
+
+        impl AnyWideVariant {
+            /// The starting position of the variant named by `id`.
+            #[must_use]
+            pub fn startpos(id: WideVariantId) -> Self {
+                match id {
+                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$alias>::startpos()), )+
+                }
+            }
+
+            /// Parses a position of the variant named by `id` from `fen`.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`WideFenError`] if `fen` is malformed or fails the
+            /// variant's validation (the same errors
+            /// [`GenericPosition::from_fen`](super::GenericPosition::from_fen)
+            /// reports).
+            pub fn from_fen(id: WideVariantId, fen: &str) -> Result<Self, WideFenError> {
+                let pos = match id {
+                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$alias>::from_fen(fen)?), )+
+                };
+                Ok(pos)
+            }
+
+            /// The identifier of the wrapped variant.
+            #[must_use]
+            pub fn variant_id(&self) -> WideVariantId {
+                match self {
+                    $( AnyWideVariant::$variant(_) => WideVariantId::$variant, )+
+                }
+            }
+
+            /// The side to move.
+            #[must_use]
+            pub fn turn(&self) -> Color {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.turn(), )+
+                }
+            }
+
+            /// The legal moves of the side to move under the wrapped variant.
+            #[must_use]
+            pub fn legal_moves(&self) -> Vec<WideMove> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.legal_moves(), )+
+                }
+            }
+
+            /// Applies `mv`, returning the successor position in the same variant
+            /// arm. The move must be legal (as for
+            /// [`GenericPosition::play`](super::GenericPosition::play)).
+            #[must_use]
+            pub fn play(&self, mv: &WideMove) -> Self {
+                match self {
+                    $( AnyWideVariant::$variant(p) => AnyWideVariant::$variant(p.play(mv)), )+
+                }
+            }
+
+            /// Counts the leaf nodes reachable in exactly `depth` plies, forwarding
+            /// to the geometry layer's [`perft`](super::perft).
+            #[must_use]
+            pub fn perft(&self, depth: u32) -> u64 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => perft(p, depth), )+
+                }
+            }
+
+            /// The variant-aware game result, or `None` if the game is not over.
+            #[must_use]
+            pub fn outcome(&self) -> Option<WideOutcome> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.outcome(), )+
+                }
+            }
+
+            /// The variant-aware [`WideEndReason`], or `None` if the game is not
+            /// over.
+            #[must_use]
+            pub fn end_reason(&self) -> Option<WideEndReason> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.end_reason(), )+
+                }
+            }
+
+            /// Whether the side to move is in check (always `false` where the king
+            /// is not royal).
+            #[must_use]
+            pub fn is_check(&self) -> bool {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.is_check(), )+
+                }
+            }
+
+            /// Serializes this position to FEN.
+            #[must_use]
+            pub fn to_fen(&self) -> String {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.to_fen(), )+
+                }
+            }
+
+            /// Renders `mv` as UCI long algebraic notation for this variant's
+            /// geometry.
+            #[must_use]
+            pub fn to_uci(&self, mv: &WideMove) -> String {
+                match self {
+                    $( AnyWideVariant::$variant(p) => move_to_uci(p, mv), )+
+                }
+            }
+
+            /// Resolves a UCI move string to a legal [`WideMove`] in this position,
+            /// or `None` if it names no legal move.
+            #[must_use]
+            pub fn parse_uci(&self, uci: &str) -> Option<WideMove> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => find_uci(p, uci), )+
+                }
+            }
+
+            /// Parses and applies a UCI move string, returning the successor
+            /// position, or `None` if the string names no legal move.
+            #[must_use]
+            pub fn play_uci(&self, uci: &str) -> Option<Self> {
+                let mv = self.parse_uci(uci)?;
+                Some(self.play(&mv))
+            }
+        }
+    };
+}
+
+wide_variants! {
+    Alice, Alice, "alice";
+    Asean, Asean, "asean";
+    Bughouse, Bughouse, "bughouse", "bug";
+    Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
+    CannonShogi, CannonShogi, "cannonshogi", "cannon-shogi";
+    Capablanca, Capablanca, "capablanca", "capa";
+    Capahouse, Capahouse, "capahouse";
+    Chak, Chak, "chak";
+    Chennis, Chennis, "chennis";
+    Dobutsu, Dobutsu, "dobutsu";
+    Dragon, Dragon, "dragon";
+    Duck, Duck, "duck";
+    Empire, Empire, "empire";
+    FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
+    Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
+    Grand, Grand, "grand";
+    Grandhouse, Grandhouse, "grandhouse";
+    HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
+    Janggi, Janggi, "janggi", "korean";
+    Jieqi, Jieqi, "jieqi";
+    Khans, Khans, "khans";
+    Knightmate, Knightmate, "knightmate";
+    Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
+    Makpong, Makpong, "makpong";
+    Makruk, Makruk, "makruk";
+    Manchu, Manchu, "manchu", "manchuchess";
+    Mansindam, Mansindam, "mansindam";
+    Minishogi, Minishogi, "minishogi";
+    Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
+    Orda, Orda, "orda";
+    Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
+    Placement, Placement, "placement";
+    Seirawan, Seirawan, "seirawan", "schess", "s-chess";
+    Shako, Shako, "shako";
+    Shatar, Shatar, "shatar";
+    Shatranj, Shatranj, "shatranj";
+    Shinobi, Shinobi, "shinobi", "shinobiplus";
+    Shogi, Shogi, "shogi";
+    Shogun, Shogun, "shogun";
+    ShoShogi, ShoShogi, "shoshogi", "sho-shogi";
+    Shouse, Shouse, "shouse", "seirawanhouse";
+    Sittuyin, Sittuyin, "sittuyin", "burmese";
+    Spartan, Spartan, "spartan";
+    Synochess, Synochess, "synochess";
+    Tori, Tori, "tori", "torishogi";
+    Xiangfu, Xiangfu, "xiangfu";
+    Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_str_round_trips_every_canonical_name() {
+        for &id in WideVariantId::ALL {
+            assert_eq!(id.as_str().parse::<WideVariantId>(), Ok(id), "{id}");
+            // Case-insensitive and whitespace-tolerant.
+            let padded = alloc::format!("  {}  ", id.as_str().to_ascii_uppercase());
+            assert_eq!(padded.parse::<WideVariantId>(), Ok(id), "{id} padded");
+        }
+        // Every canonical name is distinct (the round trip above would otherwise
+        // be ambiguous).
+        let mut names: Vec<&str> = WideVariantId::ALL.iter().map(|id| id.as_str()).collect();
+        names.sort_unstable();
+        let count = names.len();
+        names.dedup();
+        assert_eq!(names.len(), count, "canonical names must be unique");
+        assert_eq!(count, 47, "all 47 fairy variants are covered");
+    }
+
+    #[test]
+    fn from_str_accepts_documented_aliases() {
+        let cases: &[(&str, WideVariantId)] = &[
+            ("bug", WideVariantId::Bughouse),
+            ("ouk", WideVariantId::Cambodian),
+            ("capa", WideVariantId::Capablanca),
+            ("dark", WideVariantId::FogOfWar),
+            ("KOREAN", WideVariantId::Janggi),
+            ("kyoto", WideVariantId::Kyotoshogi),
+            ("s-chess", WideVariantId::Seirawan),
+            ("schess", WideVariantId::Seirawan),
+            ("cchess", WideVariantId::Xiangqi),
+            ("chinesechess", WideVariantId::Xiangqi),
+            ("  torishogi ", WideVariantId::Tori),
+        ];
+        for (name, id) in cases {
+            assert_eq!(name.parse::<WideVariantId>(), Ok(*id), "parsing {name:?}");
+        }
+    }
+
+    #[test]
+    fn from_str_rejects_junk() {
+        for junk in ["", "chess", "xyzzy", "shogi9", "  not a variant  "] {
+            let err = junk.parse::<WideVariantId>().unwrap_err();
+            assert_eq!(err.0, junk.trim().to_ascii_lowercase());
+        }
+    }
+
+    #[test]
+    fn startpos_fen_round_trips_for_every_variant() {
+        for &id in WideVariantId::ALL {
+            let pos = AnyWideVariant::startpos(id);
+            assert_eq!(pos.variant_id(), id);
+            let fen = pos.to_fen();
+            let reparsed = AnyWideVariant::from_fen(id, &fen).expect("startpos fen parses");
+            assert_eq!(reparsed.to_fen(), fen, "fen round trip for {id}");
+            assert_eq!(reparsed.variant_id(), id);
+        }
+    }
+
+    /// The enum dispatch must agree, node for node, with the typed
+    /// [`GenericPosition`](super::GenericPosition) path: same perft, same legal
+    /// moves and FEN, and the same successor after the first legal move.
+    macro_rules! agrees_with_typed {
+        ($id:expr, $alias:ty, $arm:path, $depth:expr) => {{
+            let typed = <$alias>::startpos();
+            let any = AnyWideVariant::startpos($id);
+            assert!(matches!(any, $arm(_)), "{} arm", $id);
+
+            assert_eq!(any.to_fen(), typed.to_fen(), "{} fen", $id);
+            assert_eq!(any.turn(), typed.turn(), "{} turn", $id);
+            assert_eq!(any.is_check(), typed.is_check(), "{} check", $id);
+            assert_eq!(any.legal_moves(), typed.legal_moves(), "{} moves", $id);
+            assert_eq!(any.outcome(), typed.outcome(), "{} outcome", $id);
+            assert_eq!(any.end_reason(), typed.end_reason(), "{} end", $id);
+
+            // Enum perft equals the typed-path perft at a distinctive depth.
+            for depth in 0..=$depth {
+                assert_eq!(
+                    any.perft(depth),
+                    perft(&typed, depth),
+                    "{} perft {}",
+                    $id,
+                    depth
+                );
+            }
+
+            // Playing the first legal move keeps the two in lockstep, and UCI
+            // round-trips through the enum.
+            if let Some(mv) = typed.legal_moves().first() {
+                let uci = any.to_uci(mv);
+                assert_eq!(any.parse_uci(&uci).as_ref(), Some(mv), "{} parse_uci", $id);
+                let any_after = any.play(mv);
+                let typed_after = typed.play(mv);
+                assert_eq!(
+                    any_after.to_fen(),
+                    typed_after.to_fen(),
+                    "{} after fen",
+                    $id
+                );
+                assert_eq!(
+                    any.play_uci(&uci).map(|p| p.to_fen()),
+                    Some(typed_after.to_fen()),
+                    "{} play_uci",
+                    $id
+                );
+            }
+        }};
+    }
+
+    #[test]
+    fn enum_dispatch_matches_typed_path_for_every_variant() {
+        agrees_with_typed!(WideVariantId::Alice, Alice, AnyWideVariant::Alice, 2);
+        agrees_with_typed!(WideVariantId::Asean, Asean, AnyWideVariant::Asean, 2);
+        agrees_with_typed!(
+            WideVariantId::Bughouse,
+            Bughouse,
+            AnyWideVariant::Bughouse,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Cambodian,
+            Cambodian,
+            AnyWideVariant::Cambodian,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::CannonShogi,
+            CannonShogi,
+            AnyWideVariant::CannonShogi,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Capablanca,
+            Capablanca,
+            AnyWideVariant::Capablanca,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Capahouse,
+            Capahouse,
+            AnyWideVariant::Capahouse,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Chak, Chak, AnyWideVariant::Chak, 2);
+        agrees_with_typed!(WideVariantId::Chennis, Chennis, AnyWideVariant::Chennis, 2);
+        agrees_with_typed!(WideVariantId::Dobutsu, Dobutsu, AnyWideVariant::Dobutsu, 2);
+        agrees_with_typed!(WideVariantId::Dragon, Dragon, AnyWideVariant::Dragon, 2);
+        agrees_with_typed!(WideVariantId::Duck, Duck, AnyWideVariant::Duck, 2);
+        agrees_with_typed!(WideVariantId::Empire, Empire, AnyWideVariant::Empire, 2);
+        agrees_with_typed!(
+            WideVariantId::FogOfWar,
+            FogOfWar,
+            AnyWideVariant::FogOfWar,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Gorogoro,
+            Gorogoro,
+            AnyWideVariant::Gorogoro,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Grand, Grand, AnyWideVariant::Grand, 2);
+        agrees_with_typed!(
+            WideVariantId::Grandhouse,
+            Grandhouse,
+            AnyWideVariant::Grandhouse,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::HoppelPoppel,
+            HoppelPoppel,
+            AnyWideVariant::HoppelPoppel,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Janggi, Janggi, AnyWideVariant::Janggi, 2);
+        agrees_with_typed!(WideVariantId::Jieqi, Jieqi, AnyWideVariant::Jieqi, 2);
+        agrees_with_typed!(WideVariantId::Khans, Khans, AnyWideVariant::Khans, 2);
+        agrees_with_typed!(
+            WideVariantId::Knightmate,
+            Knightmate,
+            AnyWideVariant::Knightmate,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Kyotoshogi,
+            Kyotoshogi,
+            AnyWideVariant::Kyotoshogi,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Makpong, Makpong, AnyWideVariant::Makpong, 2);
+        agrees_with_typed!(WideVariantId::Makruk, Makruk, AnyWideVariant::Makruk, 2);
+        agrees_with_typed!(WideVariantId::Manchu, Manchu, AnyWideVariant::Manchu, 2);
+        agrees_with_typed!(
+            WideVariantId::Mansindam,
+            Mansindam,
+            AnyWideVariant::Mansindam,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Minishogi,
+            Minishogi,
+            AnyWideVariant::Minishogi,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Minixiangqi,
+            Minixiangqi,
+            AnyWideVariant::Minixiangqi,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Orda, Orda, AnyWideVariant::Orda, 2);
+        agrees_with_typed!(
+            WideVariantId::Ordamirror,
+            Ordamirror,
+            AnyWideVariant::Ordamirror,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Placement,
+            Placement,
+            AnyWideVariant::Placement,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Seirawan,
+            Seirawan,
+            AnyWideVariant::Seirawan,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Shako, Shako, AnyWideVariant::Shako, 2);
+        agrees_with_typed!(WideVariantId::Shatar, Shatar, AnyWideVariant::Shatar, 2);
+        agrees_with_typed!(
+            WideVariantId::Shatranj,
+            Shatranj,
+            AnyWideVariant::Shatranj,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Shinobi, Shinobi, AnyWideVariant::Shinobi, 2);
+        agrees_with_typed!(WideVariantId::Shogi, Shogi, AnyWideVariant::Shogi, 2);
+        agrees_with_typed!(WideVariantId::Shogun, Shogun, AnyWideVariant::Shogun, 2);
+        agrees_with_typed!(
+            WideVariantId::ShoShogi,
+            ShoShogi,
+            AnyWideVariant::ShoShogi,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Shouse, Shouse, AnyWideVariant::Shouse, 2);
+        agrees_with_typed!(
+            WideVariantId::Sittuyin,
+            Sittuyin,
+            AnyWideVariant::Sittuyin,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Spartan, Spartan, AnyWideVariant::Spartan, 2);
+        agrees_with_typed!(
+            WideVariantId::Synochess,
+            Synochess,
+            AnyWideVariant::Synochess,
+            2
+        );
+        agrees_with_typed!(WideVariantId::Tori, Tori, AnyWideVariant::Tori, 2);
+        agrees_with_typed!(WideVariantId::Xiangfu, Xiangfu, AnyWideVariant::Xiangfu, 2);
+        agrees_with_typed!(WideVariantId::Xiangqi, Xiangqi, AnyWideVariant::Xiangqi, 2);
+    }
+}
