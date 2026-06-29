@@ -158,3 +158,73 @@ def test_invalid_san_raises_value_error():
     pos = mce.Position()
     with pytest.raises(ValueError):
         pos.parse_san("Qxz9")
+
+
+# -- Fairy (geometry-layer) variants ----------------------------------------
+
+
+def test_fairy_xiangqi_startpos_and_perft():
+    pos = mce.FairyPosition("xiangqi")
+    assert pos.variant == "xiangqi"
+    assert pos.turn == "white"
+    # FSF-confirmed Xiangqi startpos perft sequence (tests/perft_xiangqi.rs).
+    assert len(pos.legal_moves()) == 44
+    assert pos.perft(0) == 1
+    assert pos.perft(1) == 44
+    assert pos.perft(2) == 1920
+    assert pos.perft(3) == 79666
+
+
+def test_fairy_shogi_startpos_and_perft():
+    pos = mce.FairyPosition.startpos("shogi")
+    assert pos.variant == "shogi"
+    # FSF-confirmed Shogi startpos perft sequence (tests/perft_shogi.rs).
+    assert pos.perft(1) == 30
+    assert pos.perft(2) == 900
+
+
+def test_fairy_alias_resolution():
+    # "cchess" -> xiangqi, like the Rust FromStr alias set.
+    pos = mce.FairyPosition("cchess")
+    assert pos.variant == "xiangqi"
+
+
+def test_fairy_push_mutates_play_does_not():
+    pos = mce.FairyPosition("xiangqi")
+    start_fen = pos.fen
+    first = pos.legal_moves()[0]
+    nxt = pos.play(first)
+    # play() leaves the original untouched.
+    assert pos.fen == start_fen
+    assert nxt.turn == "black"
+    # push() mutates in place.
+    pos.push(first)
+    assert pos.fen == nxt.fen
+
+
+def test_fairy_ongoing_game_has_no_outcome():
+    pos = mce.FairyPosition("xiangqi")
+    assert pos.outcome() is None
+    assert pos.end_reason() is None
+    assert not pos.is_checkmate()
+    assert not pos.is_stalemate()
+
+
+def test_fairy_variants_catalogue():
+    names = mce.variants()
+    assert "xiangqi" in names
+    assert "shogi" in names
+    assert "janggi" in names
+
+
+def test_fairy_unknown_variant_raises_value_error():
+    with pytest.raises(ValueError):
+        mce.FairyPosition("definitely-not-a-variant")
+
+
+def test_fairy_illegal_uci_push_raises_value_error():
+    pos = mce.FairyPosition("xiangqi")
+    with pytest.raises(ValueError):
+        pos.push("a0a9")  # not a legal move
+    with pytest.raises(ValueError):
+        pos.push("garbage")

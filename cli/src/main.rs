@@ -47,6 +47,8 @@ enum Command {
     Convert(commands::convert::ConvertArgs),
     /// Parse and validate a FEN; exit 0 on success, nonzero on failure.
     Validate(commands::validate::ValidateArgs),
+    /// Work with the geometry-layer fairy variants (xiangqi, shogi, janggi, …).
+    Fairy(commands::fairy::FairyArgs),
 }
 
 fn main() -> ExitCode {
@@ -57,6 +59,7 @@ fn main() -> ExitCode {
         Command::Play(args) => commands::play::run(args),
         Command::Convert(args) => commands::convert::run(args),
         Command::Validate(args) => commands::validate::run(args),
+        Command::Fairy(args) => commands::fairy::run(args),
     };
 
     match result {

@@ -13,6 +13,7 @@
 // crate's stricter pub/idiom lints would only produce noise here.
 #![allow(clippy::needless_pass_by_value)]
 
+use mce::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
 use mce::{AnyVariant, Color, EndReason, Outcome, Position, VariantId};
 use wasm_bindgen::prelude::*;
 
@@ -242,5 +243,163 @@ impl Game {
                 "SAN is only available for standard chess and Chess960, not {other}"
             ))),
         }
+    }
+}
+
+/// The lowercase machine label for a [`WideEndReason`] (the geometry layer's
+/// analogue of [`EndReason`]; kept in lockstep with the enum).
+fn wide_end_reason_str(r: WideEndReason) -> &'static str {
+    match r {
+        WideEndReason::Checkmate => "checkmate",
+        WideEndReason::Stalemate => "stalemate",
+        WideEndReason::InsufficientMaterial => "insufficient_material",
+        WideEndReason::VariantWin => "variant_win",
+        WideEndReason::VariantDraw => "variant_draw",
+        WideEndReason::Repetition => "repetition",
+        WideEndReason::Sennichite => "sennichite",
+        WideEndReason::PerpetualCheckLoss => "perpetual_check_loss",
+        WideEndReason::Bikjang => "bikjang",
+        WideEndReason::CountingDraw => "counting_draw",
+        WideEndReason::MoveRule => "move_rule",
+    }
+}
+
+/// A fairy-chess game on the geometry layer: xiangqi, shogi, janggi, orda, and
+/// the rest of the wide variants, reached through mce's runtime
+/// [`AnyWideVariant`] dispatch.
+///
+/// This mirrors [`Game`] (construct, FEN I/O, legal moves, perft, play) for the
+/// variants whose board geometry differs from 8x8, so it is a separate class
+/// rather than another arm of `Game`. SAN, the Zobrist hash, and the other 8x8
+/// `Position` conveniences do not apply here and are not exposed. Enumerate the
+/// variant names with [`FairyGame::variants`].
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct FairyGame {
+    inner: AnyWideVariant,
+}
+
+#[wasm_bindgen]
+impl FairyGame {
+    /// Every supported fairy-variant name, as accepted by [`FairyGame::startpos`]
+    /// / [`FairyGame::fromFen`].
+    #[wasm_bindgen(js_name = variants)]
+    pub fn variants() -> Vec<String> {
+        WideVariantId::ALL
+            .iter()
+            .map(|id| id.as_str().to_owned())
+            .collect()
+    }
+
+    /// Start position of the named fairy variant (e.g. `"xiangqi"`, `"shogi"`,
+    /// `"janggi"`; aliases such as `"cchess"` work too). Unknown names throw.
+    #[wasm_bindgen(js_name = startpos)]
+    pub fn startpos(variant: &str) -> Result<FairyGame, JsError> {
+        let id = variant.parse::<WideVariantId>().map_err(js_err)?;
+        Ok(FairyGame {
+            inner: AnyWideVariant::startpos(id),
+        })
+    }
+
+    /// Parse a FEN under the named fairy variant. Throws on a malformed or
+    /// illegal FEN, or an unknown variant name.
+    #[wasm_bindgen(js_name = fromFen)]
+    pub fn from_fen(variant: &str, fen: &str) -> Result<FairyGame, JsError> {
+        let id = variant.parse::<WideVariantId>().map_err(js_err)?;
+        let inner = AnyWideVariant::from_fen(id, fen).map_err(js_err)?;
+        Ok(FairyGame { inner })
+    }
+
+    /// The variant identifier, lowercased (e.g. `"xiangqi"`, `"shogi"`).
+    #[wasm_bindgen(js_name = variant)]
+    pub fn variant(&self) -> String {
+        self.inner.variant_id().to_string()
+    }
+
+    /// The FEN for the current position.
+    #[wasm_bindgen(js_name = fen)]
+    pub fn fen(&self) -> String {
+        self.inner.to_fen()
+    }
+
+    /// Side to move: `"white"` or `"black"`.
+    #[wasm_bindgen(js_name = turn)]
+    pub fn turn(&self) -> String {
+        color_str(self.inner.turn())
+    }
+
+    /// Legal moves in this position, as UCI strings.
+    #[wasm_bindgen(js_name = legalMoves)]
+    pub fn legal_moves(&self) -> Vec<String> {
+        self.inner
+            .legal_moves()
+            .iter()
+            .map(|mv| self.inner.to_uci(mv))
+            .collect()
+    }
+
+    /// Apply a move given in UCI. Returns the resulting position's FEN. Throws if
+    /// the move is malformed or not legal here. Alias: [`FairyGame::play`].
+    #[wasm_bindgen(js_name = push)]
+    pub fn push(&mut self, uci: &str) -> Result<String, JsError> {
+        let mv = self
+            .inner
+            .parse_uci(uci)
+            .ok_or_else(|| JsError::new(&format!("illegal or malformed UCI move: {uci:?}")))?;
+        self.inner = self.inner.play(&mv);
+        Ok(self.inner.to_fen())
+    }
+
+    /// Alias for [`FairyGame::push`]: apply a UCI move in place, returning the
+    /// new FEN.
+    #[wasm_bindgen(js_name = play)]
+    pub fn play(&mut self, uci: &str) -> Result<String, JsError> {
+        self.push(uci)
+    }
+
+    /// True if the side to move is in check (always `false` where the king is not
+    /// royal).
+    #[wasm_bindgen(js_name = isCheck)]
+    pub fn is_check(&self) -> bool {
+        self.inner.is_check()
+    }
+
+    /// True if the position is a decisive loss for the side to move (checkmate or
+    /// a variant-specific win). Drawn ends surface through [`FairyGame::outcome`].
+    #[wasm_bindgen(js_name = isCheckmate)]
+    pub fn is_checkmate(&self) -> bool {
+        matches!(
+            self.inner.end_reason(),
+            Some(WideEndReason::Checkmate | WideEndReason::VariantWin)
+        )
+    }
+
+    /// The game outcome, or `null` while play continues. See [`GameOutcome`].
+    #[wasm_bindgen(js_name = outcome)]
+    pub fn outcome(&self) -> Option<GameOutcome> {
+        let reason = self
+            .inner
+            .end_reason()
+            .map(wide_end_reason_str)
+            .map(str::to_owned);
+        self.inner.outcome().map(|o| match o {
+            WideOutcome::Decisive { winner } => GameOutcome {
+                kind: "decisive".to_owned(),
+                winner: Some(color_str(winner)),
+                reason: reason.clone(),
+            },
+            WideOutcome::Draw => GameOutcome {
+                kind: "draw".to_owned(),
+                winner: None,
+                reason: reason.clone(),
+            },
+        })
+    }
+
+    /// Perft node count to `depth` from the current position. Returned as a
+    /// string to preserve precision beyond JS's safe-integer range.
+    #[wasm_bindgen(js_name = perft)]
+    pub fn perft(&self, depth: u32) -> String {
+        self.inner.perft(depth).to_string()
     }
 }

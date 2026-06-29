@@ -5,7 +5,7 @@
 //! covers the acceptance checks without needing a wasm runtime: startpos has 20
 //! legal moves, perft matches the known counts, and SAN round-trips.
 
-use mce_wasm::Game;
+use mce_wasm::{FairyGame, Game};
 
 #[test]
 fn startpos_has_twenty_legal_moves() {
@@ -38,7 +38,10 @@ fn san_round_trips() {
 
     // legalMovesSan should contain the same SAN.
     let sans = g.legal_moves_san().expect("legal SAN list");
-    assert!(sans.contains(&"Nf3".to_owned()), "Nf3 in SAN list: {sans:?}");
+    assert!(
+        sans.contains(&"Nf3".to_owned()),
+        "Nf3 in SAN list: {sans:?}"
+    );
     assert_eq!(sans.len(), 20);
 }
 
@@ -81,6 +84,50 @@ fn zobrist_is_stable_hex() {
     assert!(z0.chars().all(|c| c.is_ascii_hexdigit()));
     g.push("e2e4").unwrap();
     assert_ne!(g.zobrist(), z0, "hash changes after a move");
+}
+
+#[test]
+fn fairy_startpos_and_perft_match_known_counts() {
+    // Construct a fairy variant by name and run perft — the acceptance gate.
+    // FSF-confirmed Xiangqi startpos counts (tests/perft_xiangqi.rs).
+    let xq = FairyGame::startpos("xiangqi").expect("xiangqi startpos");
+    assert_eq!(xq.variant(), "xiangqi");
+    assert_eq!(xq.turn(), "white");
+    assert_eq!(xq.legal_moves().len(), 44, "xiangqi startpos legal moves");
+    assert!(!xq.is_check());
+    assert!(xq.outcome().is_none());
+    assert_eq!(xq.perft(1), "44");
+    assert_eq!(xq.perft(2), "1920");
+    assert_eq!(xq.perft(3), "79666");
+
+    // A second geometry (9x9 Shogi) via an alias-free name (tests/perft_shogi.rs).
+    let shogi = FairyGame::startpos("shogi").expect("shogi startpos");
+    assert_eq!(shogi.perft(1), "30");
+    assert_eq!(shogi.perft(2), "900");
+
+    // Alias resolution: "cchess" -> xiangqi.
+    let alias = FairyGame::startpos("cchess").expect("cchess alias");
+    assert_eq!(alias.variant(), "xiangqi");
+
+    // The variant catalogue is exposed and non-trivial.
+    let names = FairyGame::variants();
+    assert!(names.iter().any(|n| n == "xiangqi"));
+    assert!(names.iter().any(|n| n == "shogi"));
+}
+
+#[test]
+fn fairy_play_advances_and_fen_round_trips() {
+    let mut xq = FairyGame::startpos("xiangqi").expect("xiangqi startpos");
+    let fen = xq.fen();
+    // Re-parse the startpos FEN under the variant.
+    let reparsed = FairyGame::from_fen("xiangqi", &fen).expect("parse fen");
+    assert_eq!(reparsed.fen(), fen);
+
+    // Play the first legal move; the position advances to black to move.
+    let first = xq.legal_moves()[0].clone();
+    xq.push(&first).expect("play first legal move");
+    assert_eq!(xq.turn(), "black");
+    assert_ne!(xq.fen(), fen, "fen changes after a move");
 }
 
 // Note on the error paths (bad UCI/SAN/FEN, unknown variant, SAN on a non-SAN

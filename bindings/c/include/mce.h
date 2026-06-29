@@ -54,6 +54,16 @@ typedef int32_t MceOutcome;
 #endif // __cplusplus
 
 /**
+ * Opaque handle to a fairy-variant chess position chosen at runtime.
+ *
+ * C code only ever holds a `MceFairyPosition*`; the layout is private. Create
+ * one with [`mce_fairy_position_startpos`] /
+ * [`mce_fairy_position_new_from_fen`] and release it with
+ * [`mce_fairy_position_free`].
+ */
+typedef struct MceFairyPosition MceFairyPosition;
+
+/**
  * Opaque handle to a chess position of a runtime-chosen variant.
  *
  * C code only ever holds a `McePosition*`; the layout is private. Create one
@@ -146,6 +156,84 @@ MceOutcome mce_position_outcome(const McePosition *pos);
  * Note that `depth == 0` legitimately returns `1`.
  */
 uint64_t mce_perft(const McePosition *pos, uint32_t depth);
+
+/**
+ * Creates a fairy position from a FEN under the named `variant`.
+ *
+ * `variant` accepts the canonical names and aliases of
+ * [`WideVariantId::from_str`] (e.g. `"xiangqi"`, `"shogi"`, `"janggi"`,
+ * `"orda"`, `"cchess"`).
+ *
+ * Returns a fresh owned `MceFairyPosition*`, or **NULL** if either string is
+ * NULL / not valid UTF-8, the variant name is unknown, or the FEN does not
+ * parse. Release it with [`mce_fairy_position_free`].
+ */
+MceFairyPosition *mce_fairy_position_new_from_fen(const char *fen, const char *variant);
+
+/**
+ * Creates the starting position of the named fairy `variant`.
+ *
+ * `variant` accepts the same names as [`mce_fairy_position_new_from_fen`].
+ * Returns a fresh owned `MceFairyPosition*`, or **NULL** if `variant` is NULL /
+ * not valid UTF-8 / an unknown variant. Release it with
+ * [`mce_fairy_position_free`].
+ */
+MceFairyPosition *mce_fairy_position_startpos(const char *variant);
+
+/**
+ * Releases a fairy position created by this library.
+ *
+ * `mce_fairy_position_free(NULL)` is a no-op. Calling it twice on the same
+ * non-NULL pointer, or on a pointer this library did not produce, is undefined
+ * behavior.
+ */
+void mce_fairy_position_free(MceFairyPosition *pos);
+
+/**
+ * Writes the position's FEN into `buf` and returns the length needed (including
+ * the NUL terminator). See the crate-level buffer contract. Returns `0` if
+ * `pos` is NULL.
+ */
+uintptr_t mce_fairy_position_to_fen(const MceFairyPosition *pos, char *buf, uintptr_t buflen);
+
+/**
+ * Writes the legal moves of the side to move into `buf` as a single
+ * **space-separated** list of UCI strings, and returns the length needed
+ * including the NUL terminator. See the crate-level buffer contract. An empty
+ * move list yields the empty string (`needed == 1`). Returns `0` if `pos` is
+ * NULL.
+ */
+uintptr_t mce_fairy_position_legal_moves(const MceFairyPosition *pos, char *buf, uintptr_t buflen);
+
+/**
+ * Parses `uci` against the position and, if it names a legal move, plays it,
+ * **mutating the handle in place** (advancing it one ply).
+ *
+ * Returns `0` on success, `1` if `pos` or `uci` is NULL or `uci` is not valid
+ * UTF-8, `2` if the move is malformed or illegal. On any nonzero return the
+ * position is left unchanged.
+ */
+int mce_fairy_position_play_uci(MceFairyPosition *pos, const char *uci);
+
+/**
+ * Returns `1` if the side to move is in check, `0` if not. Returns `0` if `pos`
+ * is NULL or the underlying call panics.
+ */
+int mce_fairy_position_is_check(const MceFairyPosition *pos);
+
+/**
+ * Returns the fairy game outcome as an [`MceOutcome`] code (an `int`), with the
+ * same encoding as [`mce_position_outcome`]. Returns `ONGOING` if `pos` is NULL
+ * or the call panics.
+ */
+MceOutcome mce_fairy_position_outcome(const MceFairyPosition *pos);
+
+/**
+ * Counts the leaf nodes reachable in exactly `depth` plies from this fairy
+ * position (a perft). Returns `0` if `pos` is NULL or the computation panics.
+ * `depth == 0` legitimately returns `1`.
+ */
+uint64_t mce_fairy_perft(const MceFairyPosition *pos, uint32_t depth);
 
 #ifdef __cplusplus
 }  // extern "C"
