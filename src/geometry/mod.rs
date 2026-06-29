@@ -60,14 +60,15 @@ pub use variants::{
     CannonShogi, CannonShogiRules, Capablanca, CapablancaRules, Capahouse, CapahouseRules, Chak,
     ChakRules, Chennis, ChennisRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules,
     Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Grand, GrandRules,
-    Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Khans,
-    KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules,
-    Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules,
-    Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement,
-    PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj,
-    ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun,
-    ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess,
-    SynochessRules, Tori, ToriRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Jieqi,
+    JieqiRules, Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules,
+    Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules,
+    Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror,
+    OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
+    ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
+    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
+    SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangfu, XiangfuRules, Xiangqi,
+    XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

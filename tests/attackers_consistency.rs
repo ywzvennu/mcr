@@ -42,12 +42,12 @@ use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
     CapahouseRules, ChakRules, ChennisRules, DobutsuRules, DragonRules, DuckRules, EmpireRules,
     FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
-    HoppelPoppelRules, JanggiRules, KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules,
-    MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules,
-    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules,
-    ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangfuRules,
-    XiangqiRules,
+    HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules, KnightmateRules, KyotoshogiRules,
+    MakpongRules, MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules,
+    OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
+    ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
+    WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
@@ -1239,5 +1239,29 @@ variant_test!(
         "2rb=m4/2c=cj4/2=k1=k4/9/9/9/2J1=K1=K2/5=CC2/4=MBR2[] b - - 2 1",
         "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[*U*u] w - - 0 1",
         "2rb=m4/2c=cj4/2=k6/4=k4/9/4=K4/6=K2/4J=CC2/4=MBR2[] w - - 3 2",
+    ]
+);
+
+// -- Jieqi (hidden Xiangqi, 9x10) -------------------------------------------
+//
+// Jieqi reuses the Xiangqi movers wholesale and adds the face-down Dark piece.
+// The Dark piece is `role_attack_is_leg_asymmetric` (it stands in for whichever
+// asymmetric Xiangqi mover is native to its home square — Horse / Cannon /
+// Soldier / region-confined General-Advisor-Elephant — so `attackers_to`
+// forward-projects its effective attack set exactly as the generator does). The
+// startpos playout reveals pieces under the identity baseline, so the corpus mixes
+// the all-dark start, a fully-revealed Xiangqi middlegame, and two revealed
+// tactical positions (a horse check, a flying-general pin) — every one a position
+// whose attacker relation the property below pins.
+variant_test!(
+    jieqi,
+    Xiangqi9x10,
+    JieqiRules,
+    "jieqi",
+    [
+        "=d=d=d=dk=d=d=d=d/9/1=d5=d1/=d1=d1=d1=d1=d/9/9/=D1=D1=D1=D1=D/1=D5=D1/9/=D=D=D=DK=D=D=D=D w - - 0 1",
+        "r1oukuo1r/9/1cj3jc1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1CJ3JC1/9/R1OUKUO1R w - - 0 1",
+        "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
+        "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1",
     ]
 );
