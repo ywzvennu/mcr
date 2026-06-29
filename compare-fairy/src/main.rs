@@ -31,11 +31,8 @@ mod corpus;
 mod dobutsu;
 mod duck;
 mod empire;
-<<<<<<< HEAD
-mod gorogoro;
-=======
 mod fogofwar;
->>>>>>> 149833e (feat(variant): Fog of War (Dark Chess) on the generic engine, validated vs Fairy-Stockfish)
+mod gorogoro;
 mod grand;
 mod grandhouse;
 mod hoppelpoppel;
