@@ -9,6 +9,7 @@
 //! [`GenericPosition`]: super::GenericPosition
 
 pub mod alice;
+pub mod asean;
 pub mod cambodian;
 pub mod capablanca;
 pub mod capahouse;
@@ -42,6 +43,7 @@ pub mod tori;
 pub mod xiangqi;
 
 pub use alice::{Alice, AliceRules};
+pub use asean::{Asean, AseanRules};
 pub use cambodian::{Cambodian, CambodianRules};
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use capahouse::{Capahouse, CapahouseRules};
