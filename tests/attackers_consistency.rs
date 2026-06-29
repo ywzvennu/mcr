@@ -39,15 +39,16 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CambodianRules, CapablancaRules, ChakRules, DuckRules, EmpireRules, GenericPosition,
-    Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules,
-    MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules,
-    SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules,
-    SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant,
-    XiangqiRules,
+    Bitboard, CambodianRules, CapablancaRules, ChakRules, DobutsuRules, DuckRules, EmpireRules,
+    GenericPosition, Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
+    KyotoshogiRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules,
+    OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
+    WideVariant, XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chess8x8, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Xiangqi9x10,
+    Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
+    Xiangqi9x10,
 };
 use mce::Color;
 
@@ -602,6 +603,30 @@ variant_test!(
         "2k2/5/5/5/2K2[PSLNpsln] w - - 0 1",
         "p+nks+l/5/2+S2/5/+LSK+NP[] w - - 0 1",
         "1k3/5/1+s3/5/1K2+P[] w - - 0 1",
+    ]
+);
+
+// -- Dobutsu (3x4 animal shogi) ---------------------------------------------
+//
+// The forward-biased pieces (the Chick `p` and the promoted Hen `+p`, a Gold
+// General) are color-directional, so the forward-projection cross-check guards
+// their reverse-projection (`role_attack_is_directional`). The non-royal Lion
+// (a King-role stepper) and the Giraffe (Wazir `*j`) / Elephant (Met `m`)
+// steppers are color-symmetric. The corpus reuses `tests/perft_dobutsu.rs`'s
+// FSF-confirmed FENs: the startpos, the drop / multi-hand positions, the forced
+// Chick promotion, and the Lion try-advance.
+
+variant_test!(
+    dobutsu,
+    Dobutsu3x4,
+    DobutsuRules,
+    "dobutsu",
+    [
+        "*jkm/1p1/1P1/MK*J[] w - - 0 1",
+        "*jkm/3/1P1/MK*J[p] w - - 0 1",
+        "1k1/3/3/1K1[M*JPm*jp] w - - 0 1",
+        "1k1/1P1/3/1K1[] w - - 0 1",
+        "1k1/3/1K1/3[M*JP] w - - 0 1",
     ]
 );
 

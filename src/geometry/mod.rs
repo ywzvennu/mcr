@@ -54,13 +54,14 @@ pub use role::{WideRole, OVERFLOW_PREFIX};
 pub use square::Square;
 pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
 pub use variants::{
-    Cambodian, CambodianRules, Capablanca, CapablancaRules, Chak, ChakRules, Duck, DuckRules,
-    Empire, EmpireRules, Grand, GrandRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules,
-    Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makruk, MakrukRules, Manchu,
-    ManchuRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules,
-    Ordamirror, OrdamirrorRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
-    Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules, Sittuyin, SittuyinRules,
-    Spartan, SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangqi, XiangqiRules,
+    Cambodian, CambodianRules, Capablanca, CapablancaRules, Chak, ChakRules, Dobutsu, DobutsuRules,
+    Duck, DuckRules, Empire, EmpireRules, Grand, GrandRules, HoppelPoppel, HoppelPoppelRules,
+    Janggi, JanggiRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makruk,
+    MakrukRules, Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules,
+    Orda, OrdaRules, Ordamirror, OrdamirrorRules, Seirawan, SeirawanRules, Shako, ShakoRules,
+    Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules, Sittuyin,
+    SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangqi,
+    XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -324,6 +325,21 @@ geometry!(
     u128,
     7,
     7
+);
+
+geometry!(
+    /// The Dobutsu board: three files by four ranks (12 squares), backed by `u64`.
+    ///
+    /// The smallest fairy geometry — a 3-by-4 micro board with the odd
+    /// non-power-of-two width `3`: a square index reaches `11`, and edge-masked
+    /// east/west shifts must not wrap past the third file. Files run a..c, ranks
+    /// 1..4. It hosts Dobutsu (3x4 animal shogi), which reuses Shogi's persistent
+    /// capture-fed hand, drops, and far-rank chick promotion, and adds a
+    /// non-royal Lion that wins by reaching — and being safe on — the far rank.
+    Dobutsu3x4,
+    u64,
+    3,
+    4
 );
 
 #[cfg(test)]
