@@ -897,8 +897,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         // King moves are always generated (the only legal moves under double
         // check).
-        let king_targets =
+        let mut king_targets =
             V::role_attacks(WideRole::King, us, king_sq, occupied) & !our_pieces & !king_danger;
+        // Makpong: while in check, the king may move ONLY to capture the lone
+        // checker — it may not flee to a safe square. Under double check there is
+        // no single checker the king could capture, so it has no legal move; the
+        // target set is emptied. Default-off, so every other variant is
+        // byte-identical (the king-target set is left exactly as generated above).
+        if V::king_may_only_capture_checker() && num_checkers > 0 {
+            king_targets &= if num_checkers == 1 {
+                checkers
+            } else {
+                Bitboard::EMPTY
+            };
+        }
         out.emit_targets(king_sq, king_targets, their_pieces);
 
         if num_checkers >= 2 {

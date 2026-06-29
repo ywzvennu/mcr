@@ -35,6 +35,7 @@ mod janggi;
 mod knightmate;
 mod kyotoshogi;
 mod locate;
+mod makpong;
 mod makruk;
 mod manchu;
 mod minishogi;
@@ -184,6 +185,9 @@ fn main() {
     // `AnyVariant` corpus above), so each has its own comparison loop. Fold their
     // mismatches into the exit status.
     let makruk_mismatches = makruk::run(&mut engine, opts.full);
+    // Makpong is a FSF built-in (no variants.ini needed), like makruk; it is
+    // Makruk plus the king-may-not-flee-check rule, on the same generic engine.
+    let makpong_mismatches = makpong::run(&mut engine, opts.full);
     // Cambodian is a FSF built-in (no variants.ini needed), like makruk; it rides
     // the same generic engine.
     let cambodian_mismatches = cambodian::run(&mut engine, opts.full);
@@ -233,6 +237,7 @@ fn main() {
 
     if mismatches
         + makruk_mismatches
+        + makpong_mismatches
         + cambodian_mismatches
         + capablanca_mismatches
         + seirawan_mismatches

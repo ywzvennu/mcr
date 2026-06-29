@@ -660,6 +660,32 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Makpong king-may-not-flee-check (default OFF) --------------------
+
+    /// Returns `true` if this variant forbids the king from **fleeing** a check:
+    /// while the side to move is in check, the king may move **only to capture
+    /// the single checker** — it may not step to a safe empty square, and it may
+    /// not capture a checker that is itself defended (such a capture lands on an
+    /// attacked square and is rejected by the ordinary king-danger filter). The
+    /// check must otherwise be answered by another piece (a block or a capture of
+    /// the checker), exactly as in [Makpong](super::variants::makpong) — a Makruk
+    /// tie-break variant ("Defensive Chess").
+    ///
+    /// This mirrors Fairy-Stockfish's `makpongRule`, whose legality test rejects a
+    /// king move while in check unless its destination is the (lone) checker's
+    /// square. Under **double check** there is no single checker square the king
+    /// could capture, so no king move is legal at all — the king-target set is
+    /// emptied, matching FSF (its `checkers() ^ to` is never zero with two checker
+    /// bits set).
+    ///
+    /// The default is `false`. While it is `false` the generic engine never
+    /// inspects this rule — the king's escape squares are generated exactly as
+    /// before — so every other variant is byte-identical. Only Makpong overrides
+    /// this to `true`; it otherwise reuses the entire Makruk rule layer unchanged.
+    fn king_may_only_capture_checker() -> bool {
+        false
+    }
+
     // --- Duck chess (default OFF) -----------------------------------------
 
     /// Returns `true` if this variant has the neutral Duck: a single blocker
