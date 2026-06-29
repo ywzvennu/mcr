@@ -43,8 +43,9 @@ use mce::geometry::{
     DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules, GrandhouseRules,
     HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
     ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
-    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules,
+    SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant,
+    XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
@@ -424,6 +425,28 @@ variant_test!(
     [
         "r8r/2bqkeab2/pppp1ppppp/2n4n2/3Np5/3P6/7N2/PPP1PPPPPP/2BQKEAB2/R8R[QPqp] w - - 1 4",
         "4k5/8P1/10/10/4Q~5/10/10/10/10/RNBQK1EAN1[Nn] w - - 0 1",
+    ]
+);
+
+// -- S-House (Seirawan gating + crazyhouse drops, 8x8) ----------------------
+//
+// S-House shares Seirawan's pieces (the Hawk `a` / `WideRole::Hawk` and Elephant
+// `e` / `WideRole::Elephant` compounds, both geometrically symmetric), so only the
+// pawn is colour-directional. The unified crazyhouse hand (the `[..]` bracket) and
+// the promoted mask (a `~` token) never touch the attack sets, so this guards that
+// the compound `role_attacks` and the `attackers_to` reverse-projection agree even
+// with a hand in pocket and a promoted piece on the board. Corpus in mce dialect
+// (Hawk `a`).
+
+variant_test!(
+    shouse,
+    Chess8x8,
+    ShouseRules,
+    "shouse",
+    [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[AEae] w KQBCDFGkqbcdfg - 0 1",
+        "r1bqk2r/ppp2ppp/2n5/3pp3/3PP3/2N5/PPP2PPP/R1BQK2R[EANean] w KQCDkqcd - 0 1",
+        "4k3/8/8/3Q~4/8/8/8/4K3[] w - - 0 1",
     ]
 );
 

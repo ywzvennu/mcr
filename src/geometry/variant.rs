@@ -1199,6 +1199,26 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if a gate deploys a piece drawn from the variant's
+    /// **crazyhouse hand** ([`GenericPlacement`](super::position::GenericPlacement))
+    /// rather than from the fixed [`GenericGating`] Hawk/Elephant reserve — so
+    /// **any** held non-pawn, non-king role may be gated, and the gate consumes it
+    /// from the same hand its drops do. Only consulted when
+    /// [`supports_gating`](WideVariant::supports_gating) is `true`.
+    ///
+    /// The default is `false` — the Seirawan model, where the two reserves live in
+    /// [`GenericGating`] and a gate places a Hawk or Elephant via the 2-state
+    /// `GateRole` move encoding. Seirawan and every non-gating variant are
+    /// byte-identical. S-House overrides it to `true`: its reserves and captures
+    /// share one hand, the starting Hawk/Elephant are **droppable as well as
+    /// gateable**, and a gate emits the wider hand-gate move encoding (an arbitrary
+    /// [`WideRole`]). The [`GenericGating`] field still supplies the
+    /// gating-**eligible square set** (the virgin back-rank squares); only the
+    /// reserve source changes.
+    fn gates_from_hand() -> bool {
+        false
+    }
+
     /// The initial gating state for a fresh game: the gating-eligible squares
     /// (the original back-rank squares whose first move may gate) and each side's
     /// reserve pieces in hand.
