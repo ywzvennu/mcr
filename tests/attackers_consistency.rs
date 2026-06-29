@@ -46,7 +46,8 @@ use mce::geometry::{
     MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules,
     OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules,
     ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangfuRules,
+    XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
@@ -1212,5 +1213,31 @@ variant_test!(
         "1mk*u3/3z3/1r5/7/3B3/5**PC/3*UK2[] b - - 4 2",
         "3k3/7/7/7/7/7/3K3[**PMZ*U**pmz*u] w - - 0 1",
         "3k3/7/7/7/7/7/3K3[**P**p] w - - 0 1",
+    ]
+);
+
+// -- Xiang Fu (9x9 Xiangqi-themed drop variant) -----------------------------
+//
+// Xiang Fu fields the hobbled Horse, the orthogonal Cannon, and the diagonal
+// Crossbow (bishop-cannon) — all `role_attack_is_leg_asymmetric` (their attack set
+// is a hobbled leap or a screen-dependent over-one-screen capture, so `attackers_to`
+// forward-projects them, exactly as the generator and the per-move-verify king-safety
+// path do) — plus the ring-confined royal Champion (also leg-asymmetric: its attack
+// relation is keyed on its origin, the ring). The Mahout is a symmetric two-square
+// leaper (its blocking leg is the midpoint), so it stays on the standard reverse
+// projection; this guards that classification too. The corpus reuses the
+// FSF-confirmed FENs from `tests/perft_xiangfu.rs`: the startpos, a Horse/cannon
+// midgame, the captures-to-hand drops position (Pupils in hand), and the
+// duple-check position with the Champions adjacent.
+variant_test!(
+    xiangfu,
+    Shogi9x9,
+    XiangfuRules,
+    "xiangfu",
+    [
+        "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - - 0 1",
+        "2rb=m4/2c=cj4/2=k1=k4/9/9/9/2J1=K1=K2/5=CC2/4=MBR2[] b - - 2 1",
+        "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[*U*u] w - - 0 1",
+        "2rb=m4/2c=cj4/2=k6/4=k4/9/4=K4/6=K2/4J=CC2/4=MBR2[] w - - 3 2",
     ]
 );

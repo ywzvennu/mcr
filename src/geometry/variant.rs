@@ -364,6 +364,24 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         true
     }
 
+    /// Returns `true` if a side that has lost **all** its royal pieces still
+    /// generates its pseudo-legal moves (rather than being treated as an
+    /// already-terminal, move-less node). Only consulted on the multi-royal path
+    /// ([`multi_royal`](WideVariant::multi_royal) `true`).
+    ///
+    /// The default is `false`: a side whose [`royal_squares`](WideVariant::royal_squares)
+    /// set is empty has been eliminated (its last king captured) and has no legal
+    /// continuation, exactly as Spartan / Chak truncate the node. Xiang Fu sets it
+    /// `true` because its royalty is **pseudo-royal** (the Champions are not the
+    /// `KING` piece type): Fairy-Stockfish never truncates the move list of a side
+    /// that has lost both Champions — with no pseudo-royal pieces left there is no
+    /// king-safety constraint, so every pseudo-legal move is legal — and perft must
+    /// match that node-for-node. With the constraint inactive (an empty royal set),
+    /// every pseudo-legal move (and drop) is emitted unverified.
+    fn royalless_generates() -> bool {
+        false
+    }
+
     /// Returns the **forward step** a Berolina-style pawn (the Spartan Hoplite)
     /// uses for its *non-capturing* move: a diagonal advance. Returns the two
     /// diagonal-forward landing squares from `from` for `color`, or

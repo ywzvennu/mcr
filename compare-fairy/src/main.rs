@@ -70,6 +70,7 @@ mod synochess;
 mod tori;
 mod uci;
 mod variants;
+mod xiangfu;
 mod xiangqi;
 
 use std::time::Instant;
@@ -291,6 +292,9 @@ fn main() {
     // Chennis (7x7 tennis-themed flipping variant) is an INI variant like
     // Mansindam: load `variants.ini` inside chennis::run if the binary lacks it.
     let chennis_mismatches = chennis::run(&mut engine, &located.bin, opts.full);
+    // Xiang Fu is an INI variant: xiangfu::run loads FSF's variants.ini (resolved
+    // from the located binary) before driving `UCI_Variant xiangfu`.
+    let xiangfu_mismatches = xiangfu::run(&mut engine, &located.bin, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
     // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
@@ -342,6 +346,7 @@ fn main() {
         + tori_mismatches
         + cannonshogi_mismatches
         + chennis_mismatches
+        + xiangfu_mismatches
         + ataxx_mismatches
         > 0
     {
