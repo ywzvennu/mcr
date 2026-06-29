@@ -4861,8 +4861,7 @@ fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenE
             // Mansindam Angel `**a`); a single `*` an ordinary overflow role.
             if next == crate::geometry::role::OVERFLOW_PREFIX {
                 let base = chars.next().ok_or(WideFenError::BadCastling)?;
-                let role =
-                    WideRole::overflow2_from_base(base).ok_or(WideFenError::BadCastling)?;
+                let role = WideRole::overflow2_from_base(base).ok_or(WideFenError::BadCastling)?;
                 (role, base.is_ascii_uppercase())
             } else {
                 let role = WideRole::overflow_from_base(next).ok_or(WideFenError::BadCastling)?;

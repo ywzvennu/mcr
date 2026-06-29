@@ -319,12 +319,12 @@ impl WideVariant<Shogi9x9> for MansindamRules {
 
     fn role_promoted_to(role: WideRole) -> WideRole {
         match role {
-            WideRole::Pawn => WideRole::Commoner,   // Guard
-            WideRole::Knight => WideRole::Kheshig,  // Centaur
+            WideRole::Pawn => WideRole::Commoner,      // Guard
+            WideRole::Knight => WideRole::Kheshig,     // Centaur
             WideRole::Bishop => WideRole::DragonHorse, // Archer
-            WideRole::Rook => WideRole::Dragon,     // Tiger
-            WideRole::Hawk => WideRole::Rhino,      // Cardinal → Rhino
-            WideRole::Elephant => WideRole::Ship,   // Marshal → Ship
+            WideRole::Rook => WideRole::Dragon,        // Tiger
+            WideRole::Hawk => WideRole::Rhino,         // Cardinal → Rhino
+            WideRole::Elephant => WideRole::Ship,      // Marshal → Ship
             other => other,
         }
     }

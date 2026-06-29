@@ -2,9 +2,9 @@
 //! (issue #271) — a shogi-chess hybrid on the [`Shogi9x9`](mce::geometry::Shogi9x9)
 //! geometry with the full crazyhouse **captures-to-hand and drops**, a
 //! **mandatory** far-three-ranks promotion zone (a promotable piece whose move
-//! starts *or* ends in the zone must upgrade), three new pieces (the Angel = Queen
-//! + Knight, the promoted Rhino = Bishop + Knight + Wazir, and the promoted Ship =
-//! Rook + Knight + Ferz), and the **campmate** flag win (a King reaching the
+//! starts *or* ends in the zone must upgrade), three new pieces (the Angel =
+//! Queen-plus-Knight, the promoted Rhino = Bishop-Knight-Wazir, and the promoted
+//! Ship = Rook-Knight-Ferz), and the **campmate** flag win (a King reaching the
 //! opponent's back rank ends the game).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
@@ -80,8 +80,7 @@ const ANGEL: &str = "1k7/9/9/9/4**A4/9/9/9/4K4[] w - - 0 1";
 /// A real **capture-to-hand** midgame: after 1. e4 e5 2. e5 d6 3. exd6-style play
 /// White has captured a Pawn into its hand (`[P]`), Black to move — the captured
 /// piece is now droppable, exercising the bank-and-redrop loop down the tree.
-const CAPTURE_SEQ: &str =
-    "rnb**akqane/9/ppp2pppp/3pP4/9/9/PPPP1PPPP/9/ENAQK**ABNR[P] b - - 0 3";
+const CAPTURE_SEQ: &str = "rnb**akqane/9/ppp2pppp/3pP4/9/9/PPPP1PPPP/9/ENAQK**ABNR[P] b - - 0 3";
 
 /// Asserts the generic Mansindam perft equals each pinned `(depth, nodes)` count,
 /// and that the FEN round-trips through mce's overflow-token + hand I/O. Every
