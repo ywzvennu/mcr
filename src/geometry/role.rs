@@ -687,6 +687,52 @@ pub enum WideRole {
     /// **overflow-2 role**: its FEN token is `=E` / `=e`; the harness maps
     /// `=e → +I`.
     PromotedBishopHopper = 66,
+
+    // --- Mansindam (9x9 Korean "Pantheon tale") army (§ Milestone 10) ----
+    //
+    // Mansindam (Couch Tomato, https://www.pychess.org/variants/mansindam) is a
+    // 9x9 shogi-chess hybrid on the [`Shogi9x9`](super::Shogi9x9) geometry: a
+    // crazyhouse-style **captures-to-hand** with drops, a **mandatory** far-three-
+    // ranks promotion zone, and a **campmate** flag win (a King reaching the
+    // opponent's back rank). Confirmed square-for-square against Fairy-Stockfish
+    // `UCI_Variant mansindam`. Most of its army reuses existing roles — the
+    // Cardinal (Bishop + Knight) is the [`WideRole::Hawk`], the Marshal (Rook +
+    // Knight) the [`WideRole::Elephant`], the promoted Guard (King-step) the
+    // [`WideRole::Commoner`], the promoted Centaur (King + Knight) the
+    // [`WideRole::Kheshig`], the promoted Archer (Bishop + Wazir) the
+    // [`WideRole::DragonHorse`] (`+B`) and the promoted Tiger (Rook + Ferz) the
+    // [`WideRole::Dragon`] (`+R`) — so only three pieces are genuinely new. The
+    // single-`*` overflow bank is exhausted (every `a..=z` already names a `*`
+    // base), so all three land in the **second** overflow bank, spelled with the
+    // doubled prefix [`OVERFLOW_PREFIX`] (`**`) plus a recycled base letter whose
+    // case carries the colour (see [`is_overflow2`](WideRole::is_overflow2) /
+    // [`overflow2_from_base`](WideRole::overflow2_from_base)), exactly like the Sho
+    // Shogi royals. The `compare-fairy` harness rewrites each token to FSF's
+    // spelling when driving `UCI_Variant mansindam`.
+    /// Angel (天, FSF `amazon`, letter `a`) — moves and captures like a **Queen +
+    /// Knight** (rook + bishop slides plus the eight 2-1 leaps). Does not promote.
+    /// (Mansindam.) A **second-bank overflow role**: its FEN token is the doubled
+    /// prefix `**` plus the recycled Hawk letter `a` (FSF's amazon letter), `**A`
+    /// (white) / `**a` (black); the `compare-fairy` harness maps `**a → a` when
+    /// driving Mansindam.
+    Angel = 67,
+    /// Rhino (聖, FSF `customPiece1 = i:BNW`) — the promoted Cardinal: moves and
+    /// captures like a **Bishop + Knight + Wazir** (bishop slides, the eight knight
+    /// leaps, and one orthogonal step). Reverts to a Cardinal ([`WideRole::Hawk`])
+    /// in hand when captured. (Mansindam.) A **second-bank overflow role**: its FEN
+    /// token is the doubled prefix `**` plus the recycled Captain letter `i` (FSF's
+    /// custom-piece letter `i`), `**I` (white) / `**i` (black); the `compare-fairy`
+    /// harness maps `**i → +C` (FSF's promoted Cardinal) when driving Mansindam.
+    Rhino = 68,
+    /// Ship (名, FSF `customPiece2 = s:RNF`) — the promoted Marshal: moves and
+    /// captures like a **Rook + Knight + Ferz** (rook slides, the eight knight
+    /// leaps, and one diagonal step). Reverts to a Marshal
+    /// ([`WideRole::Elephant`]) in hand when captured. (Mansindam.) A **second-bank
+    /// overflow role**: its FEN token is the doubled prefix `**` plus the recycled
+    /// Silver letter `s` (FSF's custom-piece letter `s`), `**S` (white) / `**s`
+    /// (black); the `compare-fairy` harness maps `**s → +M` (FSF's promoted
+    /// Marshal) when driving Mansindam.
+    Ship = 69,
 }
 
 impl WideRole {
@@ -694,7 +740,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 67;
+    pub const COUNT: usize = 70;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -765,6 +811,9 @@ impl WideRole {
         WideRole::PromotedRookCannon,
         WideRole::PromotedBishopCannon,
         WideRole::PromotedBishopHopper,
+        WideRole::Angel,
+        WideRole::Rhino,
+        WideRole::Ship,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -957,6 +1006,16 @@ impl WideRole {
             // when driving Sho Shogi.
             WideRole::DrunkElephant => 'e',
             WideRole::CrownPrince => 'c',
+            // Mansindam new pieces — **second-bank** overflow roles. Each FEN token
+            // is the doubled prefix `**` plus a recycled base letter (returned
+            // here), the board FEN I/O adding the prefix. The Angel recycles the
+            // Hawk's `a` (FSF's amazon letter), the Rhino the Captain's `i` (FSF's
+            // custom-piece `i`), the Ship the Silver's `s` (FSF's custom-piece `s`).
+            // The `compare-fairy` harness maps `**a → a`, `**i → +C`, `**s → +M`
+            // when driving Mansindam.
+            WideRole::Angel => 'a',
+            WideRole::Rhino => 'i',
+            WideRole::Ship => 's',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -1162,7 +1221,14 @@ impl WideRole {
     #[must_use]
     #[inline]
     pub const fn is_overflow2(self) -> bool {
-        matches!(self, WideRole::DrunkElephant | WideRole::CrownPrince)
+        matches!(
+            self,
+            WideRole::DrunkElephant
+                | WideRole::CrownPrince
+                | WideRole::Angel
+                | WideRole::Rhino
+                | WideRole::Ship
+        )
     }
 
     /// Maps a recycled base letter (after a doubled [`OVERFLOW_PREFIX`], `**`) back
@@ -1179,6 +1245,12 @@ impl WideRole {
             'e' => Some(WideRole::DrunkElephant),
             // Crown Prince: recycles the Cannon's letter `c` ("Crown").
             'c' => Some(WideRole::CrownPrince),
+            // Mansindam: the Angel recycles the Hawk's `a` (FSF's amazon letter),
+            // the Rhino the Captain's `i`, the Ship the Silver's `s`. All distinct
+            // from the Sho Shogi royals' `e` / `c`.
+            'a' => Some(WideRole::Angel),
+            'i' => Some(WideRole::Rhino),
+            's' => Some(WideRole::Ship),
             _ => None,
         }
     }
@@ -1363,6 +1435,9 @@ impl fmt::Display for WideRole {
             WideRole::PromotedRookCannon => "promoted-rook-cannon",
             WideRole::PromotedBishopCannon => "promoted-bishop-cannon",
             WideRole::PromotedBishopHopper => "promoted-bishop-hopper",
+            WideRole::Angel => "angel",
+            WideRole::Rhino => "rhino",
+            WideRole::Ship => "ship",
         })
     }
 }
