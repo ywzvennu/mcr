@@ -959,6 +959,58 @@ pub fn elephant_attacks_blockable<G: Geometry>(
     bb
 }
 
+/// The eight Xiang-Fu **Mahout** leaps paired with the single square each passes
+/// over. Each entry is `(target_df, target_dr, leg_df, leg_dr)`: a two-square
+/// target — the four 2-diagonal Alfil leaps `(±2,±2)` and the four 2-orthogonal
+/// Dabbaba leaps `(±2,0)` / `(0,±2)` — whose blocking "leg" is the single square
+/// halfway to it `(±1,±1)` / `(±1,0)` / `(0,±1)`. The leg is the geometric
+/// midpoint, so the relation is symmetric (a Mahout reaches a square iff a Mahout
+/// on that square reaches back, the leg being the same square either way).
+const MAHOUT_LEGS: [(i8, i8, i8, i8); 8] = [
+    (2, 2, 1, 1),
+    (2, -2, 1, -1),
+    (-2, 2, -1, 1),
+    (-2, -2, -1, -1),
+    (2, 0, 1, 0),
+    (-2, 0, -1, 0),
+    (0, 2, 0, 1),
+    (0, -2, 0, -1),
+];
+
+/// Returns the squares a Xiang-Fu **Mahout** on `sq` attacks given the `occupied`
+/// set: the eight two-square targets (4 diagonal Alfil + 4 orthogonal Dabbaba)
+/// minus any whose **leg** (the single square it passes over) is occupied.
+///
+/// A Mahout leaps exactly two squares in any of the eight directions but
+/// **cannot jump** — the leap is blocked if the one square between `sq` and the
+/// target is occupied. It moves and captures alike (the attack set equals the
+/// move set). Geometry-only and occupancy-aware; the leg is the symmetric
+/// midpoint, so reverse-projecting the pattern from a target square recovers the
+/// same attackers (no leg asymmetry, unlike the Xiangqi horse).
+///
+/// ```
+/// use mce::geometry::{attacks::mahout_attacks_blockable, Bitboard, Square, Shogi9x9};
+/// // A central Mahout on an empty board reaches all eight two-step squares.
+/// let sq = Square::<Shogi9x9>::from_file_rank(4, 4).unwrap();
+/// assert_eq!(mahout_attacks_blockable::<Shogi9x9>(sq, Bitboard::EMPTY).count(), 8);
+/// ```
+#[must_use]
+pub fn mahout_attacks_blockable<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(tf, tr, lf, lr) in &MAHOUT_LEGS {
+        let Some(leg) = sq.offset(lf, lr) else {
+            continue;
+        };
+        if occupied.contains(leg) {
+            continue;
+        }
+        if let Some(dest) = sq.offset(tf, tr) {
+            bb.set(dest);
+        }
+    }
+    bb
+}
+
 /// The eight Janggi-elephant (象) leaps, each paired with the **two intervening
 /// squares** that block the jump when occupied. Each entry is
 /// `(target_df, target_dr, leg1_df, leg1_dr, leg2_df, leg2_dr)`: the elephant

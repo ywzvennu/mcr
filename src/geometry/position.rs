@@ -1384,15 +1384,38 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // variant declares (Chak's Divine Lord). For every existing variant
         // `royal_squares` is exactly `kings_of`, so this is byte-identical.
         let kings = V::royal_squares(&self.board, us);
-        // A side with no royal pieces has already lost (its last royal was captured
-        // on the previous ply): no moves.
+        // A side with no royal pieces has normally already lost (its last royal was
+        // captured on the previous ply): no moves. Xiang Fu's pseudo-royal extinction
+        // (`royalless_generates()`) is the exception — FSF keeps generating the moves
+        // of a side that has lost both Champions (with no pseudo-royal pieces left
+        // there is no king-safety constraint, so every pseudo-legal move and drop is
+        // legal), so perft must descend that node too.
         if kings.is_empty() {
+            if V::royalless_generates() {
+                let mut pseudo = WideMoveList::new();
+                self.gen_multi_royal_pseudo(&mut pseudo, us);
+                if V::has_hand() {
+                    self.gen_hand_drops(&mut pseudo);
+                }
+                pseudo.for_each(|mv| out.push(mv));
+            }
             return;
         }
         // Pseudo-legal moves into a stack-backed buffer (no per-node heap
         // allocation), then verified one at a time.
         let mut pseudo = WideMoveList::new();
         self.gen_multi_royal_pseudo(&mut pseudo, us);
+        // Hand drops (Xiang Fu — the first multi-royal hand variant): captured
+        // pieces bank into hand and are dropped onto the variant's drop region. The
+        // full drop-target superset is generated here (Xiang Fu has no single KING,
+        // so `gen_hand_drops` uses the whole board) and each drop is verified for
+        // Champion safety by the per-move filter below, exactly like a board move.
+        // Gated behind `has_hand()` (default-off), so Spartan / Chak / Sho Shogi —
+        // the handless multi-royal variants — never generate drops and stay
+        // byte-identical.
+        if V::has_hand() {
+            self.gen_hand_drops(&mut pseudo);
+        }
         // Count-thresholded pseudo-royalty (Sho Shogi): when the side holds more
         // than one royal (King + Crown Prince) neither is royal — there is no
         // king-safety constraint, so every pseudo-legal move is legal and no

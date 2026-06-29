@@ -789,6 +789,43 @@ pub enum WideRole {
     /// pawn letter `p`, `**P` (white) / `**p` (black); the `compare-fairy` harness
     /// maps `**p → p` when driving Chennis.
     ChennisPawn = 72,
+
+    // --- Xiang Fu (9x9 Xiangqi-themed drop variant, § Milestone 10) -----------
+    //
+    // Xiang Fu reuses the Xiangqi/Cannon-Shogi movers — the hobbled Horse (`j`),
+    // the Chariot (`r`), the over-screen Cannon (`c`), the Chess Bishop (`b`), the
+    // diagonal bishop-cannon Crossbow ([`WideRole::BishopCannon`]) — and the plain
+    // Commoner ([`WideRole::Commoner`]) as its non-royal **Pupil**, captured
+    // champions banking into hand as Pupils. Only two pieces are genuinely new and
+    // confirmed square-for-square against Fairy-Stockfish `UCI_Variant xiangfu`:
+    // the ring-confined royal **Champion** (FSF `+g`, the promoted commoner `k`,
+    // Betza `Q1` — one step any direction) and the **Mahout** (FSF `m`, Betza
+    // `nAnD`). The single-letter alphabet, every `*`-overflow base and the
+    // doubled-`**` second tier are all in play, so both spell themselves with the
+    // **third** overflow prefix [`OVERFLOW_PREFIX_3`] (`=`) plus a recycled base
+    // letter whose case carries the colour (resolved by
+    // [`is_overflow3`](WideRole::is_overflow3) /
+    // [`overflow3_from_base`](WideRole::overflow3_from_base)). They recycle FSF's
+    // mnemonics `k` (commoner / champion) and `m` (mahout) — free within the `=`
+    // tier (the Cannon Shogi army claims `a`/`c`/`i`/`u`/`w`/`f`/`e`, Khan's Chess
+    // `t`/`s`). The `compare-fairy` harness rewrites each `=<base>` to FSF's
+    // spelling.
+    /// Champion (FSF `+g`, the promoted commoner `k`, Betza `Q1`) — a **royal**
+    /// one-step mover (a king's eight one-steps) **confined to the central ring**
+    /// (files c..g, ranks 3..7). A side's two Champions are **pseudo-royal**: a
+    /// move may not leave any Champion en prise unless it captures an enemy
+    /// Champion, and capturing both ends the game (the duple-check rule). When
+    /// captured, a Champion banks into the captor's hand as a Pupil
+    /// ([`WideRole::Commoner`]). (Xiang Fu.) An **overflow-3 role**: its FEN token
+    /// is `=K` (white) / `=k` (black); the harness maps `=k → +g`.
+    Champion = 73,
+    /// Mahout (FSF `m`, Betza `nAnD`) — a **two-square leaper in any of the eight
+    /// directions** (the four 2-diagonal Alfil leaps and the four 2-orthogonal
+    /// Dabbaba leaps) that **cannot jump**: each leap is blocked by a piece on the
+    /// single square it passes over. Moves and captures alike. (Xiang Fu.) An
+    /// **overflow-3 role**: its FEN token is `=M` (white) / `=m` (black); the
+    /// harness maps `=m → m`.
+    Mahout = 74,
 }
 
 impl WideRole {
@@ -796,7 +833,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 73;
+    pub const COUNT: usize = 75;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -873,6 +910,8 @@ impl WideRole {
         WideRole::Khan,
         WideRole::KhanSoldier,
         WideRole::ChennisPawn,
+        WideRole::Champion,
+        WideRole::Mahout,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1117,6 +1156,13 @@ impl WideRole {
             // Chess.
             WideRole::Khan => 't',
             WideRole::KhanSoldier => 's',
+            // Xiang Fu new movers — overflow-3 roles recycling FSF's mnemonics
+            // `k` (commoner / champion) and `m` (mahout), free within the `=` tier,
+            // so `char()` returns the bare base letter and the board FEN I/O adds
+            // the `=` prefix. The `compare-fairy` harness maps `=k → +g`, `=m → m`
+            // when driving Xiang Fu.
+            WideRole::Champion => 'k',
+            WideRole::Mahout => 'm',
         }
     }
 
@@ -1356,6 +1402,8 @@ impl WideRole {
                 | WideRole::PromotedBishopHopper
                 | WideRole::Khan
                 | WideRole::KhanSoldier
+                | WideRole::Champion
+                | WideRole::Mahout
         )
     }
 
@@ -1384,6 +1432,10 @@ impl WideRole {
             // `t` / `s`, free within the `=` tier.
             't' => Some(WideRole::Khan),
             's' => Some(WideRole::KhanSoldier),
+            // Xiang Fu: the Champion and Mahout recycle FSF's mnemonics `k` / `m`,
+            // free within the `=` tier.
+            'k' => Some(WideRole::Champion),
+            'm' => Some(WideRole::Mahout),
             _ => None,
         }
     }
@@ -1523,6 +1575,8 @@ impl fmt::Display for WideRole {
             WideRole::Khan => "khan",
             WideRole::KhanSoldier => "khan-soldier",
             WideRole::ChennisPawn => "chennis-pawn",
+            WideRole::Champion => "champion",
+            WideRole::Mahout => "mahout",
         })
     }
 }
