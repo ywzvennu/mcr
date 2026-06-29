@@ -23,6 +23,7 @@
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
 mod asean;
+mod ataxx;
 mod bughouse;
 mod cambodian;
 mod capablanca;
@@ -266,6 +267,9 @@ fn main() {
     // located binary) before driving `UCI_Variant chak`.
     let chak_mismatches = chak::run(&mut engine, &located.bin, opts.full);
     let tori_mismatches = tori::run(&mut engine, opts.full);
+    // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
+    // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
+    let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
 
     engine.quit();
 
@@ -308,6 +312,7 @@ fn main() {
         + hoppelpoppel_mismatches
         + chak_mismatches
         + tori_mismatches
+        + ataxx_mismatches
         > 0
     {
         std::process::exit(1);

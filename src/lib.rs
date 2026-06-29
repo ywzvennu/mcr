@@ -40,6 +40,10 @@
 //!   [`ThreeCheck`], [`RacingKings`], [`Horde`], [`Atomic`], [`Antichess`],
 //!   [`Crazyhouse`]), plus the [`AnyVariant`] runtime dispatch enum and its
 //!   [`VariantId`] selector for choosing a variant from a string or value.
+//! - **Ataxx** — the [`ataxx`] module is a self-contained 7×7 stones game
+//!   (clone / jump / flip), **not** a chess variant: it shares none of the
+//!   chess engine's geometry, pieces, or move generator and stands entirely
+//!   apart from the types above.
 //!
 //! ## Quick start
 //!
@@ -104,6 +108,7 @@
 
 extern crate alloc;
 
+pub mod ataxx;
 pub mod attacks;
 mod bitboard;
 mod board;
