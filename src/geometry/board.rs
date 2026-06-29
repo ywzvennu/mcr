@@ -416,6 +416,33 @@ impl<G: Geometry> Board<G> {
                     board.set_piece(square, WidePiece::new(color, role));
                     file += 1;
                     i += 1;
+                } else if b as char == crate::geometry::role::OVERFLOW_PREFIX_3 {
+                    // A `=` prefix marks a third-tier overflow role (added past the
+                    // exhausted single-letter alphabet, the exhausted `*`-overflow
+                    // bases and the doubled-`**` second tier — the Cannon Shogi cannon
+                    // army): the following letter is a recycled base letter whose case
+                    // carries the colour, resolved via `WideRole::overflow3_from_base`
+                    // (`=A` = white Rook-cannon, `=a` = black). A `=` before a letter
+                    // that names no third-tier overflow role is rejected.
+                    i += 1;
+                    let next = bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
+                        crate::geometry::role::OVERFLOW_PREFIX_3,
+                    ))?;
+                    let role = WideRole::overflow3_from_base(next as char).ok_or(
+                        ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX_3),
+                    )?;
+                    let color = if (next as char).is_ascii_uppercase() {
+                        Color::White
+                    } else {
+                        Color::Black
+                    };
+                    if file >= width {
+                        return Err(ParseBoardError::RankTooLong(rank + 1));
+                    }
+                    let square = Square::new(rank * G::WIDTH + file as u8);
+                    board.set_piece(square, WidePiece::new(color, role));
+                    file += 1;
+                    i += 1;
                 } else if let Some(piece) = WidePiece::from_char(b as char) {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
@@ -489,6 +516,12 @@ impl<G: Geometry> Board<G> {
                             // recycled base letter; `char()` returns that base
                             // letter and `piece.char()` applies the colour case.
                             fen.push(crate::geometry::role::OVERFLOW_PREFIX);
+                        } else if piece.role.is_overflow3() {
+                            // A third-tier overflow role (the Cannon Shogi cannon
+                            // army) renders as the `=` prefix plus its recycled base
+                            // letter, exactly as a `*` overflow role but in the
+                            // third tier.
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX_3);
                         }
                         fen.push(piece.char());
                     }
