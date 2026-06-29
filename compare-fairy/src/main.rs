@@ -52,6 +52,7 @@ mod placement;
 mod seirawan;
 mod shako;
 mod shatar;
+mod shatranj;
 mod shinobi;
 mod shogi;
 mod shogun;
@@ -226,6 +227,9 @@ fn main() {
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
+    // Shatranj is a FSF built-in (no variants.ini needed), like makruk; its mce
+    // dialect (`*x`/`m`) is rewritten to FSF's `b`/`q` inside shatranj::run.
+    let shatranj_mismatches = shatranj::run(&mut engine, opts.full);
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
     // Shogun is an INI variant (like Shinobi): shogun::run loads FSF's
     // variants.ini (resolved from `$MCE_FSF_VARIANTS_INI`) before driving
@@ -284,6 +288,7 @@ fn main() {
         + spartan_mismatches
         + shako_mismatches
         + shatar_mismatches
+        + shatranj_mismatches
         + shinobi_mismatches
         + shogun_mismatches
         + knightmate_mismatches

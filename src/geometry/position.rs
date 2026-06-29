@@ -984,6 +984,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
 
+        // Bare-king baring loss (Shatranj): a side reduced to its lone king (with
+        // its bare-back chance spent or impossible) has lost, so the node is a
+        // terminal perft leaf with no moves. Gated behind `has_bare_king_loss()`
+        // (default-off), so every other variant skips the check and is
+        // byte-identical. The single `bare_king_loss_loser` chokepoint truncates
+        // perft descent exactly as Fairy-Stockfish's extinction claim does.
+        if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
+            return;
+        }
+
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
@@ -1045,9 +1055,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
         // The mask of squares that resolve a single check: capture the checker
         // or block between it and the king. Full board when not in check.
+        //
+        // Interposition resolves the check **only when the checker is a slider** —
+        // a leaper cannot be blocked. Most leapers (knight, ferz, ...) check from a
+        // square not collinear with the king, so `between` is already empty for
+        // them; but a leaper that jumps **along a line** — the Shatranj Alfil's
+        // two-square diagonal jump (and the Shako Fers-Alfil, the Dabbaba, ...) —
+        // checks from a collinear square with a real intervening square, and
+        // `between` would offer that square as a (false) block. Gating on
+        // [`role_is_slider`](WideVariant::role_is_slider) drops the bogus
+        // interposition. This is byte-identical for every existing variant: the
+        // pre-hook leaper checkers were never collinear (so `between` was empty
+        // anyway), and the slider checkers are unchanged.
         let check_mask = if num_checkers == 1 {
             let checker = checkers.lsb().expect("one checker");
-            checkers | between(king_sq, checker)
+            let checker_is_slider = self.board.role_at(checker).is_some_and(V::role_is_slider);
+            let interpose = if checker_is_slider {
+                between(king_sq, checker)
+            } else {
+                Bitboard::EMPTY
+            };
+            checkers | interpose
         } else {
             Bitboard::FULL
         };
@@ -1836,6 +1864,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_draw() && self.bare_king_present() {
             return;
         }
+        // Bare-king baring loss (Shatranj): a bared side that has lost ends the
+        // game, so the node is a terminal perft leaf. Gated behind
+        // `has_bare_king_loss()` (default-off), so inert for every other variant.
+        // (This mirrors the standard-path chokepoint for any bare-king-loss variant
+        // that rides the verify path.)
+        if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
+            return;
+        }
         // A side whose king has been captured has no royal piece, so there is no
         // self-check to filter: every pseudo-legal move is "legal" (the side has
         // already lost, but perft still enumerates its continuations). Fairy-
@@ -2193,6 +2229,42 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     pub fn bare_king_present(&self) -> bool {
         self.board.by_color(Color::White).count() == 1
             || self.board.by_color(Color::Black).count() == 1
+    }
+
+    /// Returns the side that has been **bared** (reduced to its lone king) and so
+    /// **lost** under the Shatranj baring rule, if this node is terminal under that
+    /// rule; else `None`. Only meaningful while
+    /// [`WideVariant::has_bare_king_loss`] is `true`; the caller gates on it.
+    ///
+    /// A side is bared when its colour mask holds exactly one piece (its king).
+    /// Baring is decisive — a loss for the bared side — but it mirrors
+    /// Fairy-Stockfish's `extinctionClaim`, which grants the bared side one
+    /// "bare-back" reply: the node is terminal when the opponent holds **three or
+    /// more** pieces (no single capture could bare it back) **or** when it is the
+    /// opponent's (the winner's) turn — the bare-back chance already spent. While
+    /// it is the bared side's own turn and the opponent holds only two pieces (a
+    /// king the bared side might capture next move, baring back into a
+    /// King-vs-King draw), the node is **not** yet terminal, so this returns
+    /// `None`. King-vs-King (neither side with two pieces) is likewise non-terminal.
+    #[must_use]
+    pub fn bare_king_loss_loser(&self) -> Option<Color> {
+        let white = self.board.by_color(Color::White).count();
+        let black = self.board.by_color(Color::Black).count();
+        let (bared, opponent) = if white == 1 && black >= 2 {
+            (Color::White, black)
+        } else if black == 1 && white >= 2 {
+            (Color::Black, white)
+        } else {
+            // Neither side bared, or King-vs-King (no opponent with ≥2 pieces).
+            return None;
+        };
+        // Terminal once the bared side can no longer bare back: the opponent has
+        // ≥3 pieces, or the bared side is not to move (its single reply is spent).
+        if opponent >= 3 || self.state.turn != bared {
+            Some(bared)
+        } else {
+            None
+        }
     }
 
     /// Returns the flag goal rank of the side to move (`us`) when it is
@@ -3665,6 +3737,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_draw() && self.bare_king_present() {
             return Some(WideEndReason::VariantDraw);
         }
+        // Bare-king baring loss (Shatranj): a side bared of all but its king has
+        // lost. Gated behind `has_bare_king_loss()` (default-off). Reported before
+        // the checkmate/stalemate test so a bared node — which generates zero moves
+        // — is classified as the baring win it is, not a spurious stalemate.
+        // `outcome` resolves the winner as the side that is *not* bared.
+        if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
+            return Some(WideEndReason::VariantWin);
+        }
         if self.legal_moves().is_empty() {
             if self.is_check() {
                 Some(WideEndReason::Checkmate)
@@ -3694,6 +3774,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     || (V::has_temple_win() && self.temple_win_reached(self.state.turn.opposite()))
                 {
                     self.state.turn.opposite()
+                } else if V::has_bare_king_loss() {
+                    // Baring (Shatranj): the bared side has lost, so its opponent
+                    // wins, whichever side is to move.
+                    match self.bare_king_loss_loser() {
+                        Some(loser) => loser.opposite(),
+                        None => self.state.turn,
+                    }
                 } else {
                     self.state.turn
                 };

@@ -550,6 +550,27 @@ pub enum WideRole {
     /// the `p` overflow base; this one takes `z`. An **overflow role**: its FEN
     /// token is `*Z` (white) / `*z` (black); the harness maps `*z → p`.
     Pheasant = 56,
+
+    // --- Shatranj (medieval chess) elephant (§ Milestone 10, Fairy variants) ---
+    //
+    // Shatranj is the medieval 8x8 ancestor of chess (FSF `UCI_Variant shatranj`).
+    // Its Ferz (counselor) reuses the Makruk [`WideRole::Met`] (one diagonal step)
+    // and its King / Knight / Rook are standard, so the only genuinely-new piece is
+    // the Alfil (elephant).
+    /// Alfil (FSF `b`, Betza `A`) — the Shatranj elephant: a **pure** two-square
+    /// diagonal leaper that jumps to the four squares two diagonal steps away,
+    /// over any intervening piece. Unlike the Shako [`WideRole::FersAlfil`] (`FA`),
+    /// it has **no** one-step (Ferz) component, so it is a distinct, colour-bound
+    /// leaper reaching only eight squares of the board. (Shatranj.) Landing **past
+    /// the exhausted single-letter alphabet** (every `a..=z` already names a role),
+    /// the Alfil is an **overflow role** like the Commoner: it has no bare letter
+    /// and spells itself with the [`OVERFLOW_PREFIX`] (`*`) followed by a recycled
+    /// base letter whose case carries the colour. FSF spells it `b` (already the
+    /// Bishop here), and every FSF mnemonic letter is already claimed as an overflow
+    /// base, so the Alfil recycles the one free letter `x` (the Janggi Elephant's
+    /// bare letter, distinct by the `*` prefix): its token is `*X` (white) / `*x`
+    /// (black), and the `compare-fairy` harness maps `*x → b` when driving Shatranj.
+    Alfil = 57,
 }
 
 impl WideRole {
@@ -557,7 +578,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 57;
+    pub const COUNT: usize = 58;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -618,6 +639,7 @@ impl WideRole {
         WideRole::LeftQuail,
         WideRole::RightQuail,
         WideRole::Pheasant,
+        WideRole::Alfil,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -792,6 +814,15 @@ impl WideRole {
             WideRole::LeftQuail => 'v',
             WideRole::RightQuail => 'r',
             WideRole::Pheasant => 'z',
+            // Shatranj Alfil (elephant) — an overflow role past the exhausted
+            // single-letter alphabet. Like the Commoner / Empire pieces, its FEN
+            // token is the `*` prefix plus a recycled base letter, so `char()`
+            // returns the bare base letter and the board FEN I/O adds the `*`
+            // prefix. FSF spells it `b` (the Bishop here), so the Alfil recycles the
+            // one free overflow base `x` (the Janggi Elephant's bare letter, distinct
+            // by the `*` prefix). The `compare-fairy` harness maps `*x → b` when
+            // driving Shatranj.
+            WideRole::Alfil => 'x',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -896,6 +927,7 @@ impl WideRole {
                 | WideRole::LeftQuail
                 | WideRole::RightQuail
                 | WideRole::Pheasant
+                | WideRole::Alfil
         )
     }
 
@@ -960,6 +992,10 @@ impl WideRole {
             'v' => Some(WideRole::LeftQuail),
             'r' => Some(WideRole::RightQuail),
             'z' => Some(WideRole::Pheasant),
+            // Shatranj Alfil (elephant): recycles the one free overflow base `x`
+            // (the Janggi Elephant's bare letter, distinct by the `*` prefix); the
+            // harness maps `*x → b` (FSF's Alfil letter) when driving Shatranj.
+            'x' => Some(WideRole::Alfil),
             _ => None,
         }
     }
@@ -1083,6 +1119,7 @@ impl fmt::Display for WideRole {
             WideRole::LeftQuail => "left-quail",
             WideRole::RightQuail => "right-quail",
             WideRole::Pheasant => "pheasant",
+            WideRole::Alfil => "alfil",
         })
     }
 }
@@ -1222,8 +1259,10 @@ mod tests {
         assert_eq!(WideRole::overflow_from_base('u'), Some(WideRole::Commoner));
         assert!(WideRole::Wazir.is_overflow());
         assert_eq!(WideRole::overflow_from_base('j'), Some(WideRole::Wazir));
-        // A base letter that names no overflow role yields `None` (`x` is the
-        // Janggi Elephant's bare letter — no overflow role recycles it).
-        assert_eq!(WideRole::overflow_from_base('x'), None);
+        // The Shatranj Alfil recycles the last free overflow base `x` (the Janggi
+        // Elephant's bare letter, distinct by the `*` prefix).
+        assert_eq!(WideRole::overflow_from_base('x'), Some(WideRole::Alfil));
+        // A character that names no overflow role yields `None`.
+        assert_eq!(WideRole::overflow_from_base('?'), None);
     }
 }

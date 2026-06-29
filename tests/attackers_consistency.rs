@@ -44,8 +44,8 @@ use mce::geometry::{
     GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
     KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
     OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    ShatranjRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
+    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -372,6 +372,33 @@ variant_test!(
         "r3k2r/p1ppdpb1/bn2pnp1/3PN3/1p2P3/2N3p1/PPPBBPPP/R3K2R w - - 0 1",
         "4k3/8/8/3d4/3D4/8/4P3/4K3 w - - 0 1",
         "4k3/4p3/8/8/8/8/3D4/4K3 w - - 0 1",
+    ]
+);
+
+// -- Shatranj (medieval, 8x8) -----------------------------------------------
+//
+// The two non-standard pieces are the Ferz (`m`, reusing `WideRole::Met` = one
+// diagonal step) and the Alfil (`*x`, a pure two-square diagonal jumper). Both
+// attack sets are geometrically symmetric leaps, so neither needs a directional /
+// leg-asymmetric flag — only the pawn is colour-directional, exactly as standard
+// chess. This test is the guard that the Alfil's (and Ferz's) `role_attacks` set
+// and the `attackers_to` reverse-projection agree, so an Alfil check — delivered
+// by a two-diagonal jump from a square *collinear* with the king — is detected on
+// both the forward (king-danger) and reverse (`attackers_to`) paths. The corpus
+// reuses the perft suite's startpos and Alfil/Ferz middlegames plus a position
+// with an Alfil checking the king along a diagonal it jumps over. (Both sides
+// stay armed so no node is a baring leaf, where the move set is empty but
+// `attackers_to` is still defined and must stay consistent.)
+
+variant_test!(
+    shatranj,
+    Chess8x8,
+    ShatranjRules,
+    "shatranj",
+    [
+        "rn1km1nr/pppppppp/3*x*x3/8/8/3*X*X3/PPPPPPPP/RN1KM1NR w - - 4 3",
+        "r1*xk1*x1r/pppmpppp/2np1n2/8/8/2NPP3/PPPM1PPP/R1*XK1*XNR w - - 3 5",
+        "rn*xkm1nr/pppppppp/8/8/1*x6/3P4/PPPKPPPP/RN*X1M*XNR w - - 3 3",
     ]
 );
 
