@@ -356,7 +356,7 @@ impl core::fmt::Debug for GenericPlacement {
 
 /// The non-board state of a generic position: side to move, castling rights,
 /// en-passant target square, and the two move clocks.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub struct GenericState<G: Geometry> {
     /// The side to move.
     pub turn: Color,
@@ -423,6 +423,28 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
     }
 }
 
+// Manual `PartialEq`/`Eq` (mirroring `GenericGating` and `Board`): every field is
+// comparable under just `G: Geometry` — `Bitboard`, `Square`, and `GenericGating`
+// all carry manual impls bounded on `G::Bits`, not on `G` — so writing the impl by
+// hand keeps every generic user of `GenericState` free of the spurious `G:
+// PartialEq` bound the derive would add.
+impl<G: Geometry> PartialEq for GenericState<G> {
+    fn eq(&self, other: &Self) -> bool {
+        self.turn == other.turn
+            && self.castling == other.castling
+            && self.ep_square == other.ep_square
+            && self.gating == other.gating
+            && self.duck == other.duck
+            && self.placement == other.placement
+            && self.halfmove_clock == other.halfmove_clock
+            && self.fullmove_number == other.fullmove_number
+            && self.consecutive_passes == other.consecutive_passes
+            && self.board_b == other.board_b
+    }
+}
+
+impl<G: Geometry> Eq for GenericState<G> {}
+
 // Manual `Hash` (mirroring `GenericGating`): the `board_b` plane mask is hashed
 // by its square indices so the impl is unconditional in `G::Bits`, keeping every
 // generic user of `GenericState` (and the `Board`-free state hashing) free of a
@@ -479,6 +501,98 @@ impl<G: Geometry, V: WideVariant<G>> core::fmt::Debug for GenericPosition<G, V> 
             ds.field("promoted", &squares);
         }
         ds.finish()
+    }
+}
+
+/// The maximum number of distinct [`WideRole`] masks a single
+/// [`apply`](GenericPosition::apply) can touch: the moving piece's role, a
+/// captured piece's role, a promotion role, a castled rook (`Rook`), a Kyoto flip
+/// role, a Jieqi reveal role, and a gated reserve / hand role — at most eight.
+/// Recording each touched role mask's prior value, plus the two color masks, is
+/// enough to rebuild the board on [`undo`] by direct assignment, with no
+/// per-square role scan.
+///
+/// [`undo`]: GenericPosition::undo
+const MAX_UNDO_ROLES: usize = 8;
+
+/// The minimal record needed to reverse a single [`apply`](GenericPosition::apply)
+/// **in place** — the unmake half of the geometry layer's make/unmake, returned by
+/// [`apply_with_undo`](GenericPosition::apply_with_undo) and consumed by
+/// [`undo`](GenericPosition::undo).
+///
+/// Rather than clone the whole [`GenericPosition`] (a board of
+/// [`WideRole::COUNT`]-plus-two bitboards — over a kilobyte on the wide
+/// geometries — plus the state) per node, an `Undo` captures only what a move
+/// changes:
+///
+/// * the **board** is restored by **direct mask assignment**: a move only ever
+///   edits the two color masks and the role masks of a bounded set of roles (the
+///   mover, a capture victim, a promotion, a castled rook, a Kyoto flip / Jieqi
+///   reveal, a gated piece — at most [`MAX_UNDO_ROLES`]). Snapshotting those masks
+///   by index before the move and assigning them straight back restores the board
+///   byte-for-byte **without any per-square [`role_at`](super::Board) scan** — that
+///   scan (a linear walk of all [`WideRole::COUNT`] masks) is what makes a
+///   square-by-square restore lose to a flat board copy, so the mask-level restore
+///   is what lets make/unmake actually beat copy-make on the wide boards.
+/// * the **non-board state** ([`GenericState`]: side, castling, en passant,
+///   Seirawan gating reserves, Duck square, placement / hand pockets, clocks, the
+///   Janggi pass counter, the Alice plane mask) and the crazyhouse **promoted
+///   mask** are each a small `Copy` value captured whole. Snapshotting them
+///   wholesale reverses every variant hook's state effect (hand banking, gate
+///   consumption, plane transfer, …) with no per-field bookkeeping and no risk of
+///   a missed delta.
+///
+/// An `Undo` is opaque and only meaningful when paired with the exact position
+/// [`apply_with_undo`](GenericPosition::apply_with_undo) produced from it; see
+/// [`undo`](GenericPosition::undo) for the contract. It is designed to be
+/// extensible: incremental attacker / Zobrist state (issues #310, #311) can hook
+/// additional restore data alongside these fields.
+pub struct Undo<G: Geometry> {
+    /// The non-board state exactly as it stood before the move.
+    state: GenericState<G>,
+    /// The crazyhouse promoted mask before the move (empty and unused for every
+    /// non-demoting variant).
+    promoted: Bitboard<G>,
+    /// Both color occupancy masks before the move.
+    by_color: [Bitboard<G>; 2],
+    /// The role masks the move touches, each as a `(WideRole index, prior mask)`
+    /// pair. Only the first `role_count` entries are populated; duplicate indices
+    /// are harmless (assigning the same prior mask twice is idempotent).
+    roles: [(usize, Bitboard<G>); MAX_UNDO_ROLES],
+    /// The number of populated entries in `roles`.
+    role_count: usize,
+}
+
+impl<G: Geometry> Undo<G> {
+    /// Records `role`'s current mask (read from `board`) as one the move touched,
+    /// so [`undo`](GenericPosition::undo) can restore it. Called by `apply` at the
+    /// point it has the pre-move board in hand, reusing its own piece lookups so no
+    /// extra [`role_at`](super::Board) scan is needed. Duplicate roles are harmless
+    /// (the restore assigns the same prior mask); `MAX_UNDO_ROLES` bounds the count.
+    #[inline]
+    fn touch(&mut self, role: WideRole, board: &Board<G>) {
+        self.roles[self.role_count] = (role.index(), board.by_role(role));
+        self.role_count += 1;
+    }
+}
+
+impl<G: Geometry> core::fmt::Debug for Undo<G> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Render without a `G::Bits: Debug` bound (mirroring `GenericState`): the
+        // masks by their set-bit counts, the touched roles by index.
+        let roles: Vec<(usize, u32)> = self.roles[..self.role_count]
+            .iter()
+            .map(|&(idx, mask)| (idx, mask.count()))
+            .collect();
+        f.debug_struct("Undo")
+            .field("state", &self.state)
+            .field("promoted", &self.promoted.count())
+            .field(
+                "by_color",
+                &[self.by_color[0].count(), self.by_color[1].count()],
+            )
+            .field("roles", &roles)
+            .finish()
     }
 }
 
@@ -1468,7 +1582,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if !no_fast_accept && multi_royal_move_off_lines::<G>(&mv, kings, royal_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
-            } else if scratch.multi_royal_move_is_legal(self, &mv, us, &attackers) {
+            } else if scratch.multi_royal_move_is_legal(&mv, us, &attackers) {
                 out.push(mv);
             }
         });
@@ -1476,23 +1590,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// Returns `true` if the pseudo-legal multi-royal move `mv` is legal — leaves
     /// at least one of our kings unattacked — testing it by **make/unmake** on
-    /// `self` (a scratch position seeded from `base`).
+    /// `self` (a scratch position holding the pre-move position).
     ///
     /// `self` is mutated to the post-move position, the duple-check survival test
     /// runs on the true post-move occupancy via
     /// [`royals_survive_after`](Self::royals_survive_after), and then `self` is
-    /// restored byte-identically to `base` — so one scratch position serves every
-    /// sibling move with no per-move heap work and no `GenericPosition`
-    /// reconstruction. Identical in result to cloning, applying, and calling
-    /// [`royals_survive`](Self::royals_survive).
+    /// restored byte-identically by [`undo`](Self::undo) — so one scratch position
+    /// serves every sibling move with no per-move heap work and no
+    /// `GenericPosition` reconstruction. Identical in result to cloning, applying,
+    /// and calling [`royals_survive`](Self::royals_survive).
     fn multi_royal_move_is_legal(
         &mut self,
-        base: &Self,
         mv: &WideMove,
         us: Color,
         attackers: &EnemyAttackers,
     ) -> bool {
-        self.apply(mv);
+        let undo = self.apply_with_undo(mv);
         // `apply` flipped the side to move; test our (now non-to-move) kings.
         let legal = self.royals_survive_after(us, attackers);
         // The fielded-role survival test must agree with the authoritative
@@ -1504,11 +1617,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.royals_survive(us),
             "multi-royal fielded-role survival diverged from the full-role predicate"
         );
-        // Unmake: restore board + state from the untouched base snapshot. Both are
-        // `Copy`, so this is a plain stack assignment — no allocation, no clone of
-        // the `GenericPosition` wrapper.
-        self.board = base.board;
-        self.state = base.state;
+        // Unmake: restore the position incrementally from the bounded undo record
+        // (issue #309) — only the squares the move wrote and the prior state, no
+        // whole-board copy.
+        self.undo(undo);
         legal
     }
 
@@ -1578,15 +1690,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         self.gen_alice_pseudo(&mut pseudo, us);
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
-            if scratch.alice_move_is_legal(self, &mv, us) {
+            if scratch.alice_move_is_legal(&mv, us) {
                 out.push(mv);
             }
         });
     }
 
     /// Returns `true` if the pseudo-legal Alice move `mv` leaves `us`'s king safe,
-    /// tested by **make/unmake** on `self` (a scratch position seeded from `base`).
-    fn alice_move_is_legal(&mut self, base: &Self, mv: &WideMove, us: Color) -> bool {
+    /// tested by **make/unmake** on `self` (a scratch position holding the pre-move
+    /// position, restored by [`undo`](Self::undo)).
+    fn alice_move_is_legal(&mut self, mv: &WideMove, us: Color) -> bool {
         let from = mv.from::<G>();
         let to = mv.to::<G>();
         let is_castle = matches!(
@@ -1597,22 +1710,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // move must leave its destination square unattacked on the plane it is
         // **leaving** — evaluated on the pre-move board, before the transfer. A
         // castle's transit / destination safety on that plane is already enforced
-        // by `gen_alice_castles`, so it is exempt here.
+        // by `gen_alice_castles`, so it is exempt here. `self` still holds the
+        // pre-move position here (the make below is the first edit), so it is the
+        // pre-move board.
         if !is_castle
-            && base
+            && self
                 .board
                 .piece_at(from)
                 .is_some_and(|p| p.role == WideRole::King)
-            && !base.alice_king_dest_safe_on_origin(from, to, us)
+            && !self.alice_king_dest_safe_on_origin(from, to, us)
         {
             return false;
         }
         // Condition Y (post-transfer): after the full move + transfer the king must
         // be unattacked on the plane it ends up on.
-        self.apply(mv);
+        let undo = self.apply_with_undo(mv);
         let legal = self.alice_king_safe(us);
-        self.board = base.board;
-        self.state = base.state;
+        // Unmake incrementally (issue #309) — only the written squares and prior
+        // state, no whole-board copy.
+        self.undo(undo);
         legal
     }
 
@@ -2028,14 +2144,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
-            } else if scratch.cannon_move_is_legal(
-                self,
-                &mv,
-                us,
-                &attackers,
-                king_masks,
-                reach_slice,
-            ) {
+            } else if scratch.cannon_move_is_legal(&mv, us, &attackers, king_masks, reach_slice) {
                 out.push(mv);
             }
         });
@@ -2053,8 +2162,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             let mut drops = WideMoveList::new();
             self.gen_hand_drops(&mut drops);
             drops.for_each(|mv| {
-                if scratch.cannon_move_is_legal(self, &mv, us, &attackers, king_masks, reach_slice)
-                {
+                if scratch.cannon_move_is_legal(&mv, us, &attackers, king_masks, reach_slice) {
                     out.push(mv);
                 }
             });
@@ -2076,24 +2184,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// Returns `true` if the pseudo-legal cannon-variant move `mv` is legal —
     /// leaves our king unattacked — testing it by **make/unmake** on `self`
-    /// (a scratch position seeded from `base`).
+    /// (a scratch position holding the pre-move position).
     ///
     /// `self` is mutated to the post-move position, the king-safety check runs on
     /// the true post-move occupancy (including the cannon over-screen captures and
     /// the flying-general file, via [`king_safe_after`](Self::king_safe_after)),
-    /// and then `self` is restored byte-identically to `base` — so one scratch
-    /// position serves every sibling move with no per-move heap work and no
-    /// `GenericPosition` reconstruction.
+    /// and then `self` is restored byte-identically by [`undo`](Self::undo) — so
+    /// one scratch position serves every sibling move with no per-move heap work
+    /// and no `GenericPosition` reconstruction.
     fn cannon_move_is_legal(
         &mut self,
-        base: &Self,
         mv: &WideMove,
         us: Color,
         attackers: &EnemyAttackers,
         king_masks: KingLineMasks<G>,
         reach: Option<&[Bitboard<G>]>,
     ) -> bool {
-        self.apply(mv);
+        // The bikjang facing rule needs whether the mover's general faced **before**
+        // the move; capture it from the pre-move board (`self` still holds it here,
+        // the make below being the first edit).
+        let faced_before = V::restricts_facing_general() && generals_face::<G>(&self.board);
+        let undo = self.apply_with_undo(mv);
         // `apply` flipped the side to move; our king is now the non-mover's.
         let mut legal = match self.board.king_of(us) {
             // The node-level `king_masks` and reach supersets are taken through the
@@ -2125,12 +2236,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // general faces **after** it AND either it faced **before** (an existing
         // facing check it failed to resolve) OR the move was the **general's own**
         // move (the general may not step into / along a facing). The pass
-        // (`from == to`) always escapes. `self` is the post-move position; `base` is
-        // the pre-move snapshot.
+        // (`from == to`) always escapes. `self` is the post-move position;
+        // `faced_before` was captured from the pre-move board.
         if legal && V::restricts_facing_general() {
             let from = mv.from::<G>();
             let to = mv.to::<G>();
-            if from != to && generals_face::<G>(&self.board) && generals_face::<G>(&base.board) {
+            if from != to && generals_face::<G>(&self.board) && faced_before {
                 // Faced before and still faces after a non-pass move: an existing
                 // bikjang check the move failed to resolve (or the general slid
                 // along the contested line staying faced). Moving *into* a facing
@@ -2139,11 +2250,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 legal = false;
             }
         }
-        // Unmake: restore board + state from the untouched base snapshot. Both are
-        // `Copy`, so this is a plain stack assignment — no allocation, no clone of
-        // the `GenericPosition` wrapper.
-        self.board = base.board;
-        self.state = base.state;
+        // Unmake incrementally (issue #309) — only the written squares and prior
+        // state, no whole-board copy.
+        self.undo(undo);
         legal
     }
 
@@ -3335,7 +3444,112 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         self.apply(mv);
     }
 
+    /// Applies `mv` **in place** and returns an [`Undo`] that reverses it exactly
+    /// — the zero-copy make half of make/unmake (issue #309).
+    ///
+    /// This is [`play_unchecked`](Self::play_unchecked) plus a reversal record: it
+    /// performs the identical in-place edit (so the resulting position is
+    /// byte-for-byte what `play_unchecked` and [`play`](Self::play) produce) while
+    /// snapshotting, *before* the edit, the prior occupant of every board square
+    /// the move writes and the prior non-board state. Pass the returned token to
+    /// [`undo`](Self::undo) to restore the position.
+    ///
+    /// # Contract
+    ///
+    /// The move **must be legal** for this position, exactly as for
+    /// [`play_unchecked`](Self::play_unchecked); this does not re-validate it. The
+    /// returned [`Undo`] is valid only for undoing *this* move from the position
+    /// this produced — make/unmake pairs must nest (last made, first unmade).
+    pub fn apply_with_undo(&mut self, mv: &WideMove) -> Undo<G> {
+        // Snapshot the scalar state, promoted mask, and both color masks before any
+        // edit; `apply` then fills in the touched role masks (reusing its own piece
+        // lookups, so no extra `role_at` scan) and performs the move.
+        let mut undo = Undo {
+            state: self.state,
+            promoted: self.promoted,
+            by_color: self.board.color_masks(),
+            roles: [(0usize, Bitboard::<G>::EMPTY); MAX_UNDO_ROLES],
+            role_count: 0,
+        };
+        self.apply_inner(mv, Some(&mut undo));
+        undo
+    }
+
+    /// Reverses an [`apply_with_undo`](Self::apply_with_undo) **in place**,
+    /// restoring the position to exactly what it was before the move — board,
+    /// side to move, castling rights, en passant, gating, Duck, placement / hand
+    /// pockets, clocks, pass counter, Alice plane mask, and promoted mask all
+    /// byte-identical.
+    ///
+    /// # Contract
+    ///
+    /// `undo` must be the token from the matching
+    /// [`apply_with_undo`](Self::apply_with_undo) call on the position this is the
+    /// successor of, and make/unmake pairs must nest (last made, first unmade).
+    /// Misuse leaves the position in an unspecified state; there is no validation.
+    pub fn undo(&mut self, undo: Undo<G>) {
+        // Restore the non-board state and promoted mask wholesale.
+        self.state = undo.state;
+        self.promoted = undo.promoted;
+        // Restore the board by direct mask assignment — no per-square role scan.
+        // The two color masks and every role mask the move touched are put back to
+        // their pre-move values; every other role mask was untouched by `apply`.
+        self.board.set_color_masks(undo.by_color);
+        for &(index, mask) in &undo.roles[..undo.role_count] {
+            self.board.set_role_mask(index, mask);
+        }
+    }
+
+    /// Test support (issue #309): walks the legal-move tree to `depth`, asserting
+    /// at every node that [`apply_with_undo`](Self::apply_with_undo) reaches the
+    /// same position as [`play`](Self::play) and that the matching
+    /// [`undo`](Self::undo) restores the position **byte-for-byte** — board, state,
+    /// and promoted mask. `self` is byte-identical on entry and exit.
+    #[cfg(test)]
+    pub(crate) fn assert_make_unmake_walk(&mut self, depth: u32) {
+        if depth == 0 {
+            return;
+        }
+        let before = self.clone();
+        for mv in before.legal_moves() {
+            let expected = before.play(&mv);
+            let undo = self.apply_with_undo(&mv);
+            assert!(
+                self.board == expected.board
+                    && self.state == expected.state
+                    && self.promoted == expected.promoted,
+                "apply_with_undo({}) diverged from play() at {}",
+                mv.to_uci::<G>(),
+                before.to_fen(),
+            );
+            self.assert_make_unmake_walk(depth - 1);
+            self.undo(undo);
+            assert!(
+                self.board == before.board
+                    && self.state == before.state
+                    && self.promoted == before.promoted,
+                "undo({}) failed to restore {} (got {})",
+                mv.to_uci::<G>(),
+                before.to_fen(),
+                self.to_fen(),
+            );
+        }
+    }
+
+    /// Applies `mv` to this position **in place** (the copy-make / no-undo path).
+    /// The move must be legal.
     fn apply(&mut self, mv: &WideMove) {
+        self.apply_inner(mv, None);
+    }
+
+    /// Applies `mv` in place. The move must be legal.
+    ///
+    /// `play`/`play_unchecked` pass `undo == None`; `apply_with_undo` passes a
+    /// fresh `Undo` (with its scalar state and color masks already snapshotted),
+    /// and this records the role masks the move touches as it goes — reusing the
+    /// `moving`/captured piece lookups the move already performs, so the make/unmake
+    /// path costs no extra `role_at` scan over plain `apply` on the common path.
+    fn apply_inner(&mut self, mv: &WideMove, mut undo: Option<&mut Undo<G>>) {
         let us = self.state.turn;
         let them = us.opposite();
         let from = mv.from::<G>();
@@ -3351,6 +3565,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // setup phase never resets nor advances the halfmove clock in FSF's
         // counting (it stays 0 through deployment), so leave it untouched.
         if let WideMoveKind::Drop { role } = mv.kind() {
+            // A drop places exactly its role on an empty square; that is the only
+            // role mask it edits, so it is all the undo needs to record.
+            if let Some(u) = undo.as_mut() {
+                u.touch(role, &self.board);
+            }
             self.board.set_piece(to, WidePiece::new(us, role));
             // A dropped piece is never promoted (its `to` was empty), so clear any
             // stale promoted bit there. Gated, so non-demoting variants skip it.
@@ -3389,6 +3608,42 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             .expect("move originates from an occupied square");
         let is_pawn_move = moving.role == WideRole::Pawn;
         let mut reset_clock = is_pawn_move;
+
+        // Record, before any board edit, the role masks this move will touch, so
+        // `undo` can restore the board by direct assignment with no per-square scan.
+        // This reuses the `moving` lookup above (no extra `from` scan); the only
+        // added read is a capture victim's role, and only on the make/unmake path.
+        // The set mirrors `apply`'s board writes exactly: the mover's role (carried,
+        // captured-away, promoted, flipped, or revealed at `to`), a capture victim
+        // (the destination occupant; en passant's victim is a Pawn, the same role as
+        // the moving pawn, already recorded), a promotion's new role, a castled
+        // `Rook`, a Kyoto flip / Jieqi reveal role, and a Seirawan / S-House gate.
+        if let Some(u) = undo.as_mut() {
+            u.touch(moving.role, &self.board);
+            if mv.is_capture() && !matches!(mv.kind(), WideMoveKind::EnPassant) {
+                if let Some(captured) = self.board.role_at(to) {
+                    u.touch(captured, &self.board);
+                }
+            }
+            if let Some(promo) = mv.kind().promotion() {
+                u.touch(promo, &self.board);
+            }
+            if mv.kind().is_castle() {
+                u.touch(WideRole::Rook, &self.board);
+            }
+            if let Some(flipped) = V::flips_on_move(moving.role) {
+                u.touch(flipped, &self.board);
+            }
+            if let Some(revealed) = V::reveal_on_move(moving.role, from) {
+                u.touch(revealed, &self.board);
+            }
+            if let Some(gate) = mv.gate() {
+                u.touch(gate.role(), &self.board);
+            }
+            if let Some(role) = mv.hand_gate() {
+                u.touch(role, &self.board);
+            }
+        }
 
         // Alice chess: the plane (A = false / B = true) the mover starts on, read
         // before any board-membership edit. After the board move below the piece
@@ -4764,14 +5019,22 @@ pub fn perft<G: Geometry, V: WideVariant<G>>(position: &GenericPosition<G, V>, d
     // sibling nodes; standard positions never spill, so this allocates nothing
     // below the root.
     let mut buf = WideMoveList::new();
-    perft_inner(position, depth, &mut buf)
+    // The recursion walks a single mutable position by **make/unmake** (issue
+    // #309) rather than cloning the whole position per node, so it works on one
+    // owned copy made here at the root; the per-node cost is then a bounded undo
+    // record, not a kilobyte-scale board copy.
+    let mut scratch = position.clone();
+    perft_inner(&mut scratch, depth, &mut buf)
 }
 
 /// Recursive core of [`perft`]. The caller owns `buf` (this ply's move buffer)
 /// and reuses it across sibling nodes; each frame creates one child buffer on its
-/// own stack and threads it down.
+/// own stack and threads it down. The position is walked in place by make/unmake:
+/// each child is reached with [`apply_with_undo`](GenericPosition::apply_with_undo)
+/// and the move undone before the next sibling, so `position` is byte-identical on
+/// entry and exit.
 fn perft_inner<G: Geometry, V: WideVariant<G>>(
-    position: &GenericPosition<G, V>,
+    position: &mut GenericPosition<G, V>,
     depth: u32,
     buf: &mut WideMoveList,
 ) -> u64 {
@@ -4785,17 +5048,22 @@ fn perft_inner<G: Geometry, V: WideVariant<G>>(
     }
     buf.clear();
     position.generate_list(buf);
+    let mut nodes = 0;
     if depth == 2 {
         // Every child is a leaf: bulk-count it directly, no child buffer needed.
-        let mut nodes = 0;
-        buf.for_each(|mv| nodes += position.play(&mv).legal_move_count() as u64);
+        buf.for_each(|mv| {
+            let undo = position.apply_with_undo(&mv);
+            nodes += position.legal_move_count() as u64;
+            position.undo(undo);
+        });
         return nodes;
     }
     // One child buffer on this frame's stack, reused for every child node.
     let mut child = WideMoveList::new();
-    let mut nodes = 0;
     buf.for_each(|mv| {
-        nodes += perft_inner(&position.play(&mv), depth - 1, &mut child);
+        let undo = position.apply_with_undo(&mv);
+        nodes += perft_inner(position, depth - 1, &mut child);
+        position.undo(undo);
     });
     nodes
 }
@@ -4811,11 +5079,18 @@ pub fn perft_divide<G: Geometry, V: WideVariant<G>>(
     if depth == 0 {
         return out;
     }
-    for mv in position.legal_moves() {
+    // Walk the root moves by make/unmake on one owned copy (issue #309), mirroring
+    // `perft`; the per-move subtree count is byte-identical to cloning and playing.
+    let moves = position.legal_moves();
+    let mut scratch = position.clone();
+    for mv in moves {
         let count = if depth == 1 {
             1
         } else {
-            perft(&position.play(&mv), depth - 1)
+            let undo = scratch.apply_with_undo(&mv);
+            let count = perft(&scratch, depth - 1);
+            scratch.undo(undo);
+            count
         };
         out.push((mv, count));
     }

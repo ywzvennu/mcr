@@ -299,6 +299,29 @@ impl<G: Geometry> Board<G> {
         self.by_role[piece.role.index()].set(square);
     }
 
+    /// The two color occupancy masks, `[white, black]`. Used by the make/unmake
+    /// [`Undo`](super::Undo) to snapshot and restore the board's color planes
+    /// without a per-square scan.
+    #[inline]
+    pub(crate) fn color_masks(&self) -> [Bitboard<G>; COLOR_COUNT] {
+        self.by_color
+    }
+
+    /// Overwrites both color occupancy masks. The make/unmake unmake half restores
+    /// the color planes by direct assignment (no scan).
+    #[inline]
+    pub(crate) fn set_color_masks(&mut self, masks: [Bitboard<G>; COLOR_COUNT]) {
+        self.by_color = masks;
+    }
+
+    /// Overwrites the role mask at the raw `WideRole` index `index`. The unmake
+    /// half restores exactly the role masks a move touched, by direct assignment
+    /// (its snapshot reads them through [`by_role`](Self::by_role)).
+    #[inline]
+    pub(crate) fn set_role_mask(&mut self, index: usize, mask: Bitboard<G>) {
+        self.by_role[index] = mask;
+    }
+
     /// Parses a board from a FEN piece-placement field over the geometry `G`.
     ///
     /// The field lists the ranks from the top (`HEIGHT - 1`) down to `0`,
