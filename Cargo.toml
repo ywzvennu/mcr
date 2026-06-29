@@ -108,6 +108,10 @@ harness = false
 name = "variants"
 harness = false
 
+[[bench]]
+name = "geometry"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
