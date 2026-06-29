@@ -42,10 +42,10 @@ use mce::geometry::{
     AseanRules, Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules,
     DuckRules, EmpireRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
     HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
-    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
-    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules,
-    SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant,
-    XiangqiRules,
+    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules,
+    SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
+    WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -490,6 +490,24 @@ variant_test!(
         "rrnmk1n1/1ss5/4pppp/pppp4/4PPPP/PPPP4/1SS5/RRNMK1N1 w - - 0 9",
         "rrn1k1n1/1ss5/4pppp/ppp5/5PPP/PPPP1p2/1SS1M3/RRN1K1N1 b - - 0 11",
         "8/8/4pppp/pppp4/4PPPP/PPPP4/8/3M2R1[NNRKSSnnrrkmss] b - - 0 3",
+    ]
+);
+
+// -- Placement / Pre-Chess (deployment phase, 8x8) --------------------------
+// The startpos is a deployment-phase position (both pockets in hand, no king on
+// the board yet); the corpus adds a mid-deployment position, a non-standard
+// fully-deployed array with castling, and a developed middlegame. Standard chess
+// movement, so this guards that adding the deployment mechanic left the attacker
+// reverse-projection byte-identical.
+variant_test!(
+    placement,
+    Chess8x8,
+    PlacementRules,
+    "placement",
+    [
+        "rnb5/pppppppp/8/8/8/8/PPPPPPPP/RNB5[NBRQKnbrqk] w - - 0 4",
+        "rbnqknbr/pppppppp/8/8/8/8/PPPPPPPP/RBNQKNBR w KQkq - 0 9",
+        "rbnqk1br/ppp1pppp/5n2/3pP3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq d6 0 9",
     ]
 );
 

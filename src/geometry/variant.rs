@@ -794,6 +794,31 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// For a placement variant whose deployment **grants standard castling**
+    /// (Placement / Pre-Chess), the file the king must occupy on its
+    /// [`castle_rank`](WideVariant::castle_rank) for a freshly dropped king or
+    /// rook to confer castling rights; `None` if the placement phase never grants
+    /// castling.
+    ///
+    /// Only consulted when [`has_placement`](WideVariant::has_placement) is
+    /// `true`. The default is `None`: a placement variant whose deployment confers
+    /// no castling (Sittuyin) leaves the castling rights exactly as the drops left
+    /// them, so it — and every non-placement variant — is byte-identical to a
+    /// build without this hook.
+    ///
+    /// When `Some(file)`, the generic engine re-derives the dropping side's rights
+    /// after each placement drop: with that side's king on `(file, castle_rank)`,
+    /// a rook on the queenside corner (file `0`) confers the queenside right and a
+    /// rook on the kingside corner (file `WIDTH - 1`) the kingside right — the
+    /// standard a-/h-file rook castling [`GenericCastling::standard`] uses. This
+    /// matches Fairy-Stockfish's `placement`, which assigns `KQkq` incrementally
+    /// as the king and corner rooks reach their squares.
+    ///
+    /// [`GenericCastling::standard`]: super::position::GenericCastling::standard
+    fn placement_castling_king_file() -> Option<u8> {
+        None
+    }
+
     // --- Shogi hand / drops + per-piece promotion (default OFF) ----------
 
     /// Returns `true` if this variant has a **persistent hand**: a captured piece

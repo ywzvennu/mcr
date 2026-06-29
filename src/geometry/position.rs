@@ -3137,6 +3137,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // byte-identical.
                 self.state.placement.take(us, V::role_hand_base(role));
             }
+            // Placement (Pre-Chess): a deployment that puts the king on its
+            // castling file with a corner rook confers standard castling rights,
+            // assigned incrementally as the pieces reach their squares. Gated
+            // behind `placement_castling_king_file()` (default `None`), so every
+            // other variant — including the no-castling placement variant
+            // (Sittuyin) — leaves the rights untouched and is byte-identical.
+            if let Some(king_file) = V::placement_castling_king_file() {
+                self.derive_placement_castling(us, king_file);
+            }
             self.state.ep_square = None;
             if us.is_black() {
                 self.state.fullmove_number = self.state.fullmove_number.saturating_add(1);
@@ -3522,6 +3531,32 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if let Some(file) = self.state.castling.rook_file(color, side) {
                 if Square::<G>::from_file_rank(file, rank) == Some(square) {
                     self.state.castling.set(color, side, None);
+                }
+            }
+        }
+    }
+
+    /// Re-derives `color`'s standard castling rights from the board after a
+    /// placement drop (Placement / Pre-Chess). With `color`'s king on
+    /// `(king_file, castle_rank)`, a rook on the queenside corner (file `0`)
+    /// confers the queenside right and a rook on the kingside corner
+    /// (file `WIDTH - 1`) the kingside right — the a-/h-file rooks
+    /// [`GenericCastling::standard`] uses. The rights only build up (the king and
+    /// rooks never leave the board during deployment), so this matches FSF's
+    /// incremental `KQkq` assignment.
+    fn derive_placement_castling(&mut self, color: Color, king_file: u8) {
+        let rank = V::castle_rank(color);
+        let Some(king_sq) = Square::<G>::from_file_rank(king_file, rank) else {
+            return;
+        };
+        if self.board.piece_at(king_sq) != Some(WidePiece::new(color, WideRole::King)) {
+            return;
+        }
+        let rook = WidePiece::new(color, WideRole::Rook);
+        for (side, file) in [(KINGSIDE, G::WIDTH - 1), (QUEENSIDE, 0)] {
+            if let Some(rook_sq) = Square::<G>::from_file_rank(file, rank) {
+                if self.board.piece_at(rook_sq) == Some(rook) {
+                    self.state.castling.set(color, side, Some(file));
                 }
             }
         }
