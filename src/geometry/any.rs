@@ -209,6 +209,14 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// The 1-based fullmove number (incremented after each Black move).
+            #[must_use]
+            pub fn fullmove_number(&self) -> u16 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.fullmove_number(), )+
+                }
+            }
+
             /// The legal moves of the side to move under the wrapped variant.
             #[must_use]
             pub fn legal_moves(&self) -> Vec<WideMove> {
@@ -294,6 +302,23 @@ macro_rules! wide_variants {
             pub fn play_uci(&self, uci: &str) -> Option<Self> {
                 let mv = self.parse_uci(uci)?;
                 Some(self.play(&mv))
+            }
+
+            /// Renders the legal move `mv` as SAN for this variant's geometry.
+            #[must_use]
+            pub fn san(&self, mv: &WideMove) -> String {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.san(mv), )+
+                }
+            }
+
+            /// Resolves a SAN move string to a legal [`WideMove`] in this
+            /// position, or `None` if it names no (or an ambiguous) legal move.
+            #[must_use]
+            pub fn parse_san(&self, san: &str) -> Option<WideMove> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.parse_san(san).ok(), )+
+                }
             }
         }
     };
