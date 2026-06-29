@@ -46,6 +46,7 @@ mod minishogi;
 mod minixiangqi;
 mod orda;
 mod ordamirror;
+mod placement;
 mod seirawan;
 mod shako;
 mod shatar;
@@ -209,6 +210,9 @@ fn main() {
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
+    // Placement (Pre-Chess) is a FSF built-in (no variants.ini needed), like
+    // sittuyin; it rides the same generic engine's deployment phase.
+    let placement_mismatches = placement::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
@@ -264,6 +268,7 @@ fn main() {
         + grandhouse_mismatches
         + duck_mismatches
         + sittuyin_mismatches
+        + placement_mismatches
         + spartan_mismatches
         + shako_mismatches
         + shatar_mismatches
