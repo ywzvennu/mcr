@@ -87,19 +87,17 @@ impl Variant for RacingKingsRules {
     /// any move that would leave the mover's own king in check, exactly standard
     /// king safety), then remove the moves that **give check** to the opponent —
     /// the one extra Racing Kings restriction. The gives-check test uses attack
-    /// tables over the post-move occupancy ([`gives_check`]) instead of a full
+    /// tables over the post-move occupancy (`gives_check`) instead of a full
     /// make-move per candidate.
     ///
     /// This produces an identical move set to the original pseudo-legal +
     /// make-move filter: the fast generator's set is precisely the moves that keep
-    /// the mover's king safe, and [`gives_check`] removes exactly those among them
+    /// the mover's king safe, and `gives_check` removes exactly those among them
     /// that attack the enemy king afterwards — i.e. the moves the old
     /// [`Variant::is_legal_after`] (`!either_king_in_check(child)`) rejected for the
     /// opponent-check reason. Racing Kings has no pawns, castling, en passant, or
     /// promotion, so every move is a single piece stepping from one square to
     /// another, which keeps the post-move occupancy a plain `from`→`to` edit.
-    ///
-    /// [`gives_check`]: gives_check
     fn legal_into(core: &Position, out: &mut MoveList) {
         // Standard king safety (own king not left in check), fast path. There is
         // no castling in Racing Kings, so the no-castles fast generator is exact.
@@ -116,7 +114,7 @@ impl Variant for RacingKingsRules {
     /// generation now goes through the faster [`RacingKingsRules::legal_into`]
     /// override, which never calls this hook. It still matches that override move
     /// for move: the override's fast generator enforces the mover-king half and
-    /// [`gives_check`] enforces the opponent half.
+    /// `gives_check` enforces the opponent half.
     fn is_legal_after(_parent: &Position, _mv: &Move, child: &Position) -> bool {
         !either_king_in_check(child)
     }

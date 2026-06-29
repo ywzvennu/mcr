@@ -1,7 +1,7 @@
 //! Chak (9x9 Mayan chess) on the generic engine — a Couch Tomato variant
 //! inspired by the Mayan civilisation, validated node-for-node against
 //! Fairy-Stockfish `UCI_Variant chak` (from its `variants.ini`). It reuses the
-//! [`Shogi9x9`](super::super::Shogi9x9) geometry and introduces six new pieces, a
+//! [`Shogi9x9`] geometry and introduces six new pieces, a
 //! **king/Lord-promotes-on-the-temple-half** rule, a **region-confined** Shaman
 //! and Divine Lord, an **eight-direction cannon** (the Quetzal), and a
 //! **temple-square win**.

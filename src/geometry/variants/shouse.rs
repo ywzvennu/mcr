@@ -27,7 +27,7 @@
 //! Confirmed against FSF: at the start, both `H@`/`E@` drops and the gates are
 //! legal; with a captured Knight in hand a back-rank piece's first move may gate
 //! that Knight. S-House therefore sets [`WideVariant::gates_from_hand`], drawing
-//! the gated piece from [`GenericPlacement`](crate::geometry::position::GenericPlacement)
+//! the gated piece from [`GenericPlacement`]
 //! rather than the fixed Hawk/Elephant reserve; the [`GenericGating`] state still
 //! supplies the gating-**eligible square set** (the virgin back-rank squares).
 //!

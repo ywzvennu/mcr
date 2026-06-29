@@ -20,7 +20,7 @@
 //!
 //! sorted by `key`, so a position's entries are found by binary search. Reading
 //! is split into a `std`-free [`Book::from_bytes`] over an in-memory slice and,
-//! behind the `book` Cargo feature, a [`Book::open`] convenience that reads a
+//! behind the `book` Cargo feature, a `Book::open` convenience that reads a
 //! file from disk.
 //!
 //! [Polyglot]: http://hgm.nubati.net/book_format.html
@@ -60,7 +60,7 @@ const ENTRY_SIZE: usize = 16;
 /// on-disk big-endian form and decoded lazily on lookup.
 ///
 /// Construct one with [`Book::from_bytes`] (no_std-friendly, borrows or owns a
-/// byte buffer) or, with the `book` feature, [`Book::open`] to read a file.
+/// byte buffer) or, with the `book` feature, `Book::open` to read a file.
 /// [`lookup`](Book::lookup) binary-searches the entries — which Polyglot stores
 /// sorted by key — for those matching a position's [`polyglot_key`].
 #[derive(Debug, Clone)]
@@ -230,7 +230,7 @@ pub fn weighted_pick(entries: &[BookEntry], random: u64) -> Option<BookEntry> {
 ///
 /// This is the hash Polyglot books are keyed by, and is *independent* of mce's
 /// own incremental [`Zobrist`](crate::Zobrist) key: it uses Polyglot's fixed
-/// public-domain table of 781 random constants ([`RANDOM64`]) and its own
+/// public-domain table of 781 random constants (`RANDOM64`) and its own
 /// scheme:
 ///
 /// - **Pieces:** for each occupied square, XOR the constant at

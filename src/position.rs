@@ -843,7 +843,7 @@ impl Position {
     /// Number of legal moves without allocating the full list — used by
     /// checkmate / stalemate queries and perft at depth 1.
     ///
-    /// Counts via the bulk leaf-counting [`CountSink`] (population counts over
+    /// Counts via the bulk leaf-counting `CountSink` (population counts over
     /// the target masks) rather than materializing every move, so it is both
     /// allocation-free and cheaper than building and measuring a [`MoveList`].
     #[must_use]

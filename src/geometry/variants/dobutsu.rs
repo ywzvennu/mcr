@@ -44,7 +44,7 @@
 //! board move, **drop** a held piece onto **any empty square** — with **no**
 //! restrictions: a Chick may be dropped on the last rank (FSF `immobilityIllegal
 //! = false`, so an immobile dropped Chick there is legal), and there is **no
-//! nifu** (FSF `dropNoDoubled = -`), so the trait-default [`drop_targets`] (all
+//! nifu** (FSF `dropNoDoubled = -`), so the trait-default [`drop_targets`](crate::geometry::WideVariant::drop_targets) (all
 //! empty squares) applies unchanged. A dropped piece is always unpromoted.
 //!
 //! ## Try / flag win

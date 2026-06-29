@@ -41,7 +41,7 @@
 //! Cambodian reuses the entire Makruk rule layer and adds the leaps behind the
 //! default-off [`WideVariant::has_first_move_leaps`] hook. The two leap rights
 //! are stored in the existing
-//! [`GenericCastling`](crate::geometry::position::GenericCastling) field — the
+//! [`GenericCastling`] field — the
 //! **kingside** slot for the king (keyed to its home file) and the **queenside**
 //! slot for the Met — so they are parsed, serialized, and revoked (on the
 //! piece's first move) by the same machinery as a castling right.

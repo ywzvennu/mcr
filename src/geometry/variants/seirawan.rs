@@ -26,7 +26,7 @@
 //! its own (a gated piece may not block a check or shield the king), which is
 //! exactly how the generic engine emits gates — it augments already-legal base
 //! moves, so the gate can only *add* an option. See
-//! [`GenericPosition`](crate::geometry::GenericPosition)'s movegen and `apply`.
+//! [`GenericPosition`]'s movegen and `apply`.
 //!
 //! ## Confirmed starting FEN
 //!

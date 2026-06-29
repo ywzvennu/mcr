@@ -88,7 +88,7 @@ pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 /// The derived masks ([`FILE_A_MASK`](Geometry::FILE_A_MASK),
 /// [`LAST_FILE_MASK`](Geometry::LAST_FILE_MASK),
 /// [`BOARD_MASK`](Geometry::BOARD_MASK)) are expressed over the backing integer
-/// `Bits`; the [`geometry!`](crate::geometry) macro fills them in from `WIDTH`
+/// `Bits`; the [`geometry!`](crate::geometry!) macro fills them in from `WIDTH`
 /// and `HEIGHT` for you, so most implementors never write them by hand.
 pub trait Geometry: Copy + 'static {
     /// The integer backing a [`Bitboard<Self>`]: `u64` for 8x8, `u128` for

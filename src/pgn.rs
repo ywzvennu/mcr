@@ -345,7 +345,7 @@ impl Pgn {
     /// The mainline as variation-tree nodes.
     ///
     /// This is the top-level line of the tree: walking it forward replays the
-    /// mainline, and each node's [`PgnNode::variations`] gives the alternative
+    /// mainline, and each node's `PgnNode::variations` gives the alternative
     /// sub-lines (RAV `(...)`) branching from the position before that node.
     #[must_use]
     pub fn mainline(&self) -> &[PgnNode] {

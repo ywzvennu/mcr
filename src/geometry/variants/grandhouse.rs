@@ -12,7 +12,7 @@
 //! Identical to Grand — every rule of movement, the absence of castling, the
 //! pawn double-push rank, the three-rank promotion zone, and the
 //! promote-only-to-a-captured-type rule are inherited unchanged by delegating to
-//! [`GrandRules`](super::grand::GrandRules):
+//! [`GrandRules`]:
 //!
 //! * **Marshal** (Rook + Knight) — [`WideRole::Elephant`], FEN letter `e`/`E` in
 //!   the mce dialect (Fairy-Stockfish spells the marshal/chancellor `c`/`C`; the

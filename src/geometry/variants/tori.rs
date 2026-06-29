@@ -3,7 +3,7 @@
 //! seven-bird army in place of the usual Shogi pieces. Validated square-for-square
 //! and node-for-node against Fairy-Stockfish `UCI_Variant torishogi`.
 //!
-//! Tori Shogi reuses every piece of the Shogi machinery proven by [`Shogi`] /
+//! Tori Shogi reuses every piece of the Shogi machinery proven by [`Shogi`](crate::geometry::Shogi) /
 //! [`Minishogi`](super::Minishogi) — a captured piece flips colour and enters the
 //! captor's **hand**, from which it may be **dropped** back onto an empty square;
 //! a piece **promotes** when a move starts or ends in the far-board zone — but on
@@ -63,7 +63,7 @@
 //! 3. A dropped piece is always unpromoted.
 //!
 //! The Swallow-drop-mate rule (FSF `shogiPawnDropMateIllegal`) is **not** applied
-//! here: like Shogi against FSF (see [`Shogi`]), FSF's `torishogi` move generation
+//! here: like Shogi against FSF (see [`Shogi`](crate::geometry::Shogi)), FSF's `torishogi` move generation
 //! lists a mating swallow drop in its `go perft` divide, so mce matches FSF and
 //! leaves [`pawn_drop_mate_forbidden`](WideVariant::pawn_drop_mate_forbidden) at
 //! its `false` default.
@@ -77,7 +77,7 @@
 //! ```
 //!
 //! In mce's overflow spelling (each bird is a `*`-prefixed overflow role) this is
-//! the [`TORI_PLACEMENT`] below; the `compare-fairy/` harness rewrites each
+//! the `TORI_PLACEMENT` below; the `compare-fairy/` harness rewrites each
 //! `*<base>` token to FSF's letter when driving FSF.
 
 use crate::geometry::position::{

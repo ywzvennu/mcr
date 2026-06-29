@@ -9,7 +9,7 @@
 //! and no drops**. Its one extra piece is the **Drunk Elephant**, which promotes
 //! to a **Crown Prince**, a *second royal piece*.
 //!
-//! This module is a thin layer over [`ShogiRules`](super::shogi::ShogiRules): the
+//! This module is a thin layer over [`ShogiRules`]: the
 //! whole shared army (movement, the `+`-promotions, the promotion zone, the forced
 //! promotions, the directional/slider classifications) is **delegated** to it, and
 //! only the two new pieces and the multi-royal rule are added here. The hand and

@@ -17,7 +17,7 @@
 //!   over per-direction line masks (rank / file / diagonal / anti-diagonal)
 //!   regenerated for the geometry from its width and height. Pure integer
 //!   arithmetic, no `unsafe`.
-//! * **Geometry rays** — [`between`] and [`line`] give the strictly-between and
+//! * **Geometry rays** — [`between`] and [`line`](fn@line) give the strictly-between and
 //!   full-line squares for two aligned squares.
 //!
 //! The slider line masks and ray walks are recomputed per call from the

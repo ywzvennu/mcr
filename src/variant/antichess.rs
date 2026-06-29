@@ -138,7 +138,7 @@ impl Variant for AntichessRules {
 
     /// The core pseudo-legal generator emits only the four standard promotion
     /// roles (it has no knowledge of [`Variant::promotion_roles`]). It is invoked
-    /// here through [`Position::pseudo_into_all_kings`] so that king moves are
+    /// here through `Position::pseudo_into_all_kings` so that king moves are
     /// emitted for *every* king of the side to move — a side may have several
     /// kings, since antichess allows promotion to a king — rather than only one.
     /// Antichess adds the king-promotion moves here: the standard pass is

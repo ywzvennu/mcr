@@ -2,7 +2,7 @@
 //! the [`WideVariant`] layer (`docs/fairy-variants-architecture.md`, Phase 2,
 //! Group C). It validates a **second** `u128` geometry ([`Grand10x10`], 100
 //! squares) end-to-end against Fairy-Stockfish, after Capablanca proved the 10x8
-//! [`Cap10x8`] path.
+//! [`Cap10x8`](crate::geometry::Cap10x8) path.
 //!
 //! Grand chess is played on a ten-files by ten-ranks board (files a..j, ranks
 //! 1..10). Beyond the standard chess army each side adds two compound pieces:

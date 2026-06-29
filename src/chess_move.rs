@@ -203,7 +203,7 @@ const FLAG_MASK: u16 = 0xf;
 /// A chess move: where a piece moves from, where it moves to, and the
 /// [`MoveKind`] that gives it its special meaning.
 ///
-/// Stored as a packed `u16` (see the [module docs](self#packed-representation)
+/// Stored as a packed `u16` (see the module docs
 /// for the bit layout). Castling is encoded as the king's move (for example
 /// `e1` to `g1`), matching the UCI convention for standard chess.
 ///

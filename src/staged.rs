@@ -58,7 +58,7 @@ enum Stage {
 ///
 /// Built by [`Position::staged_moves`] (and [`crate::VariantPosition::staged_moves`]).
 /// Pull moves with [`MoveGenerator::next`] or via the [`Iterator`] impl; see the
-/// [module docs](self) for the stage order and the guarantee that the yielded
+/// module docs for the stage order and the guarantee that the yielded
 /// set equals [`Position::legal_moves`].
 ///
 /// ```
@@ -136,7 +136,7 @@ impl<'a> MoveGenerator<'a> {
     }
 
     /// Pulls the next legal move in staged order, or `None` when exhausted. See
-    /// the [module docs](self) for the stage order.
+    /// the module docs for the stage order.
     pub fn next_move(&mut self) -> Option<Move> {
         loop {
             match self.stage {
