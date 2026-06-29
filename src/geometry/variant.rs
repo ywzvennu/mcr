@@ -1047,6 +1047,27 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         role.promoted_base()
     }
 
+    /// Returns `true` if a captured piece that **reached the board by promotion**
+    /// is banked into the captor's hand as a **Pawn** rather than by its own role
+    /// — the crazyhouse "promoted pieces demote" rule. Only consulted when
+    /// [`has_hand`](WideVariant::has_hand) and
+    /// [`captures_to_hand`](WideVariant::captures_to_hand) are both `true`.
+    ///
+    /// The default is `false`. Shogi-family hand variants (Shogi, Shogun, …)
+    /// represent every promoted form as a **distinct role** and revert it via
+    /// [`role_hand_base`](WideVariant::role_hand_base), so they need no separate
+    /// promoted bookkeeping and keep this off. Crazyhouse-style variants
+    /// (Capahouse) instead promote a Pawn into an ordinary army role (Queen,
+    /// Archbishop, …) that is **indistinguishable on the board** from a natural
+    /// piece of that role, so a per-square *promoted mask* records which occupants
+    /// arrived by promotion; capturing one banks a Pawn. The mask rides the FEN as
+    /// a trailing `~` on the promoted piece's token (e.g. `Q~`) and is maintained
+    /// across moves by the make-move path. Default-off, so every other variant
+    /// carries an empty mask, never reads the `~` token, and is byte-identical.
+    fn demotes_promoted_captures() -> bool {
+        false
+    }
+
     /// Returns `true` if a piece of `role` of `color` is **forbidden from
     /// promoting** in the current `board` because the variant caps the number of
     /// its promoted form (FSF `promotionLimit`). When `true`, the generic per-piece

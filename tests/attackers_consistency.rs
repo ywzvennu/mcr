@@ -39,12 +39,12 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CambodianRules, CapablancaRules, ChakRules, DobutsuRules, DuckRules, EmpireRules,
-    GenericPosition, Geometry, GrandRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
-    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
-    OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules,
-    ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
-    WideRole, WideVariant, XiangqiRules,
+    Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules, DuckRules,
+    EmpireRules, GenericPosition, Geometry, GrandRules, HoppelPoppelRules, JanggiRules,
+    KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules,
+    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules,
+    ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess,
+    SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
@@ -345,6 +345,30 @@ variant_test!(
         "r4k3r/pppppppppp/10/10/10/10/PPPPPPPPPP/R4K3R w KQkq - 0 1",
         "1nabqkben1/p1ppppppp1/1r6r1/1p6p1/3PP5/2N4N2/PPP2PPPPP/R1ABQKBE1R w KQ - 0 5",
         "5k4/4P5/10/10/10/10/10/5K4 w - - 0 1",
+    ]
+);
+
+// -- Capahouse (10x8, crazyhouse drops) -------------------------------------
+//
+// Capahouse shares Capablanca's pieces (the Archbishop `a` / `WideRole::Hawk` and
+// Chancellor `e` / `WideRole::Elephant` compounds, both geometrically symmetric),
+// so only the pawn is colour-directional, exactly as Capablanca. The added
+// crazyhouse hand (the `[..]` bracket) and the promoted mask (a `~` token) never
+// touch the attack sets — a promoted Queen attacks as a Queen — so this guards
+// that the compound `role_attacks` and the `attackers_to` reverse-projection agree
+// even with a hand in pocket and a promoted piece (`Q~`) on the board. The corpus
+// mixes a castling position, a midgame with pieces in hand, and a promoted-queen
+// position (all in mce dialect, chancellor `e`).
+
+variant_test!(
+    capahouse,
+    Cap10x8,
+    CapahouseRules,
+    "capahouse",
+    [
+        "r4k3r/pppppppppp/10/10/10/10/PPPPPPPPPP/R4K3R[] w KQkq - 0 1",
+        "1nabqkben1/p1ppppppp1/1r6r1/1p6p1/3PP5/2N4N2/PPP2PPPPP/R1ABQKBE1R[QPqp] w KQ - 0 5",
+        "5k4/10/10/4Q~5/10/10/10/5K4[] w - - 0 1",
     ]
 );
 

@@ -10,6 +10,7 @@
 
 pub mod cambodian;
 pub mod capablanca;
+pub mod capahouse;
 pub mod chak;
 pub mod dobutsu;
 pub mod duck;
@@ -40,6 +41,7 @@ pub mod xiangqi;
 
 pub use cambodian::{Cambodian, CambodianRules};
 pub use capablanca::{Capablanca, CapablancaRules};
+pub use capahouse::{Capahouse, CapahouseRules};
 pub use chak::{Chak, ChakRules};
 pub use dobutsu::{Dobutsu, DobutsuRules};
 pub use duck::{Duck, DuckRules};
