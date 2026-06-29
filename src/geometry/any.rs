@@ -244,6 +244,16 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// Test support (issue #309): walks the legal-move tree to `depth`,
+            /// asserting `apply_with_undo` then `undo` restores every node
+            /// byte-for-byte and matches `play`.
+            #[cfg(test)]
+            pub(crate) fn assert_make_unmake_walk(&self, depth: u32) {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.clone().assert_make_unmake_walk(depth), )+
+                }
+            }
+
             /// The variant-aware game result, or `None` if the game is not over.
             #[must_use]
             pub fn outcome(&self) -> Option<WideOutcome> {
@@ -433,6 +443,37 @@ mod tests {
             let reparsed = AnyWideVariant::from_fen(id, &fen).expect("startpos fen parses");
             assert_eq!(reparsed.to_fen(), fen, "fen round trip for {id}");
             assert_eq!(reparsed.variant_id(), id);
+        }
+    }
+
+    /// Make/unmake round-trip (issue #309): for every variant, walking the
+    /// legal-move tree from the start position and reaching each child by
+    /// `apply_with_undo` must (a) match `play` exactly and (b) be restored
+    /// byte-for-byte by the matching `undo` — board, state, and promoted mask.
+    ///
+    /// The always-run sweep is a depth-2 walk across all 47 variants (fast even in
+    /// a debug build); the exhaustive deeper coverage of every move kind reached at
+    /// depth — captures, en passant, promotions, drops, gates, Alice transfers,
+    /// the Janggi pass — is provided by [`make_unmake_round_trips_deep`] and, more
+    /// thoroughly still, by the pinned perft suites (which now walk the tree by
+    /// make/unmake, so any undo defect surfaces as a node-count mismatch).
+    #[test]
+    fn make_unmake_round_trips_for_every_variant() {
+        for &id in WideVariantId::ALL {
+            AnyWideVariant::startpos(id).assert_make_unmake_walk(2);
+        }
+    }
+
+    /// The deep make/unmake round-trip sweep (issue #309): a depth-3 walk across
+    /// all 47 variants, reaching captures, en passant, promotions, drops, gates,
+    /// and the Janggi pass as *applied* moves. `#[ignore]`d so the default
+    /// `cargo test` stays fast; run with
+    /// `cargo test --release --lib -- --ignored make_unmake_round_trips_deep`.
+    #[test]
+    #[ignore = "deep make/unmake walk; run with --release --ignored"]
+    fn make_unmake_round_trips_deep() {
+        for &id in WideVariantId::ALL {
+            AnyWideVariant::startpos(id).assert_make_unmake_walk(3);
         }
     }
 
