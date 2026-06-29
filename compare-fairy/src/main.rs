@@ -31,6 +31,7 @@ mod capahouse;
 mod chak;
 mod corpus;
 mod dobutsu;
+mod dragon;
 mod duck;
 mod empire;
 mod fogofwar;
@@ -214,6 +215,10 @@ fn main() {
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
+    // Dragon is a FSF built-in (no variants.ini needed): standard chess plus a
+    // Bishop+Knight Dragon in each fixed pocket, droppable onto the back rank. Its
+    // mce dialect (`a`/`A`) is rewritten to FSF's `d`/`D` inside dragon::run.
+    let dragon_mismatches = dragon::run(&mut engine, opts.full);
     // Fog of War is an INI variant FSF lacks entirely: fogofwar::run bundles its
     // own variants.ini definition (inheriting built-in chess) and loads it via
     // VariantPath before comparing.
@@ -288,6 +293,7 @@ fn main() {
         + grand_mismatches
         + grandhouse_mismatches
         + duck_mismatches
+        + dragon_mismatches
         + fogofwar_mismatches
         + sittuyin_mismatches
         + placement_mismatches

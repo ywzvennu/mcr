@@ -40,11 +40,11 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CapablancaRules, CapahouseRules,
-    ChakRules, DobutsuRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry,
-    GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
-    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
-    OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
+    ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition,
+    Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules,
+    KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules,
+    MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules,
+    ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
     SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
     WideVariant, XiangqiRules,
 };
@@ -525,6 +525,20 @@ variant_test!(
         "rnbqkbnr/ppp1pppp/8/3pP3/*7/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1",
         "4k3/8/8/r2pPK2/8/8/8/8 w - d6 0 1",
         "8/2k5/8/3*4/8/5K2/4P3/8 w - - 0 1",
+    ]
+);
+
+// -- Dragon (chess + Bishop+Knight Dragon dropped on the back rank, 8x8) ----
+
+variant_test!(
+    dragon,
+    Chess8x8,
+    DragonRules,
+    "dragon",
+    [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/3A4/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1",
+        "r1bqk2r/pppp1ppp/2n2n2/2a1p3/2A1P3/2N2N2/PPPP1PPP/R2QK2R[] w KQkq - 0 1",
     ]
 );
 
