@@ -842,7 +842,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // materialising generator and the bulk-count leaf path funnel through, so a
         // flag win terminates perft descent exactly as Fairy-Stockfish does.
         // `flag_win_reached(opp)` ≡ "the opponent's king is on its goal rank."
-        if V::has_flag_win() && self.flag_win_reached(us.opposite()) {
+        if V::has_flag_win() && self.flag_win_terminal(us) {
             return;
         }
 
@@ -866,13 +866,31 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             None => return,
         };
 
-        let checkers = self.attackers_to(king_sq, them, occupied);
+        // A **non-royal** king (Dobutsu's Lion): there is no check, so the king
+        // never has a check mask, pins, or king-danger filter — it may step into an
+        // attacked square, and any piece may move freely (a side loses only by
+        // extinction or the opponent's try, both handled as terminals). The "king"
+        // here is the [`WideRole::King`]-role Lion; treat it as an ordinary piece
+        // with no safety filtering. Gated behind `non_royal_king()` (default-off),
+        // so every royal-king variant keeps the exact check/pin/king-danger path.
+        let non_royal = V::non_royal_king();
+
+        let checkers = if non_royal {
+            Bitboard::EMPTY
+        } else {
+            self.attackers_to(king_sq, them, occupied)
+        };
         let num_checkers = checkers.count();
 
         // King-danger: squares attacked by the enemy with our king lifted out
-        // of the occupancy, so it cannot shield itself along a slider ray.
-        let occ_without_king = occupied.without(king_sq);
-        let king_danger = self.attacked_by(them, occ_without_king);
+        // of the occupancy, so it cannot shield itself along a slider ray. A
+        // non-royal king has no danger filter.
+        let king_danger = if non_royal {
+            Bitboard::EMPTY
+        } else {
+            let occ_without_king = occupied.without(king_sq);
+            self.attacked_by(them, occ_without_king)
+        };
 
         // King moves are always generated (the only legal moves under double
         // check).
@@ -895,7 +913,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             Bitboard::FULL
         };
 
-        let pins = self.compute_pins(king_sq, us, them, occupied);
+        let pins = if non_royal {
+            Pins::empty(king_sq)
+        } else {
+            self.compute_pins(king_sq, us, them, occupied)
+        };
 
         // Every non-king, non-pawn role: its attack set minus friendly pieces,
         // confined by the check mask and (if pinned) its pin line. Roles the
@@ -1324,7 +1346,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // on its goal rank, the opponent has won and the side to move has no legal
         // continuation — Fairy-Stockfish returns zero here, so the node is a perft
         // leaf. Gated behind `has_flag_win()` (default-off).
-        if V::has_flag_win() && self.flag_win_reached(us.opposite()) {
+        if V::has_flag_win() && self.flag_win_terminal(us) {
             return;
         }
         // Bare-king "Robado" draw (Shatar): a side reduced to its lone king ends
@@ -1565,10 +1587,43 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// [`WideVariant::has_flag_win`] is `true`; the caller gates on it.
     fn flag_win_reached(&self, who: Color) -> bool {
         let rank = V::flag_rank(who);
-        self.board
+        let on_rank = self
+            .board
             .kings_of(who)
             .into_iter()
-            .any(|k| k.rank() == rank)
+            .filter(|k| k.rank() == rank);
+        if V::flag_win_requires_safe() {
+            // Dobutsu's "try" rule: a king on its goal rank wins only if it is
+            // **safe** — unattacked by the opponent, who would otherwise capture it.
+            // The check fires on the opponent's turn, so the opponent is `who`'s
+            // enemy; reuse the standard attacker scan on the live occupancy. Default
+            // off, so every other flag variant keeps the purely positional rule.
+            let them = who.opposite();
+            let occ = self.board.occupied();
+            on_rank
+                .into_iter()
+                .any(|k| self.attackers_to(k, them, occ).is_empty())
+        } else {
+            on_rank.into_iter().next().is_some()
+        }
+    }
+
+    /// Returns `true` if a flag ("campmate" / "try") win has already been reached
+    /// when `us` is to move, so the node is terminal (no legal continuation). The
+    /// caller gates on [`WideVariant::has_flag_win`].
+    ///
+    /// For the purely positional flag (Orda / Synochess) only the **opponent** can
+    /// already stand on its goal rank — the winner places its own king there on its
+    /// own move, so the win is always adjudicated on the loser's turn.
+    ///
+    /// For the **safe** "try" rule (Dobutsu), the win can become true on **either**
+    /// side's turn: the loser may have safely reached the far rank on its own move,
+    /// or the *winner's* king may have become safe only because the loser's last
+    /// move stopped attacking it — in which case the win is adjudicated on the
+    /// winner's own (next) turn. So check both sides under the safe rule.
+    fn flag_win_terminal(&self, us: Color) -> bool {
+        self.flag_win_reached(us.opposite())
+            || (V::flag_win_requires_safe() && self.flag_win_reached(us))
     }
 
     /// Returns `true` if **either** side has been reduced to a lone king (its
@@ -1964,19 +2019,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // The check mask: a drop must resolve a single check by interposing on a
         // square between the king and the (single) checker. Under double check no
         // drop helps (only a king move), and a drop can never capture the checker.
-        let drop_mask = match board.king_of(us) {
-            Some(king_sq) => {
-                let checkers = self.attackers_to(king_sq, them, occupied);
-                match checkers.count() {
-                    0 => Bitboard::FULL,
-                    // A drop cannot capture, so only the between-squares resolve a
-                    // single check.
-                    1 => between(king_sq, checkers.lsb().expect("one checker")),
-                    // Double check: no drop is legal.
-                    _ => return,
+        // A **non-royal** king (Dobutsu's Lion) is never in check, so a drop is
+        // never required to resolve one: the mask is the whole board. Gated behind
+        // `non_royal_king()` (default-off), so every royal-king hand variant keeps
+        // the byte-identical check-resolving drop mask.
+        let drop_mask = if V::non_royal_king() {
+            Bitboard::FULL
+        } else {
+            match board.king_of(us) {
+                Some(king_sq) => {
+                    let checkers = self.attackers_to(king_sq, them, occupied);
+                    match checkers.count() {
+                        0 => Bitboard::FULL,
+                        // A drop cannot capture, so only the between-squares resolve
+                        // a single check.
+                        1 => between(king_sq, checkers.lsb().expect("one checker")),
+                        // Double check: no drop is legal.
+                        _ => return,
+                    }
                 }
+                None => Bitboard::FULL,
             }
-            None => Bitboard::FULL,
         };
 
         let pawn_role = V::pawn_drop_role();

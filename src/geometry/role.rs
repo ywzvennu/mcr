@@ -67,11 +67,17 @@ pub enum WideRole {
     /// Gold-general mover — the three forward squares, the two sideways, and one
     /// straight back (Shogi).
     Gold = 8,
-    /// Wazir — one orthogonal step. A **letterless reserved** census role: it was
-    /// never fielded by any variant (the Spartan Captain is "Wazir + Dabbaba" but
-    /// is its own [`WideRole::Captain`] role, not built from this one), so it
-    /// carries no FEN letter — its slot is kept only to preserve the stable role
-    /// indices. Its letter `w` was reclaimed for the Orda [`WideRole::Kheshig`].
+    /// Wazir — one orthogonal step. Fielded as the **Giraffe** of Dobutsu (3x4
+    /// animal shogi), which steps one square orthogonally in any direction. Its
+    /// bare letter `w` was reclaimed for the Orda [`WideRole::Kheshig`], so — like
+    /// the [`WideRole::Commoner`] and the Empire/Chak pieces past the exhausted
+    /// single-letter alphabet — the Wazir is an **overflow role**: its FEN token is
+    /// the [`OVERFLOW_PREFIX`] (`*`) followed by the recycled base letter `j` (the
+    /// [`WideRole::Horse`]'s, distinct by the `*` prefix; chosen clear of the Tori
+    /// [`WideRole::Goose`] which already recycles `g` as `*g`), so
+    /// `char()` returns the bare base letter and the board FEN I/O adds the `*`
+    /// prefix. The `compare-fairy` harness maps `*j` to FSF's `g` (the Giraffe) when
+    /// driving Dobutsu.
     Wazir = 9,
     /// Hawk — Bishop + Knight compound (a.k.a. Archbishop / Cardinal / Janus;
     /// Seirawan's hawk, Capablanca's archbishop).
@@ -173,10 +179,10 @@ pub enum WideRole {
     /// squares (sixteen targets), all as a non-sliding leaper. (Orda; also the
     /// piece a promoting pawn may become, see the Orda promotion targets.) FSF's
     /// `h` already names the Hoplite here; the single-letter alphabet is otherwise
-    /// exhausted, so the Kheshig reclaims the letter `w` — freed by retiring the
-    /// never-fielded census [`WideRole::Wazir`] placeholder to a letterless
-    /// reserved role (no variant ever used the Wazir, see its doc) — and the
-    /// `compare-fairy` harness maps the Kheshig to FSF's `h` when driving Orda.
+    /// exhausted, so the Kheshig reclaims the letter `w` — freed from the
+    /// [`WideRole::Wazir`], which now carries the overflow token `*j` as Dobutsu's
+    /// Giraffe (see its doc) rather than a bare letter — and the `compare-fairy`
+    /// harness maps the Kheshig to FSF's `h` when driving Orda.
     Kheshig = 31,
     /// Archer (FSF `knibis`, letter `a`) — **moves like a knight** to an empty
     /// square but **captures like a bishop** (a diagonal slider capture). Like the
@@ -636,7 +642,8 @@ impl WideRole {
     ///
     /// The standard six reuse the concrete letters (`p n b r q k`). The fairy
     /// roles take distinct letters that do not collide with the standard six;
-    /// the reserved roles have no character yet and map to `'?'`.
+    /// the overflow roles return a recycled base letter (the board FEN I/O adds
+    /// the `*` prefix). No role maps to the sentinel `'?'`.
     #[must_use]
     #[inline]
     pub const fn char(self) -> char {
@@ -650,9 +657,13 @@ impl WideRole {
             WideRole::Met => 'm',
             WideRole::Silver => 's',
             WideRole::Gold => 'g',
-            // Wazir is a letterless reserved census role (see its doc); its `w`
-            // was reclaimed by the Orda Kheshig.
-            WideRole::Wazir => '?',
+            // Wazir (Dobutsu Giraffe) is an overflow role: its FEN token is the `*`
+            // prefix plus the recycled base letter `j` (the Horse's, chosen clear of
+            // the Tori Goose, which already recycles `g` as `*g`), so `char()` returns
+            // the bare base letter and the board FEN I/O adds the `*` prefix (its
+            // `w` was reclaimed by the Orda Kheshig). The `compare-fairy` harness
+            // maps `*j` to FSF's `g` (the Giraffe) when driving Dobutsu.
+            WideRole::Wazir => 'j',
             WideRole::Hawk => 'a',
             WideRole::Elephant => 'e',
             WideRole::Cannon => 'c',
@@ -685,8 +696,9 @@ impl WideRole {
             // Orda cavalry. FSF spells these `l h a` (kniroo, centaur, knibis),
             // but `l`, `h`, and `a` already name the Lance, Hoplite, and Hawk here;
             // the Orda pieces take the free letters `f` and `y` plus the `w`
-            // reclaimed from the retired Wazir, and the `compare-fairy` harness maps
-            // them to FSF's letters when driving Orda. The Yurt is a plain Silver
+            // reclaimed from the Wazir (now Dobutsu's `*j` Giraffe), and the
+            // `compare-fairy` harness maps them to FSF's letters when driving Orda.
+            // The Yurt is a plain Silver
             // (`s`) and needs no letter of its own.
             WideRole::Lancer => 'f',
             WideRole::Kheshig => 'w',
@@ -859,7 +871,8 @@ impl WideRole {
     pub const fn is_overflow(self) -> bool {
         matches!(
             self,
-            WideRole::Commoner
+            WideRole::Wazir
+                | WideRole::Commoner
                 | WideRole::ShogiKnight
                 | WideRole::Falcon
                 | WideRole::Eagle
@@ -909,6 +922,9 @@ impl WideRole {
     #[inline]
     pub const fn overflow_from_base(ch: char) -> Option<WideRole> {
         match ch.to_ascii_lowercase() {
+            // Dobutsu Giraffe: recycles the Horse's letter `j` (distinct by `*`,
+            // chosen clear of the Tori Goose which already recycles `g`).
+            'j' => Some(WideRole::Wazir),
             'u' => Some(WideRole::Commoner),
             'n' => Some(WideRole::ShogiKnight),
             'f' => Some(WideRole::Falcon),
@@ -979,7 +995,7 @@ impl WideRole {
             'm' => Some(WideRole::Met),
             's' => Some(WideRole::Silver),
             'g' => Some(WideRole::Gold),
-            // 'w' is the Orda Kheshig (reclaimed from the now-letterless Wazir).
+            // 'w' is the Orda Kheshig (reclaimed from the Wazir, now `*j`).
             'w' => Some(WideRole::Kheshig),
             'a' => Some(WideRole::Hawk),
             'e' => Some(WideRole::Elephant),
@@ -1114,11 +1130,11 @@ mod tests {
         // promoted one — they are excluded from this round-trip.
         for role in WideRole::ALL {
             // The Shogi promoted roles share a base letter (handled by the `+`
-            // FEN prefix), the overflow roles share a recycled base letter
-            // (handled by the `*` prefix), and the Wazir is a letterless reserved
-            // census role (its `w` was reclaimed by the Orda Kheshig); all are
-            // excluded from the bare-letter round-trip.
-            if role.is_promoted() || role.is_overflow() || role == WideRole::Wazir {
+            // FEN prefix) and the overflow roles (including the Wazir / Dobutsu
+            // Giraffe, whose `w` was reclaimed by the Orda Kheshig) share a recycled
+            // base letter (handled by the `*` prefix); all are excluded from the
+            // bare-letter round-trip.
+            if role.is_promoted() || role.is_overflow() {
                 continue;
             }
             let ch = role.char();
@@ -1127,12 +1143,14 @@ mod tests {
             assert_eq!(WideRole::from_char(role.upper_char()), Some(role));
             assert_eq!(role.char().to_ascii_uppercase(), role.upper_char());
         }
-        // The Wazir is letterless: its `char()` is the sentinel `'?'`, which does
-        // not parse back to it (or to anything).
-        assert_eq!(WideRole::Wazir.char(), '?');
+        // The Wazir (Dobutsu Giraffe) is an overflow role: its bare letter `j`
+        // parses to the Horse (its recycled base role), and the `*j` token resolves
+        // to the Wazir via `overflow_from_base`.
+        assert_eq!(WideRole::Wazir.char(), 'j');
+        assert_eq!(WideRole::from_char('j'), Some(WideRole::Horse));
+        assert_eq!(WideRole::overflow_from_base('j'), Some(WideRole::Wazir));
         assert_eq!(WideRole::from_char('?'), None);
         assert_eq!(WideRole::from_char('1'), None);
-        assert_eq!(WideRole::from_char('?'), None);
     }
 
     #[test]
@@ -1197,12 +1215,15 @@ mod tests {
                 Some(role)
             );
         }
-        // The Commoner is the only overflow role today, spelled `*u`.
+        // The Commoner is the original overflow role, spelled `*u`; the Wazir
+        // (Dobutsu Giraffe) is spelled `*j`.
         assert!(WideRole::Commoner.is_overflow());
         assert_eq!(WideRole::Commoner.char(), 'u');
         assert_eq!(WideRole::overflow_from_base('u'), Some(WideRole::Commoner));
-        // A base letter that names no overflow role yields `None` (`j` is free —
-        // no overflow role recycles it).
-        assert_eq!(WideRole::overflow_from_base('j'), None);
+        assert!(WideRole::Wazir.is_overflow());
+        assert_eq!(WideRole::overflow_from_base('j'), Some(WideRole::Wazir));
+        // A base letter that names no overflow role yields `None` (`x` is the
+        // Janggi Elephant's bare letter — no overflow role recycles it).
+        assert_eq!(WideRole::overflow_from_base('x'), None);
     }
 }

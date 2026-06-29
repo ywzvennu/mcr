@@ -258,6 +258,24 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         board.kings_of(color)
     }
 
+    /// Returns `true` if this variant's king role is **non-royal** — there is no
+    /// check, and a side instead **loses by extinction** (its king captured). On a
+    /// **hand** variant (Dobutsu) this routes move generation through the per-move
+    /// verify path, whose non-royal branch emits every pseudo-legal board move and
+    /// drop **unverified** (no self-check filter), exactly as Fairy-Stockfish's
+    /// extinction rule: the king may step into capture, and capturing the enemy
+    /// king is legal.
+    ///
+    /// The default is `false`, so every other variant keeps its existing path
+    /// (Duck rides its own generator off [`royal_squares`] alone, and the
+    /// single-king / multi-royal / cannon paths are unchanged). A variant that sets
+    /// this `true` should also return an empty [`royal_squares`] set. Only the
+    /// hand-path routing consults this hook, so non-hand non-royal variants (Duck)
+    /// stay byte-identical.
+    fn non_royal_king() -> bool {
+        false
+    }
+
     // --- Spartan multi-king / duple-check (default OFF) -------------------
 
     /// Returns `true` if this variant can give a side **more than one royal
@@ -542,6 +560,19 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         } else {
             0
         }
+    }
+
+    /// Returns `true` if the flag win additionally requires the king on the goal
+    /// rank to be **safe** — unattacked by the opponent (Dobutsu's "try" rule: the
+    /// Lion wins by reaching the far rank only when it cannot be captured there).
+    /// The default is `false`, so the flag win is purely positional (Orda /
+    /// Synochess: a king on its goal rank wins even while attacked), keeping every
+    /// other flag variant byte-identical. Only consulted while
+    /// [`has_flag_win`](WideVariant::has_flag_win) is `true`. When `true`, a king on
+    /// its goal rank that the opponent attacks is **not** yet a win — the game
+    /// continues, exactly as Fairy-Stockfish's `flagPieceSafe` rule.
+    fn flag_win_requires_safe() -> bool {
+        false
     }
 
     // --- Bare-king "Robado" draw (default OFF) ---------------------------
