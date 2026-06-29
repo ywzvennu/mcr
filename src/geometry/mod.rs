@@ -58,13 +58,13 @@ pub use variant::{
 pub use variants::{
     Alice, AliceRules, Asean, AseanRules, Cambodian, CambodianRules, Capablanca, CapablancaRules,
     Capahouse, CapahouseRules, Chak, ChakRules, Dobutsu, DobutsuRules, Duck, DuckRules, Empire,
-    EmpireRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
-    Janggi, JanggiRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong,
-    MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi,
-    MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Seirawan, SeirawanRules, Shako,
-    ShakoRules, Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules,
-    Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
-    Tori, ToriRules, Xiangqi, XiangqiRules,
+    EmpireRules, Gorogoro, GorogoroRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
+    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Knightmate, KnightmateRules, Kyotoshogi,
+    KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Minishogi,
+    MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
+    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi,
+    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
+    SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -343,6 +343,22 @@ geometry!(
     u64,
     3,
     4
+);
+
+geometry!(
+    /// The Gorogoro Shogi board: five files by six ranks (30 squares), backed by
+    /// `u64`.
+    ///
+    /// A small odd-width (`5`) `u64` geometry hosting Gorogoro Shogi Plus — a
+    /// compact Shogi played on a five-by-six board: a square index reaches `29`,
+    /// and edge-masked east/west shifts must not wrap past the fifth file. Files
+    /// run a..e, ranks 1..6. It reuses Shogi's persistent capture-fed hand,
+    /// drops, far-zone promotion, Lance, and Shogi Knight on the smaller board,
+    /// with a two-rank promotion zone and the Lance/Knight pair starting in hand.
+    Gorogoro5x6,
+    u64,
+    5,
+    6
 );
 
 #[cfg(test)]

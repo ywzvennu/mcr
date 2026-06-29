@@ -40,7 +40,7 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules,
-    DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules, GrandhouseRules,
+    DuckRules, EmpireRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
     HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
     ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
     ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules,
@@ -48,8 +48,8 @@ use mce::geometry::{
     XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
-    Xiangqi9x10,
+    Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
+    Tori7x7, Xiangqi9x10,
 };
 use mce::Color;
 
@@ -666,6 +666,25 @@ variant_test!(
         "4k/4S/5/5/4K[] w - - 0 1",
         "2k2/5/R3r/5/2K2[Pp] w - - 0 1",
         "2k2/5/P4/5/2K2[P] w - - 0 1",
+    ]
+);
+
+// -- Gorogoro Shogi Plus (hand / drops / Lance + Knight, 5x6) ----------------
+//
+// FENs reused from `tests/perft_gorogoro.rs` (each FSF-confirmed): the startpos
+// with the Lance/Knight pair in hand, a bare-king multi-hand drop swarm, the
+// forward-sliding Lance, the forward-jumping Knight, and the nifu file filter.
+variant_test!(
+    gorogoro,
+    Gorogoro5x6,
+    GorogoroRules,
+    "gorogoro",
+    [
+        "sgkgs/5/1ppp1/1PPP1/5/SGKGS[LNln] w - - 0 1",
+        "2k2/5/5/5/5/2K2[LNPlnp] w - - 0 1",
+        "2k2/5/5/5/2L2/2K2[] w - - 0 1",
+        "2k2/5/5/2N2/5/2K2[N] w - - 0 1",
+        "2k2/5/5/P4/5/2K2[P] w - - 0 1",
     ]
 );
 

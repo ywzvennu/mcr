@@ -31,6 +31,7 @@ mod corpus;
 mod dobutsu;
 mod duck;
 mod empire;
+mod gorogoro;
 mod grand;
 mod grandhouse;
 mod hoppelpoppel;
@@ -231,6 +232,9 @@ fn main() {
     // Orda is an INI variant: orda::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant orda`.
     let orda_mismatches = orda::run(&mut engine, &located.bin, opts.full);
+    // Gorogoro Shogi Plus is an INI variant: gorogoro::run loads FSF's variants.ini
+    // (resolved from the located binary) before driving `UCI_Variant gorogoroplus`.
+    let gorogoro_mismatches = gorogoro::run(&mut engine, &located.bin, opts.full);
     // Ordamirror is also an INI variant: ordamirror::run loads FSF's variants.ini
     // (resolved from the located binary) before driving `UCI_Variant ordamirror`.
     let ordamirror_mismatches = ordamirror::run(&mut engine, &located.bin, opts.full);
@@ -275,6 +279,7 @@ fn main() {
         + dobutsu_mismatches
         + minixiangqi_mismatches
         + orda_mismatches
+        + gorogoro_mismatches
         + ordamirror_mismatches
         + synochess_mismatches
         + empire_mismatches
