@@ -624,6 +624,33 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if this variant **decides the game by baring the king** — a
+    /// side stripped of every piece but its king has **lost**, the Shatranj baring
+    /// rule (FSF `extinctionValue = -VALUE_MATE`, `extinctionPieceCount = 1`,
+    /// `extinctionOpponentPieceCount = 2`, `extinctionClaim = true`). The default
+    /// is `false`; while it is `false` the engine never evaluates the rule, so
+    /// every other variant is byte-identical.
+    ///
+    /// This is the **loss** counterpart of the Shatar [`has_bare_king_draw`] rule,
+    /// and — unlike that draw — it is **not** unconditional: it mirrors FSF's
+    /// `extinctionClaim` exactly, granting the bared side a single "bare-back"
+    /// reply. A node is terminal (a perft leaf, the bared side having lost) when
+    /// one side holds exactly its lone king and the opponent holds **three or more**
+    /// pieces (no single capture could bare it back), **or** when it is the
+    /// opponent's turn (the bared side's bare-back chance already spent). While the
+    /// bared side is to move and its opponent has only two pieces (a king it might
+    /// capture next move into a King-vs-King draw), the node is **not** terminal.
+    /// The single
+    /// [`bare_king_loss_loser`](super::position::GenericPosition::bare_king_loss_loser)
+    /// chokepoint both the standard generator and the bulk-count leaf path funnel
+    /// through truncates the perft descent exactly as Fairy-Stockfish does. Only
+    /// Shatranj overrides this so far.
+    ///
+    /// [`has_bare_king_draw`]: WideVariant::has_bare_king_draw
+    fn has_bare_king_loss() -> bool {
+        false
+    }
+
     /// Returns `true` if **stalemate is a loss** for the stalemated side rather
     /// than a draw (Synochess `stalemateValue = loss`). The default is `false`
     /// (the standard draw). This affects only the reported [outcome]; it has no
