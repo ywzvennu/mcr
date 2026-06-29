@@ -268,7 +268,12 @@ mod tests {
                 .find(|(l, _, _)| *l == case.label)
                 .copied()
                 .expect("a pinned count for the case");
-            assert_eq!(gperft::<Chess8x8, _>(&pos, depth), want, "{} perft", case.label);
+            assert_eq!(
+                gperft::<Chess8x8, _>(&pos, depth),
+                want,
+                "{} perft",
+                case.label
+            );
         }
     }
 
