@@ -24,6 +24,7 @@
 
 mod cambodian;
 mod capablanca;
+mod capahouse;
 mod chak;
 mod corpus;
 mod dobutsu;
@@ -192,6 +193,7 @@ fn main() {
     // the same generic engine.
     let cambodian_mismatches = cambodian::run(&mut engine, opts.full);
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
+    let capahouse_mismatches = capahouse::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
@@ -240,6 +242,7 @@ fn main() {
         + makpong_mismatches
         + cambodian_mismatches
         + capablanca_mismatches
+        + capahouse_mismatches
         + seirawan_mismatches
         + grand_mismatches
         + duck_mismatches

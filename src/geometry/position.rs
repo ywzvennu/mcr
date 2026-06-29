@@ -419,15 +419,32 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
 pub struct GenericPosition<G: Geometry, V: WideVariant<G>> {
     board: Board<G>,
     state: GenericState<G>,
+    /// The crazyhouse **promoted mask**: the squares whose occupant reached the
+    /// board by promotion, so that capturing one banks a Pawn (the "promoted
+    /// pieces demote" rule). It is always [`Bitboard::EMPTY`] — and never read —
+    /// for every variant whose [`WideVariant::demotes_promoted_captures`] is
+    /// `false` (all but Capahouse), keeping their moves, state, and FEN
+    /// byte-identical to a build without it. It follows make/unmake via the
+    /// position [`Clone`] and rides the FEN as a trailing `~` on a promoted
+    /// piece's token.
+    promoted: Bitboard<G>,
     _variant: PhantomData<V>,
 }
 
 impl<G: Geometry, V: WideVariant<G>> core::fmt::Debug for GenericPosition<G, V> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("GenericPosition")
-            .field("placement", &self.board.to_fen_placement())
-            .field("state", &self.state)
-            .finish()
+        let mut ds = f.debug_struct("GenericPosition");
+        ds.field("placement", &self.board.to_fen_placement())
+            .field("state", &self.state);
+        // The promoted mask is only meaningful for a crazyhouse-style variant; it
+        // stays out of every other variant's Debug so they remain byte-identical.
+        // Rendered as its set squares' indices (the geometry's `Bits` need not be
+        // `Debug`).
+        if V::demotes_promoted_captures() {
+            let squares: Vec<u8> = self.promoted.into_iter().map(|s| s.index()).collect();
+            ds.field("promoted", &squares);
+        }
+        ds.finish()
     }
 }
 
@@ -439,6 +456,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         GenericPosition {
             board,
             state,
+            promoted: Bitboard::EMPTY,
             _variant: PhantomData,
         }
     }
@@ -2650,6 +2668,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // counting (it stays 0 through deployment), so leave it untouched.
         if let WideMoveKind::Drop { role } = mv.kind() {
             self.board.set_piece(to, WidePiece::new(us, role));
+            // A dropped piece is never promoted (its `to` was empty), so clear any
+            // stale promoted bit there. Gated, so non-demoting variants skip it.
+            if V::demotes_promoted_captures() {
+                self.promoted.clear(to);
+            }
             if V::has_placement() || V::has_hand() {
                 // The hand stores the **base** role; under `drops_can_promote`
                 // (Kyoto) a piece may be deployed in its promoted form, but it is
@@ -2699,7 +2722,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state
                             .placement
-                            .add(us, V::role_hand_base(captured.role));
+                            .add(us, self.banked_role(captured.role, to));
                     }
                 }
                 // `to` holds the captured enemy, so `set_piece` clears it first;
@@ -2770,7 +2793,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     if let Some(captured) = self.board.piece_at(to) {
                         self.state
                             .placement
-                            .add(us, V::role_hand_base(captured.role));
+                            .add(us, self.banked_role(captured.role, to));
                     }
                 }
                 // `from` holds the known promoting piece (`moving`); `to` may hold a
@@ -2861,7 +2884,64 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 0
             };
         }
+        // Crazyhouse promoted mask upkeep (default-off): carry a moving piece's
+        // promoted bit to its destination, set it on a fresh promotion, and clear
+        // any stale bit. The board-move path only (drops returned early above).
+        if V::demotes_promoted_captures() {
+            self.update_promoted_mask(mv.kind(), from, to);
+        }
         self.state.turn = them;
+    }
+
+    /// The role a captured piece banks into the captor's hand: a Pawn when the
+    /// captured square is in the crazyhouse [`promoted`](Self::promoted) mask (the
+    /// piece reached the board by promotion), otherwise the role's own hand base
+    /// ([`WideVariant::role_hand_base`]). For a non-demoting variant the mask is
+    /// always empty, so this is exactly `role_hand_base`.
+    #[inline]
+    fn banked_role(&self, captured: WideRole, to: Square<G>) -> WideRole {
+        if V::demotes_promoted_captures() && self.promoted.contains(to) {
+            WideRole::Pawn
+        } else {
+            V::role_hand_base(captured)
+        }
+    }
+
+    /// Maintains the crazyhouse [`promoted`](Self::promoted) mask after a board
+    /// move (never a drop — those return early). A promotion marks its destination
+    /// as a promoted piece; any other move carries the source's promoted bit, if
+    /// any, to the destination (and clears a stale destination bit left by a
+    /// captured promoted piece). The captured pawn of an en-passant move and the
+    /// rook of a castle are never promoted, so the single source→destination carry
+    /// of the moving piece covers every kind.
+    fn update_promoted_mask(&mut self, kind: WideMoveKind, from: Square<G>, to: Square<G>) {
+        match kind {
+            WideMoveKind::Promotion { .. } => {
+                // The newly promoted piece sits on `to`; its source pawn was never
+                // promoted.
+                self.promoted.clear(from);
+                self.promoted.set(to);
+            }
+            WideMoveKind::Drop { .. } => {
+                unreachable!("drops are handled before the board-move path");
+            }
+            WideMoveKind::Quiet
+            | WideMoveKind::Capture
+            | WideMoveKind::DoublePawnPush
+            | WideMoveKind::EnPassant
+            | WideMoveKind::CastleKingside
+            | WideMoveKind::CastleQueenside => {
+                if self.promoted.contains(from) {
+                    self.promoted.clear(from);
+                    self.promoted.set(to);
+                } else {
+                    // The mover carried no promoted bit; clear `to` in case a
+                    // captured promoted piece had stood there.
+                    self.promoted.clear(from);
+                    self.promoted.clear(to);
+                }
+            }
+        }
     }
 
     /// Updates the Seirawan gating state after a move (gating variants only):
@@ -3076,6 +3156,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             placement
         };
+        // A crazyhouse-style variant (Capahouse) marks a promoted piece with a
+        // trailing `~` on its placement token (`Q~`). Strip the markers out
+        // (recording their squares) before the board parser, which knows only bare
+        // piece letters. Non-demoting variants never see a `~`, keep the borrowed
+        // placement, and allocate nothing here.
+        let mut promoted = Bitboard::<G>::EMPTY;
+        let promoted_stripped;
+        let placement = if V::demotes_promoted_captures() {
+            let (s, mask) = split_promoted::<G>(placement)?;
+            promoted = mask;
+            promoted_stripped = s;
+            promoted_stripped.as_str()
+        } else {
+            placement
+        };
         let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
         // Sittuyin carries the setup-phase pocket in the same `[..]` holdings
@@ -3145,7 +3240,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             fullmove_number,
             consecutive_passes: 0,
         };
-        Ok(Self::from_parts(board, state))
+        let mut pos = Self::from_parts(board, state);
+        pos.promoted = promoted;
+        Ok(pos)
     }
 
     /// Serializes this position as a six-field FEN string over `G`.
@@ -3156,7 +3253,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// dialect. A non-gating variant produces the plain six-field FEN unchanged.
     #[must_use]
     pub fn to_fen(&self) -> String {
-        let mut out = if V::has_duck() {
+        let mut out = if V::demotes_promoted_captures() {
+            placement_with_promoted::<G>(&self.board, self.promoted)
+        } else if V::has_duck() {
             placement_with_duck::<G>(&self.board, self.state.duck)
         } else {
             self.board.to_fen_placement()
@@ -4210,6 +4309,94 @@ fn placement_with_duck<G: Geometry>(board: &Board<G>, duck: Option<Square<G>>) -
                     fen.push('*');
                 }
                 (None, false) => empty += 1,
+            }
+        }
+        flush_empty(&mut fen, &mut empty);
+        if rank > 0 {
+            fen.push('/');
+        }
+    }
+    fen
+}
+
+/// Strips the crazyhouse promoted markers (`~`, a suffix on a piece token) out of
+/// a placement field, returning the bare placement (which the board parser
+/// understands) and the mask of squares whose occupant is promoted. A `~` not
+/// preceded by a piece on its rank is rejected.
+fn split_promoted<G: Geometry>(placement: &str) -> Result<(String, Bitboard<G>), WideFenError> {
+    let height = G::HEIGHT;
+    let mut out = String::with_capacity(placement.len());
+    let mut promoted = Bitboard::<G>::EMPTY;
+
+    for (rank_from_top, rank_str) in placement.split('/').enumerate() {
+        if rank_from_top > 0 {
+            out.push('/');
+        }
+        if rank_from_top as u8 >= height {
+            // Let the board parser report the structural error; just copy through.
+            out.push_str(rank_str);
+            continue;
+        }
+        let rank = height - 1 - rank_from_top as u8;
+        let mut file: u32 = 0;
+        // The square the most recent piece letter on this rank occupies — the one a
+        // `~` would mark as promoted.
+        let mut last_sq: Option<Square<G>> = None;
+        let bytes = rank_str.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            let b = bytes[i];
+            if b == b'~' {
+                let sq = last_sq.ok_or(WideFenError::Placement(
+                    super::ParseBoardError::InvalidChar('~'),
+                ))?;
+                promoted.set(sq);
+                // The marker is consumed and never re-emitted; it advances no file.
+                last_sq = None;
+                i += 1;
+            } else if b.is_ascii_digit() {
+                let mut skip: u32 = 0;
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    skip = skip
+                        .saturating_mul(10)
+                        .saturating_add((bytes[i] - b'0') as u32);
+                    out.push(bytes[i] as char);
+                    i += 1;
+                }
+                file = file.saturating_add(skip);
+                last_sq = None;
+            } else {
+                last_sq = Square::<G>::from_file_rank(file as u8, rank);
+                out.push(b as char);
+                file = file.saturating_add(1);
+                i += 1;
+            }
+        }
+    }
+    Ok((out, promoted))
+}
+
+/// Renders a placement field with each promoted piece carrying a trailing `~`
+/// (`Q~`). The inverse of [`split_promoted`]; iterates per cell like
+/// [`Board::to_fen_placement`] but appends `~` after a piece on a promoted square.
+fn placement_with_promoted<G: Geometry>(board: &Board<G>, promoted: Bitboard<G>) -> String {
+    let width = G::WIDTH;
+    let height = G::HEIGHT;
+    let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
+    for rank_from_top in 0..height {
+        let rank = height - 1 - rank_from_top;
+        let mut empty: u32 = 0;
+        for file in 0..width {
+            let square = Square::<G>::new(rank * width + file);
+            match board.piece_at(square) {
+                Some(piece) => {
+                    flush_empty(&mut fen, &mut empty);
+                    fen.push(piece.char());
+                    if promoted.contains(square) {
+                        fen.push('~');
+                    }
+                }
+                None => empty += 1,
             }
         }
         flush_empty(&mut fen, &mut empty);
