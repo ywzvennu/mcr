@@ -31,6 +31,7 @@ mod dobutsu;
 mod duck;
 mod empire;
 mod grand;
+mod grandhouse;
 mod hoppelpoppel;
 mod janggi;
 mod knightmate;
@@ -196,6 +197,7 @@ fn main() {
     let capahouse_mismatches = capahouse::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
+    let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
@@ -245,6 +247,7 @@ fn main() {
         + capahouse_mismatches
         + seirawan_mismatches
         + grand_mismatches
+        + grandhouse_mismatches
         + duck_mismatches
         + sittuyin_mismatches
         + spartan_mismatches
