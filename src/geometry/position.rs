@@ -356,7 +356,7 @@ impl core::fmt::Debug for GenericPlacement {
 
 /// The non-board state of a generic position: side to move, castling rights,
 /// en-passant target square, and the two move clocks.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct GenericState<G: Geometry> {
     /// The side to move.
     pub turn: Color,
@@ -392,6 +392,18 @@ pub struct GenericState<G: Geometry> {
     /// produced moves, state, and FEN are byte-identical to a build without it. It
     /// is transient (a freshly parsed FEN resets it to `0`).
     pub consecutive_passes: u8,
+    /// **Alice chess** per-piece board membership: the set of squares whose
+    /// occupant is on **plane B** (the second of the two mirror boards). A piece
+    /// on a square *not* in this mask is on plane A. At most one piece occupies
+    /// any square across both planes, so the [`Board`] holds every piece and this
+    /// mask alone says which plane each is on.
+    ///
+    /// [`Bitboard::EMPTY`] for every non-Alice variant — and at the start of an
+    /// Alice game (all pieces begin on plane A) — so the two-plane movement,
+    /// transfer, and king-safety code paths, all guarded behind
+    /// [`WideVariant::is_alice`], never fire and produced moves, state, and FEN
+    /// stay byte-identical to a build without the Alice mechanic.
+    pub board_b: Bitboard<G>,
 }
 
 impl<G: Geometry> core::fmt::Debug for GenericState<G> {
@@ -406,7 +418,29 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("halfmove_clock", &self.halfmove_clock)
             .field("fullmove_number", &self.fullmove_number)
             .field("consecutive_passes", &self.consecutive_passes)
+            .field("board_b", &self.board_b.count())
             .finish()
+    }
+}
+
+// Manual `Hash` (mirroring `GenericGating`): the `board_b` plane mask is hashed
+// by its square indices so the impl is unconditional in `G::Bits`, keeping every
+// generic user of `GenericState` (and the `Board`-free state hashing) free of a
+// `G::Bits: Hash` bound. Every other field hashes directly.
+impl<G: Geometry> core::hash::Hash for GenericState<G> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.turn.hash(state);
+        self.castling.hash(state);
+        self.ep_square.hash(state);
+        self.gating.hash(state);
+        self.duck.hash(state);
+        self.placement.hash(state);
+        self.halfmove_clock.hash(state);
+        self.fullmove_number.hash(state);
+        self.consecutive_passes.hash(state);
+        for sq in self.board_b {
+            sq.index().hash(state);
+        }
     }
 }
 
@@ -480,6 +514,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[inline]
     pub fn turn(&self) -> Color {
         self.state.turn
+    }
+
+    /// Returns the **Alice** board-membership mask: the set of occupied squares
+    /// whose piece is on plane B (the second mirror board); a piece on a square
+    /// not in the mask is on plane A. [`Bitboard::EMPTY`] for every non-Alice
+    /// variant. See [`GenericState::board_b`].
+    #[must_use]
+    #[inline]
+    pub fn board_b(&self) -> Bitboard<G> {
+        self.state.board_b
     }
 
     /// Returns the castling rights.
@@ -624,6 +668,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[must_use]
     pub fn is_check(&self) -> bool {
         let us = self.state.turn;
+        // Alice chess: a king is attacked only by enemy pieces on the **same
+        // plane**, so check is plane-restricted. Default-off, so every other
+        // variant takes the standard occupancy-wide test below.
+        if V::is_alice() {
+            return !self.alice_king_safe(us);
+        }
         let them = us.opposite();
         let occ = self.board.occupied();
         let royals = V::royal_squares(&self.board, us);
@@ -755,6 +805,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[inline]
     fn uses_standard_path(&self) -> bool {
         let special = V::has_duck()
+            || V::is_alice()
             || V::multi_royal()
             || V::has_cannons()
             || V::has_flying_general()
@@ -770,7 +821,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// so the reusable-buffer perft recursion can reuse one allocation across
     /// sibling nodes for these variants too. Never reached on the standard path.
     fn generate_special_into<S: WideSink>(&self, out: &mut S) {
-        if V::has_duck() {
+        if V::is_alice() {
+            self.generate_alice_into(out);
+        } else if V::has_duck() {
             self.generate_duck_into(out);
         } else if V::has_placement() && self.state.placement.any(self.state.turn) {
             self.generate_placement_into(out);
@@ -788,6 +841,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// Pushes every legal move into `out`.
     fn generate_into(&self, out: &mut Vec<WideMove>) {
+        // Alice chess: two mirror boards with per-piece plane membership. Movement,
+        // capture, blocking, and king-safety are all plane-restricted and every
+        // move transfers the mover to the opposite plane, so it has its own
+        // generator. Gated behind `is_alice()` (default-off), so every other
+        // variant takes the standard path below unchanged.
+        if V::is_alice() {
+            self.generate_alice_into(out);
+            return;
+        }
         // Duck chess has its own generator: there is no check, so no pin /
         // king-danger filtering, and every base piece move is crossed with every
         // legal duck placement. Gated behind `has_duck()` (default off), so every
@@ -1342,6 +1404,341 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             kings
                 .into_iter()
                 .any(|k| self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None))
+        }
+    }
+
+    // ===================== Alice chess =====================
+
+    /// Pushes every legal Alice move for the side to move into `out`.
+    ///
+    /// Alice is generated by **verify**: [`gen_alice_pseudo`](Self::gen_alice_pseudo)
+    /// produces the pseudo-legal moves (every chess move on the mover's own plane
+    /// whose destination is vacant on the opposite plane, plus Alice castling),
+    /// and each is applied to a scratch position and kept only if it leaves the
+    /// mover's king safe — on the plane the king **ends up on** after the transfer
+    /// (so a discovered check on the plane it stayed on, or a king transferring
+    /// into check on the plane it lands on, is rejected), and, for an ordinary
+    /// king move, also on the plane it **leaves** (the king "may not transfer out
+    /// of check"; a castle's transit safety on the leaving plane is checked at
+    /// generation instead). See [`alice_move_is_legal`](Self::alice_move_is_legal).
+    fn generate_alice_into<S: WideSink>(&self, out: &mut S) {
+        let us = self.state.turn;
+        // A side without a king has already lost; enumerate its pseudo-moves
+        // unverified so perft still descends (mirrors the cannon kingless branch).
+        if self.board.king_of(us).is_none() {
+            self.gen_alice_pseudo(out, us);
+            return;
+        }
+        let mut pseudo = WideMoveList::new();
+        self.gen_alice_pseudo(&mut pseudo, us);
+        let mut scratch = self.clone();
+        pseudo.for_each(|mv| {
+            if scratch.alice_move_is_legal(self, &mv, us) {
+                out.push(mv);
+            }
+        });
+    }
+
+    /// Returns `true` if the pseudo-legal Alice move `mv` leaves `us`'s king safe,
+    /// tested by **make/unmake** on `self` (a scratch position seeded from `base`).
+    fn alice_move_is_legal(&mut self, base: &Self, mv: &WideMove, us: Color) -> bool {
+        let from = mv.from::<G>();
+        let to = mv.to::<G>();
+        let is_castle = matches!(
+            mv.kind(),
+            WideMoveKind::CastleKingside | WideMoveKind::CastleQueenside
+        );
+        // Condition X ("the king cannot transfer out of check"): an ordinary king
+        // move must leave its destination square unattacked on the plane it is
+        // **leaving** — evaluated on the pre-move board, before the transfer. A
+        // castle's transit / destination safety on that plane is already enforced
+        // by `gen_alice_castles`, so it is exempt here.
+        if !is_castle
+            && base
+                .board
+                .piece_at(from)
+                .is_some_and(|p| p.role == WideRole::King)
+            && !base.alice_king_dest_safe_on_origin(from, to, us)
+        {
+            return false;
+        }
+        // Condition Y (post-transfer): after the full move + transfer the king must
+        // be unattacked on the plane it ends up on.
+        self.apply(mv);
+        let legal = self.alice_king_safe(us);
+        self.board = base.board;
+        self.state = base.state;
+        legal
+    }
+
+    /// Returns `true` if `us`'s king is **not** attacked by an enemy piece on the
+    /// **same plane** (Alice king-safety in the current position). A side with no
+    /// king is vacuously safe.
+    fn alice_king_safe(&self, us: Color) -> bool {
+        let Some(king) = self.board.king_of(us) else {
+            return true;
+        };
+        let them = us.opposite();
+        let plane_mask = self.alice_plane_mask(self.state.board_b.contains(king));
+        let plane_occ = self.board.occupied() & plane_mask;
+        // Attackers projected from the king under the king's-plane occupancy,
+        // restricted to enemy pieces actually on that plane: a piece on the other
+        // plane neither blocks the ray (it is absent from `plane_occ`) nor attacks
+        // across boards (it is dropped by `& plane_mask`).
+        (self.attackers_to(king, them, plane_occ) & plane_mask).is_empty()
+    }
+
+    /// Returns `true` if a **king** of `us` moving from `from` to `to` lands on a
+    /// square unattacked on the plane it is **leaving** (Alice condition X),
+    /// evaluated on the pre-move (`self`) board before the transfer.
+    fn alice_king_dest_safe_on_origin(&self, from: Square<G>, to: Square<G>, us: Color) -> bool {
+        let them = us.opposite();
+        let plane_mask = self.alice_plane_mask(self.state.board_b.contains(from));
+        // Pre-transfer board-O occupancy: the king has left `from` and stands at
+        // `to` on the leaving plane; a captured enemy on `to` is gone.
+        let plane_occ = (self.board.occupied() & plane_mask).without(from).with(to);
+        // Enemy pieces on the leaving plane, excluding one captured on `to`.
+        let enemy_plane = (self.board.by_color(them) & plane_mask).without(to);
+        (self.attackers_to(to, them, plane_occ) & enemy_plane).is_empty()
+    }
+
+    /// The plane mask (the set of squares on plane B if `plane_b`, else plane A)
+    /// used to restrict Alice movement and king-safety to a single board.
+    #[inline]
+    fn alice_plane_mask(&self, plane_b: bool) -> Bitboard<G> {
+        if plane_b {
+            self.state.board_b
+        } else {
+            !self.state.board_b
+        }
+    }
+
+    /// The Alice king-danger map on one plane: the squares attacked by `by`'s
+    /// pieces **on that plane** under the plane's own occupancy.
+    fn alice_plane_danger(
+        &self,
+        by: Color,
+        plane_mask: Bitboard<G>,
+        plane_occ: Bitboard<G>,
+    ) -> Bitboard<G> {
+        let mut danger = Bitboard::EMPTY;
+        for role in WideRole::ALL {
+            for from in self.board.pieces(by, role) & plane_mask {
+                danger |= V::role_attacks(role, by, from, plane_occ);
+            }
+        }
+        danger
+    }
+
+    /// Pushes the pseudo-legal Alice moves for `us` (every chess move on the
+    /// mover's own plane whose destination is vacant on the opposite plane, plus
+    /// Alice castling) into `out`, without any king-safety filtering.
+    fn gen_alice_pseudo<S: WideSink>(&self, out: &mut S, us: Color) {
+        let board = &self.board;
+        let them = us.opposite();
+        let occ = board.occupied();
+        let bb = self.state.board_b;
+        let our = board.by_color(us);
+        let promo_roles = V::promotion_config().roles;
+        for from in our {
+            let role = board
+                .role_at(from)
+                .expect("our piece on an occupied square");
+            let plane_b = bb.contains(from);
+            let plane_mask = self.alice_plane_mask(plane_b);
+            let plane_occ = occ & plane_mask; // pieces sharing the mover's plane
+            let other_occ = occ & !plane_mask; // pieces on the opposite (transfer) plane
+            if role == WideRole::Pawn {
+                self.gen_alice_pawn(
+                    out,
+                    us,
+                    from,
+                    plane_occ,
+                    other_occ,
+                    plane_mask,
+                    &promo_roles,
+                );
+                continue;
+            }
+            // Chess attack set on the mover's own plane; sliders are blocked only
+            // by same-plane pieces.
+            let att = V::role_attacks(role, us, from, plane_occ);
+            // Land only off our own same-plane pieces and on a square whose
+            // opposite plane is vacant (so the transfer succeeds). A same-plane
+            // enemy on the target is a capture (its opposite plane is empty by the
+            // one-piece-per-square invariant, so it survives the `!other_occ`
+            // filter); an empty same-plane square is a quiet move.
+            let friendly_plane = our & plane_mask;
+            let enemy_plane = board.by_color(them) & plane_mask;
+            let targets = att & !friendly_plane & !other_occ;
+            for to in targets {
+                let kind = if enemy_plane.contains(to) {
+                    WideMoveKind::Capture
+                } else {
+                    WideMoveKind::Quiet
+                };
+                out.push(WideMove::new(from, to, kind));
+            }
+        }
+        if V::has_castling() {
+            self.gen_alice_castles(out, us);
+        }
+    }
+
+    /// Pushes the pseudo-legal Alice pawn moves from `from` into `out`. The pawn
+    /// pushes and captures on its own plane and transfers to the opposite plane;
+    /// a quiet push needs its landing square vacant on **both** planes, a capture
+    /// needs a same-plane enemy (whose opposite plane is then empty). En passant
+    /// is excluded from Alice (the standard ruleset normally omits it).
+    #[allow(clippy::too_many_arguments)]
+    fn gen_alice_pawn<S: WideSink>(
+        &self,
+        out: &mut S,
+        us: Color,
+        from: Square<G>,
+        plane_occ: Bitboard<G>,
+        other_occ: Bitboard<G>,
+        plane_mask: Bitboard<G>,
+        promo_roles: &[WideRole],
+    ) {
+        let board = &self.board;
+        let them = us.opposite();
+        let occ = board.occupied();
+        let dir: i8 = if us.is_white() { 1 } else { -1 };
+        let promo = V::promotion_rank(us);
+        let dpr = V::double_push_rank(us);
+        // Forward push: the square in front must be empty on the mover's own plane
+        // (the slide is on that board).
+        if let Some(one) = from.offset(0, dir) {
+            if !plane_occ.contains(one) {
+                // Single push lands on `one`; the transfer needs it vacant on the
+                // opposite plane too — i.e. `one` totally empty.
+                if !other_occ.contains(one) {
+                    if one.rank() == promo {
+                        for &r in promo_roles {
+                            out.push(WideMove::new(
+                                from,
+                                one,
+                                WideMoveKind::Promotion {
+                                    role: r,
+                                    capture: false,
+                                },
+                            ));
+                        }
+                    } else {
+                        out.push(WideMove::new(from, one, WideMoveKind::Quiet));
+                    }
+                }
+                // Double push: the intermediate `one` only needs to be clear on the
+                // own plane (above); the landing `two` must be vacant on both planes.
+                if from.rank() == dpr {
+                    if let Some(two) = from.offset(0, 2 * dir) {
+                        if !occ.contains(two) {
+                            out.push(WideMove::new(from, two, WideMoveKind::DoublePawnPush));
+                        }
+                    }
+                }
+            }
+        }
+        // Diagonal captures: a same-plane enemy on the diagonal target. The target
+        // then holds an enemy on this plane, so its opposite plane is empty and the
+        // transfer always succeeds.
+        let enemy_plane = board.by_color(them) & plane_mask;
+        for df in [-1i8, 1] {
+            if let Some(cap) = from.offset(df, dir) {
+                if enemy_plane.contains(cap) {
+                    if cap.rank() == promo {
+                        for &r in promo_roles {
+                            out.push(WideMove::new(
+                                from,
+                                cap,
+                                WideMoveKind::Promotion {
+                                    role: r,
+                                    capture: true,
+                                },
+                            ));
+                        }
+                    } else {
+                        out.push(WideMove::new(from, cap, WideMoveKind::Capture));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Pushes the pseudo-legal Alice castling moves for `us` into `out`.
+    ///
+    /// Castling is a king move played on the king's own plane: the squares the
+    /// king and rook traverse must be clear **on that plane** (other-plane pieces
+    /// are invisible to the slide), the king must not be in check nor pass through
+    /// or land on a square attacked **on that plane**, the rook must share the
+    /// king's plane, and the king's and rook's destination squares must be vacant
+    /// on the **opposite** plane (both transfer there). The king's safety on the
+    /// plane it lands on is checked by the verify step.
+    fn gen_alice_castles<S: WideSink>(&self, out: &mut S, us: Color) {
+        if !self.state.castling.has_any(us) {
+            return;
+        }
+        let Some(king_sq) = self.board.king_of(us) else {
+            return;
+        };
+        let rank = V::castle_rank(us);
+        if king_sq.rank() != rank {
+            return;
+        }
+        let king_plane_b = self.state.board_b.contains(king_sq);
+        let plane_mask = self.alice_plane_mask(king_plane_b);
+        let occ = self.board.occupied();
+        let plane_occ = occ & plane_mask;
+        let other_occ = occ & !plane_mask;
+        let them = us.opposite();
+        let king_danger = self.alice_plane_danger(them, plane_mask, plane_occ);
+        // The king may not castle out of check (attacked on its own plane).
+        if king_danger.contains(king_sq) {
+            return;
+        }
+        let (k_king, k_rook) = V::castle_dest_files(KINGSIDE);
+        let (q_king, q_rook) = V::castle_dest_files(QUEENSIDE);
+        for (side, king_dest_file, rook_dest_file, kind) in [
+            (KINGSIDE, k_king, k_rook, WideMoveKind::CastleKingside),
+            (QUEENSIDE, q_king, q_rook, WideMoveKind::CastleQueenside),
+        ] {
+            let Some(rook_file) = self.state.castling.rook_file(us, side) else {
+                continue;
+            };
+            let Some(rook_from) = Square::<G>::from_file_rank(rook_file, rank) else {
+                continue;
+            };
+            if self.board.piece_at(rook_from) != Some(WidePiece::new(us, WideRole::Rook)) {
+                continue;
+            }
+            // The rook must be on the same plane as the king to castle on it.
+            if self.state.board_b.contains(rook_from) != king_plane_b {
+                continue;
+            }
+            let Some(king_dest) = Square::<G>::from_file_rank(king_dest_file, rank) else {
+                continue;
+            };
+            let Some(rook_dest) = Square::<G>::from_file_rank(rook_dest_file, rank) else {
+                continue;
+            };
+            let king_path = between(king_sq, king_dest).with(king_dest);
+            let rook_path = between(rook_from, rook_dest).with(rook_dest);
+            let must_be_empty = (king_path | rook_path).without(king_sq).without(rook_from);
+            // Path clear on the king's plane (the board the move is played on).
+            if !(must_be_empty & plane_occ).is_empty() {
+                continue;
+            }
+            // King and rook destinations must be vacant on the opposite plane.
+            if other_occ.contains(king_dest) || other_occ.contains(rook_dest) {
+                continue;
+            }
+            // The king may not pass over or land on a square attacked on its plane.
+            let king_walk = between(king_sq, king_dest).with(king_dest);
+            if !(king_walk & king_danger).is_empty() {
+                continue;
+            }
+            out.push(WideMove::new(king_sq, king_dest, kind));
         }
     }
 
@@ -2697,6 +3094,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let is_pawn_move = moving.role == WideRole::Pawn;
         let mut reset_clock = is_pawn_move;
 
+        // Alice chess: the plane (A = false / B = true) the mover starts on, read
+        // before any board-membership edit. After the board move below the piece
+        // **transfers** to the opposite plane (and a castled rook with it). Read
+        // only on the Alice path (default-off), so every other variant is inert.
+        let alice_from_plane = V::is_alice() && self.state.board_b.contains(from);
+
         self.state.ep_square = None;
 
         // The castling rook's origin, captured for the gating update below (a
@@ -2861,6 +3264,42 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if let Some(dsq) = mv.duck_to::<G>() {
                 self.state.duck = Some(dsq);
             }
+        }
+
+        // Alice chess: after the move is on the board, the moved piece **goes
+        // through the looking-glass** — it transfers to the same square on the
+        // opposite plane. The board-membership mask is updated to reflect it: the
+        // origin is vacated, the destination takes the *opposite* plane, and a
+        // castled rook transfers with the king. En passant is not played in Alice
+        // (the standard ruleset normally excludes it), so the ep target is always
+        // cleared. Default-off, so every other variant leaves `board_b` empty.
+        if V::is_alice() {
+            let to_plane = !alice_from_plane;
+            // Vacate the origin(s).
+            self.state.board_b.clear(from);
+            if let Some(rook_from) = castle_rook_from {
+                self.state.board_b.clear(rook_from);
+            }
+            if matches!(mv.kind(), WideMoveKind::EnPassant) {
+                if let Some(captured) = Square::<G>::from_file_rank(to.file(), from.rank()) {
+                    self.state.board_b.clear(captured);
+                }
+            }
+            // Land the transferred piece(s) on the opposite plane (a capture's
+            // victim shared the mover's plane, so overwriting its bit is correct).
+            set_plane(&mut self.state.board_b, to, to_plane);
+            if castle_rook_from.is_some() {
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                let (_k, rook_dest_file) = V::castle_dest_files(side);
+                if let Some(rook_to) = Square::<G>::from_file_rank(rook_dest_file, rank) {
+                    set_plane(&mut self.state.board_b, rook_to, to_plane);
+                }
+            }
+            self.state.ep_square = None;
         }
 
         if reset_clock {
@@ -3239,6 +3678,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             halfmove_clock,
             fullmove_number,
             consecutive_passes: 0,
+            board_b: crate::geometry::Bitboard::EMPTY,
         };
         let mut pos = Self::from_parts(board, state);
         pos.promoted = promoted;
@@ -3679,6 +4119,17 @@ fn cannon_move_off_king_lines<G: Geometry>(
     }
     let to = mv.to::<G>();
     !king_lines.contains(from) && !king_lines.contains(to)
+}
+
+/// Sets or clears `sq` in the Alice board-membership mask `bb` to place its
+/// occupant on plane B (`plane_b == true`) or plane A (`plane_b == false`).
+#[inline]
+fn set_plane<G: Geometry>(bb: &mut Bitboard<G>, sq: Square<G>, plane_b: bool) {
+    if plane_b {
+        bb.set(sq);
+    } else {
+        bb.clear(sq);
+    }
 }
 
 /// Returns `true` if both sides have exactly-locatable generals (kings) that

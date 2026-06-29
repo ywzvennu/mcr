@@ -169,6 +169,7 @@ impl WideVariant<Shogi9x9> for ShogiRules {
             halfmove_clock: 0,
             fullmove_number: 1,
             consecutive_passes: 0,
+            board_b: crate::geometry::Bitboard::EMPTY,
         };
         (board, state)
     }

@@ -8,6 +8,7 @@
 //! [`WideVariant`]: super::WideVariant
 //! [`GenericPosition`]: super::GenericPosition
 
+pub mod alice;
 pub mod cambodian;
 pub mod capablanca;
 pub mod capahouse;
@@ -39,6 +40,7 @@ pub mod synochess;
 pub mod tori;
 pub mod xiangqi;
 
+pub use alice::{Alice, AliceRules};
 pub use cambodian::{Cambodian, CambodianRules};
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use capahouse::{Capahouse, CapahouseRules};
