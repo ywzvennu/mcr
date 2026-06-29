@@ -66,7 +66,8 @@ use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
 use crate::geometry::{
-    attacks, Bitboard, Board, Chess8x8, Geometry, Square, StandardChess, WideRole, WideVariant,
+    attacks, Bitboard, Board, Chess8x8, Geometry, RoyalSlider, Square, StandardChess, WideRole,
+    WideVariant,
 };
 use crate::Color;
 
@@ -224,6 +225,34 @@ impl WideVariant<Chess8x8> for SynochessRules {
         // Standard line sliders plus White's army; the Cannon needs a screen (not a
         // pinning slider), and the Commoner / FersAlfil / Soldier are steppers.
         <StandardChess as WideVariant<Chess8x8>>::role_is_slider(role)
+    }
+
+    fn royal_slider_kind(role: WideRole) -> Option<RoyalSlider> {
+        // The Rook, Bishop, and Queen are the plain standard sliders (the
+        // `role_attacks` standard-chess fallback), so the cannon king-safety verify
+        // reverse-projects them from the king with its precomputed line masks. The
+        // Janggi Cannon (asymmetric), the Soldier, the Commoner, and the FersAlfil
+        // are not standard sliders and keep their existing paths.
+        match role {
+            WideRole::Rook => Some(RoyalSlider::Rook),
+            WideRole::Bishop => Some(RoyalSlider::Bishop),
+            WideRole::Queen => Some(RoyalSlider::Queen),
+            _ => None,
+        }
+    }
+
+    fn royal_reach_superset(role: WideRole, king: Square<Chess8x8>) -> Option<Bitboard<Chess8x8>> {
+        // Supersets of the squares from which the two forward-projected roles could
+        // attack the king. The Soldier moves forward / sideways one step, so it
+        // attacks from a square adjacent to the king — the king's one-step
+        // neighbourhood covers it. The Janggi-style Cannon attacks along an
+        // over-screen orthogonal ray (Synochess has no palace), so its sources lie on
+        // the king's rank/file.
+        match role {
+            WideRole::Soldier => Some(attacks::king_attacks::<Chess8x8>(king)),
+            WideRole::Cannon => Some(attacks::rook_attacks::<Chess8x8>(king, Bitboard::EMPTY)),
+            _ => None,
+        }
     }
 
     fn has_cannons() -> bool {

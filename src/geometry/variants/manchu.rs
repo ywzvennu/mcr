@@ -62,7 +62,9 @@ use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
 use crate::geometry::variants::xiangqi::XiangqiRules;
-use crate::geometry::{attacks, Bitboard, Board, Square, WideRole, WideVariant, Xiangqi9x10};
+use crate::geometry::{
+    attacks, Bitboard, Board, RoyalSlider, Square, WideRole, WideVariant, Xiangqi9x10,
+};
 use crate::Color;
 
 /// The confirmed Manchu starting placement in the mce dialect: a full Black
@@ -192,6 +194,31 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
         // to the Xiangqi classification (only the plain Chariot pins) for every
         // other role; the Banner is not pin-classified.
         XiangqiRules::role_is_slider(role)
+    }
+
+    fn royal_slider_kind(role: WideRole) -> Option<RoyalSlider> {
+        // Manchu's Chariot is the Xiangqi Chariot — the plain standard rook — so it
+        // reuses the same king-safety masked fast path. The Banner is occupancy-
+        // asymmetric (its cannon/horse parts) and keeps the forward path.
+        XiangqiRules::royal_slider_kind(role)
+    }
+
+    fn royal_reach_superset(
+        role: WideRole,
+        king: Square<Xiangqi9x10>,
+    ) -> Option<Bitboard<Xiangqi9x10>> {
+        // Manchu's non-Banner roles are the Xiangqi roles, so reuse the Xiangqi
+        // king-reach supersets for the king-safety pre-filter. The Banner combines
+        // rook + cannon + horse moves: its sources lie on the king's rank/file (rook
+        // and cannon rays) or its knight neighbourhood (horse), so the union of both
+        // is a valid superset (a strict over-estimate that still prunes the board).
+        match role {
+            WideRole::Banner => Some(
+                attacks::rook_attacks::<Xiangqi9x10>(king, Bitboard::EMPTY)
+                    | attacks::knight_attacks::<Xiangqi9x10>(king),
+            ),
+            _ => XiangqiRules::royal_reach_superset(role, king),
+        }
     }
 
     fn has_castling() -> bool {

@@ -54,7 +54,9 @@
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{attacks, Bitboard, Board, Grand10x10, PromotionConfig, Square, WideRole};
+use crate::geometry::{
+    attacks, Bitboard, Board, Grand10x10, PromotionConfig, RoyalSlider, Square, WideRole,
+};
 use crate::geometry::{StandardChess, WideVariant};
 use crate::Color;
 
@@ -176,6 +178,21 @@ impl WideVariant<Grand10x10> for ShakoRules {
         // Fers-Alfil Elephant is a plain symmetric leaper and needs no special
         // handling. (Issue #202.)
         matches!(role, WideRole::Cannon)
+    }
+
+    fn royal_slider_kind(role: WideRole) -> Option<RoyalSlider> {
+        // The Rook, Bishop, and Queen are the plain standard sliders here (the
+        // `role_attacks` default), so the cannon king-safety verify can reverse-
+        // project them from the king with its precomputed line masks rather than
+        // rebuilding the slider masks every sibling move. Identical result, no
+        // per-move diagonal fill. The Cannon (asymmetric, screen-dependent) and the
+        // Fers-Alfil Elephant (a leaper) are not standard sliders.
+        match role {
+            WideRole::Rook => Some(RoyalSlider::Rook),
+            WideRole::Bishop => Some(RoyalSlider::Bishop),
+            WideRole::Queen => Some(RoyalSlider::Queen),
+            _ => None,
+        }
     }
 
     fn promotion_config() -> PromotionConfig {

@@ -52,7 +52,9 @@ pub use position::{
 };
 pub use role::{WideRole, OVERFLOW_PREFIX};
 pub use square::Square;
-pub use variant::{PromotionConfig, StandardChess, WideEndReason, WideRegion, WideVariant};
+pub use variant::{
+    PromotionConfig, RoyalSlider, StandardChess, WideEndReason, WideRegion, WideVariant,
+};
 pub use variants::{
     Cambodian, CambodianRules, Capablanca, CapablancaRules, Chak, ChakRules, Dobutsu, DobutsuRules,
     Duck, DuckRules, Empire, EmpireRules, Grand, GrandRules, HoppelPoppel, HoppelPoppelRules,

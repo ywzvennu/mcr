@@ -55,7 +55,9 @@
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{attacks, Bitboard, Board, Square, WideRole, WideVariant, Xiangqi9x10};
+use crate::geometry::{
+    attacks, Bitboard, Board, RoyalSlider, Square, WideRole, WideVariant, Xiangqi9x10,
+};
 use crate::Color;
 
 /// The Xiangqi rule layer: a zero-sized [`WideVariant`] over [`Xiangqi9x10`].
@@ -78,6 +80,11 @@ const FERZ_OFFSETS: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
 /// The four wazir (one orthogonal step) offsets — the General's movement.
 const WAZIR_OFFSETS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+/// The four two-step-diagonal offsets — the Elephant's leap shape (unhobbled,
+/// unconfined). Used only to build the **superset** of squares from which an
+/// Elephant could reach a target, for the king-safety reach pre-filter.
+const ELEPHANT_OFFSETS: [(i8, i8); 4] = [(2, 2), (2, -2), (-2, 2), (-2, -2)];
 
 impl XiangqiRules {
     /// The palace mask for `color`: the 3x3 block on files d..f (3..=5), on the
@@ -278,6 +285,47 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         // and Soldier are steppers/leapers. Xiangqi runs the cannon verify path,
         // which does not consult pins, but the classification is kept honest.
         matches!(role, WideRole::Rook)
+    }
+
+    fn royal_slider_kind(role: WideRole) -> Option<RoyalSlider> {
+        // The Chariot is the plain standard rook (`role_attacks` is exactly
+        // `rook_attacks`), so the cannon king-safety verify reverse-projects it from
+        // the king with the precomputed line masks instead of rebuilding them every
+        // sibling move. No diagonal sliders exist in Xiangqi; every other role is a
+        // leaper or the asymmetric Cannon, which keep the forward path.
+        matches!(role, WideRole::Rook).then_some(RoyalSlider::Rook)
+    }
+
+    fn royal_reach_superset(
+        role: WideRole,
+        king: Square<Xiangqi9x10>,
+    ) -> Option<Bitboard<Xiangqi9x10>> {
+        // A superset (occupancy-independent, ignoring legs / confinement / screens —
+        // all re-checked by the exact forward projection) of the squares from which
+        // each forward-projected role could attack the king. Every leap shape is
+        // symmetric, so its shape from the king is a superset of its attack-source
+        // squares; confinement and hobbling only remove attacks. The Cannon attacks
+        // only along orthogonals, so its sources lie on the king's rank/file.
+        match role {
+            // Horse: knight-shape neighbourhood of the king.
+            WideRole::Horse => Some(attacks::knight_attacks::<Xiangqi9x10>(king)),
+            // Elephant: the two-step-diagonal leap shape (unhobbled, unconfined).
+            WideRole::XiangqiElephant => Some(attacks::leaper_attacks::<Xiangqi9x10>(
+                king,
+                &ELEPHANT_OFFSETS,
+            )),
+            // General (King), Advisor, Soldier: each attacks only from a square
+            // adjacent to the king (orthogonally for general/soldier, diagonally for
+            // advisor), so the king's one-step neighbourhood is a superset of all
+            // three. (The flying-general file is handled separately.)
+            WideRole::King | WideRole::Advisor | WideRole::Soldier => {
+                Some(attacks::king_attacks::<Xiangqi9x10>(king))
+            }
+            // Cannon: its over-screen capture travels a straight rank/file ray, so a
+            // cannon attacking the king lies on the king's orthogonal lines.
+            WideRole::Cannon => Some(attacks::rook_attacks::<Xiangqi9x10>(king, Bitboard::EMPTY)),
+            _ => None,
+        }
     }
 
     fn has_castling() -> bool {

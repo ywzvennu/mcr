@@ -24,9 +24,12 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use super::attacks::{between, king_attack_lines, line};
+use super::attacks::{
+    between, bishop_attacks_masked, king_attack_lines, line, queen_attacks_masked,
+    rook_attacks_masked, KingLineMasks,
+};
 use super::role::WideRole;
-use super::variant::{WideEndReason, WideVariant};
+use super::variant::{RoyalSlider, WideEndReason, WideVariant};
 use super::{
     Bitboard, Board, GateRole, GateSquare, Geometry, Square, WideMove, WideMoveKind, WidePiece,
 };
@@ -1297,14 +1300,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // requires **every** royal to be safe — a move may not leave any king or
         // Divine Lord en prise. Default is the at-least-one rule, so Spartan is
         // byte-identical.
+        // Multi-royal variants (Spartan, Chak) are not cannon variants, so they opt
+        // no role into the masked slider fast path (`royal_slider_kind` is `None`);
+        // the masks are still built per king to satisfy the shared signature and are
+        // otherwise inert here.
         if V::royals_all_must_survive() {
             kings
                 .into_iter()
-                .all(|k| self.king_safe_after(k, them, attackers))
+                .all(|k| self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None))
         } else {
             kings
                 .into_iter()
-                .any(|k| self.king_safe_after(k, them, attackers))
+                .any(|k| self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None))
         }
     }
 
@@ -1387,7 +1394,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // legal and skips the make/unmake + scan entirely. Anything that *could*
         // matter (a king move, an en-passant's three-square shuffle, a move on a
         // king line) falls through to the full verify, so the result is identical.
-        let in_check = !self.king_safe_after(king, us.opposite(), &attackers);
+        // The king's line masks, precomputed once for the node: every sibling move
+        // that falls through to the full verify re-tests king safety from this same
+        // square (only a king move shifts it, handled in `cannon_move_is_legal`), so
+        // the rank/file/diagonal masks the slider reverse-projection needs are
+        // constant and built once here rather than per move.
+        let king_masks = KingLineMasks::new(king);
+        // The per-role reach supersets, also precomputed once for the node and
+        // aligned to `attackers.roles()`: a forward-projected (leg-asymmetric) role
+        // restricts the enemy pieces it tests to those on its king-reach superset.
+        // `Bitboard::FULL` marks "no superset available, test every piece" (the
+        // unchanged behaviour). Built per node and reused by every sibling move.
+        let reach = attackers.reach_supersets::<G, V>(king);
+        let reach_slice = reach.as_ref().map(|r| &r[..attackers.len()]);
+        let in_check =
+            !self.king_safe_after(king, us.opposite(), &attackers, king_masks, reach_slice);
         let king_lines = king_attack_lines::<G>(king);
 
         // Janggi bikjang: facing the enemy general on an open line is *also* a check
@@ -1427,7 +1448,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
                 // Provably safe: no apply/unmake, no scan.
                 out.push(mv);
-            } else if scratch.cannon_move_is_legal(self, &mv, us, &attackers) {
+            } else if scratch.cannon_move_is_legal(
+                self,
+                &mv,
+                us,
+                &attackers,
+                king_masks,
+                reach_slice,
+            ) {
                 out.push(mv);
             }
         });
@@ -1445,7 +1473,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             let mut drops = WideMoveList::new();
             self.gen_hand_drops(&mut drops);
             drops.for_each(|mv| {
-                if scratch.cannon_move_is_legal(self, &mv, us, &attackers) {
+                if scratch.cannon_move_is_legal(self, &mv, us, &attackers, king_masks, reach_slice)
+                {
                     out.push(mv);
                 }
             });
@@ -1481,11 +1510,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         mv: &WideMove,
         us: Color,
         attackers: &EnemyAttackers,
+        king_masks: KingLineMasks<G>,
+        reach: Option<&[Bitboard<G>]>,
     ) -> bool {
         self.apply(mv);
         // `apply` flipped the side to move; our king is now the non-mover's.
         let mut legal = match self.board.king_of(us) {
-            Some(king) => self.king_safe_after(king, us.opposite(), attackers),
+            // The node-level `king_masks` and reach supersets are taken through the
+            // **pre-move** king square, which is correct for every sibling that does
+            // not move the king. A king move shifts the royal square, so the cached
+            // geometry no longer applies: rebuild the line masks for the new square
+            // and disable the reach pre-filter (its supersets were keyed on the old
+            // square), falling back to testing every piece. This is the only place
+            // the cached node geometry can go stale.
+            Some(king) => {
+                if king == king_masks.square() {
+                    self.king_safe_after(king, us.opposite(), attackers, king_masks, reach)
+                } else {
+                    let masks = KingLineMasks::new(king);
+                    self.king_safe_after(king, us.opposite(), attackers, masks, None)
+                }
+            }
             // A move that captured our own king cannot arise from a legal pseudo
             // set here (our king is never a capture target of our own move), but
             // be defensive: no king means nothing to leave en prise.
@@ -1533,18 +1578,59 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// for a node, so it is computed once in [`EnemyAttackers::new`] and reused for
     /// every sibling move. The result is identical to `!royal_attacked(...)`.
     #[inline]
-    fn king_safe_after(&self, king: Square<G>, by: Color, attackers: &EnemyAttackers) -> bool {
+    fn king_safe_after(
+        &self,
+        king: Square<G>,
+        by: Color,
+        attackers: &EnemyAttackers,
+        king_masks: KingLineMasks<G>,
+        reach: Option<&[Bitboard<G>]>,
+    ) -> bool {
+        debug_assert_eq!(king_masks.square(), king);
         let board = &self.board;
         let occupied = board.occupied();
-        for &role in attackers.roles() {
-            let pieces = board.pieces(by, role);
+        for (idx, &role) in attackers.roles().iter().enumerate() {
+            let mut pieces = board.pieces(by, role);
             if pieces.is_empty() {
+                continue;
+            }
+            // Symmetric standard-slider roles (a plain rook / bishop / queen) reuse
+            // the king's precomputed line masks: the reverse projection back from
+            // the king is bit-for-bit the same slider ray, but the per-move mask
+            // rebuild (the diagonal fill in particular) is skipped. A role opts in
+            // only when its `role_attacks` is exactly the plain slider from the
+            // king square, so the result is identical to the general path below.
+            if let Some(kind) = V::royal_slider_kind(role) {
+                let from_king = match kind {
+                    RoyalSlider::Rook => rook_attacks_masked(king_masks, occupied),
+                    RoyalSlider::Bishop => bishop_attacks_masked(king_masks, occupied),
+                    RoyalSlider::Queen => queen_attacks_masked(king_masks, occupied),
+                };
+                if !(from_king & pieces).is_empty() {
+                    return false;
+                }
                 continue;
             }
             // The Xiangqi Horse's leg is asymmetric, so reverse-projecting from the
             // king square tests the wrong leg; detect it forward from each horse,
             // exactly as `attackers_to` does.
             if V::role_attack_is_leg_asymmetric(role) {
+                // Cheap superset pre-filter (precomputed once per node): a piece off
+                // the king's reach superset for this role can never attack the king,
+                // so it is dropped before the exact (and costlier) forward
+                // projection. The mask is a superset — it ignores hobbling legs,
+                // region confinement, and cannon screens, all of which the forward
+                // projection still checks exactly — so no real attacker is excluded
+                // and the result is identical to testing every piece. Absent a
+                // superset (`None`) the full set is tested, as before.
+                if let Some(masks) = reach {
+                    if let Some(mask) = masks.get(idx).copied() {
+                        pieces &= mask;
+                        if pieces.is_empty() {
+                            continue;
+                        }
+                    }
+                }
                 // A board-aware attacker (the Janggi cannon) is projected from each
                 // origin against the whole board; the king sits on an occupied
                 // square, so it can only fall in the cannon's capture portion. The
@@ -3411,7 +3497,54 @@ impl EnemyAttackers {
     fn roles(&self) -> &[WideRole] {
         &self.roles[..self.len]
     }
+
+    /// The number of fielded enemy roles.
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    /// The per-role king-reach superset masks, aligned to [`roles`](Self::roles),
+    /// computed once per node for the cannon king-safety verify.
+    ///
+    /// Entry `i` is the variant's [`royal_reach_superset`] for role `roles()[i]`
+    /// through `king`, or [`Bitboard::FULL`] when the variant offers no superset
+    /// (the "test every piece" sentinel). Returns `None` — disabling the pre-filter
+    /// entirely (correct, just unoptimised) — if the node fields more distinct roles
+    /// than [`REACH_CAP`], which no cannon variant does. The fixed-width array is
+    /// returned by value so it lives on the node's stack and is reused by every
+    /// sibling move; capping it at `REACH_CAP` (rather than the full
+    /// [`WideRole::COUNT`]) keeps that per-node initialisation small.
+    ///
+    /// [`royal_reach_superset`]: WideVariant::royal_reach_superset
+    /// [`roles`]: Self::roles
+    fn reach_supersets<G: Geometry, V: WideVariant<G>>(
+        &self,
+        king: Square<G>,
+    ) -> Option<[Bitboard<G>; REACH_CAP]> {
+        if self.len > REACH_CAP {
+            // No cannon variant fields this many distinct roles; fall back to the
+            // unfiltered path rather than truncate (which would be a correctness
+            // bug). Cheap and never taken in practice.
+            return None;
+        }
+        let mut masks = [Bitboard::FULL; REACH_CAP];
+        for (i, &role) in self.roles().iter().enumerate() {
+            if let Some(mask) = V::royal_reach_superset(role, king) {
+                masks[i] = mask;
+            }
+        }
+        Some(masks)
+    }
 }
+
+/// The maximum number of distinct fielded roles the cannon king-safety reach
+/// pre-filter precomputes per node. A cannon variant fields at most ~9 distinct
+/// roles (e.g. Xiangqi: General, Advisor, Elephant, Horse, Chariot, Cannon,
+/// Soldier), so this bound is never reached; a node that somehow exceeds it simply
+/// disables the pre-filter (see [`EnemyAttackers::reach_supersets`]). Sized to keep
+/// the per-node stack array small relative to the full [`WideRole::COUNT`].
+const REACH_CAP: usize = 12;
 
 /// Returns `true` if the cannon-variant move `mv` is **provably king-safe** by
 /// geometry alone: it is an ordinary board move (not a king move, not an
