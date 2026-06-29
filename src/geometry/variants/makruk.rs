@@ -26,12 +26,13 @@
 //! Makruk has a "counting" endgame rule (a bare-king side counts down a move
 //! budget to force a win or claim a draw). That rule affects only **game
 //! termination**, never move generation, so it does not change perft. It is
-//! modelled — in a simplified, board-honour-only form — at the *game* level via
-//! the default-off [`WideVariant::counting_rule`] hook, adjudicated by
-//! [`GenericGame`](crate::geometry::game::GenericGame); see that type for the
-//! exact countdown. The perft validation against Fairy-Stockfish (which likewise
-//! does not let the counting rule affect `go perft`) confirms the move
-//! generation is exact regardless.
+//! modelled at the *game* level via the default-off
+//! [`WideVariant::counting_rule`] hook, adjudicated by
+//! [`GenericGame`](crate::geometry::game::GenericGame), which reproduces
+//! Fairy-Stockfish's board-honour and material-scaled pieces-honour countdown
+//! exactly; see that type for the exact countdown. The perft validation against
+//! Fairy-Stockfish (which likewise does not let the counting rule affect `go
+//! perft`) confirms the move generation is exact regardless.
 //!
 //! ## Confirmed starting FEN
 //!
@@ -161,11 +162,13 @@ impl WideVariant<Chess8x8> for MakrukRules {
         false
     }
 
-    fn counting_rule() -> bool {
-        // Makruk's board-honour counting endgame (simplified; see
+    fn counting_rule() -> Option<crate::geometry::WideCountingRule> {
+        // Makruk's counting endgame: board-honour while the counted side still has
+        // material, then the material-scaled pieces-honour countdown once it is a
+        // lone king (reproduced exactly from Fairy-Stockfish; see
         // [`GenericGame`](crate::geometry::game::GenericGame)). Terminal-only, so
         // perft is byte-identical.
-        true
+        Some(crate::geometry::WideCountingRule::Makruk)
     }
 }
 

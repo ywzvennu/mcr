@@ -3956,7 +3956,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // was the checker, so it is resolved by
             // [`GenericGame`](super::game::GenericGame), never produced here. A
             // bare position cannot reach this arm; treat it as a draw defensively.
-            WideEndReason::PerpetualCheckLoss => WideOutcome::Draw,
+            WideEndReason::PerpetualCheckLoss | WideEndReason::PerpetualChaseLoss => {
+                WideOutcome::Draw
+            }
             WideEndReason::Stalemate
             | WideEndReason::InsufficientMaterial
             | WideEndReason::VariantDraw

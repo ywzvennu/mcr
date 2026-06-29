@@ -40,11 +40,15 @@
 //! shallow perft (depths 1–5 from the start position are identical); they first
 //! diverge at depth 6, where the extra promotion targets multiply.
 //!
-//! ## Out of scope: the counting / draw rule
+//! ## The counting / draw rule (terminal only)
 //!
-//! Like Makruk, ASEAN has endgame counting / draw rules, but those affect only
-//! **game termination**, never move generation, so they do not change perft and
-//! are not modelled here (the same reasoning as `makruk.rs`).
+//! ASEAN has its own modernised-Makruk counting endgame, modelled at the *game*
+//! level through the default-off [`WideVariant::counting_rule`] hook (adjudicated
+//! by [`GenericGame`](crate::geometry::game::GenericGame)). Unlike Makruk it is
+//! **pieces-honour only** — the count begins once the losing side is a lone king
+//! with no pawns, limited to 16 / 44 / 64 full moves by the superior side's
+//! strongest piece. It affects only game termination, never move generation, so
+//! perft is unchanged.
 //!
 //! ## Confirmed starting FEN
 //!
@@ -165,6 +169,16 @@ impl WideVariant<Chess8x8> for AseanRules {
 
     fn has_castling() -> bool {
         false
+    }
+
+    fn counting_rule() -> Option<crate::geometry::WideCountingRule> {
+        // ASEAN's modernised-Makruk counting: a pieces-honour-only countdown that
+        // begins once the losing side is a lone king with no pawns left, limited to
+        // 16 / 44 / 64 full moves by the superior side's strongest piece (rook /
+        // khon / knight). Reproduced exactly from Fairy-Stockfish (see
+        // [`GenericGame`](crate::geometry::game::GenericGame)); terminal-only, so
+        // perft is byte-identical.
+        Some(crate::geometry::WideCountingRule::Asean)
     }
 }
 

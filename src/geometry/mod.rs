@@ -59,7 +59,8 @@ pub use position::{
 pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use square::Square;
 pub use variant::{
-    PromotionConfig, RoyalSlider, StandardChess, WideEndReason, WideRegion, WideVariant,
+    PromotionConfig, RoyalSlider, StandardChess, WideCountingRule, WideEndReason, WideRegion,
+    WideVariant,
 };
 pub use variants::{
     Alice, AliceRules, Asean, AseanRules, Bughouse, BughouseRules, Cambodian, CambodianRules,

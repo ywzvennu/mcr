@@ -258,6 +258,7 @@ fn wide_end_reason_str(r: WideEndReason) -> &'static str {
         WideEndReason::Repetition => "repetition",
         WideEndReason::Sennichite => "sennichite",
         WideEndReason::PerpetualCheckLoss => "perpetual_check_loss",
+        WideEndReason::PerpetualChaseLoss => "perpetual_chase_loss",
         WideEndReason::Bikjang => "bikjang",
         WideEndReason::CountingDraw => "counting_draw",
         WideEndReason::MoveRule => "move_rule",

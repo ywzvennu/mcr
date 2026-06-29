@@ -364,20 +364,26 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         (attacks::between::<Xiangqi9x10>(general, sq) & occupied).is_empty()
     }
 
-    // --- Repetition / perpetual check (terminal only; perft unaffected) ----
+    // --- Repetition / perpetual check + chase (terminal only; perft unaffected) -
     //
-    // Xiangqi forbids perpetual check: a repetition forced by one side checking on
-    // every move is a loss for that (checking) side. Adjudicated by
+    // Xiangqi forbids both perpetual **check** and perpetual **chase**: a repetition
+    // forced by one side checking — or chasing the same unprotected / value-superior
+    // enemy piece — on every move is a loss for that side. Both are adjudicated by
     // [`GenericGame`](crate::geometry::game::GenericGame); move generation is
-    // untouched, so perft stays byte-identical. The full perpetual-**chase**
-    // adjudication (a loss for perpetually chasing an undefended piece) is **not**
-    // modelled — only perpetual check and plain three-fold repetition (a draw).
+    // untouched, so perft stays byte-identical. The chase model reproduces
+    // Fairy-Stockfish's AXF direct-attack chase (the dominant case); see
+    // [`GenericGame`](crate::geometry::game::GenericGame) for the precise subset and
+    // its residual simplifications versus FSF.
 
     fn tracks_repetition() -> bool {
         true
     }
 
     fn perpetual_check_loses() -> bool {
+        true
+    }
+
+    fn perpetual_chase_loses() -> bool {
         true
     }
 }

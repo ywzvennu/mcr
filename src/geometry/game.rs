@@ -20,61 +20,111 @@
 //! empty, nothing is recorded, and the wrapper is a thin driver over
 //! [`GenericPosition`] that just forwards [`outcome`](GenericPosition::outcome).
 //!
-//! # Perpetual check
+//! # Perpetual check and chase
 //!
 //! When a repetition is found and the variant's
 //! [`perpetual_check_loses`](WideVariant::perpetual_check_loses) is on, the
 //! wrapper walks the repeated cycle: if one side delivered check on **every** one
 //! of its moves through the cycle, that side is the perpetual checker and **loses**
-//! (the win goes to the side that was being checked). Otherwise the repetition is
+//! (the win goes to the side that was being checked).
+//!
+//! Xiangqi additionally forbids perpetual **chase**
+//! ([`perpetual_chase_loses`](WideVariant::perpetual_chase_loses), the AXF rule):
+//! a side that, on **every** one of its moves through the repeated cycle, makes a
+//! qualifying *chase* — a fresh attack on an enemy piece that is either left
+//! **unprotected** or is **value-superior** to the attacker (a Horse / Cannon
+//! attacking a Chariot, or an Elephant / Advisor attacking a Chariot / Cannon /
+//! Horse) — loses, exactly as a perpetual checker does. Perpetual check is scored
+//! first; a mutual perpetual (both sides) is a draw. Otherwise the repetition is
 //! the ordinary [`repetition_draw_reason`](WideVariant::repetition_draw_reason)
 //! draw (Sennichite for Shogi, Repetition elsewhere).
 //!
-//! # Counting (simplified)
+//! The chase detector reproduces Fairy-Stockfish's **direct-attack** chase
+//! (`Position::chased`): the moved piece's new attacks, the King / Soldier and
+//! same-type-mutual exclusions, the Rook / Cannon "attack along the moved line is
+//! not new" exclusion, the value-superior tiers, and the unprotected-victim test
+//! (defenders recomputed with the attacker lifted off the board). It is a faithful
+//! **subset**: it does not model FSF's discovered-attack chases, the impaired-horse
+//! and flying-general-pin refinements, or the exact single-victim identity tracked
+//! across the cycle (mce instead requires a qualifying chase on **every** cycle
+//! ply, the same structural rule as perpetual check). These cover the dominant
+//! cases (a Chariot/Horse/Cannon harrying one piece) and agree with FSF on them.
 //!
-//! The Makruk / Cambodian counting endgame is modelled in a **board-honour-only,
-//! simplified** form: from the ply a side is reduced to a lone king, the superior
-//! side is given [`COUNTING_LIMIT_PLIES`] plies to deliver mate; if the count
-//! elapses the game is a [`WideEndReason::CountingDraw`]. The full Fairy-Stockfish
-//! rule (piece-honour counts that begin earlier and whose limit scales with the
-//! stronger side's material) is **not** reproduced; see the per-variant notes.
+//! # Bikjang (Janggi)
+//!
+//! The Janggi **bikjang** draw fires when the two generals face each other down an
+//! open line in **two consecutive** positions — Fairy-Stockfish's
+//! `st->bikjang && st->previous->bikjang`. The wrapper records each position's
+//! facing flag and draws ([`WideEndReason::Bikjang`]) when the current and previous
+//! recorded positions both face, implementing the rule directly from its own
+//! history rather than relying on the move generator.
+//!
+//! The two formulations coincide: the move generator forbids **any non-pass move
+//! that leaves the generals facing** once they already face (FSF's legality at
+//! `position.cpp` — a move whose post-occupancy keeps the rook-line between the
+//! kings open is illegal unless it is a pass), so the only way to carry a facing
+//! into the next ply is to **pass**. [`GenericPosition::end_reason`] already labels
+//! that pass terminal (the facing side, after the opponent's pass, has no legal
+//! move) a bikjang for a bare position; this wrapper additionally derives the same
+//! verdict from the recorded facing flags.
+//!
+//! # Counting (Makruk / Cambodian / ASEAN)
+//!
+//! The counting endgame is reproduced **exactly** from Fairy-Stockfish's
+//! `count_limit` / `do_move` / `is_optional_game_end` state machine (validated
+//! against the FSF binary's echoed counting FEN field). The wrapper keeps the two
+//! counters FSF does — a `limit` and a `ply`, both in plies — updating them on
+//! every move and drawing ([`WideEndReason::CountingDraw`]) when `ply > limit`.
+//! Both **board-honour** (the count while the losing side still has material) and
+//! the material-scaled **pieces-honour** countdown (once it is a lone king) are
+//! modelled, with the correct table per [`WideCountingRule`].
 
 use alloc::vec::Vec;
 
 use super::position::{GenericPosition, WideOutcome};
-use super::variant::{WideEndReason, WideVariant};
-use super::{Geometry, WideMove};
+use super::variant::{WideCountingRule, WideEndReason, WideVariant};
+use super::{Bitboard, Board, Geometry, Square, WideMove, WideRole};
 use crate::Color;
 
-/// The number of plies, counted from the appearance of a lone king, after which
-/// the Makruk / Cambodian **board-honour** count elapses into a draw. Sixty-four
-/// full moves — the board-honour limit — expressed in plies. This is the
-/// simplified model (see the [module docs](self)).
+/// The number of plies the Makruk / Cambodian **board-honour** count runs while the
+/// losing side still has material: sixty-four full moves expressed in plies. The
+/// pieces-honour countdown (a lone king) is shorter and material-scaled; see the
+/// [module docs](self) and [`WideCountingRule`].
 pub const COUNTING_LIMIT_PLIES: u16 = 128;
 
-/// One recorded position in a [`GenericGame`]'s history: its repetition key, the
-/// side to move there, and whether that side was in check (i.e. whether the move
-/// that produced the position delivered check). The check flag is what the
-/// perpetual-check adjudication reads back.
+/// One recorded position in a [`GenericGame`]'s history.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct HistoryEntry {
     /// The position's [`repetition_key`](GenericPosition::repetition_key).
     key: u64,
     /// The side to move at this position.
     turn: Color,
-    /// Whether the side to move is in check here.
+    /// Whether the side to move is in check here (i.e. the move that produced this
+    /// position delivered check). Read back by the perpetual-check adjudication.
     in_check: bool,
+    /// Whether the move that produced this position was a qualifying **chase**
+    /// (Xiangqi). Read back by the perpetual-chase adjudication. Always `false` for
+    /// the seed entry and for variants without
+    /// [`perpetual_chase_loses`](WideVariant::perpetual_chase_loses).
+    chase: bool,
+    /// Whether the two generals **face** each other in this position (Janggi
+    /// bikjang). Always `false` for variants without
+    /// [`has_bikjang`](WideVariant::has_bikjang).
+    facing: bool,
 }
 
-/// The Makruk / Cambodian board-honour counting state (simplified): how many
-/// plies have elapsed since a lone king appeared.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The Makruk / Cambodian / ASEAN counting state, mirroring Fairy-Stockfish's two
+/// `StateInfo` counters (both in plies): the game is a [`CountingDraw`] once
+/// `ply > limit`.
+///
+/// [`CountingDraw`]: WideEndReason::CountingDraw
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct Counting {
-    /// The side reduced to a lone king (the side the count protects).
-    lone: Color,
-    /// Plies elapsed since the lone king appeared (`1` on the ply it is first
-    /// seen).
-    plies: u16,
+    /// FSF `countingLimit`: twice the limit in full moves, or `0` when no count is
+    /// active.
+    limit: u16,
+    /// FSF `countingPly`: how far the count has progressed.
+    ply: u16,
 }
 
 /// The error returned when an illegal move is passed to [`GenericGame::play`].
@@ -104,9 +154,9 @@ pub struct GenericGame<G: Geometry, V: WideVariant<G>> {
     /// The recorded history (oldest first, current last); empty unless the variant
     /// tracks repetition.
     history: Vec<HistoryEntry>,
-    /// The board-honour counting state; `None` unless the variant uses counting
-    /// and a lone king is on the board.
-    counting: Option<Counting>,
+    /// The counting state (Makruk / Cambodian / ASEAN); inert (`limit == 0`) unless
+    /// the variant counts and a triggering position has been reached.
+    counting: Counting,
 }
 
 impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
@@ -116,17 +166,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     pub fn new(position: GenericPosition<G, V>) -> Self {
         let mut history = Vec::new();
         if V::tracks_repetition() {
-            history.push(Self::entry_for(&position));
+            // The seed position has no preceding move, so it neither checks nor
+            // chases; record only its facing flag (for bikjang).
+            history.push(HistoryEntry {
+                key: position.repetition_key(),
+                turn: position.turn(),
+                in_check: position.is_check(),
+                chase: false,
+                facing: V::has_bikjang() && position.is_facing_generals(),
+            });
         }
-        let counting = if V::counting_rule() {
-            Self::counting_for(&position, None)
-        } else {
-            None
-        };
         GenericGame {
             position,
             history,
-            counting,
+            // No count is active until a triggering move is played (FSF likewise
+            // starts a fresh game with `countingLimit == 0`).
+            counting: Counting::default(),
         }
     }
 
@@ -161,52 +216,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         if !self.position.legal_moves().iter().any(|m| m == mv) {
             return Err(WideIllegalMove(*mv));
         }
+        // Snapshot the pre-move board for the counting material deltas (capture /
+        // promotion detection), exactly as Fairy-Stockfish's `do_move` reads them.
+        let before = *self.position.board();
         self.position = self.position.play(mv);
         if V::tracks_repetition() {
-            self.history.push(Self::entry_for(&self.position));
+            let chase = V::perpetual_chase_loses()
+                && Self::chase_targets(&self.position, mv.from::<G>(), mv.to::<G>()).is_some();
+            self.history.push(HistoryEntry {
+                key: self.position.repetition_key(),
+                turn: self.position.turn(),
+                in_check: self.position.is_check(),
+                chase,
+                facing: V::has_bikjang() && self.position.is_facing_generals(),
+            });
         }
-        if V::counting_rule() {
-            self.counting = Self::counting_for(&self.position, self.counting);
+        if let Some(rule) = V::counting_rule() {
+            self.counting = Self::update_counting(self.counting, &before, &self.position, rule);
         }
         Ok(())
-    }
-
-    /// Builds the history entry for `position`.
-    fn entry_for(position: &GenericPosition<G, V>) -> HistoryEntry {
-        HistoryEntry {
-            key: position.repetition_key(),
-            turn: position.turn(),
-            in_check: position.is_check(),
-        }
-    }
-
-    /// The side reduced to a lone king (the only piece of its colour), if exactly
-    /// one side is, and the other still has material.
-    fn lone_king_side(position: &GenericPosition<G, V>) -> Option<Color> {
-        let board = position.board();
-        let white = board.by_color(Color::White).count();
-        let black = board.by_color(Color::Black).count();
-        if white == 1 && black > 1 {
-            Some(Color::White)
-        } else if black == 1 && white > 1 {
-            Some(Color::Black)
-        } else {
-            None
-        }
-    }
-
-    /// Advances the counting state for `position` given the prior state.
-    fn counting_for(position: &GenericPosition<G, V>, prev: Option<Counting>) -> Option<Counting> {
-        let lone = Self::lone_king_side(position)?;
-        match prev {
-            // Same lone king as before: keep counting.
-            Some(c) if c.lone == lone => Some(Counting {
-                lone,
-                plies: c.plies.saturating_add(1),
-            }),
-            // A lone king has just appeared (or switched sides): (re)start.
-            _ => Some(Counting { lone, plies: 1 }),
-        }
     }
 
     /// How many times the current position has occurred (always ≥ 1 when the
@@ -223,8 +251,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// The reason the game has ended, or `None` if it is still in progress.
     ///
     /// The union of the single-position reasons ([`GenericPosition::end_reason`])
-    /// and the history-dependent ones: repetition / sennichite / perpetual-check
-    /// and the counting draw.
+    /// and the history-dependent ones: repetition / sennichite / perpetual-check /
+    /// perpetual-chase, the two-ply bikjang draw, and the counting draw.
     #[must_use]
     pub fn end_reason(&self) -> Option<WideEndReason> {
         if let Some(reason) = self.position.end_reason() {
@@ -235,7 +263,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 return Some(reason);
             }
         }
-        if V::counting_rule() && self.counting_elapsed() {
+        if self.bikjang_draw() {
+            return Some(WideEndReason::Bikjang);
+        }
+        if V::counting_rule().is_some() && self.counting_elapsed() {
             return Some(WideEndReason::CountingDraw);
         }
         None
@@ -252,10 +283,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 return Some(outcome);
             }
         }
-        if V::counting_rule() && self.counting_elapsed() {
+        if self.bikjang_draw() {
+            return Some(WideOutcome::Draw);
+        }
+        if V::counting_rule().is_some() && self.counting_elapsed() {
             return Some(WideOutcome::Draw);
         }
         None
+    }
+
+    /// Whether the game is a **bikjang** draw (Janggi): the two generals face each
+    /// other in the current and the immediately preceding recorded positions —
+    /// Fairy-Stockfish's `st->bikjang && st->previous->bikjang`.
+    fn bikjang_draw(&self) -> bool {
+        if !V::has_bikjang() {
+            return false;
+        }
+        let n = self.history.len();
+        n >= 2 && self.history[n - 1].facing && self.history[n - 2].facing
     }
 
     /// Whether the game has ended (decisively or drawn).
@@ -270,9 +315,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         matches!(self.outcome(), Some(WideOutcome::Draw))
     }
 
-    /// Whether the board-honour count has elapsed.
+    /// Whether the counting countdown has elapsed: FSF's `countingPly > countingLimit`
+    /// with an active limit.
     fn counting_elapsed(&self) -> bool {
-        matches!(self.counting, Some(c) if c.plies >= COUNTING_LIMIT_PLIES)
+        self.counting.limit != 0 && self.counting.ply > self.counting.limit
     }
 
     /// Adjudicates the current position's repetition, if any: the
@@ -281,7 +327,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     ///
     /// A perpetual check (one side checking on every move through the repeated
     /// cycle) under [`WideVariant::perpetual_check_loses`] is a loss for the
-    /// checker; otherwise the recurrence is the variant's repetition draw.
+    /// checker; a perpetual chase under
+    /// [`WideVariant::perpetual_chase_loses`] is a loss for the chaser (perpetual
+    /// check is scored first); otherwise the recurrence is the variant's repetition
+    /// draw.
     fn repetition_adjudication(&self) -> Option<(WideEndReason, WideOutcome)> {
         let key = self.position.repetition_key();
         // Index of the earliest occurrence of the current key.
@@ -304,7 +353,56 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 ));
             }
         }
+        if V::perpetual_chase_loses() {
+            if let Some(chaser) = self.perpetual_chaser(first) {
+                // The perpetual chaser loses; the side it was chasing wins.
+                return Some((
+                    WideEndReason::PerpetualChaseLoss,
+                    WideOutcome::Decisive {
+                        winner: chaser.opposite(),
+                    },
+                ));
+            }
+        }
         Some((V::repetition_draw_reason(), WideOutcome::Draw))
+    }
+
+    /// The side that delivered a qualifying **chase** on **every** one of its moves
+    /// through the repeated cycle starting at `first` (the perpetual chaser), if
+    /// exactly one side did. The structural analogue of [`perpetual_checker`]: a
+    /// move made at position `i` chased iff the position at `i + 1` carries the
+    /// `chase` flag.
+    ///
+    /// [`perpetual_checker`]: Self::perpetual_checker
+    fn perpetual_chaser(&self, first: usize) -> Option<Color> {
+        let h = &self.history;
+        let last = h.len() - 1;
+        let mut white_moves = 0u32;
+        let mut black_moves = 0u32;
+        let mut white_all_chase = true;
+        let mut black_all_chase = true;
+        for i in first..last {
+            let chased = h[i + 1].chase;
+            match h[i].turn {
+                Color::White => {
+                    white_moves += 1;
+                    white_all_chase &= chased;
+                }
+                Color::Black => {
+                    black_moves += 1;
+                    black_all_chase &= chased;
+                }
+            }
+        }
+        let white_perp = white_moves > 0 && white_all_chase;
+        let black_perp = black_moves > 0 && black_all_chase;
+        match (white_perp, black_perp) {
+            (true, false) => Some(Color::White),
+            (false, true) => Some(Color::Black),
+            // Neither chased throughout, or (a mutual chase) both did: not a clean
+            // perpetual chase — fall back to the ordinary repetition draw.
+            _ => None,
+        }
     }
 
     /// The side that delivered check on **every** one of its moves through the
@@ -341,6 +439,249 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             _ => None,
         }
     }
+
+    // -- Perpetual-chase detection (Xiangqi AXF; direct-attack subset) ----------
+
+    /// The set of enemy squares the move `from -> to` (made in the position
+    /// **before** `pos`, leaving `pos` with the chaser **not** to move) newly
+    /// **chases**, or `None` if it chases nothing — a faithful subset of
+    /// Fairy-Stockfish's `Position::chased` (direct attacks only).
+    ///
+    /// `pos` is the position **after** the move: its side to move
+    /// ([`turn`](GenericPosition::turn)) is the chased side (FSF `sideToMove`); the
+    /// chaser is the side that just moved. A chase is a *new* attack by the moved
+    /// piece on an enemy piece that is not a General or Soldier, is not of the moved
+    /// piece's own type, and is either **value-superior** to the attacker or left
+    /// **unprotected**.
+    fn chase_targets(
+        pos: &GenericPosition<G, V>,
+        from: Square<G>,
+        to: Square<G>,
+    ) -> Option<Bitboard<G>> {
+        let board = pos.board();
+        let victims = pos.turn();
+        let mover = victims.opposite();
+        let moved_role = board.role_at(to)?;
+        // Only non-King, non-Soldier movers create a direct chase (FSF).
+        if matches!(moved_role, WideRole::King | WideRole::Soldier) {
+            return None;
+        }
+        let occ = board.occupied();
+        let mut attacks = V::role_attacks(moved_role, mover, to, occ) & board.by_color(victims);
+        // A Chariot / Cannon attack *along the moved line* is not a new attack.
+        if matches!(moved_role, WideRole::Rook | WideRole::Cannon) {
+            attacks &= !Self::move_line_mask(from, to);
+        }
+        // Exclude the enemy General and Soldiers (and so any check on the General).
+        attacks &=
+            !(board.pieces(victims, WideRole::King) | board.pieces(victims, WideRole::Soldier));
+        // A piece attacking an enemy piece of its **own** type is a mutual /
+        // symmetric attack, not a chase.
+        attacks &= !board.pieces(victims, moved_role);
+
+        let occ_without_attacker = occ ^ Bitboard::from_square(to);
+        let mut result = Bitboard::EMPTY;
+        for s in attacks {
+            let Some(victim_role) = board.role_at(s) else {
+                continue;
+            };
+            if Self::is_superior_chase(moved_role, victim_role)
+                || pos
+                    .attackers_to(s, victims, occ_without_attacker)
+                    .is_empty()
+            {
+                result |= Bitboard::from_square(s);
+            }
+        }
+        (!result.is_empty()).then_some(result)
+    }
+
+    /// Whether `attacker` attacking `victim` is a **value-superior** chase that
+    /// counts regardless of protection (FSF's stronger-piece tiers): a Horse or
+    /// Cannon attacking a Chariot, or an Elephant or Advisor attacking a Chariot,
+    /// Cannon, or Horse.
+    fn is_superior_chase(attacker: WideRole, victim: WideRole) -> bool {
+        match attacker {
+            WideRole::Horse | WideRole::Cannon => victim == WideRole::Rook,
+            WideRole::XiangqiElephant | WideRole::Advisor => {
+                matches!(victim, WideRole::Rook | WideRole::Cannon | WideRole::Horse)
+            }
+            _ => false,
+        }
+    }
+
+    /// The rank or file the orthogonal move `from -> to` slides along — the squares
+    /// a Chariot / Cannon was already covering before the move, so an attack on a
+    /// piece there is not *new*.
+    fn move_line_mask(from: Square<G>, to: Square<G>) -> Bitboard<G> {
+        let mut mask = Bitboard::EMPTY;
+        if from.file() == to.file() {
+            let file = to.file();
+            for rank in 0..G::HEIGHT {
+                if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+                    mask |= Bitboard::from_square(sq);
+                }
+            }
+        } else if from.rank() == to.rank() {
+            let rank = to.rank();
+            for file in 0..G::WIDTH {
+                if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+                    mask |= Bitboard::from_square(sq);
+                }
+            }
+        }
+        mask
+    }
+
+    // -- Counting (Makruk / Cambodian / ASEAN; exact FSF replication) -----------
+
+    /// Advances the counting state across a move, reproducing Fairy-Stockfish's
+    /// `do_move` counting block: increment the live count, then (re)start it when a
+    /// triggering material configuration is reached.
+    fn update_counting(
+        prev: Counting,
+        before: &Board<G>,
+        pos: &GenericPosition<G, V>,
+        rule: WideCountingRule,
+    ) -> Counting {
+        let board = pos.board();
+        let stm = pos.turn(); // FSF `sideToMove` (after the flip): the side to move now.
+        let mover = stm.opposite();
+        let mut c = prev;
+        // Increment the existing count (FSF `if (countingLimit) ++countingPly`),
+        // using the limit carried from before this move.
+        if c.limit != 0 {
+            c.ply = c.ply.saturating_add(1);
+        }
+        let total_all = board.occupied().count() as u16;
+        let pawns = Self::pawns_total(board);
+        let captured = (board.occupied().count() as u16) < (before.occupied().count() as u16);
+        // The captured piece (if any) belonged to the side that did not move (`stm`).
+        let captured_pawn = captured
+            && Self::role_count(board, stm, WideRole::Pawn)
+                < Self::role_count(before, stm, WideRole::Pawn);
+        // A promotion lowers the mover's own pawn count.
+        let promotion = Self::role_count(board, mover, WideRole::Pawn)
+            < Self::role_count(before, mover, WideRole::Pawn);
+
+        // Branch 1 (not ASEAN): the mover's King captured the last pawn and is now
+        // bare — start the count for the mover.
+        if rule != WideCountingRule::Asean
+            && captured_pawn
+            && Self::total(board, mover) == 1
+            && pawns == 0
+        {
+            let limit = Self::count_limit(board, mover, rule);
+            if limit != 0 {
+                c.limit = 2 * limit;
+                c.ply = 2 * total_all - 1;
+            }
+        }
+        // Branch 2: start the count for the side to move when none is active, or
+        // restart it when a capture / promotion has just bared that side.
+        if c.limit == 0 || ((captured || promotion) && Self::total(board, stm) == 1) {
+            let limit = Self::count_limit(board, stm, rule);
+            if limit != 0 {
+                c.limit = 2 * limit;
+                c.ply = if rule == WideCountingRule::Asean || Self::total(board, stm) > 1 {
+                    0
+                } else {
+                    2 * total_all
+                };
+            }
+        }
+        c
+    }
+
+    /// The counting limit in **full moves** for the side `side` being counted under
+    /// `rule`, or `0` for no count — a clean-room reproduction of Fairy-Stockfish's
+    /// `Position::count_limit` (validated against the FSF binary's echoed counting
+    /// FEN field). KHON is the Silver / Khon ([`WideRole::Silver`]).
+    fn count_limit(board: &Board<G>, side: Color, rule: WideCountingRule) -> u16 {
+        let opp = side.opposite();
+        let pawns = Self::pawns_total(board);
+        let rooks = Self::role_count(board, opp, WideRole::Rook);
+        let khons = Self::role_count(board, opp, WideRole::Silver);
+        let knights = Self::role_count(board, opp, WideRole::Knight);
+        match rule {
+            WideCountingRule::Makruk => {
+                if pawns > 0 || Self::total(board, opp) == 1 {
+                    return 0;
+                }
+                if Self::total(board, side) > 1 {
+                    return 64; // board's honour
+                }
+                // Pieces' honour, scaled by the superior side's material.
+                if rooks > 1 {
+                    8
+                } else if rooks == 1 {
+                    16
+                } else if khons > 1 {
+                    22
+                } else if knights > 1 {
+                    32
+                } else if khons == 1 {
+                    44
+                } else {
+                    64
+                }
+            }
+            WideCountingRule::Cambodian => {
+                if Self::total(board, side) > 3 || Self::total(board, opp) == 1 {
+                    return 0;
+                }
+                if Self::total(board, side) > 1 {
+                    return 63; // board's honour
+                }
+                if pawns > 0 {
+                    return 0;
+                }
+                if rooks > 1 {
+                    7
+                } else if rooks == 1 {
+                    15
+                } else if khons > 1 {
+                    21
+                } else if knights > 1 {
+                    31
+                } else if khons == 1 {
+                    43
+                } else {
+                    63
+                }
+            }
+            WideCountingRule::Asean => {
+                // Pieces' honour only: the counted side must be a lone king.
+                if pawns > 0 || Self::total(board, side) > 1 {
+                    0
+                } else if rooks > 0 {
+                    16
+                } else if khons > 0 {
+                    44
+                } else if knights > 0 {
+                    64
+                } else {
+                    0
+                }
+            }
+        }
+    }
+
+    /// The number of pieces of color `color` on `board`.
+    fn total(board: &Board<G>, color: Color) -> u16 {
+        board.by_color(color).count() as u16
+    }
+
+    /// The number of `role` pieces of `color` on `board`.
+    fn role_count(board: &Board<G>, color: Color, role: WideRole) -> u16 {
+        board.pieces(color, role).count() as u16
+    }
+
+    /// The total number of pawns (both colors) on `board`.
+    fn pawns_total(board: &Board<G>) -> u16 {
+        Self::role_count(board, Color::White, WideRole::Pawn)
+            + Self::role_count(board, Color::Black, WideRole::Pawn)
+    }
 }
 
 impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame<G, V> {
@@ -353,8 +694,28 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::variants::{Janggi, Makruk, Minixiangqi, Shogi};
+    use crate::geometry::variants::{
+        Asean, Cambodian, Janggi, Makruk, Minixiangqi, Shogi, Xiangqi,
+    };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
+
+    /// Plays the cyclic move pattern `cycle` one ply at a time (up to `max` plies),
+    /// returning the number of plies played when the game first becomes over, or
+    /// `None` if it never does.
+    fn play_until_over<G: Geometry, V: WideVariant<G>>(
+        game: &mut GenericGame<G, V>,
+        cycle: &[(u8, u8)],
+        max: usize,
+    ) -> Option<usize> {
+        for i in 0..max {
+            let (from, to) = cycle[i % cycle.len()];
+            play(game, from, to);
+            if game.is_over() {
+                return Some(i + 1);
+            }
+        }
+        None
+    }
 
     /// Finds the legal move in `game`'s current position whose source and
     /// destination square indices are `from` and `to`.
@@ -485,6 +846,45 @@ mod tests {
     }
 
     #[test]
+    fn janggi_facing_side_must_break_or_pass_and_breaking_avoids_bikjang() {
+        // Fairy-Stockfish (and mce's move generator) forbid **any non-pass move that
+        // leaves the generals facing** once they already face — so a
+        // two-consecutive-facing bikjang is only ever reachable through a pass, and
+        // the wrapper's `st->bikjang && st->previous->bikjang` history check
+        // coincides with the pass terminal it relabels. From the facing position
+        // White's only legal moves are the two king steps that break the line
+        // (e1->d1, e1->f1) and the pass (e1->e1); breaking it avoids bikjang.
+        // e1=4, d1=3, f1=5.
+        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
+            .expect("valid janggi fen");
+        let pos: Janggi = pos;
+        assert!(pos.is_facing_generals());
+        let moves: alloc::vec::Vec<(u8, u8)> = pos
+            .legal_moves()
+            .into_iter()
+            .map(|m| {
+                (
+                    m.from_index(),
+                    m.to::<crate::geometry::Xiangqi9x10>().index(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            moves,
+            alloc::vec![(4, 3), (4, 5), (4, 4)],
+            "facing side may only break the line (d1/f1) or pass (e1e1)"
+        );
+        let mut game = GenericGame::new(pos);
+        play(&mut game, 4, 3); // White Ke1->d1 breaks the facing
+        assert!(!game.position().is_facing_generals());
+        assert_eq!(
+            game.end_reason(),
+            None,
+            "breaking the facing is not a bikjang"
+        );
+    }
+
+    #[test]
     fn janggi_non_facing_generals_is_not_bikjang() {
         // Generals on different files do not face: no bikjang.
         let pos = GenericPosition::<_, _>::from_fen("3k5/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
@@ -495,30 +895,139 @@ mod tests {
         assert_eq!(game.outcome(), None);
     }
 
-    // --- Makruk counting -------------------------------------------------
+    // --- Xiangqi perpetual chase -----------------------------------------
 
     #[test]
-    fn makruk_board_honour_count_elapses_into_a_draw() {
-        // Black is reduced to a lone king; White shuffles a rook without mating.
-        // After the board-honour count elapses the game is a counting draw.
-        // White king g1=(6,0); white rook c1=(2,0); black king a8=(0,7).
+    fn xiangqi_perpetual_chase_loses_for_the_chaser() {
+        // A White Horse perpetually chases an undefended Black Chariot (Rook): the
+        // Horse re-attacks the fleeing Rook on every White move (a Horse attacking a
+        // Chariot is a value-superior chase that counts regardless of protection),
+        // forcing a repetition. White is the perpetual chaser and **loses**. The
+        // kings sit on different files (White Kf1, Black Ke10) so they never face.
+        // Validated against Fairy-Stockfish `UCI_Variant xiangqi` on the same line
+        // (`go` returns a forced-mate loss for the chasing side).
+        // Indices (9 wide): c4=29, e5=40 (Horse); d3=21, d6=48 (Chariot).
+        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/2J6/3r5/9/5K3 w - - 0 1")
+            .expect("valid xiangqi fen");
+        let pos: Xiangqi = pos;
+        let mut game = GenericGame::new(pos);
+        // Two full 4-ply cycles bring the start position to its third occurrence.
+        for _ in 0..2 {
+            play(&mut game, 29, 40); // J c4->e5, chases the chariot on d3
+            play(&mut game, 21, 48); // r d3->d6 (flees)
+            play(&mut game, 40, 29); // J e5->c4, chases the chariot on d6
+            play(&mut game, 48, 21); // r d6->d3 (flees)
+        }
+        assert_eq!(game.repetition_count(), 3);
+        assert_eq!(game.end_reason(), Some(WideEndReason::PerpetualChaseLoss));
+        // White perpetually chased, so White loses: Black wins.
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black,
+            })
+        );
+    }
+
+    #[test]
+    fn xiangqi_quiet_repetition_is_a_plain_draw() {
+        // The same two pieces shuffling **without** any chase (the Chariot moves
+        // along its own file out of the Horse's reach and back; the Horse never
+        // attacks it): an ordinary three-fold repetition draw, not a chase loss.
+        // Horse a1 (idx 0) shuffles a1<->c2; Chariot i6 far away shuffles i6<->i5.
+        // Kings on different files (Black Ke10, White Kf1) so the flying-general
+        // file is never open between them.
+        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/8r/9/9/9/9/J4K3 w - - 0 1")
+            .expect("valid xiangqi fen");
+        let pos: Xiangqi = pos;
+        let mut game = GenericGame::new(pos);
+        // Horse a1=0 -> c2=11 (a knight move) and back; Chariot i6=53 -> i5=44.
+        for _ in 0..2 {
+            play(&mut game, 0, 11); // J a1->c2 (does not attack the far chariot)
+            play(&mut game, 53, 44); // r i6->i5
+            play(&mut game, 11, 0); // J c2->a1
+            play(&mut game, 44, 53); // r i5->i6
+        }
+        assert_eq!(game.repetition_count(), 3);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    // --- Makruk / Cambodian / ASEAN counting -----------------------------
+
+    #[test]
+    fn makruk_pieces_honour_count_matches_fsf() {
+        // Black is a lone king; White has K + one Chariot (Rook) and no pawns, so
+        // the **pieces-honour** count applies: limit 16 full moves (FSF
+        // `countingLimit = 32`), the count starting from the piece total (FSF
+        // `countingPly = 6` after the first move). The draw fires when the ply
+        // exceeds 32, i.e. on the 28th half-move — matching the FSF binary's echoed
+        // counting field (`... 32 6` after one move; the rook K+R-vs-K limit is 16).
         let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid makruk fen");
         let pos: Makruk = pos;
         let mut game = GenericGame::new(pos);
-        // c1=2, c2=10; a8=56, a7=48.
-        let mut elapsed = false;
-        for _ in 0..40 {
-            play(&mut game, 2, 10); // R c1->c2
-            play(&mut game, 56, 48); // k a8->a7
-            play(&mut game, 10, 2); // R c2->c1
-            play(&mut game, 48, 56); // k a7->a8
-            if game.outcome().is_some() {
-                elapsed = true;
-                break;
-            }
-        }
-        assert!(elapsed, "the counting draw should have been reached");
+        // c1=2, c2=10; a8=56, a7=48 (a quiet, non-mating shuffle).
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(
+            plies,
+            Some(28),
+            "FSF pieces-honour draws on the 28th half-move"
+        );
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn makruk_board_honour_count_matches_fsf() {
+        // Both sides keep material (K + Rook each, no pawns), so the **board-honour**
+        // count applies: limit 64 full moves (FSF `countingLimit = 128`), the count
+        // starting from zero. The draw fires when the ply exceeds 128, i.e. on the
+        // 130th half-move — matching the FSF echo (`... 128 0` after one move).
+        let pos = GenericPosition::<_, _>::from_fen("k4r2/8/8/8/8/8/8/2R4K w - - 0 1")
+            .expect("valid makruk fen");
+        let pos: Makruk = pos;
+        let mut game = GenericGame::new(pos);
+        // White Rc1<->c2 (2<->10); Black Rf8<->f7 (61<->53). No captures or checks.
+        let plies = play_until_over(&mut game, &[(2, 10), (61, 53), (10, 2), (53, 61)], 200);
+        assert_eq!(
+            plies,
+            Some(130),
+            "FSF board-honour draws on the 130th half-move"
+        );
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn asean_pieces_honour_count_matches_fsf() {
+        // ASEAN is pieces-honour only and starts the count from **zero** (FSF
+        // `countingPly = 0`): K + Rook vs lone king gives limit 16 moves
+        // (`countingLimit = 32`), so the draw fires when the ply exceeds 32 — the
+        // 34th half-move (FSF echo `... 32 0` after one move).
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+            .expect("valid asean fen");
+        let pos: Asean = pos;
+        let mut game = GenericGame::new(pos);
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(plies, Some(34), "FSF ASEAN draws on the 34th half-move");
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn cambodian_pieces_honour_count_matches_fsf() {
+        // Cambodian K + Rook vs lone king: pieces-honour limit 15 moves (FSF
+        // `countingLimit = 30`), count starting from the piece total (`countingPly =
+        // 6`). The draw fires when the ply exceeds 30 — the 26th half-move (FSF echo
+        // `... 30 6` after one move). Cambodian shares the Makruk array but carries
+        // the `DEde` leap-rights field.
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w DEde - 0 1")
+            .expect("valid cambodian fen");
+        let pos: Cambodian = pos;
+        let mut game = GenericGame::new(pos);
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(plies, Some(26), "FSF Cambodian draws on the 26th half-move");
         assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
     }
