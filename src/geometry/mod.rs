@@ -32,6 +32,7 @@
 //! assert_eq!(Chess8x8::SQUARES, 64);
 //! ```
 
+mod any;
 pub mod attacks;
 mod backing;
 mod bitboard;
@@ -43,6 +44,7 @@ pub mod variant;
 pub mod variants;
 mod wide_move;
 
+pub use any::{AnyWideVariant, UnknownWideVariant, WideVariantId};
 pub use backing::BitboardBacking;
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
