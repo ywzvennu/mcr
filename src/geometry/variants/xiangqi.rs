@@ -363,6 +363,23 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         // No piece may lie strictly between the two generals on their shared file.
         (attacks::between::<Xiangqi9x10>(general, sq) & occupied).is_empty()
     }
+
+    // --- Repetition / perpetual check (terminal only; perft unaffected) ----
+    //
+    // Xiangqi forbids perpetual check: a repetition forced by one side checking on
+    // every move is a loss for that (checking) side. Adjudicated by
+    // [`GenericGame`](crate::geometry::game::GenericGame); move generation is
+    // untouched, so perft stays byte-identical. The full perpetual-**chase**
+    // adjudication (a loss for perpetually chasing an undefended piece) is **not**
+    // modelled — only perpetual check and plain three-fold repetition (a draw).
+
+    fn tracks_repetition() -> bool {
+        true
+    }
+
+    fn perpetual_check_loses() -> bool {
+        true
+    }
 }
 
 /// Xiangqi (Chinese chess) as a [`GenericPosition`] over the 9x10 [`Xiangqi9x10`]

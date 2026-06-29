@@ -447,6 +447,20 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
     fn restricts_facing_general() -> bool {
         true
     }
+
+    // --- Bikjang + repetition (terminal only; perft unaffected) ------------
+    //
+    // Both rules are adjudicated outside move generation (bikjang from the single
+    // position, repetition via [`GenericGame`](crate::geometry::game::GenericGame)),
+    // so perft is byte-identical.
+
+    fn has_bikjang() -> bool {
+        true
+    }
+
+    fn tracks_repetition() -> bool {
+        true
+    }
 }
 
 /// Janggi (Korean chess) as a [`GenericPosition`] over the 9x10 [`Xiangqi9x10`]

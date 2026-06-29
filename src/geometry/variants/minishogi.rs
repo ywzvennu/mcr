@@ -277,6 +277,24 @@ impl WideVariant<Minishogi5x5> for MinishogiRules {
         }
         mask
     }
+
+    // --- Sennichite / perpetual check (terminal only; perft unaffected) ----
+
+    fn tracks_repetition() -> bool {
+        true
+    }
+
+    fn repetition_fold() -> usize {
+        4
+    }
+
+    fn repetition_draw_reason() -> crate::geometry::WideEndReason {
+        crate::geometry::WideEndReason::Sennichite
+    }
+
+    fn perpetual_check_loses() -> bool {
+        true
+    }
 }
 
 impl MinishogiRules {

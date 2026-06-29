@@ -1293,6 +1293,95 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    // --- Repetition / draw rules (default OFF) ----------------------------
+    //
+    // These hooks drive the history-dependent terminal rules, which a bare
+    // [`GenericPosition`] cannot see (it is deliberately history-free, so perft
+    // never pays for a position history and stays byte-identical). They are
+    // consulted only by [`GenericGame`](super::game::GenericGame), the opt-in
+    // wrapper that records the key of every position that has occurred. A variant
+    // that leaves [`tracks_repetition`](Self::tracks_repetition) `false` (every
+    // variant but the Asian families below) records no history and is unaffected.
+
+    /// Returns `true` if [`GenericGame`](super::game::GenericGame) should record a
+    /// position history for this variant so its repetition / perpetual-check rules
+    /// can fire. The default is `false`: no history is kept, the repetition hooks
+    /// are never consulted, and the game wrapper behaves like a thin
+    /// [`GenericPosition`] driver. Shogi, Xiangqi, and Janggi override it.
+    fn tracks_repetition() -> bool {
+        false
+    }
+
+    /// The number of occurrences of a position that draws (or, under
+    /// [`perpetual_check_loses`](Self::perpetual_check_loses), is adjudicated) by
+    /// repetition. Consulted only when [`tracks_repetition`](Self::tracks_repetition)
+    /// is `true`. The default is the western three-fold count; Shogi's sennichite
+    /// overrides it to four.
+    fn repetition_fold() -> usize {
+        3
+    }
+
+    /// The [`WideEndReason`] a plain (non-perpetual-check) repetition draw is
+    /// reported as. The default is [`WideEndReason::Repetition`]; Shogi overrides
+    /// it to [`WideEndReason::Sennichite`]. Consulted only when
+    /// [`tracks_repetition`](Self::tracks_repetition) is `true`.
+    fn repetition_draw_reason() -> WideEndReason {
+        WideEndReason::Repetition
+    }
+
+    /// Returns `true` if a repetition brought about by **perpetual check** is a
+    /// **loss for the checking side** rather than a draw (Shogi sennichite's
+    /// perpetual-check exception; Xiangqi `perpetualCheckIllegal`). The default is
+    /// `false`. Consulted only when [`tracks_repetition`](Self::tracks_repetition)
+    /// is `true`.
+    fn perpetual_check_loses() -> bool {
+        false
+    }
+
+    /// Returns `true` if this variant draws by **bikjang** — the two generals
+    /// facing each other down an open file when the opponent passes, leaving the
+    /// side to move with no legal continuation (Janggi). The default is `false`, so
+    /// [`end_reason`](super::position::GenericPosition::end_reason) never runs the
+    /// [`is_facing_generals`](super::position::GenericPosition::is_facing_generals)
+    /// test and every other variant is byte-identical. Only Janggi overrides it.
+    ///
+    /// The zero-move truncation that makes the node terminal already lives in the
+    /// move generator (gated on [`allows_pass`](Self::allows_pass) +
+    /// [`restricts_facing_general`](Self::restricts_facing_general)) and is counted
+    /// by perft; this hook only relabels that terminal from a stalemate into the
+    /// [`WideEndReason::Bikjang`] draw it is.
+    fn has_bikjang() -> bool {
+        false
+    }
+
+    /// The ply count at which the variant's **move-count rule** (the generic
+    /// analogue of the fifty-move rule) draws: `Some(n)` means a position whose
+    /// halfmove clock has reached `n` is a [`WideEndReason::MoveRule`] draw. The
+    /// default is `None` (no move-count rule), so the clock never ends the game and
+    /// every variant that does not opt in is byte-identical. Reported from the
+    /// single position.
+    fn move_rule_plies() -> Option<u16> {
+        None
+    }
+
+    /// Returns `true` if this variant uses the Makruk / Cambodian **counting**
+    /// (board-honour countdown) endgame rule, tracked by
+    /// [`GenericGame`](super::game::GenericGame). The default is `false`. See
+    /// [`GenericGame`](super::game::GenericGame) for the (simplified, board-honour)
+    /// model implemented.
+    fn counting_rule() -> bool {
+        false
+    }
+
+    /// Returns `true` if the position is an **insufficient-material** draw for this
+    /// variant. The default is `false` (no material draw is imposed — most fairy
+    /// variants do not have one). Reported from the single position via
+    /// [`WideEndReason::InsufficientMaterial`]; a variant that wants the rule
+    /// overrides this with its own material test.
+    fn is_insufficient_material(_board: &Board<G>, _state: &GenericState<G>) -> bool {
+        false
+    }
+
     /// Reserved no-op hook for drop generation (Shogi / crazyhouse). Standard
     /// chess emits no drops, so the default does nothing.
     fn emit_drops(_board: &Board<G>, _state: &GenericState<G>, _out: &mut Vec<super::WideMove>) {}
@@ -1425,6 +1514,38 @@ pub enum WideEndReason {
     VariantWin,
     /// A variant-specific drawn end (reserved).
     VariantDraw,
+    /// The same position (board, side to move, hands, rights — excluding the
+    /// move clocks) has recurred enough times to draw under the variant's
+    /// [`repetition fold`](WideVariant::repetition_fold). The generic
+    /// repetition draw, reported by [`GenericGame`](super::game::GenericGame) for
+    /// Xiangqi, Janggi, and any variant whose
+    /// [`repetition_draw_reason`](WideVariant::repetition_draw_reason) is this.
+    /// Draw.
+    Repetition,
+    /// Shogi **sennichite**: the same position (board, side to move, **and both
+    /// hands**) has recurred four times. Draw, unless it was brought about by
+    /// perpetual check, in which case [`PerpetualCheckLoss`](Self::PerpetualCheckLoss)
+    /// is reported instead. Reported by [`GenericGame`](super::game::GenericGame).
+    Sennichite,
+    /// A repetition was brought about by **perpetual check**: one side gave check
+    /// on every one of its moves through the repeated cycle. That side (the
+    /// checker) **loses** (Shogi, Xiangqi `perpetualCheckIllegal`). Decisive for
+    /// the side that was *being* checked. Reported by
+    /// [`GenericGame`](super::game::GenericGame), which resolves the winner from
+    /// the recorded check history.
+    PerpetualCheckLoss,
+    /// Janggi **bikjang**: the two generals face each other down an open file with
+    /// the side to move unable to break the confrontation. Draw. Reported from the
+    /// single position via [`WideVariant::has_bikjang`].
+    Bikjang,
+    /// Makruk / Cambodian **counting**: the board-honour countdown expired before
+    /// the superior side delivered mate. Draw. Reported by
+    /// [`GenericGame`](super::game::GenericGame).
+    CountingDraw,
+    /// The variant's **move-count rule** (the generic analogue of the fifty-move
+    /// rule) elapsed: [`move_rule_plies`](WideVariant::move_rule_plies) plies have
+    /// passed with no capture or pawn move. Draw.
+    MoveRule,
 }
 
 /// The standard-chess wide variant over an 8x8 [`Geometry`]: the reference

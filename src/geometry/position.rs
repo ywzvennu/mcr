@@ -3870,12 +3870,48 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
             return Some(WideEndReason::VariantWin);
         }
-        if self.legal_moves().is_empty() {
-            if self.is_check() {
-                Some(WideEndReason::Checkmate)
-            } else {
-                Some(WideEndReason::Stalemate)
+        let no_moves = self.legal_moves().is_empty();
+        // Checkmate takes precedence over every draw rule below: a side with no
+        // move while in check has lost, whatever the clocks or material say.
+        if no_moves && self.is_check() {
+            return Some(WideEndReason::Checkmate);
+        }
+        // Bikjang (Janggi): when the opponent **passes while the two generals face**
+        // down an open file, the side to move has no legal move at all (the move
+        // generator already truncates to zero — a perft-counted terminal) and the
+        // game is a **draw**, exactly as Fairy-Stockfish adjudicates
+        // `st->bikjang && st->previous->bikjang`. Detected here from the single
+        // position (the facing relation plus the pending pass recorded in
+        // `consecutive_passes`) so the zero-move node is reported as the draw it is
+        // rather than a spurious stalemate. Gated behind the default-off
+        // [`WideVariant::has_bikjang`], so every other variant is byte-identical.
+        if no_moves
+            && V::has_bikjang()
+            && self.state.consecutive_passes >= 1
+            && self.is_facing_generals()
+        {
+            return Some(WideEndReason::Bikjang);
+        }
+        // The single-position draw rules, each behind a default-off hook so every
+        // variant that does not opt in is unaffected (and none of this touches move
+        // generation, so perft stays byte-identical). Repetition / sennichite /
+        // perpetual-check / bikjang / counting need a move history and live in
+        // [`GenericGame`](super::game::GenericGame); the two below are derivable
+        // from the position alone.
+        //
+        // Insufficient material (opt-in per variant; default-off).
+        if V::is_insufficient_material(&self.board, &self.state) {
+            return Some(WideEndReason::InsufficientMaterial);
+        }
+        // Move-count rule — the generic analogue of the fifty-move rule (opt-in).
+        if let Some(limit) = V::move_rule_plies() {
+            if self.state.halfmove_clock >= limit {
+                return Some(WideEndReason::MoveRule);
             }
+        }
+        if no_moves {
+            // Not in check and no move: stalemate.
+            Some(WideEndReason::Stalemate)
         } else {
             None
         }
@@ -3916,10 +3952,99 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             WideEndReason::Stalemate if V::stalemate_is_loss() => WideOutcome::Decisive {
                 winner: self.state.turn.opposite(),
             },
+            // The perpetual-check loss needs the move history to know which side
+            // was the checker, so it is resolved by
+            // [`GenericGame`](super::game::GenericGame), never produced here. A
+            // bare position cannot reach this arm; treat it as a draw defensively.
+            WideEndReason::PerpetualCheckLoss => WideOutcome::Draw,
             WideEndReason::Stalemate
             | WideEndReason::InsufficientMaterial
-            | WideEndReason::VariantDraw => WideOutcome::Draw,
+            | WideEndReason::VariantDraw
+            | WideEndReason::Repetition
+            | WideEndReason::Sennichite
+            | WideEndReason::Bikjang
+            | WideEndReason::CountingDraw
+            | WideEndReason::MoveRule => WideOutcome::Draw,
         })
+    }
+
+    // -- Repetition / draw helpers -----------------------------------------
+
+    /// A 64-bit key identifying this position for **repetition** purposes: the
+    /// board placement, side to move, en-passant target, castling / gating rights,
+    /// hands in pocket, the Duck and Alice planes, and the promoted mask — but
+    /// **not** the move clocks (which differ on every ply and must not break a
+    /// repetition). Two positions share a key iff they are "the same position" for
+    /// the repetition rules.
+    ///
+    /// This is the generic analogue of [`Position::zobrist`](crate::Position::zobrist):
+    /// rather than an incrementally folded Zobrist value (the concrete engine's
+    /// approach), it is recomputed from the position with a deterministic FNV-1a
+    /// fold. It is consulted **only** by [`GenericGame`](super::game::GenericGame)
+    /// when [`WideVariant::tracks_repetition`] is on, so the history-free
+    /// [`GenericPosition`] (and therefore perft) never computes it and stays
+    /// byte-identical.
+    #[must_use]
+    pub fn repetition_key(&self) -> u64 {
+        use core::hash::{Hash, Hasher};
+        let mut h = Fnv1a::new();
+        self.state.turn.hash(&mut h);
+        self.state.castling.hash(&mut h);
+        self.state.ep_square.map(|s| s.index()).hash(&mut h);
+        self.state.gating.hash(&mut h);
+        self.state.placement.hash(&mut h);
+        self.state.duck.map(|s| s.index()).hash(&mut h);
+        for sq in self.state.board_b {
+            (0xB_u8, sq.index()).hash(&mut h);
+        }
+        for sq in self.promoted {
+            (0xC_u8, sq.index()).hash(&mut h);
+        }
+        for color in Color::ALL {
+            for role in WideRole::ALL {
+                let pieces = self.board.pieces(color, role);
+                for sq in pieces {
+                    // Tag each square with its (color, role) so the same square in
+                    // two different piece groups folds to a distinct contribution.
+                    (color, role, sq.index()).hash(&mut h);
+                }
+            }
+        }
+        h.finish()
+    }
+
+    /// Returns `true` if the two royal generals (kings) **face each other** down an
+    /// open file with no piece between them. The geometric core of the Janggi
+    /// **bikjang** rule (and the Xiangqi "flying general" relation). Single-royal
+    /// only; uses each side's king square.
+    ///
+    /// Bikjang is a draw when this holds in two **consecutive** positions, exactly
+    /// as Fairy-Stockfish models it (`st->bikjang && st->previous->bikjang`); the
+    /// two-ply test lives in [`GenericGame`](super::game::GenericGame), which has
+    /// the history. This predicate is the single-position half it consults.
+    #[must_use]
+    pub fn is_facing_generals(&self) -> bool {
+        let (Some(w), Some(b)) = (
+            self.board.king_of(Color::White),
+            self.board.king_of(Color::Black),
+        ) else {
+            return false;
+        };
+        if w.file() != b.file() {
+            return false;
+        }
+        let occ = self.board.occupied();
+        let file = w.file();
+        let lo = w.rank().min(b.rank());
+        let hi = w.rank().max(b.rank());
+        for r in (lo + 1)..hi {
+            if let Some(sq) = Square::<G>::from_file_rank(file, r) {
+                if occ.contains(sq) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     // -- FEN ---------------------------------------------------------------
@@ -4109,6 +4234,38 @@ pub enum WideOutcome {
     },
     /// The game is drawn.
     Draw,
+}
+
+/// A tiny deterministic FNV-1a [`Hasher`](core::hash::Hasher) used to fold a
+/// position into its [`repetition_key`](GenericPosition::repetition_key). It is
+/// not a cryptographic hash; it only needs to be stable and well-distributed
+/// enough that distinct positions almost never collide, which is exactly what
+/// repetition detection wants. Defined here (rather than reusing a `std` hasher)
+/// so the key is identical in `no_std` builds and across platforms.
+struct Fnv1a(u64);
+
+impl Fnv1a {
+    /// The 64-bit FNV offset basis.
+    const fn new() -> Self {
+        Fnv1a(0xcbf2_9ce4_8422_2325)
+    }
+}
+
+impl core::hash::Hasher for Fnv1a {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        let mut h = self.0;
+        for &b in bytes {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        self.0 = h;
+    }
 }
 
 // -- Move sink (materialise vs bulk-count) ----------------------------------

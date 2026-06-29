@@ -3,8 +3,9 @@
 //!
 //! Cambodian chess is identical to [`Makruk`](super::makruk::Makruk) — the same
 //! [`Chess8x8`] geometry, the same Met (ferz), Khon (silver), single-step
-//! promote-to-Met pawns, and the same counting endgame rule (which never affects
-//! move generation, so it is not modelled) — **except** that, at most once per
+//! promote-to-Met pawns, and the same counting endgame rule (terminal only, so it
+//! never affects move generation; modelled in simplified board-honour form via
+//! [`WideVariant::counting_rule`]) — **except** that, at most once per
 //! side, the king and the queen/Met may use a special leap on their first move:
 //!
 //! * **King (Sdech)** — a one-time leap to either of the two **forward-knight**
@@ -177,6 +178,13 @@ impl WideVariant<Chess8x8> for CambodianRules {
 
     fn write_first_move_rights(rights: GenericCastling, out: &mut alloc::string::String) {
         write_leap_rights(rights, out);
+    }
+
+    fn counting_rule() -> bool {
+        // Cambodian (Ouk Chaktrang) shares Makruk's board-honour counting endgame
+        // (simplified; see [`GenericGame`](crate::geometry::game::GenericGame)).
+        // Terminal-only, so perft is byte-identical.
+        true
     }
 }
 
