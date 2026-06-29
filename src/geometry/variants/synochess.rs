@@ -306,6 +306,16 @@ impl WideVariant<Chess8x8> for SynochessRules {
         true
     }
 
+    fn pawn_is_stepper() -> bool {
+        // Synochess keeps ordinary chess pawns (double push, diagonal capture, en
+        // passant) — the dropped Black Soldier reinforcements are not Pawns. The
+        // multi-royal/cannon-verify generator therefore routes its pawns through the
+        // straight-push `gen_pawn_moves`, not the forward-stepper role loop. (This
+        // pins the flag that previously defaulted to `has_hand()`; the routing is
+        // unchanged.)
+        false
+    }
+
     fn captures_to_hand() -> bool {
         // The pocket is fixed: captures never bank into a hand.
         false

@@ -24,6 +24,20 @@ use core::fmt;
 /// letter is `*`. See [`WideRole::is_overflow`].
 pub const OVERFLOW_PREFIX: char = '*';
 
+/// The **third** overflow prefix, for roles added once the single-letter FEN
+/// alphabet (`a..=z`), every `*`-prefixed [`OVERFLOW_PREFIX`] base **and** the
+/// doubled-`**` second tier ([`WideRole::is_overflow2`], the Sho Shogi royals)
+/// were all in play and a distinct, non-colliding bank was needed for the Cannon
+/// Shogi cannon army (whose recycled letters `c` / `e` would clash with the Sho
+/// Shogi `**` royals). The token is this prefix followed by a recycled base letter
+/// whose case carries the colour (e.g. `=A` / `=a` for the Cannon Shogi
+/// [`WideRole::RookCannon`]). There is no `OVERFLOW_PREFIX_2` constant: the second
+/// tier reuses [`OVERFLOW_PREFIX`] **doubled** (`**`). Distinct from `*` (the first
+/// overflow tier), `**` (the second), `+` (Shogi promotions) and `~` (the
+/// crazyhouse promoted-mask), it is reserved: no role's bare letter is `=`. See
+/// [`WideRole::is_overflow3`].
+pub const OVERFLOW_PREFIX_3: char = '=';
+
 /// An extended piece role for the generic board.
 ///
 /// The discriminant doubles as the array index used by [`Board<G>`] for its
@@ -604,6 +618,75 @@ pub enum WideRole {
     /// FEN token is the doubled prefix `**` plus the recycled Cannon letter `c`
     /// ("Crown"), `**C` (white) / `**c` (black); the harness maps `**c → +E`.
     CrownPrince = 59,
+
+    // --- Cannon Shogi (大砲将棋) cannon army (§ Milestone 10, Fairy variants) ---
+    //
+    // Cannon Shogi adds five CANNON-type pieces to the 9x9 Shogi army (confirmed
+    // square-for-square against Fairy-Stockfish `UCI_Variant cannonshogi`). The
+    // Xiangqi rook-cannon reuses the existing [`WideRole::Cannon`] (`mRcpR`) and
+    // the soldier reuses the [`WideRole::Pawn`] (a forward/sideways stepper), so
+    // only three genuinely-new movers and their four promoted forms need roles.
+    //
+    // Every single-letter FEN base (`a..=z`), every `*`-prefixed overflow base and
+    // the doubled-`**` second tier (the Sho Shogi royals, whose letters `c` / `e`
+    // would clash) are already in play, so these roles spell themselves with the
+    // **third** overflow prefix [`OVERFLOW_PREFIX_3`] (`=`) followed by a recycled
+    // base letter whose case carries the colour, resolved by
+    // [`is_overflow3`](WideRole::is_overflow3) /
+    // [`overflow3_from_base`](WideRole::overflow3_from_base). They are **not**
+    // [`is_promoted`] (the four promoted forms revert to their base via the
+    // variant's [`role_hand_base`](super::WideVariant::role_hand_base) hook, as
+    // Tori Shogi's birds do, not via the global `+`-token machinery). The
+    // `compare-fairy` harness rewrites each `=<base>` to FSF's spelling.
+    /// Rook-cannon (砲, FSF `a`, Betza `pR`) — moves **and** captures only by
+    /// leaping over exactly one screen on a rook line, then sliding any distance
+    /// beyond it (to an empty square or an enemy). Unlike the Xiangqi
+    /// [`WideRole::Cannon`] (`mRcpR`) it has **no** non-jumping quiet slide.
+    /// Promotes to a [`WideRole::PromotedRookCannon`]. (Cannon Shogi.) An
+    /// **overflow-2 role**: its FEN token is `=A` (white) / `=a` (black); the
+    /// harness maps `=a → a`.
+    RookCannon = 60,
+    /// Bishop-cannon (砲, FSF `c`, Betza `mBcpB`) — the diagonal Xiangqi cannon:
+    /// slides quietly like a bishop and captures by leaping over exactly one
+    /// diagonal screen onto the first piece beyond it. Promotes to a
+    /// [`WideRole::PromotedBishopCannon`]. (Cannon Shogi.) An **overflow-2 role**:
+    /// its FEN token is `=C` / `=c`; the harness maps `=c → c`.
+    BishopCannon = 61,
+    /// Bishop-hopper (砲, FSF `i`, Betza `pB`) — moves **and** captures only by
+    /// leaping over exactly one diagonal screen, then sliding any distance beyond
+    /// it. The diagonal analogue of the [`WideRole::RookCannon`]. Promotes to a
+    /// [`WideRole::PromotedBishopHopper`]. (Cannon Shogi.) An **overflow-2 role**:
+    /// its FEN token is `=I` / `=i`; the harness maps `=i → i`.
+    BishopHopper = 62,
+    /// Promoted Cannon (FSF `+U`, Betza `mRpRmFpB2`) — a promoted Xiangqi
+    /// [`WideRole::Cannon`]: a full rook line (quiet slide **plus** unlimited
+    /// over-screen hop, move and capture) together with a one-step diagonal quiet
+    /// move and a range-2 diagonal hop (a screen one diagonal step away, landing
+    /// two away). Reverts to a [`WideRole::Cannon`] in hand when captured. (Cannon
+    /// Shogi.) An **overflow-2 role**: its FEN token is `=U` / `=u`; the harness
+    /// maps `=u → +U`.
+    PromotedCannon = 63,
+    /// Promoted Rook-cannon (FSF `+A`) — moves identically to the
+    /// [`WideRole::PromotedCannon`] (`mRpRmFpB2`) but reverts to a
+    /// [`WideRole::RookCannon`] in hand when captured (its distinct base identity
+    /// must survive promotion, exactly as FSF banks a captured `+A` as an `a`).
+    /// (Cannon Shogi.) An **overflow-2 role**: its FEN token is `=W` / `=w`; the
+    /// harness maps `=w → +A`.
+    PromotedRookCannon = 64,
+    /// Promoted Bishop-cannon (FSF `+C`, Betza `mBpBmWpR2`) — a promoted
+    /// [`WideRole::BishopCannon`]: a full bishop line (quiet slide **plus**
+    /// unlimited over-screen hop, move and capture) together with a one-step
+    /// orthogonal quiet move and a range-2 orthogonal hop. Reverts to a
+    /// [`WideRole::BishopCannon`] in hand when captured. (Cannon Shogi.) An
+    /// **overflow-2 role**: its FEN token is `=F` / `=f`; the harness maps
+    /// `=f → +C`.
+    PromotedBishopCannon = 65,
+    /// Promoted Bishop-hopper (FSF `+I`) — moves identically to the
+    /// [`WideRole::PromotedBishopCannon`] (`mBpBmWpR2`) but reverts to a
+    /// [`WideRole::BishopHopper`] in hand when captured. (Cannon Shogi.) An
+    /// **overflow-2 role**: its FEN token is `=E` / `=e`; the harness maps
+    /// `=e → +I`.
+    PromotedBishopHopper = 66,
 }
 
 impl WideRole {
@@ -611,7 +694,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 60;
+    pub const COUNT: usize = 67;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -675,6 +758,13 @@ impl WideRole {
         WideRole::Alfil,
         WideRole::DrunkElephant,
         WideRole::CrownPrince,
+        WideRole::RookCannon,
+        WideRole::BishopCannon,
+        WideRole::BishopHopper,
+        WideRole::PromotedCannon,
+        WideRole::PromotedRookCannon,
+        WideRole::PromotedBishopCannon,
+        WideRole::PromotedBishopHopper,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -879,6 +969,23 @@ impl WideRole {
             WideRole::PromotedSilver => 's',
             WideRole::Dragon => 'r',
             WideRole::DragonHorse => 'b',
+            // Cannon Shogi cannon army — overflow-3 roles past the exhausted
+            // single-letter alphabet, the exhausted `*`-overflow bases and the
+            // doubled-`**` second tier (the Sho Shogi royals). Each FEN token is the
+            // `=` ([`OVERFLOW_PREFIX_3`]) prefix plus a
+            // recycled base letter, so `char()` returns the bare base letter and the
+            // board FEN I/O adds the prefix. The bases recycle FSF's mnemonics
+            // (`a`/`c`/`i` for the three new movers; `u`/`w`/`f`/`e` for the four
+            // promoted forms, distinct from one another within the `=` tier). The
+            // `compare-fairy` harness maps `=a → a`, `=c → c`, `=i → i`,
+            // `=u → +U`, `=w → +A`, `=f → +C`, `=e → +I` when driving Cannon Shogi.
+            WideRole::RookCannon => 'a',
+            WideRole::BishopCannon => 'c',
+            WideRole::BishopHopper => 'i',
+            WideRole::PromotedCannon => 'u',
+            WideRole::PromotedRookCannon => 'w',
+            WideRole::PromotedBishopCannon => 'f',
+            WideRole::PromotedBishopHopper => 'e',
         }
     }
 
@@ -1076,6 +1183,57 @@ impl WideRole {
         }
     }
 
+    /// Returns `true` if this is a **third-tier overflow** role — a fairy role added
+    /// after the single-letter alphabet, every `*`-prefixed [`OVERFLOW_PREFIX`] base
+    /// **and** the doubled-`**` second tier ([`is_overflow2`]) were all in play (the
+    /// Cannon Shogi cannon army, whose recycled letters `c` / `e` would clash with
+    /// the Sho Shogi `**` royals). Like the lower tiers it has **no bare letter of
+    /// its own**: its FEN token is the [`OVERFLOW_PREFIX_3`] (`=`) followed by a
+    /// recycled base letter (returned by [`char`](WideRole::char)) whose case
+    /// carries the colour, and the board FEN parser / writer handle the prefix (see
+    /// [`overflow3_from_base`](WideRole::overflow3_from_base)).
+    ///
+    /// [`is_overflow2`]: WideRole::is_overflow2
+    #[must_use]
+    #[inline]
+    pub const fn is_overflow3(self) -> bool {
+        matches!(
+            self,
+            WideRole::RookCannon
+                | WideRole::BishopCannon
+                | WideRole::BishopHopper
+                | WideRole::PromotedCannon
+                | WideRole::PromotedRookCannon
+                | WideRole::PromotedBishopCannon
+                | WideRole::PromotedBishopHopper
+        )
+    }
+
+    /// Maps a recycled base letter (after an [`OVERFLOW_PREFIX_3`]) back to its
+    /// third-tier overflow role, returning `None` if the letter does not name one.
+    /// The inverse of [`char`](WideRole::char) for an [`is_overflow3`] role; used by
+    /// the board FEN parser when it sees a `=`-prefixed token. Accepts either case
+    /// (the case carries colour, handled by the caller).
+    ///
+    /// [`is_overflow3`]: WideRole::is_overflow3
+    #[must_use]
+    #[inline]
+    pub const fn overflow3_from_base(ch: char) -> Option<WideRole> {
+        match ch.to_ascii_lowercase() {
+            // Cannon Shogi cannon army: the three new movers recycle FSF's
+            // mnemonics `a` / `c` / `i`; the four promoted forms recycle distinct
+            // letters `u` / `w` / `f` / `e` within the `=` tier.
+            'a' => Some(WideRole::RookCannon),
+            'c' => Some(WideRole::BishopCannon),
+            'i' => Some(WideRole::BishopHopper),
+            'u' => Some(WideRole::PromotedCannon),
+            'w' => Some(WideRole::PromotedRookCannon),
+            'f' => Some(WideRole::PromotedBishopCannon),
+            'e' => Some(WideRole::PromotedBishopHopper),
+            _ => None,
+        }
+    }
+
     /// Returns the uppercase FEN/SAN character for this role.
     #[must_use]
     #[inline]
@@ -1198,6 +1356,13 @@ impl fmt::Display for WideRole {
             WideRole::Alfil => "alfil",
             WideRole::DrunkElephant => "drunk-elephant",
             WideRole::CrownPrince => "crown-prince",
+            WideRole::RookCannon => "rook-cannon",
+            WideRole::BishopCannon => "bishop-cannon",
+            WideRole::BishopHopper => "bishop-hopper",
+            WideRole::PromotedCannon => "promoted-cannon",
+            WideRole::PromotedRookCannon => "promoted-rook-cannon",
+            WideRole::PromotedBishopCannon => "promoted-bishop-cannon",
+            WideRole::PromotedBishopHopper => "promoted-bishop-hopper",
         })
     }
 }
@@ -1249,7 +1414,11 @@ mod tests {
             // Giraffe, whose `w` was reclaimed by the Orda Kheshig) share a recycled
             // base letter (handled by the `*` prefix); all are excluded from the
             // bare-letter round-trip.
-            if role.is_promoted() || role.is_overflow() || role.is_overflow2() {
+            if role.is_promoted()
+                || role.is_overflow()
+                || role.is_overflow2()
+                || role.is_overflow3()
+            {
                 continue;
             }
             let ch = role.char();
@@ -1301,7 +1470,9 @@ mod tests {
         // excluded from the distinctness check.
         let chars: Vec<char> = WideRole::ALL
             .into_iter()
-            .filter(|r| !r.is_promoted() && !r.is_overflow() && !r.is_overflow2())
+            .filter(|r| {
+                !r.is_promoted() && !r.is_overflow() && !r.is_overflow2() && !r.is_overflow3()
+            })
             .map(WideRole::char)
             .filter(|&c| c != '?')
             .collect();
@@ -1378,5 +1549,40 @@ mod tests {
         );
         // A character that names no second-bank role yields `None`.
         assert_eq!(WideRole::overflow2_from_base('z'), None);
+    }
+
+    #[test]
+    fn overflow3_roles_round_trip_through_the_prefix_token() {
+        // A third-tier overflow role (the Cannon Shogi cannon army) has no bare
+        // letter: its `char()` is a recycled base letter, and `overflow3_from_base`
+        // maps that base letter back to the role (what the board FEN parser does
+        // after a `=` prefix). None of them is a first-tier `*` or second-tier `**`
+        // overflow role.
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow3()) {
+            assert!(!role.is_overflow());
+            assert!(!role.is_overflow2());
+            assert!(!role.is_promoted());
+            let base = role.char();
+            assert_ne!(base, '?', "overflow-3 base letter is real");
+            assert_eq!(WideRole::overflow3_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow3_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+        }
+        // The three new movers recycle FSF's `a` / `c` / `i`; the promoted Cannon
+        // recycles `u`.
+        assert_eq!(WideRole::RookCannon.char(), 'a');
+        assert_eq!(
+            WideRole::overflow3_from_base('a'),
+            Some(WideRole::RookCannon)
+        );
+        assert_eq!(
+            WideRole::overflow3_from_base('u'),
+            Some(WideRole::PromotedCannon)
+        );
+        // A character that names no third-tier overflow role yields `None`.
+        assert_eq!(WideRole::overflow3_from_base('?'), None);
+        assert_eq!(WideRole::overflow3_from_base('z'), None);
     }
 }

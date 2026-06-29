@@ -26,6 +26,7 @@ mod asean;
 mod ataxx;
 mod bughouse;
 mod cambodian;
+mod cannonshogi;
 mod capablanca;
 mod capahouse;
 mod chak;
@@ -275,6 +276,9 @@ fn main() {
     // located binary) before driving `UCI_Variant chak`.
     let chak_mismatches = chak::run(&mut engine, &located.bin, opts.full);
     let tori_mismatches = tori::run(&mut engine, opts.full);
+    // Cannon Shogi is an INI variant: cannonshogi::run loads FSF's variants.ini
+    // (resolved from the located binary) before driving `UCI_Variant cannonshogi`.
+    let cannonshogi_mismatches = cannonshogi::run(&mut engine, &located.bin, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
     // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
@@ -322,6 +326,7 @@ fn main() {
         + hoppelpoppel_mismatches
         + chak_mismatches
         + tori_mismatches
+        + cannonshogi_mismatches
         + ataxx_mismatches
         > 0
     {

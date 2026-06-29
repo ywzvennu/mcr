@@ -21,26 +21,27 @@
 //! §4.4), zero for every non-Duck move.
 //!
 //! ```text
-//! bit:  31 ... 29 | 28 | 27 26 | 25 24 23 22 | 21 20 19 18 17 16 | 15 ... 8 | 7 ... 0
-//!       \-unused-/ \rk/ \gate-/ \---kind----/ \-------role------/ \--from--/ \--to--/
+//! bit:  31 30 | 29 | 28 27 | 26 25 24 23 | 22 21 20 19 18 17 16 | 15 ... 8 | 7 ... 0
+//!       \unus/ \rk/ \gate-/ \---kind----/ \---------role--------/ \--from--/ \--to--/
 //! ```
 //!
 //! * **`to`** (bits 0..8): destination square index, `0..128`.
 //! * **`from`** (bits 8..16): origin square index, `0..128`. For a drop this is
 //!   redundant (a drop has `from == to`), so the public [`WideMove::from`]
 //!   reports the target square.
-//! * **`role`** (bits 16..22): a [`WideRole`] index `0..64`, used as the
+//! * **`role`** (bits 16..23): a [`WideRole`] index `0..=127`, used as the
 //!   promotion role or the dropped role depending on the kind; unused (`0`)
-//!   otherwise. Six bits since the Orda army grew `WideRole::COUNT` past 32.
-//! * **`kind`** (bits 22..26): the [`WideMoveKind`] tag. Four bits hold the nine
+//!   otherwise. Seven bits since the Cannon Shogi cannon army grew
+//!   `WideRole::COUNT` past 64.
+//! * **`kind`** (bits 23..27): the [`WideMoveKind`] tag. Four bits hold the nine
 //!   kinds in use with headroom for future fairy kinds (gating, duck-placement,
 //!   palace moves) beyond the codes used today.
-//! * **`gate`** (bits 26..29): the Seirawan gating addendum. Bits 26..28 carry a
-//!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 28
+//! * **`gate`** (bits 27..30): the Seirawan gating addendum. Bits 27..29 carry a
+//!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 29
 //!   selects, for a castling base move, whether the reserve gates onto the
 //!   **rook's** vacated square (`1`) rather than the king's (`0`). For a
 //!   non-castling base move the gated square is always the move's origin, so
-//!   bit 28 is `0`. These bits are `0` for every non-gating move, so a variant
+//!   bit 29 is `0`. These bits are `0` for every non-gating move, so a variant
 //!   without gating produces byte-identical words to before this field existed.
 //!
 //! ## Duck addendum (bits 32..40), Duck chess only
@@ -159,20 +160,22 @@ const KIND_DROP: u32 = 8;
 const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
 const ROLE_SHIFT: u32 = 16;
-const KIND_SHIFT: u32 = 22;
-const GATE_ROLE_SHIFT: u32 = 26;
-const GATE_ON_ROOK_SHIFT: u32 = 28;
+const KIND_SHIFT: u32 = 23;
+const GATE_ROLE_SHIFT: u32 = 27;
+const GATE_ON_ROOK_SHIFT: u32 = 29;
 
 const SQ_MASK: u32 = 0xff;
-// The role field is **6 bits** (bits 16..22), holding a `WideRole` index `0..64`
-// — widened from 5 bits when the Orda army pushed `WideRole::COUNT` past 32. The
-// kind field below shrank to **4 bits** (codes `0..16`, ample for the nine kinds)
-// to make room; the gate field and the whole high (Duck) word are unchanged.
-const ROLE_MASK: u32 = 0x3f;
+// The role field is **7 bits** (bits 16..23), holding a `WideRole` index `0..=127`
+// — widened from 6 bits when the Cannon Shogi cannon army pushed `WideRole::COUNT`
+// past 64 (the promoted bishop-hopper is index 64, which a 6-bit field truncated to
+// 0 = Pawn). The kind field stays **4 bits** (codes `0..16`, ample for the nine
+// kinds) and the gate field each shift up one bit; both still fit below bit 30, so
+// the whole high (Duck / hand-gate) word from bit 32 is unchanged.
+const ROLE_MASK: u32 = 0x7f;
 const KIND_MASK: u32 = 0xf;
 const GATE_ROLE_MASK: u32 = 0x3;
 
-// Gated-reserve codes occupying bits 26..28. `0` means no gate.
+// Gated-reserve codes occupying bits 27..29. `0` means no gate.
 const GATE_NONE: u32 = 0;
 const GATE_HAWK: u32 = 1;
 const GATE_ELEPHANT: u32 = 2;

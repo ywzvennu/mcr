@@ -39,14 +39,14 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    AseanRules, Bitboard, BughouseRules, CambodianRules, CapablancaRules, CapahouseRules,
-    ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition,
-    Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules,
-    KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules,
-    ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
-    WideVariant, XiangqiRules,
+    AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
+    CapahouseRules, ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules,
+    GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules,
+    JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
+    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules,
+    ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
+    ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
+    WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -249,6 +249,31 @@ variant_test!(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+    ]
+);
+
+// -- Cannon Shogi (9x9) -----------------------------------------------------
+//
+// Cannon Shogi adds five occupancy-dependent CANNON-type movers (and four promoted
+// forms) to the Shogi army, every one of which is `role_attack_is_leg_asymmetric`
+// (its attack set turns on a screen under the live occupancy, so `attackers_to`
+// forward-projects it, exactly as the generator and the per-move-verify king-safety
+// path do). This guards that the orthogonal/diagonal hop attack relations — the
+// Cannon, the rook/bishop hoppers, the diagonal bishop-cannon, and the promoted
+// cannons' range-2 hops — match the forward relation. The Soldier (the reused Pawn)
+// is forward-directional. The corpus pairs a promoted-cannon midgame with a
+// drop-bearing hand and a screen-dense cannon position.
+
+variant_test!(
+    cannonshogi,
+    Shogi9x9,
+    CannonShogiRules,
+    "cannonshogi",
+    [
+        "lns=Ukgsnl/1r=c=i1c=ab1/p3p1p1p/2p6/9/9/P1P1P1P1P/1B=A2=I=CR1/LNSGKGSNL[G] b - - 0 2",
+        "4k4/9/9/9/9/9/9/9/4K4[RBC=A=C=Irbc=a=c=i] w - - 0 1",
+        "4k4/9/2p1p4/3=U5/2P1P4/9/4=i4/2P1P4/4K4[Pp] w - - 0 1",
+        "4k4/9/3p1p3/9/3=FcP3/9/3P1P3/9/4K4[] b - - 0 1",
     ]
 );
 

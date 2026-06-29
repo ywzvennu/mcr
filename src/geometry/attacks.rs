@@ -763,6 +763,100 @@ pub fn janggi_cannon_capture<G: Geometry>(
 }
 
 // ---------------------------------------------------------------------------
+// Diagonal cannon primitives (Cannon Shogi bishop-cannon / bishop-hopper).
+// ---------------------------------------------------------------------------
+
+/// The four diagonal half-rays from `sq`, the diagonal analogue of [`OrthoRays`].
+/// Built by splitting the full diagonal / anti-diagonal line masks at `sq`'s bit,
+/// exactly as [`ortho_rays`] splits the rank / file masks.
+struct DiagRays<G: Geometry> {
+    /// North-east half-ray (ascending bit index — `rank+file` rises along the
+    /// NE/SW diagonal, higher ranks **and** files).
+    ne: Bitboard<G>,
+    /// South-west half-ray (descending — lower ranks and files).
+    sw: Bitboard<G>,
+    /// North-west half-ray (ascending — higher ranks, lower files, along the
+    /// NW/SE anti-diagonal).
+    nw: Bitboard<G>,
+    /// South-east half-ray (descending — lower ranks, higher files).
+    se: Bitboard<G>,
+}
+
+/// Builds the four diagonal half-rays from `sq` (see [`DiagRays`]).
+#[inline]
+fn diag_rays<G: Geometry>(sq: Square<G>) -> DiagRays<G> {
+    let s = G::Bits::bit(sq.index() as u32);
+    let two_s = s.wrapping_add(s);
+    let above = !two_s.wrapping_sub(G::Bits::ONE);
+    let below = s.wrapping_sub(G::Bits::ONE);
+
+    let diag = diag_mask::<G>(sq).0;
+    let anti = anti_diag_mask::<G>(sq).0;
+
+    DiagRays {
+        ne: Bitboard::<G>(diag & above),
+        sw: Bitboard::<G>(diag & below),
+        nw: Bitboard::<G>(anti & above),
+        se: Bitboard::<G>(anti & below),
+    }
+}
+
+/// Returns the squares a **bishop-cannon** on `sq` may capture on — the diagonal
+/// analogue of [`cannon_capture_targets`]: along each of the four diagonals, the
+/// first piece beyond **exactly one** intervening piece (the screen). Pure
+/// geometry (occupancy-aware); the caller masks out friendly occupants.
+///
+/// ```
+/// use mce::geometry::{attacks::diag_cannon_capture_targets, Chess8x8, Bitboard, Square};
+/// // Screen on c3, enemy on e5: a bishop-cannon on a1 captures over the screen onto e5.
+/// let occ = Bitboard::<Chess8x8>::EMPTY
+///     .with(Square::new(18)) // c3 screen
+///     .with(Square::new(36)); // e5 target
+/// let caps = diag_cannon_capture_targets::<Chess8x8>(Square::new(0), occ);
+/// assert_eq!(caps, Bitboard::EMPTY.with(Square::new(36)));
+/// ```
+#[must_use]
+#[inline]
+pub fn diag_cannon_capture_targets<G: Geometry>(
+    sq: Square<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    let rays = diag_rays::<G>(sq);
+    let mut bb = Bitboard::EMPTY;
+    if let Some(t) = cannon_target_up(occupied, rays.ne) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_up(occupied, rays.nw) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_down(occupied, rays.sw) {
+        bb.set(t);
+    }
+    if let Some(t) = cannon_target_down(occupied, rays.se) {
+        bb.set(t);
+    }
+    bb
+}
+
+/// Returns the **empty** squares a **bishop-hopper** on `sq` may move to — the
+/// diagonal analogue of [`janggi_cannon_quiet`] (with no cannon restriction): on
+/// each diagonal, every empty square strictly **beyond the first screen**, up to
+/// (but not including) the next piece. Pairs with [`diag_cannon_capture_targets`]
+/// for the bishop-hopper's full move-and-capture set; both move and capture
+/// require jumping exactly one screen.
+#[must_use]
+#[inline]
+pub fn diag_cannon_quiet_jumps<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let rays = diag_rays::<G>(sq);
+    let mut bb = Bitboard::EMPTY;
+    bb |= janggi_ray_up(occupied, Bitboard::EMPTY, rays.ne).0;
+    bb |= janggi_ray_up(occupied, Bitboard::EMPTY, rays.nw).0;
+    bb |= janggi_ray_down(occupied, Bitboard::EMPTY, rays.sw).0;
+    bb |= janggi_ray_down(occupied, Bitboard::EMPTY, rays.se).0;
+    bb
+}
+
+// ---------------------------------------------------------------------------
 // Blockable-leg leapers (Xiangqi horse and elephant).
 // ---------------------------------------------------------------------------
 
