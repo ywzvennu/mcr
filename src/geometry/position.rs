@@ -694,7 +694,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Returns the squares attacked by color `by` under `occupied` — the
     /// king-danger map (the squares the other king may not step onto). Pawns use
     /// their diagonal attack pattern.
-    fn attacked_by(&self, by: Color, occupied: Bitboard<G>) -> Bitboard<G> {
+    ///
+    /// `pub(crate)` so the Fog of War view helper
+    /// ([`FogOfWar::visible_squares`](crate::geometry::FogOfWar::visible_squares))
+    /// can reuse it to compute per-player visibility.
+    pub(crate) fn attacked_by(&self, by: Color, occupied: Bitboard<G>) -> Bitboard<G> {
         let b = &self.board;
         let mut attacked = Bitboard::EMPTY;
         for role in WideRole::ALL {

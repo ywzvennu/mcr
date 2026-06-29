@@ -58,14 +58,14 @@ pub use variant::{
 pub use variants::{
     Alice, AliceRules, Asean, AseanRules, Cambodian, CambodianRules, Capablanca, CapablancaRules,
     Capahouse, CapahouseRules, Chak, ChakRules, Dobutsu, DobutsuRules, Duck, DuckRules, Empire,
-    EmpireRules, Gorogoro, GorogoroRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
-    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Knightmate, KnightmateRules, Kyotoshogi,
-    KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Minishogi,
-    MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
-    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
-    Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin,
-    SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangqi,
-    XiangqiRules,
+    EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Grand, GrandRules, Grandhouse,
+    GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Knightmate,
+    KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules,
+    Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules,
+    Ordamirror, OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako,
+    ShakoRules, Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules,
+    Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
+    Tori, ToriRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
