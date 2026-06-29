@@ -40,11 +40,11 @@
 
 use mce::geometry::{
     Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules, DuckRules,
-    EmpireRules, GenericPosition, Geometry, GrandRules, HoppelPoppelRules, JanggiRules,
-    KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square, StandardChess,
-    SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    EmpireRules, GenericPosition, Geometry, GrandRules, GrandhouseRules, HoppelPoppelRules,
+    JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
+    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules,
+    ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square,
+    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
@@ -382,6 +382,29 @@ variant_test!(
     [
         "r8r/2bqkeab2/pppp1ppppp/2n4n2/3Np5/3P6/7N2/PPP1PPPPPP/2BQKEAB2/R8R b - - 1 4",
         "4k5/8P1/10/10/10/10/10/10/10/RNBQK1EAN1 w - - 0 1",
+    ]
+);
+
+// -- Grandhouse (10x10, crazyhouse drops) -----------------------------------
+//
+// Grandhouse shares Grand's pieces (the Cardinal `a` / `WideRole::Hawk` and
+// Marshal `e` / `WideRole::Elephant` compounds, both geometrically symmetric), so
+// only the pawn is colour-directional, exactly as Grand. The added crazyhouse hand
+// (the `[..]` bracket) and the promoted mask (a `~` token) never touch the attack
+// sets — a promoted Queen attacks as a Queen — so this guards that the compound
+// `role_attacks` and the `attackers_to` reverse-projection agree even with a hand
+// in pocket and a promoted piece (`Q~`) on the board. The corpus mixes a developed
+// midgame with pieces in hand and a promoted-queen position (mce dialect, marshal
+// `e`).
+
+variant_test!(
+    grandhouse,
+    Grand10x10,
+    GrandhouseRules,
+    "grandhouse",
+    [
+        "r8r/2bqkeab2/pppp1ppppp/2n4n2/3Np5/3P6/7N2/PPP1PPPPPP/2BQKEAB2/R8R[QPqp] w - - 1 4",
+        "4k5/8P1/10/10/4Q~5/10/10/10/10/RNBQK1EAN1[Nn] w - - 0 1",
     ]
 );
 
