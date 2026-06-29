@@ -922,6 +922,51 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         pins
     }
 
+    /// The side-to-move's pieces pinned to their king by an enemy **plain slider**
+    /// (chariot / rook / bishop / queen), as one lightweight bitboard — the
+    /// incremental check/pin filter (issue #310) the cannon-verify generator
+    /// consumes to fast-reject pinned-piece moves off their pin line.
+    ///
+    /// This is the `pinned` mask of [`compute_pins`](Self::compute_pins) without the
+    /// heavyweight per-piece pin-line array: the consumer derives a pinned piece's
+    /// confinement line on demand as `line(king, piece)` (king, piece, and pinner
+    /// are collinear). A cannon's check/pin is screen-based, not a plain ray
+    /// ([`role_is_slider`](WideVariant::role_is_slider) is false for cannons), so a
+    /// piece pinned only by a cannon is absent here and still takes the full
+    /// make/unmake verify — keeping the produced move set byte-identical.
+    fn king_slider_blockers(
+        &self,
+        king_sq: Square<G>,
+        us: Color,
+        them: Color,
+        occupied: Bitboard<G>,
+    ) -> Bitboard<G> {
+        let b = &self.board;
+        let our_pieces = b.by_color(us);
+        let mut pinned = Bitboard::EMPTY;
+        for role in WideRole::ALL {
+            if !V::role_is_slider(role) {
+                continue;
+            }
+            for slider in b.pieces(them, role) {
+                if line(king_sq, slider).is_empty() {
+                    continue;
+                }
+                if !V::role_attacks(role, them, slider, Bitboard::EMPTY).contains(king_sq) {
+                    continue;
+                }
+                let blockers = between(king_sq, slider) & occupied;
+                if blockers.count() == 1 {
+                    let blocker = blockers.lsb().expect("one blocker");
+                    if our_pieces.contains(blocker) {
+                        pinned.set(blocker);
+                    }
+                }
+            }
+        }
+        pinned
+    }
+
     // -- Move generation ---------------------------------------------------
 
     /// Generates every legal move for the side to move.
@@ -2106,6 +2151,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let in_check =
             !self.king_safe_after(king, us.opposite(), &attackers, king_masks, reach_slice);
         let king_lines = king_attack_lines::<G>(king);
+        // Incremental check/pin filter (issue #310): the side-to-move's pieces
+        // pinned to the king by a plain slider, computed once for the node. A pinned
+        // piece may move only along its pin line — `line(king, piece)`, since king,
+        // piece, and pinner are collinear — so any other destination exposes the
+        // king and is illegal (in or out of check, independent of the cannons) and
+        // is rejected below without a make/unmake verify.
+        let our_pinned = self.king_slider_blockers(king, us, us.opposite(), self.board.occupied());
 
         // Janggi bikjang: facing the enemy general on an open line is *also* a check
         // the side to move must resolve. It does not enter `king_safe_after` (it is
@@ -2140,6 +2192,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     // flag rank: forbidden.
                     return;
                 }
+            }
+            // Pin fast-reject (issue #310): a pinned piece moving off its pin line
+            // exposes the king to the pinner — always illegal — so drop it without a
+            // make/unmake verify. The king is never pinned, and an unpinned piece's
+            // `our_pinned` bit is clear, so only genuine off-line pinned moves are
+            // rejected. Debug-asserted against the authoritative verify.
+            let from = mv.from::<G>();
+            if our_pinned.contains(from) && !line(king, from).contains(mv.to::<G>()) {
+                debug_assert!(
+                    !scratch.cannon_move_is_legal(&mv, us, &attackers, king_masks, reach_slice),
+                    "pin fast-reject discarded a move the verify accepts",
+                );
+                return;
             }
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
                 // Provably safe: no apply/unmake, no scan.
