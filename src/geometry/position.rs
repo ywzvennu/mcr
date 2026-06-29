@@ -3519,6 +3519,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.board.set_piece(to, WidePiece::new(us, flipped));
         }
 
+        // Jieqi reveal (default-off): a face-down dark piece reveals its identity
+        // on its first board move. Keyed on the piece's *origin* (home) square
+        // `from`, the deterministic baseline reveals it as the Xiangqi piece native
+        // to that square (under which the Jieqi tree is exactly Xiangqi). Like the
+        // Kyoto flip above it is a post-move board rewrite at the destination — it
+        // never affects the legality of the move itself, only the next position
+        // sees the revealed role. Every non-Jieqi variant returns `None` and is
+        // byte-identical.
+        if let Some(revealed) = V::reveal_on_move(moving.role, from) {
+            self.board.set_piece(to, WidePiece::new(us, revealed));
+        }
+
         // Castling-right updates. A king move clears *both* of its side's castling
         // rights — but only for a castling variant. A first-move-leap variant
         // (Cambodian) instead carries two independent per-piece leap rights in the

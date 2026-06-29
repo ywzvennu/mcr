@@ -826,6 +826,33 @@ pub enum WideRole {
     /// **overflow-3 role**: its FEN token is `=M` (white) / `=m` (black); the
     /// harness maps `=m → m`.
     Mahout = 74,
+
+    // --- Jieqi (hidden Xiangqi, § Milestone 10) -------------------------------
+    //
+    // Jieqi (揭棋, https://www.pychess.org/variants/jieqi) is standard Xiangqi
+    // with every piece except the two Generals starting **face-down**: a hidden
+    // "dark" piece whose true identity is concealed. A dark piece **moves as the
+    // Xiangqi piece native to its start square** (a back-rank dark piece on the
+    // chariot's home square moves as a Chariot, on the horse's home square as a
+    // Horse, …) until its **first move**, on which it is **revealed** — its true
+    // identity drawn from the side's remaining hidden pool (the Xiangqi army minus
+    // the General). Once revealed it moves as that standard Xiangqi piece. The
+    // single new role is the face-down [`WideRole::Dark`]; every revealed piece is
+    // an existing Xiangqi role, so Jieqi reuses the Xiangqi mover/king-safety
+    // machinery wholesale. The single-letter alphabet, every `*`-overflow base and
+    // the doubled-`**` tier are all in play, so it spells itself with the **third**
+    // overflow prefix [`OVERFLOW_PREFIX_3`] (`=`) plus the recycled base letter `d`
+    // (mnemonic "dark"), free within the `=` tier. Jieqi is **not** an FSF variant
+    // (its stochastic reveal cannot be expressed in an FSF variant config), so no
+    // `compare-fairy` rewrite exists for it.
+    /// Dark (Jieqi face-down piece) — a hidden piece that **moves as the standard
+    /// Xiangqi piece native to its start (home) square** and, on its first move, is
+    /// **revealed** to its true identity drawn from the side's remaining hidden
+    /// pool (the Xiangqi army minus the General). A dark piece is always on its
+    /// home square (it reveals the instant it moves). (Jieqi.) An **overflow-3
+    /// role**: its FEN token is `=D` (white) / `=d` (black). It has no FSF
+    /// counterpart (Jieqi is not an FSF variant).
+    Dark = 75,
 }
 
 impl WideRole {
@@ -833,7 +860,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 75;
+    pub const COUNT: usize = 76;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -912,6 +939,7 @@ impl WideRole {
         WideRole::ChennisPawn,
         WideRole::Champion,
         WideRole::Mahout,
+        WideRole::Dark,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1163,6 +1191,11 @@ impl WideRole {
             // when driving Xiang Fu.
             WideRole::Champion => 'k',
             WideRole::Mahout => 'm',
+            // Jieqi face-down piece — an overflow-3 role recycling the free base
+            // letter `d` (mnemonic "dark"), so `char()` returns the bare base
+            // letter and the board FEN I/O adds the `=` prefix. Jieqi is not an FSF
+            // variant, so no `compare-fairy` rewrite applies.
+            WideRole::Dark => 'd',
         }
     }
 
@@ -1404,6 +1437,7 @@ impl WideRole {
                 | WideRole::KhanSoldier
                 | WideRole::Champion
                 | WideRole::Mahout
+                | WideRole::Dark
         )
     }
 
@@ -1436,6 +1470,9 @@ impl WideRole {
             // free within the `=` tier.
             'k' => Some(WideRole::Champion),
             'm' => Some(WideRole::Mahout),
+            // Jieqi: the face-down Dark piece recycles the free base letter `d`,
+            // free within the `=` tier.
+            'd' => Some(WideRole::Dark),
             _ => None,
         }
     }
@@ -1577,6 +1614,7 @@ impl fmt::Display for WideRole {
             WideRole::ChennisPawn => "chennis-pawn",
             WideRole::Champion => "champion",
             WideRole::Mahout => "mahout",
+            WideRole::Dark => "dark",
         })
     }
 }

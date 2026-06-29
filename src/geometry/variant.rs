@@ -963,6 +963,28 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// Returns the role a face-down piece of `role` standing on its origin square
+    /// `from` is **revealed** to when it makes its first board move (the Jieqi
+    /// mechanic), or `None` if the piece does not reveal.
+    ///
+    /// The default is `None` — no piece reveals, so the move-application path never
+    /// rewrites a moved piece's role through this hook and every other variant is
+    /// byte-identical. Only Jieqi overrides it: a face-down [`WideRole::Dark`]
+    /// piece reveals on its first move. The **deterministic baseline** (the one in
+    /// the make-move / perft path) reveals it to the Xiangqi piece native to its
+    /// `from` (home) square — the no-shuffle identity assignment, under which the
+    /// whole Jieqi tree collapses to standard Xiangqi and is perft-validatable
+    /// against Fairy-Stockfish `UCI_Variant xiangqi`. The full **stochastic**
+    /// reveal-from-pool (a random unrevealed identity) is a separate, explicitly
+    /// seeded model (see `variants::jieqi`); it is not baked into the deterministic
+    /// perft path. Like the Kyoto flip this is a pure post-move state transform — it
+    /// rewrites the moved piece's role at its destination *after* legality is
+    /// decided, so the move's own legality is unaffected; only the next position
+    /// sees the revealed role.
+    fn reveal_on_move(_role: WideRole, _from: Square<G>) -> Option<WideRole> {
+        None
+    }
+
     /// Returns `true` if a held piece may be **dropped in either its base or its
     /// promoted form** (FSF `dropPromoted`; the Kyoto Shogi rule). Only consulted
     /// when [`has_hand`](WideVariant::has_hand) is `true`.

@@ -42,6 +42,7 @@ mod grand;
 mod grandhouse;
 mod hoppelpoppel;
 mod janggi;
+mod jieqi;
 mod khans;
 mod knightmate;
 mod kyotoshogi;
@@ -295,6 +296,10 @@ fn main() {
     // Xiang Fu is an INI variant: xiangfu::run loads FSF's variants.ini (resolved
     // from the located binary) before driving `UCI_Variant xiangfu`.
     let xiangfu_mismatches = xiangfu::run(&mut engine, &located.bin, opts.full);
+    // Jieqi (hidden Xiangqi) is not an FSF variant; its full-information core is
+    // Xiangqi, so jieqi::run drives FSF `UCI_Variant xiangqi` on the identity-
+    // reveal Xiangqi equivalent of each Jieqi position.
+    let jieqi_mismatches = jieqi::run(&mut engine, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
     // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
@@ -347,6 +352,7 @@ fn main() {
         + cannonshogi_mismatches
         + chennis_mismatches
         + xiangfu_mismatches
+        + jieqi_mismatches
         + ataxx_mismatches
         > 0
     {
