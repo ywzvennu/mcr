@@ -56,11 +56,11 @@ pub use variant::{
     PromotionConfig, RoyalSlider, StandardChess, WideEndReason, WideRegion, WideVariant,
 };
 pub use variants::{
-    Alice, AliceRules, Cambodian, CambodianRules, Capablanca, CapablancaRules, Capahouse,
-    CapahouseRules, Chak, ChakRules, Dobutsu, DobutsuRules, Duck, DuckRules, Empire, EmpireRules,
-    Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi,
-    JanggiRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules,
-    Makruk, MakrukRules, Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi,
+    Alice, AliceRules, Asean, AseanRules, Cambodian, CambodianRules, Capablanca, CapablancaRules,
+    Capahouse, CapahouseRules, Chak, ChakRules, Dobutsu, DobutsuRules, Duck, DuckRules, Empire,
+    EmpireRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
+    Janggi, JanggiRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong,
+    MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Minishogi, MinishogiRules, Minixiangqi,
     MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Seirawan, SeirawanRules, Shako,
     ShakoRules, Shatar, ShatarRules, Shinobi, ShinobiRules, Shogi, ShogiRules, Shogun, ShogunRules,
     Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori, ToriRules,

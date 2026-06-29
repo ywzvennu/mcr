@@ -22,6 +22,7 @@
 //! If no FSF binary can be obtained, the harness SKIPS gracefully with install
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
+mod asean;
 mod cambodian;
 mod capablanca;
 mod capahouse;
@@ -193,6 +194,11 @@ fn main() {
     // Cambodian is a FSF built-in (no variants.ini needed), like makruk; it rides
     // the same generic engine.
     let cambodian_mismatches = cambodian::run(&mut engine, opts.full);
+    // ASEAN is a FSF built-in (no variants.ini needed), like makruk; it is
+    // Makruk with the symmetric FIDE start array and FIDE-style last-rank,
+    // four-target promotion, on the same generic engine. Its mce FEN dialect
+    // (`s`/`m`) is rewritten to FSF's `b`/`q` inside asean::run.
+    let asean_mismatches = asean::run(&mut engine, opts.full);
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
     let capahouse_mismatches = capahouse::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
@@ -243,6 +249,7 @@ fn main() {
         + makruk_mismatches
         + makpong_mismatches
         + cambodian_mismatches
+        + asean_mismatches
         + capablanca_mismatches
         + capahouse_mismatches
         + seirawan_mismatches

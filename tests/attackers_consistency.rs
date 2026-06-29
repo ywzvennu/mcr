@@ -39,12 +39,12 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules, DuckRules,
-    EmpireRules, GenericPosition, Geometry, GrandRules, GrandhouseRules, HoppelPoppelRules,
-    JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
-    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules, ShakoRules,
-    ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    AseanRules, Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules,
+    DuckRules, EmpireRules, GenericPosition, Geometry, GrandRules, GrandhouseRules,
+    HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
+    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, SeirawanRules,
+    ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, SittuyinRules, SpartanRules,
+    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7,
@@ -260,6 +260,25 @@ variant_test!(
     [
         "rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSKMSNR b - - 0 2",
         "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 4",
+    ]
+);
+
+// -- ASEAN (8x8) ------------------------------------------------------------
+//
+// ASEAN reuses Makruk's piece set and `role_attacks` relation — the only
+// colour-directional attacker is the Khon (Silver), exactly as Makruk — and
+// changes only the start array and the promotion rule. Neither touches the
+// forward/reverse attack agreement this test guards, so the consistency check
+// is the same shape as Makruk's. The corpus keeps two Khon-bearing midgames.
+
+variant_test!(
+    asean,
+    Chess8x8,
+    AseanRules,
+    "asean",
+    [
+        "rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSMKSNR b - - 0 2",
+        "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SMKS1R w - - 0 4",
     ]
 );
 
