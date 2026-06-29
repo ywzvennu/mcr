@@ -57,6 +57,7 @@ mod shatranj;
 mod shinobi;
 mod shogi;
 mod shogun;
+mod shoshogi;
 mod shouse;
 mod sittuyin;
 mod spartan;
@@ -242,6 +243,8 @@ fn main() {
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
     let janggi_mismatches = janggi::run(&mut engine, opts.full);
     let shogi_mismatches = shogi::run(&mut engine, opts.full);
+    // Sho Shogi is a FSF built-in (no variants.ini needed), like shogi.
+    let shoshogi_mismatches = shoshogi::run(&mut engine, opts.full);
     let minishogi_mismatches = minishogi::run(&mut engine, opts.full);
     // Kyoto Shogi is a FSF built-in (no variants.ini needed), like minishogi.
     let kyotoshogi_mismatches = kyotoshogi::run(&mut engine, opts.full);
@@ -300,6 +303,7 @@ fn main() {
         + manchu_mismatches
         + janggi_mismatches
         + shogi_mismatches
+        + shoshogi_mismatches
         + minishogi_mismatches
         + kyotoshogi_mismatches
         + dobutsu_mismatches

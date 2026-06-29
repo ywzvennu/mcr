@@ -385,10 +385,26 @@ impl<G: Geometry> Board<G> {
                     let next = bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
                         crate::geometry::role::OVERFLOW_PREFIX,
                     ))?;
-                    let role = WideRole::overflow_from_base(next as char).ok_or(
-                        ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
-                    )?;
-                    let color = if (next as char).is_ascii_uppercase() {
+                    // A **doubled** prefix (`**`) marks a second-bank overflow role
+                    // (the Sho Shogi royals, added after the single-`*` bank was
+                    // exhausted): the letter after the second `*` is the recycled
+                    // base, resolved via `WideRole::overflow2_from_base`.
+                    let (role, base) = if next as char == crate::geometry::role::OVERFLOW_PREFIX {
+                        i += 1;
+                        let base = bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
+                            crate::geometry::role::OVERFLOW_PREFIX,
+                        ))?;
+                        let role = WideRole::overflow2_from_base(base as char).ok_or(
+                            ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
+                        )?;
+                        (role, base)
+                    } else {
+                        let role = WideRole::overflow_from_base(next as char).ok_or(
+                            ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
+                        )?;
+                        (role, next)
+                    };
+                    let color = if (base as char).is_ascii_uppercase() {
                         Color::White
                     } else {
                         Color::Black
@@ -462,6 +478,12 @@ impl<G: Geometry> Board<G> {
                         // for a promoted role, so only the prefix is added.
                         if piece.role.is_promoted() {
                             fen.push('+');
+                        } else if piece.role.is_overflow2() {
+                            // A second-bank overflow role (the Sho Shogi royals)
+                            // renders as the **doubled** `**` prefix plus its
+                            // recycled base letter.
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
                         } else if piece.role.is_overflow() {
                             // An overflow role renders as the `*` prefix plus its
                             // recycled base letter; `char()` returns that base

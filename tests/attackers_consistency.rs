@@ -44,8 +44,9 @@ use mce::geometry::{
     GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
     KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
     OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShatranjRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
+    WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -1060,5 +1061,31 @@ variant_test!(
         "rn*s*qk1*snr/4*o4/*p1*p1*p1*p1*p/3*L5/9/9/*P1*P1*P1*P1*P/4*O4/RN*S1K*Q*SNR w - - 0 1",
         "rn*s*qk1*snr/4*o4/*p1*p1*L1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*S1K*Q*SNR w - - 0 1",
         "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/4*W4/9/4*w4/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1",
+    ]
+);
+
+// -- Sho Shogi (old 9x9 Shogi without drops; Drunk Elephant / Crown Prince) --
+//
+// Sho Shogi reuses the whole Shogi army on `Shogi9x9` and adds the **Drunk
+// Elephant** (`**e`, a seven-direction stepper — every King step but the
+// straight-backward one, so its attack set is colour-directional) and the **Crown
+// Prince** (`**c`, a full King and a second royal). This test guards that those
+// two roles' `role_attacks` sets and the `attackers_to` reverse-projection agree
+// on both the king-danger and `attackers_to` paths. The corpus reuses the
+// FSF-confirmed FENs from `tests/perft_shoshogi.rs` (the startpos, a developed
+// middlegame, a two-royal position, a Drunk Elephant in the promotion zone, and a
+// lone Crown Prince in check), each in mce dialect with the doubled-overflow
+// tokens `**e` / `**c`.
+variant_test!(
+    shoshogi,
+    Shogi9x9,
+    ShoShogiRules,
+    "shoshogi",
+    [
+        "lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL w - - 0 1",
+        "lnsgkgsnl/1r2**e2b1/p1pppp1pp/1p4p2/9/2P3P2/PP1PPP1PP/1B2**E2R1/LNSGKGSNL w - - 0 1",
+        "4k4/9/9/9/9/9/4**C4/9/4K4 w - - 0 1",
+        "4k4/9/4**E4/9/9/9/9/9/4K4 w - - 0 1",
+        "3k5/9/9/9/9/9/9/r8/4**C4 w - - 0 1",
     ]
 );
