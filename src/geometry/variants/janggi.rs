@@ -82,6 +82,20 @@ const JANGGI_START_PLACEMENT: &str =
 /// movement.
 const WAZIR_OFFSETS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
+/// The eight Janggi-elephant leap-shape offsets — the `(±2,±3)/(±3,±2)` long
+/// diagonal leap (unhobbled). Used only to build the **superset** of squares from
+/// which an Elephant could reach a target, for the king-safety reach pre-filter.
+const ELEPHANT_OFFSETS: [(i8, i8); 8] = [
+    (2, 3),
+    (2, -3),
+    (-2, 3),
+    (-2, -3),
+    (3, 2),
+    (3, -2),
+    (-3, 2),
+    (-3, -2),
+];
+
 impl JanggiRules {
     /// The palace mask for `color`: the 3x3 block on files d..f (3..=5), on the
     /// three ranks nearest that color (ranks 1..3 for White, 8..10 for Black).
@@ -375,6 +389,43 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
         // Only the Chariot is a line slider. The cannon-verify king-safety path does
         // not consult pins, but the classification is kept honest.
         matches!(role, WideRole::Rook)
+    }
+
+    fn royal_reach_superset(
+        role: WideRole,
+        king: Square<Xiangqi9x10>,
+    ) -> Option<Bitboard<Xiangqi9x10>> {
+        // A superset (occupancy-independent, ignoring legs / palace confinement /
+        // cannon screens — all re-checked by the exact forward projection) of the
+        // squares from which each forward-projected role could attack the king. Each
+        // leap shape is symmetric, so its shape from the king is a superset of its
+        // attack sources. The Chariot keeps the symmetric reverse-projection path
+        // (it is not leg-asymmetric) and so needs no superset here.
+        match role {
+            // Horse: knight-shape neighbourhood of the king.
+            WideRole::Horse => Some(attacks::knight_attacks::<Xiangqi9x10>(king)),
+            // Elephant: the long `(±2,±3)/(±3,±2)` leap shape (unhobbled).
+            WideRole::JanggiElephant => Some(attacks::leaper_attacks::<Xiangqi9x10>(
+                king,
+                &ELEPHANT_OFFSETS,
+            )),
+            // General / Guard: each moves one step (orthogonal, or diagonal on a
+            // palace diagonal point), so it attacks the king only from an adjacent
+            // square — the king's one-step neighbourhood covers every case.
+            WideRole::King | WideRole::Advisor => Some(attacks::king_attacks::<Xiangqi9x10>(king)),
+            // Soldier: moves forward / sideways one step (and a palace-diagonal
+            // forward step), so it attacks from a square adjacent to the king; the
+            // king's one-step neighbourhood is a superset.
+            WideRole::Soldier => Some(attacks::king_attacks::<Xiangqi9x10>(king)),
+            // Cannon: an over-screen orthogonal ray, *plus* the palace-diagonal jump
+            // (corner-to-corner over the palace centre). Its orthogonal sources lie
+            // on the king's rank/file; its palace-diagonal sources are palace points.
+            // Union both — the palaces are tiny, so this still prunes the board.
+            WideRole::Cannon => Some(
+                attacks::rook_attacks::<Xiangqi9x10>(king, Bitboard::EMPTY) | Self::both_palaces(),
+            ),
+            _ => None,
+        }
     }
 
     fn has_castling() -> bool {

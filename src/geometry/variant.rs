@@ -36,6 +36,32 @@ pub enum WideRegion {
     OwnHalf(Color),
 }
 
+/// Which plain (occupancy-only, geometry-standard) slider pattern a role's
+/// **king-safety reverse projection** is exactly equal to, when projecting from
+/// the royal square.
+///
+/// The cannon king-safety verify re-tests "is the king attacked" once per sibling
+/// move; for a symmetric slider role it reverse-projects the role's pattern back
+/// from the (fixed) king square. When that pattern is precisely a standard rook /
+/// bishop / queen ray, the projection can reuse the king's precomputed line masks
+/// (`KingLineMasks`) instead of re-deriving them every move — bit-for-bit
+/// identical, just without the per-move mask rebuild.
+///
+/// A variant opts a role in via [`WideVariant::royal_slider_kind`] **only** when
+/// that role's [`role_attacks`](WideVariant::role_attacks) is exactly the plain
+/// slider for every square the king could be on (no palace-diagonal addendum, no
+/// region masking). The default is `None`, so every variant keeps the existing
+/// reverse-projection path untouched and byte-identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoyalSlider {
+    /// A plain rook (orthogonal rays).
+    Rook,
+    /// A plain bishop (diagonal rays).
+    Bishop,
+    /// A plain queen (orthogonal + diagonal rays).
+    Queen,
+}
+
 /// The promotion configuration a variant exposes: which squares promote and to
 /// which roles. The default is standard chess — the last rank, promoting to
 /// knight, bishop, rook, or queen.
@@ -899,6 +925,55 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// [`role_attack_is_directional`]: WideVariant::role_attack_is_directional
     fn role_attack_is_leg_asymmetric(_role: WideRole) -> bool {
         false
+    }
+
+    /// Returns the plain slider pattern a role's **king-safety reverse projection**
+    /// is exactly equal to, enabling the cannon verify path to reuse the king's
+    /// precomputed `KingLineMasks` instead of
+    /// re-deriving the slider's line masks on every sibling move.
+    ///
+    /// This is a pure performance hook for the cannon king-safety verify
+    /// ([`king_safe_after`]): it changes *how* a symmetric slider's reverse
+    /// projection from the king is computed, never *what* it computes. A variant
+    /// returns `Some(kind)` for a role **only** when that role's
+    /// [`role_attacks`](WideVariant::role_attacks), reverse-projected from any
+    /// square the king may occupy, is bit-for-bit the standard rook / bishop /
+    /// queen ray (no palace-diagonal addendum, no region masking, not directional,
+    /// not leg-asymmetric). The default is `None`, so every variant — including
+    /// every non-cannon variant, which never reaches this path — keeps the existing
+    /// reverse-projection and is byte-identical.
+    ///
+    /// [`king_safe_after`]: super::position::GenericPosition
+    fn royal_slider_kind(_role: WideRole) -> Option<RoyalSlider> {
+        None
+    }
+
+    /// Returns a **superset** of the squares from which a piece of `role` could
+    /// attack the royal square `king` — a cheap, occupancy-independent over-estimate
+    /// the cannon king-safety verify uses to skip enemy pieces that cannot possibly
+    /// reach the king before running the exact (and costlier) forward projection.
+    ///
+    /// This is a pure performance hook for the leg-asymmetric / forward-projected
+    /// roles in [`king_safe_after`]: instead of computing the full attack set of
+    /// **every** enemy piece of `role` and testing whether it contains the king,
+    /// the verify first intersects the role's enemy pieces with this mask, then runs
+    /// the exact forward projection only on the survivors. Because the mask is a
+    /// **superset** (it ignores hobbling legs, region confinement, and cannon
+    /// screens — all re-checked exactly by the forward projection), no genuine
+    /// attacker is ever excluded, so the result is bit-for-bit identical. The king
+    /// square is fixed across a node's sibling moves, so the mask is computed once
+    /// per node and reused.
+    ///
+    /// The default is `None`, meaning "no cheap superset is available, test every
+    /// piece" — the existing behaviour, so every non-cannon variant (which never
+    /// reaches this path) is byte-identical. A cannon variant returns `Some(mask)`
+    /// for each forward-projected role whose reach geometry has such a superset
+    /// (e.g. the Horse's knight-shape neighbourhood of the king, the Cannon's king
+    /// rank/file plus any palace-diagonal corner).
+    ///
+    /// [`king_safe_after`]: super::position::GenericPosition
+    fn royal_reach_superset(_role: WideRole, _king: Square<G>) -> Option<Bitboard<G>> {
+        None
     }
 
     /// Returns `true` if a piece of `role` **may promote** by a move that starts

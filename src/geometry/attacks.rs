@@ -283,6 +283,89 @@ pub fn queen_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitbo
     rook_attacks(sq, occupied) | bishop_attacks(sq, occupied)
 }
 
+/// The four full line masks (rank, file, diagonal, anti-diagonal) through a fixed
+/// square, precomputed once so a hot loop that re-derives a slider's reach from
+/// the *same* square against changing occupancy never rebuilds them.
+///
+/// The slider primitives ([`rook_attacks`] / [`bishop_attacks`] / [`queen_attacks`])
+/// derive these four masks on every call — and [`diag_mask`] / [`anti_diag_mask`]
+/// each run a `HEIGHT - 1`-round directional fill. The cannon king-safety verify
+/// re-tests "is the king attacked" on a fresh post-move occupancy for every
+/// sibling move of a node, but the king square is fixed across those siblings, so
+/// its line masks are constant: computing them once with [`KingLineMasks::new`]
+/// and reusing them via [`rook_attacks_masked`] / [`bishop_attacks_masked`] /
+/// [`queen_attacks_masked`] removes the per-move mask rebuild. The reach computed
+/// is bit-for-bit identical to the plain primitives (same `sliding` over the same
+/// masks).
+#[derive(Clone, Copy)]
+pub(crate) struct KingLineMasks<G: Geometry> {
+    /// The square the masks are taken through (the royal square).
+    sq: Square<G>,
+    /// The full file through `sq`.
+    file: Bitboard<G>,
+    /// The full rank through `sq`.
+    rank: Bitboard<G>,
+    /// The full NE/SW diagonal through `sq`.
+    diag: Bitboard<G>,
+    /// The full NW/SE anti-diagonal through `sq`.
+    anti: Bitboard<G>,
+}
+
+impl<G: Geometry> KingLineMasks<G> {
+    /// Precomputes the four line masks through `sq`.
+    #[inline]
+    pub(crate) fn new(sq: Square<G>) -> KingLineMasks<G> {
+        KingLineMasks {
+            sq,
+            file: file_mask::<G>(sq),
+            rank: rank_mask::<G>(sq),
+            diag: diag_mask::<G>(sq),
+            anti: anti_diag_mask::<G>(sq),
+        }
+    }
+
+    /// The square the masks were built for.
+    #[inline]
+    pub(crate) fn square(self) -> Square<G> {
+        self.sq
+    }
+}
+
+/// Rook reach from the precomputed king square against `occupied` — identical to
+/// `rook_attacks(masks.square(), occupied)` but reusing the cached rank/file
+/// masks instead of re-deriving them.
+#[must_use]
+#[inline]
+pub(crate) fn rook_attacks_masked<G: Geometry>(
+    masks: KingLineMasks<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    sliding(masks.sq, occupied, masks.file) | sliding(masks.sq, occupied, masks.rank)
+}
+
+/// Bishop reach from the precomputed king square against `occupied` — identical to
+/// `bishop_attacks(masks.square(), occupied)` but reusing the cached diagonal
+/// masks (whose fill is the costly part) instead of re-deriving them.
+#[must_use]
+#[inline]
+pub(crate) fn bishop_attacks_masked<G: Geometry>(
+    masks: KingLineMasks<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    sliding(masks.sq, occupied, masks.diag) | sliding(masks.sq, occupied, masks.anti)
+}
+
+/// Queen reach from the precomputed king square against `occupied` — the union of
+/// [`rook_attacks_masked`] and [`bishop_attacks_masked`].
+#[must_use]
+#[inline]
+pub(crate) fn queen_attacks_masked<G: Geometry>(
+    masks: KingLineMasks<G>,
+    occupied: Bitboard<G>,
+) -> Bitboard<G> {
+    rook_attacks_masked(masks, occupied) | bishop_attacks_masked(masks, occupied)
+}
+
 /// Returns the squares a Shogi Lance of `color` on `sq` attacks given the
 /// `occupied` set: the blocker-aware **forward** file ray only (north for white,
 /// south for black), stopping at and including the first occupant.

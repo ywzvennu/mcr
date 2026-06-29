@@ -47,7 +47,9 @@
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{attacks, Bitboard, Board, Minixiangqi7x7, Square, WideRole, WideVariant};
+use crate::geometry::{
+    attacks, Bitboard, Board, Minixiangqi7x7, RoyalSlider, Square, WideRole, WideVariant,
+};
 use crate::Color;
 
 /// The Minixiangqi rule layer: a zero-sized [`WideVariant`] over
@@ -208,6 +210,37 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
         // steppers/leapers. Minixiangqi runs the cannon verify path, which does
         // not consult pins, but the classification is kept honest.
         matches!(role, WideRole::Rook)
+    }
+
+    fn royal_slider_kind(role: WideRole) -> Option<RoyalSlider> {
+        // The Chariot is the plain standard rook (`role_attacks` is exactly
+        // `rook_attacks`), so the cannon king-safety verify reuses the king's
+        // precomputed line masks. No diagonal sliders; every other role is a leaper
+        // or the asymmetric Cannon, which keep the forward path.
+        matches!(role, WideRole::Rook).then_some(RoyalSlider::Rook)
+    }
+
+    fn royal_reach_superset(
+        role: WideRole,
+        king: Square<Minixiangqi7x7>,
+    ) -> Option<Bitboard<Minixiangqi7x7>> {
+        // Supersets (occupancy-independent, ignoring legs / palace confinement /
+        // cannon screens) of the squares from which each forward-projected role could
+        // attack the king. Minixiangqi has no river and no elephant; the Soldier is
+        // handled by the directional reverse-projection (no superset needed).
+        match role {
+            // Horse: the knight-shape neighbourhood of the king.
+            WideRole::Horse => Some(attacks::knight_attacks::<Minixiangqi7x7>(king)),
+            // General (King): attacks only from a square adjacent to the king.
+            WideRole::King => Some(attacks::king_attacks::<Minixiangqi7x7>(king)),
+            // Cannon: an over-screen orthogonal ray, so its sources lie on the king's
+            // rank/file.
+            WideRole::Cannon => Some(attacks::rook_attacks::<Minixiangqi7x7>(
+                king,
+                Bitboard::EMPTY,
+            )),
+            _ => None,
+        }
     }
 
     fn has_castling() -> bool {
