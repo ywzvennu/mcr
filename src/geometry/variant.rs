@@ -62,6 +62,29 @@ pub enum RoyalSlider {
     Queen,
 }
 
+/// Which **counting** endgame rule a variant uses (Makruk / Cambodian / ASEAN).
+///
+/// Each selects a distinct material-scaled countdown table — see
+/// [`GenericGame`](super::game::GenericGame), which reproduces Fairy-Stockfish's
+/// `count_limit` exactly. A variant opts in through
+/// [`WideVariant::counting_rule`]; the default is `None` (no counting), so every
+/// non-counting variant is byte-identical and the count is never tracked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WideCountingRule {
+    /// Thai Makruk: board-honour (64 full moves) while the counted side still has
+    /// material, then pieces-honour (8 / 16 / 22 / 32 / 44 moves, scaled by the
+    /// superior side's rooks / khons / knights) once it is a lone king.
+    Makruk,
+    /// Cambodian Ouk Chaktrang: like Makruk but the board-honour count is 63 and
+    /// applies only while the counted side has at most three pieces; the
+    /// pieces-honour tiers are 7 / 15 / 21 / 31 / 43.
+    Cambodian,
+    /// ASEAN (modernised Makruk): pieces-honour only — counting begins once the
+    /// counted side is a lone king and no pawns remain, with a 16 / 44 / 64-move
+    /// limit by the superior side's strongest piece (rook / khon / knight).
+    Asean,
+}
+
 /// The promotion configuration a variant exposes: which squares promote and to
 /// which roles. The default is standard chess — the last rank, promoting to
 /// knight, bishop, rook, or queen.
@@ -1364,12 +1387,25 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
-    /// Returns `true` if this variant uses the Makruk / Cambodian **counting**
-    /// (board-honour countdown) endgame rule, tracked by
-    /// [`GenericGame`](super::game::GenericGame). The default is `false`. See
-    /// [`GenericGame`](super::game::GenericGame) for the (simplified, board-honour)
-    /// model implemented.
-    fn counting_rule() -> bool {
+    /// Returns the variant's **counting** endgame rule, or `None` if it has none.
+    /// Tracked by [`GenericGame`](super::game::GenericGame), which reproduces
+    /// Fairy-Stockfish's board-honour and material-scaled pieces-honour countdown
+    /// exactly (see [`WideCountingRule`] and that type). The default is `None`;
+    /// Makruk, Cambodian, and ASEAN override it. The rule is terminal-only and
+    /// never consulted by move generation, so perft is byte-identical.
+    fn counting_rule() -> Option<WideCountingRule> {
+        None
+    }
+
+    /// Returns `true` if this variant adjudicates **perpetual chase** as a loss for
+    /// the chasing side — the Xiangqi/AXF rule that a side which, on every move
+    /// through a repeated cycle, attacks the **same kind of** unprotected (or
+    /// value-superior) enemy piece, forcing the repetition, loses exactly as a
+    /// perpetual checker does. The default is `false`. Consulted only when
+    /// [`tracks_repetition`](Self::tracks_repetition) is `true`; the detection lives
+    /// in [`GenericGame`](super::game::GenericGame), so move generation and perft
+    /// are untouched. Only Xiangqi overrides it.
+    fn perpetual_chase_loses() -> bool {
         false
     }
 
@@ -1534,6 +1570,14 @@ pub enum WideEndReason {
     /// [`GenericGame`](super::game::GenericGame), which resolves the winner from
     /// the recorded check history.
     PerpetualCheckLoss,
+    /// A repetition was brought about by **perpetual chase** (Xiangqi / AXF
+    /// `chasingRule`): one side made a qualifying chase — a fresh attack on the same
+    /// kind of unprotected or value-superior enemy piece — on every one of its moves
+    /// through the repeated cycle. That side (the chaser) **loses**. Decisive for
+    /// the side being chased. Reported by
+    /// [`GenericGame`](super::game::GenericGame), which resolves the winner from the
+    /// recorded chase history.
+    PerpetualChaseLoss,
     /// Janggi **bikjang**: the two generals face each other down an open file with
     /// the side to move unable to break the confrontation. Draw. Reported from the
     /// single position via [`WideVariant::has_bikjang`].
