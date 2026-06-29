@@ -279,6 +279,16 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
         // No piece may lie strictly between the two generals on their shared file.
         (attacks::between::<Minixiangqi7x7>(general, sq) & occupied).is_empty()
     }
+
+    // --- Repetition / perpetual check (terminal only; perft unaffected) ----
+
+    fn tracks_repetition() -> bool {
+        true
+    }
+
+    fn perpetual_check_loses() -> bool {
+        true
+    }
 }
 
 /// Minixiangqi as a [`GenericPosition`] over the 7x7 [`Minixiangqi7x7`] geometry.

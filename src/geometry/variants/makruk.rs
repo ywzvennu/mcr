@@ -21,12 +21,15 @@
 //! There is **no castling**. The game is won by checkmate; stalemate is a draw —
 //! both are the generic engine's standard behaviour, so they need no override.
 //!
-//! ## Out of scope: the counting / draw rule
+//! ## The counting / draw rule (terminal only)
 //!
 //! Makruk has a "counting" endgame rule (a bare-king side counts down a move
 //! budget to force a win or claim a draw). That rule affects only **game
-//! termination**, never move generation, so it does not change perft and is not
-//! modelled here. The perft validation against Fairy-Stockfish (which likewise
+//! termination**, never move generation, so it does not change perft. It is
+//! modelled — in a simplified, board-honour-only form — at the *game* level via
+//! the default-off [`WideVariant::counting_rule`] hook, adjudicated by
+//! [`GenericGame`](crate::geometry::game::GenericGame); see that type for the
+//! exact countdown. The perft validation against Fairy-Stockfish (which likewise
 //! does not let the counting rule affect `go perft`) confirms the move
 //! generation is exact regardless.
 //!
@@ -156,6 +159,13 @@ impl WideVariant<Chess8x8> for MakrukRules {
 
     fn has_castling() -> bool {
         false
+    }
+
+    fn counting_rule() -> bool {
+        // Makruk's board-honour counting endgame (simplified; see
+        // [`GenericGame`](crate::geometry::game::GenericGame)). Terminal-only, so
+        // perft is byte-identical.
+        true
     }
 }
 
