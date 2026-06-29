@@ -562,6 +562,46 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         self.state.placement.count(color, role)
     }
 
+    /// Injects one `role` piece into `color`'s **hand**, where it becomes
+    /// droppable — the **Bughouse cross-board transfer**.
+    ///
+    /// Bughouse is a 2-board team game: a piece captured on one board is delivered
+    /// to the capturer's partner on the **other** board. This library models a
+    /// single board only ([`Bughouse`](crate::geometry::Bughouse)); the partner
+    /// linkage is a server (mcs) concern. A server holding the two boards calls
+    /// this method on the partner board to deliver the captured piece — reverted
+    /// to its base role and flipped to the receiving side's `color` (a captured
+    /// **promoted** piece is delivered as a [`WideRole::Pawn`], the crazyhouse
+    /// demotion applied at the transfer site). The injected piece then drops like
+    /// any crazyhouse hand piece.
+    ///
+    /// This is the value-adding counterpart of [`remove_from_hand`](Self::remove_from_hand)
+    /// and reuses the same per-color, per-role hand store
+    /// ([`hand_count`](Self::hand_count) reads it back). It is only meaningful for
+    /// a variant with a hand ([`WideVariant::has_hand`]); for any other variant the
+    /// hand is never consulted by move generation, so an injected piece is inert.
+    #[inline]
+    pub fn inject_into_hand(&mut self, color: Color, role: WideRole) {
+        self.state.placement.add(color, role);
+    }
+
+    /// Removes one `role` piece from `color`'s **hand**, returning `true` if one
+    /// was present (and `false`, leaving the hand unchanged, if it was empty).
+    ///
+    /// The inverse of [`inject_into_hand`](Self::inject_into_hand): a server uses
+    /// it to reclaim a piece from a board's hand (e.g. when undoing a cross-board
+    /// transfer, or reconciling the two boards' hands). A normal **drop** already
+    /// consumes from the hand through move generation; this is the out-of-band
+    /// transfer hook, the mirror of the injection.
+    #[inline]
+    pub fn remove_from_hand(&mut self, color: Color, role: WideRole) -> bool {
+        if self.state.placement.count(color, role) == 0 {
+            return false;
+        }
+        self.state.placement.take(color, role);
+        true
+    }
+
     // -- Attack queries ----------------------------------------------------
 
     /// Returns the set of `attacker` pieces that attack `sq` under `occupied`.

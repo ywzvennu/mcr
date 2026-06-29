@@ -23,6 +23,7 @@
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
 mod asean;
+mod bughouse;
 mod cambodian;
 mod capablanca;
 mod capahouse;
@@ -218,6 +219,10 @@ fn main() {
     // Placement (Pre-Chess) is a FSF built-in (no variants.ini needed), like
     // sittuyin; it rides the same generic engine's deployment phase.
     let placement_mismatches = placement::run(&mut engine, opts.full);
+    // Bughouse is a FSF built-in (no variants.ini needed): on a single board it is
+    // crazyhouse with the hand fed externally (FSF `twoBoards`), so `go perft` is
+    // meaningful and the standard piece letters need no translation.
+    let bughouse_mismatches = bughouse::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
@@ -275,6 +280,7 @@ fn main() {
         + fogofwar_mismatches
         + sittuyin_mismatches
         + placement_mismatches
+        + bughouse_mismatches
         + spartan_mismatches
         + shako_mismatches
         + shatar_mismatches

@@ -10,6 +10,7 @@
 
 pub mod alice;
 pub mod asean;
+pub mod bughouse;
 pub mod cambodian;
 pub mod capablanca;
 pub mod capahouse;
@@ -48,6 +49,7 @@ pub mod xiangqi;
 
 pub use alice::{Alice, AliceRules};
 pub use asean::{Asean, AseanRules};
+pub use bughouse::{Bughouse, BughouseRules};
 pub use cambodian::{Cambodian, CambodianRules};
 pub use capablanca::{Capablanca, CapablancaRules};
 pub use capahouse::{Capahouse, CapahouseRules};
