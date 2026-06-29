@@ -39,13 +39,13 @@
 //! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
 
 use mce::geometry::{
-    AseanRules, Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules,
-    DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules,
-    GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules,
-    MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules,
-    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules,
-    ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess,
-    SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
+    AseanRules, Bitboard, BughouseRules, CambodianRules, CapablancaRules, CapahouseRules,
+    ChakRules, DobutsuRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry,
+    GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules,
+    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules,
+    OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
+    ShinobiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square,
+    StandardChess, SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -248,6 +248,27 @@ variant_test!(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+    ]
+);
+
+// -- Bughouse (single-board, 8x8) -------------------------------------------
+//
+// Single-board Bughouse is standard chess plus crazyhouse-style drops from a hand
+// that is fed externally; a capture does not bank into the captor's hand (it
+// crosses to the partner board). The pieces and their attacks are the standard
+// chess set, so this guards that adding the externally-fed hand left the attacker
+// reverse-projection byte-identical. The corpus pairs the empty-hand start with
+// hand-bearing positions (a `[NPnp]` midgame and a full `[QRBNPqrbnp]` reserve).
+
+variant_test!(
+    bughouse,
+    Chess8x8,
+    BughouseRules,
+    "bughouse",
+    [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1",
+        "r1bqk2r/ppp2ppp/2n5/3pp3/3PP3/2N5/PPP2PPP/R1BQK2R[NPnp] w KQkq - 0 1",
+        "r3k2r/8/8/8/8/8/8/R3K2R[QRBNPqrbnp] w KQkq - 0 1",
     ]
 );
 
