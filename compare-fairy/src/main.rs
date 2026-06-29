@@ -41,6 +41,7 @@ mod grand;
 mod grandhouse;
 mod hoppelpoppel;
 mod janggi;
+mod khans;
 mod knightmate;
 mod kyotoshogi;
 mod locate;
@@ -267,6 +268,9 @@ fn main() {
     // Ordamirror is also an INI variant: ordamirror::run loads FSF's variants.ini
     // (resolved from the located binary) before driving `UCI_Variant ordamirror`.
     let ordamirror_mismatches = ordamirror::run(&mut engine, &located.bin, opts.full);
+    // Khan's Chess is an INI variant: khans::run loads FSF's variants.ini (resolved
+    // from the located binary) before driving `UCI_Variant khans`.
+    let khans_mismatches = khans::run(&mut engine, &located.bin, opts.full);
     let synochess_mismatches = synochess::run(&mut engine, opts.full);
     // Empire is an INI variant: empire::run loads FSF's variants.ini (resolved from
     // the located binary) before driving `UCI_Variant empire`.
@@ -325,6 +329,7 @@ fn main() {
         + orda_mismatches
         + gorogoro_mismatches
         + ordamirror_mismatches
+        + khans_mismatches
         + synochess_mismatches
         + empire_mismatches
         + hoppelpoppel_mismatches
