@@ -31,7 +31,11 @@ mod corpus;
 mod dobutsu;
 mod duck;
 mod empire;
+<<<<<<< HEAD
 mod gorogoro;
+=======
+mod fogofwar;
+>>>>>>> 149833e (feat(variant): Fog of War (Dark Chess) on the generic engine, validated vs Fairy-Stockfish)
 mod grand;
 mod grandhouse;
 mod hoppelpoppel;
@@ -209,6 +213,10 @@ fn main() {
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
+    // Fog of War is an INI variant FSF lacks entirely: fogofwar::run bundles its
+    // own variants.ini definition (inheriting built-in chess) and loads it via
+    // VariantPath before comparing.
+    let fogofwar_mismatches = fogofwar::run(&mut engine, opts.full);
     let sittuyin_mismatches = sittuyin::run(&mut engine, opts.full);
     // Placement (Pre-Chess) is a FSF built-in (no variants.ini needed), like
     // sittuyin; it rides the same generic engine's deployment phase.
@@ -267,6 +275,7 @@ fn main() {
         + grand_mismatches
         + grandhouse_mismatches
         + duck_mismatches
+        + fogofwar_mismatches
         + sittuyin_mismatches
         + placement_mismatches
         + spartan_mismatches

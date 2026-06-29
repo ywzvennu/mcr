@@ -40,12 +40,12 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, CambodianRules, CapablancaRules, CapahouseRules, ChakRules, DobutsuRules,
-    DuckRules, EmpireRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
-    HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules,
-    ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules,
-    SeirawanRules, ShakoRules, ShatarRules, ShinobiRules, ShogiRules, ShogunRules, ShouseRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
-    WideVariant, XiangqiRules,
+    DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules,
+    GrandhouseRules, HoppelPoppelRules, JanggiRules, KnightmateRules, KyotoshogiRules,
+    MakpongRules, MakrukRules, ManchuRules, MinishogiRules, MinixiangqiRules, OrdaRules,
+    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShinobiRules,
+    ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess,
+    SynochessRules, ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -476,6 +476,21 @@ variant_test!(
         "rnbqkbnr/ppp1pppp/8/3pP3/*7/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1",
         "4k3/8/8/r2pPK2/8/8/8/8 w - d6 0 1",
         "8/2k5/8/3*4/8/5K2/4P3/8 w - - 0 1",
+    ]
+);
+
+// -- Fog of War (standard movement, non-royal king, 8x8) --------------------
+
+variant_test!(
+    fogofwar,
+    Chess8x8,
+    FogOfWarRules,
+    "fogofwar",
+    [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "rnbqkbnr/ppppp1pp/8/5p1Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2",
+        "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
     ]
 );
 
