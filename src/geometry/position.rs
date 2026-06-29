@@ -2657,11 +2657,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// from the gating state.
     fn append_gating_moves<S: WideSink>(&self, out: &mut S, us: Color) {
         let gating = self.state.gating;
-        if !gating.any_reserve(us) {
-            return;
-        }
         let eligible = gating.eligible();
         if eligible.is_empty() {
+            return;
+        }
+        // S-House draws the gated piece from the crazyhouse hand (any held non-pawn,
+        // non-king role) and emits the wider hand-gate encoding; Seirawan draws it
+        // from the fixed Hawk/Elephant reserve.
+        if V::gates_from_hand() {
+            self.append_hand_gating_moves(out, us, eligible);
+            return;
+        }
+        if !gating.any_reserve(us) {
             return;
         }
         let reserves: Vec<GateRole> = [GateRole::Hawk, GateRole::Elephant]
@@ -2702,6 +2709,57 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 if eligible.contains(from) {
                     for &r in &reserves {
                         out.push(mv.with_gate(r, GateSquare::Origin));
+                    }
+                }
+            }
+        }
+    }
+
+    /// The S-House counterpart of [`append_gating_moves`](Self::append_gating_moves):
+    /// for every base move vacating a gating-eligible square, appends one hand-gate
+    /// per **held** non-pawn, non-king role (drawn from the crazyhouse hand). Pawns
+    /// and the king are never gated (FSF), and a role absent from the hand emits no
+    /// gate.
+    fn append_hand_gating_moves<S: WideSink>(&self, out: &mut S, us: Color, eligible: Bitboard<G>) {
+        let roles: Vec<WideRole> = WideRole::ALL
+            .into_iter()
+            .filter(|&r| {
+                r != WideRole::Pawn && r != WideRole::King && self.state.placement.count(us, r) > 0
+            })
+            .collect();
+        if roles.is_empty() {
+            return;
+        }
+        let base_len = out.len();
+        for i in 0..base_len {
+            let mv = out.get(i);
+            if mv.is_castle() {
+                let king_from = mv.from::<G>();
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                let rook_from = self
+                    .state
+                    .castling
+                    .rook_file(us, side)
+                    .and_then(|f| Square::<G>::from_file_rank(f, back_rank::<G>(us)));
+                for &r in &roles {
+                    if eligible.contains(king_from) {
+                        out.push(mv.with_hand_gate::<G>(r, GateSquare::Origin));
+                    }
+                    if let Some(rook_from) = rook_from {
+                        if eligible.contains(rook_from) {
+                            out.push(mv.with_hand_gate::<G>(r, GateSquare::RookOrigin));
+                        }
+                    }
+                }
+            } else {
+                let from = mv.from::<G>();
+                if eligible.contains(from) {
+                    for &r in &roles {
+                        out.push(mv.with_hand_gate::<G>(r, GateSquare::Origin));
                     }
                 }
             }
@@ -3436,6 +3494,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // eligible, and `vacate(from)` above already cleared the square.
             }
         }
+        // S-House hand-gate: the gated piece comes from the crazyhouse hand (any
+        // held role), consumed from `placement` rather than the fixed reserve.
+        if let Some(role) = mv.hand_gate() {
+            let square = match mv.hand_gate_square() {
+                GateSquare::Origin => Some(from),
+                GateSquare::RookOrigin => castle_rook_from,
+            };
+            if let Some(square) = square {
+                self.board.set_piece(square, WidePiece::new(us, role));
+                self.state.placement.take(us, role);
+            }
+        }
     }
 
     /// If `square` is a castling rook's home square for `color`, revokes that
@@ -3635,7 +3705,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // file letters mark gating-eligible squares. Non-gating variants reject
         // any non-`KQkq` letter, exactly as before.
         let (castling, gating) = if V::supports_gating() {
-            parse_castling_and_gating::<G>(castling_field, holdings, &board)?
+            // S-House keeps its reserves in the crazyhouse hand (parsed above into
+            // `placement_pocket`), not in the fixed gating reserve, so the gating
+            // parser sees empty holdings and only reads the eligible-square rights
+            // from the castling field.
+            let gating_holdings = if V::gates_from_hand() { "" } else { holdings };
+            parse_castling_and_gating::<G>(castling_field, gating_holdings, &board)?
         } else if V::has_first_move_leaps() {
             // A first-move-leap variant (Cambodian) folds its two per-side leap
             // rights into the castling field as home-file letters (`DEde`),
@@ -3700,7 +3775,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             self.board.to_fen_placement()
         };
-        if V::supports_gating() {
+        if V::supports_gating() && !V::gates_from_hand() {
             write_holdings(self.state.gating, &mut out);
         }
         if V::has_placement() || V::has_hand() {

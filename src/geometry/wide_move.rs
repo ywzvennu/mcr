@@ -183,6 +183,19 @@ const DUCK_PRESENT_SHIFT: u32 = 32;
 const DUCK_SQUARE_SHIFT: u32 = 33;
 const DUCK_PRESENT: u64 = 1 << DUCK_PRESENT_SHIFT;
 
+// Hand-gate addendum (S-House), in free high-word bits above the Duck fields
+// (which occupy 32..41). Unlike the 2-bit Seirawan `GATE_ROLE` field (which only
+// encodes Hawk/Elephant), a hand-gate carries an arbitrary `WideRole` drawn from
+// the crazyhouse hand, so it needs the full 6-bit role index. The two gate
+// encodings are mutually exclusive (a variant gates either from the fixed
+// reserve or from the hand, never both), and every non-hand-gating move leaves
+// these bits `0`, so the words stay bit-identical for Seirawan and every other
+// variant.
+const HAND_GATE_ROLE_SHIFT: u32 = 41; // bits 41..47: 6-bit WideRole index
+const HAND_GATE_ROLE_MASK: u64 = 0x3f;
+const HAND_GATE_PRESENT: u64 = 1 << 47;
+const HAND_GATE_ON_ROOK: u64 = 1 << 48;
+
 /// The Seirawan reserve piece a [`WideMove`] gates in as the second half of a
 /// back-rank piece's first move: a Hawk (Bishop + Knight) or an Elephant
 /// (Rook + Knight). See [`WideMove::with_gate`].
@@ -512,6 +525,50 @@ impl WideMove {
         (self.base() >> GATE_ROLE_SHIFT) & GATE_ROLE_MASK != GATE_NONE
     }
 
+    /// Returns a copy of this move that, in addition to its base effect, gates the
+    /// arbitrary hand piece `role` (S-House) onto the square selected by `square`.
+    ///
+    /// The hand-gate counterpart of [`with_gate`](WideMove::with_gate): where that
+    /// encodes a fixed Hawk/Elephant reserve in 2 bits, this carries the full
+    /// [`WideRole`] index drawn from the crazyhouse hand. The base move (kind,
+    /// squares, any promotion role) and the Duck addendum are preserved.
+    #[must_use]
+    #[inline]
+    pub fn with_hand_gate<G: Geometry>(self, role: WideRole, square: GateSquare) -> WideMove {
+        let _ = core::marker::PhantomData::<G>;
+        let mut w = self.0 & !((HAND_GATE_ROLE_MASK << HAND_GATE_ROLE_SHIFT) | HAND_GATE_ON_ROOK);
+        w |= HAND_GATE_PRESENT;
+        w |= ((role.index() as u64) & HAND_GATE_ROLE_MASK) << HAND_GATE_ROLE_SHIFT;
+        if matches!(square, GateSquare::RookOrigin) {
+            w |= HAND_GATE_ON_ROOK;
+        }
+        WideMove(w)
+    }
+
+    /// Returns the hand-gated piece (S-House) if this move gates one from the hand,
+    /// otherwise `None`.
+    #[must_use]
+    #[inline]
+    pub fn hand_gate(self) -> Option<WideRole> {
+        if self.0 & HAND_GATE_PRESENT == 0 {
+            return None;
+        }
+        let idx = ((self.0 >> HAND_GATE_ROLE_SHIFT) & HAND_GATE_ROLE_MASK) as usize;
+        WideRole::from_index(idx)
+    }
+
+    /// Returns which vacated square a hand-gate lands on: the origin, or — for a
+    /// castling base move — the rook's start square.
+    #[must_use]
+    #[inline]
+    pub const fn hand_gate_square(self) -> GateSquare {
+        if self.0 & HAND_GATE_ON_ROOK != 0 {
+            GateSquare::RookOrigin
+        } else {
+            GateSquare::Origin
+        }
+    }
+
     /// Returns a copy of this move carrying a Duck-chess placement: the second
     /// half of the ply moves the neutral Duck onto `square`. The base move is
     /// unchanged; only the high-word Duck addendum is set.
@@ -607,6 +664,16 @@ impl WideMove {
             s.push(gate.role().upper_char());
             if matches!(self.gate_square(), GateSquare::RookOrigin) {
                 // Distinguish a castling gate onto the rook's vacated square.
+                s.push('@');
+                s.push('r');
+            }
+        }
+        // A hand-gate (S-House) renders the same `/<PIECE>` way, with the gated
+        // piece drawn from the crazyhouse hand.
+        if let Some(role) = self.hand_gate() {
+            s.push('/');
+            s.push(role.upper_char());
+            if matches!(self.hand_gate_square(), GateSquare::RookOrigin) {
                 s.push('@');
                 s.push('r');
             }

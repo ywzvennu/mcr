@@ -51,6 +51,7 @@ mod shatar;
 mod shinobi;
 mod shogi;
 mod shogun;
+mod shouse;
 mod sittuyin;
 mod spartan;
 mod synochess;
@@ -202,6 +203,7 @@ fn main() {
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
     let capahouse_mismatches = capahouse::run(&mut engine, opts.full);
     let seirawan_mismatches = seirawan::run(&mut engine, opts.full);
+    let shouse_mismatches = shouse::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
@@ -253,6 +255,7 @@ fn main() {
         + capablanca_mismatches
         + capahouse_mismatches
         + seirawan_mismatches
+        + shouse_mismatches
         + grand_mismatches
         + grandhouse_mismatches
         + duck_mismatches
