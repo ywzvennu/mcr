@@ -47,6 +47,7 @@ mod locate;
 mod makpong;
 mod makruk;
 mod manchu;
+mod mansindam;
 mod minishogi;
 mod minixiangqi;
 mod orda;
@@ -275,6 +276,9 @@ fn main() {
     // Chak is an INI variant: chak::run loads FSF's variants.ini (resolved from the
     // located binary) before driving `UCI_Variant chak`.
     let chak_mismatches = chak::run(&mut engine, &located.bin, opts.full);
+    // Mansindam is an INI variant: mansindam::run loads FSF's variants.ini (resolved
+    // from the located binary) before driving `UCI_Variant mansindam`.
+    let mansindam_mismatches = mansindam::run(&mut engine, &located.bin, opts.full);
     let tori_mismatches = tori::run(&mut engine, opts.full);
     // Cannon Shogi is an INI variant: cannonshogi::run loads FSF's variants.ini
     // (resolved from the located binary) before driving `UCI_Variant cannonshogi`.
@@ -325,6 +329,7 @@ fn main() {
         + empire_mismatches
         + hoppelpoppel_mismatches
         + chak_mismatches
+        + mansindam_mismatches
         + tori_mismatches
         + cannonshogi_mismatches
         + ataxx_mismatches

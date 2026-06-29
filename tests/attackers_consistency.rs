@@ -43,10 +43,10 @@ use mce::geometry::{
     CapahouseRules, ChakRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules,
     GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules,
     JanggiRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
-    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules,
-    ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
-    ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
-    WideRole, WideVariant, XiangqiRules,
+    MansindamRules, MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules,
+    SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules,
+    ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
+    ToriRules, WideRole, WideVariant, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
@@ -1126,5 +1126,35 @@ variant_test!(
         "4k4/9/9/9/9/9/4**C4/9/4K4 w - - 0 1",
         "4k4/9/4**E4/9/9/9/9/9/4K4 w - - 0 1",
         "3k5/9/9/9/9/9/9/r8/4**C4 w - - 0 1",
+    ]
+);
+
+// -- Mansindam (9x9 Korean shogi-chess hybrid: hand + drops, mandatory promotion,
+// campmate flag win) -------------------------------------------------------
+//
+// The only colour-directional attacker is the Shogi-style Pawn (it captures
+// straight ahead, `role_attack_is_directional`); the standard chess Knight, the
+// Cardinal (= Hawk, Bishop + Knight), the Marshal (= Elephant, Rook + Knight), the
+// Queen, and the three new compounds — the Angel (`**a`, Bishop + Rook + Knight),
+// the promoted Rhino (`**i`, Bishop + Knight + Wazir) and the promoted Ship
+// (`**s`, Rook + Knight + Ferz), plus the reused Guard (= Commoner), Centaur
+// (= Kheshig), Archer (`+B` = Dragon Horse) and Tiger (`+R` = Dragon) — are all
+// colour-symmetric, so this guards that their `role_attacks` sets and the
+// `attackers_to` reverse-projection agree on both the king-danger and `attackers_to`
+// paths. The corpus reuses the FSF-confirmed FENs from `tests/perft_mansindam.rs`:
+// the startpos, the drop swarm, the promoted-mover board, the lone Angel, and the
+// capture-to-hand midgame, each in mce dialect (Cardinal `a`, Marshal `e`, Angel
+// `**a`, Rhino `**i`, Ship `**s`).
+variant_test!(
+    mansindam,
+    Shogi9x9,
+    MansindamRules,
+    "mansindam",
+    [
+        "rnb**akqane/9/ppppppppp/9/9/9/PPPPPPPPP/9/ENAQK**ABNR[] w - - 0 1",
+        "4k4/9/9/9/9/9/9/9/4K4[NBRnbr] w - - 0 1",
+        "9/k8/2+B1+R1**I2/9/2**S1W1*U2/9/9/9/4K4[Nn] w - - 0 1",
+        "1k7/9/9/9/4**A4/9/9/9/4K4[] w - - 0 1",
+        "rnb**akqane/9/ppp2pppp/3pP4/9/9/PPPP1PPPP/9/ENAQK**ABNR[P] b - - 0 3",
     ]
 );
