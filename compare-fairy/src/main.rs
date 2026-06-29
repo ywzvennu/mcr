@@ -30,6 +30,7 @@ mod cannonshogi;
 mod capablanca;
 mod capahouse;
 mod chak;
+mod chennis;
 mod corpus;
 mod dobutsu;
 mod dragon;
@@ -287,6 +288,9 @@ fn main() {
     // Cannon Shogi is an INI variant: cannonshogi::run loads FSF's variants.ini
     // (resolved from the located binary) before driving `UCI_Variant cannonshogi`.
     let cannonshogi_mismatches = cannonshogi::run(&mut engine, &located.bin, opts.full);
+    // Chennis (7x7 tennis-themed flipping variant) is an INI variant like
+    // Mansindam: load `variants.ini` inside chennis::run if the binary lacks it.
+    let chennis_mismatches = chennis::run(&mut engine, &located.bin, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
     // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
@@ -337,6 +341,7 @@ fn main() {
         + mansindam_mismatches
         + tori_mismatches
         + cannonshogi_mismatches
+        + chennis_mismatches
         + ataxx_mismatches
         > 0
     {
