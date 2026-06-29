@@ -145,6 +145,41 @@ int main(void) {
           "atomic startpos perft(1) == 20");
     mce_position_free(atomic);
 
+    /* --- Fairy (geometry-layer) variants ---------------------------------- */
+    MceFairyPosition *xq = mce_fairy_position_startpos("xiangqi");
+    CHECK(xq != NULL, "fairy startpos(\"xiangqi\") returns a handle");
+    if (xq != NULL) {
+        /* Two-call buffer contract for the fairy legal-move list. */
+        size_t need = mce_fairy_position_legal_moves(xq, NULL, 0);
+        char *fmoves = (char *)malloc(need);
+        if (fmoves != NULL && mce_fairy_position_legal_moves(xq, fmoves, need) == need) {
+            size_t count = count_words(fmoves);
+            printf("  xiangqi legal moves (%zu)\n", count);
+            CHECK(count == 44, "xiangqi startpos has 44 legal moves");
+            free(fmoves);
+        } else {
+            CHECK(0, "fairy legal_moves succeeds");
+            free(fmoves);
+        }
+        /* FSF-confirmed Xiangqi startpos perft (tests/perft_xiangqi.rs). */
+        printf("  xiangqi perft(1)=%llu perft(2)=%llu\n",
+               (unsigned long long)mce_fairy_perft(xq, 1),
+               (unsigned long long)mce_fairy_perft(xq, 2));
+        CHECK(mce_fairy_perft(xq, 1) == 44ULL, "xiangqi perft(1) == 44");
+        CHECK(mce_fairy_perft(xq, 2) == 1920ULL, "xiangqi perft(2) == 1920");
+        CHECK(mce_fairy_perft(xq, 3) == 79666ULL, "xiangqi perft(3) == 79666");
+        mce_fairy_position_free(xq);
+    }
+
+    MceFairyPosition *shogi = mce_fairy_position_startpos("shogi");
+    CHECK(shogi != NULL && mce_fairy_perft(shogi, 1) == 30ULL,
+          "shogi startpos perft(1) == 30");
+    mce_fairy_position_free(shogi);
+
+    CHECK(mce_fairy_position_startpos("notafairyvariant") == NULL,
+          "unknown fairy variant returns NULL");
+    mce_fairy_position_free(NULL); /* documented no-op */
+
     if (failures == 0) {
         printf("\nAll checks passed.\n");
         return 0;

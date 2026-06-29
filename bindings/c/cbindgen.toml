@@ -30,7 +30,7 @@ documentation_style = "doxy"
 parse_deps = false
 
 [export]
-include = ["McePosition", "MceOutcome"]
+include = ["McePosition", "MceFairyPosition", "MceOutcome"]
 prefix = ""
 
 [enum]

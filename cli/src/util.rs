@@ -3,6 +3,7 @@
 
 use std::fmt;
 
+use mce::geometry::{AnyWideVariant, WideVariantId};
 use mce::{AnyVariant, CastleSide, Color, File, Position, Rank, Square, VariantId};
 
 /// The standard chess starting FEN, used as the expansion of `startpos`.
@@ -64,6 +65,24 @@ pub fn load_position(fen: &str) -> CliResult<Position> {
 /// Loads an [`AnyVariant`] for a runtime-chosen variant from a FEN.
 pub fn load_variant(id: VariantId, fen: &str) -> CliResult<AnyVariant> {
     AnyVariant::from_fen(id, fen).map_err(|err| CliError::new(format!("bad FEN for {id}: {err}")))
+}
+
+/// Parses a geometry-layer fairy variant name (anything [`WideVariantId`]
+/// accepts: `xiangqi`, `shogi`, `janggi`, `orda`, ... plus their aliases).
+pub fn parse_wide_variant(name: &str) -> CliResult<WideVariantId> {
+    name.parse::<WideVariantId>().map_err(CliError::new)
+}
+
+/// Loads an [`AnyWideVariant`] for a runtime-chosen fairy variant. Unlike the
+/// concrete engine, every fairy variant has its own start array, so `startpos`
+/// resolves to that variant's opening rather than a single shared FEN.
+pub fn load_wide_variant(id: WideVariantId, fen: &str) -> CliResult<AnyWideVariant> {
+    if fen == "startpos" {
+        Ok(AnyWideVariant::startpos(id))
+    } else {
+        AnyWideVariant::from_fen(id, fen)
+            .map_err(|err| CliError::new(format!("bad FEN for {id}: {err}")))
+    }
 }
 
 /// The human-readable side name.

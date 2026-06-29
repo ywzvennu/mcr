@@ -60,6 +60,7 @@ use std::ffi::{c_char, c_int, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
+use mce::geometry::{AnyWideVariant, WideVariantId};
 use mce::{AnyVariant, Color, Outcome, VariantId};
 
 /// Opaque handle to a chess position of a runtime-chosen variant.
@@ -303,6 +304,204 @@ pub extern "C" fn mce_perft(pos: *const McePosition, depth: u32) -> u64 {
     catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
 }
 
+// -- Fairy (geometry-layer) variants ----------------------------------------
+//
+// The same opaque-handle surface as above, over `AnyWideVariant` rather than the
+// concrete engine's `AnyVariant`. These reach the geometry-layer fairy variants
+// (xiangqi, shogi, janggi, orda, …) whose board geometry differs from 8x8, so
+// they need a distinct handle type and a distinct set of entry points. Ownership,
+// the two-call buffer contract, and panic safety are identical to the standard
+// functions above.
+
+/// Opaque handle to a fairy-variant chess position chosen at runtime.
+///
+/// C code only ever holds a `MceFairyPosition*`; the layout is private. Create
+/// one with [`mce_fairy_position_startpos`] /
+/// [`mce_fairy_position_new_from_fen`] and release it with
+/// [`mce_fairy_position_free`].
+pub struct MceFairyPosition {
+    inner: AnyWideVariant,
+}
+
+/// Creates a fairy position from a FEN under the named `variant`.
+///
+/// `variant` accepts the canonical names and aliases of
+/// [`WideVariantId::from_str`] (e.g. `"xiangqi"`, `"shogi"`, `"janggi"`,
+/// `"orda"`, `"cchess"`).
+///
+/// Returns a fresh owned `MceFairyPosition*`, or **NULL** if either string is
+/// NULL / not valid UTF-8, the variant name is unknown, or the FEN does not
+/// parse. Release it with [`mce_fairy_position_free`].
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_new_from_fen(
+    fen: *const c_char,
+    variant: *const c_char,
+) -> *mut MceFairyPosition {
+    let fen = cstr!(fen, ptr::null_mut());
+    let variant = cstr!(variant, ptr::null_mut());
+    let result = catch_unwind(|| {
+        let id: WideVariantId = variant.parse().ok()?;
+        let inner = AnyWideVariant::from_fen(id, fen).ok()?;
+        Some(Box::new(MceFairyPosition { inner }))
+    });
+    match result {
+        Ok(Some(boxed)) => Box::into_raw(boxed),
+        _ => ptr::null_mut(),
+    }
+}
+
+/// Creates the starting position of the named fairy `variant`.
+///
+/// `variant` accepts the same names as [`mce_fairy_position_new_from_fen`].
+/// Returns a fresh owned `MceFairyPosition*`, or **NULL** if `variant` is NULL /
+/// not valid UTF-8 / an unknown variant. Release it with
+/// [`mce_fairy_position_free`].
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_startpos(variant: *const c_char) -> *mut MceFairyPosition {
+    let variant = cstr!(variant, ptr::null_mut());
+    let result = catch_unwind(|| {
+        let id: WideVariantId = variant.parse().ok()?;
+        Some(Box::new(MceFairyPosition {
+            inner: AnyWideVariant::startpos(id),
+        }))
+    });
+    match result {
+        Ok(Some(boxed)) => Box::into_raw(boxed),
+        _ => ptr::null_mut(),
+    }
+}
+
+/// Releases a fairy position created by this library.
+///
+/// `mce_fairy_position_free(NULL)` is a no-op. Calling it twice on the same
+/// non-NULL pointer, or on a pointer this library did not produce, is undefined
+/// behavior.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_free(pos: *mut MceFairyPosition) {
+    if pos.is_null() {
+        return;
+    }
+    // SAFETY: `pos` is non-null and, per the ownership contract, was produced by
+    // `Box::into_raw` in one of this crate's fairy constructors and has not been
+    // freed yet. Reconstituting the `Box` reclaims that exact allocation;
+    // dropping it frees it exactly once.
+    let boxed = unsafe { Box::from_raw(pos) };
+    drop(boxed);
+}
+
+/// Writes the position's FEN into `buf` and returns the length needed (including
+/// the NUL terminator). See the crate-level buffer contract. Returns `0` if
+/// `pos` is NULL.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_to_fen(
+    pos: *const MceFairyPosition,
+    buf: *mut c_char,
+    buflen: usize,
+) -> usize {
+    let pos = pos_ref!(pos, 0);
+    let fen = match catch_unwind(AssertUnwindSafe(|| pos.inner.to_fen())) {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    write_c_string(&fen, buf, buflen)
+}
+
+/// Writes the legal moves of the side to move into `buf` as a single
+/// **space-separated** list of UCI strings, and returns the length needed
+/// including the NUL terminator. See the crate-level buffer contract. An empty
+/// move list yields the empty string (`needed == 1`). Returns `0` if `pos` is
+/// NULL.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_legal_moves(
+    pos: *const MceFairyPosition,
+    buf: *mut c_char,
+    buflen: usize,
+) -> usize {
+    let pos = pos_ref!(pos, 0);
+    let joined = match catch_unwind(AssertUnwindSafe(|| {
+        let p = &pos.inner;
+        let ucis: Vec<String> = p.legal_moves().iter().map(|m| p.to_uci(m)).collect();
+        ucis.join(" ")
+    })) {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    write_c_string(&joined, buf, buflen)
+}
+
+/// Parses `uci` against the position and, if it names a legal move, plays it,
+/// **mutating the handle in place** (advancing it one ply).
+///
+/// Returns `0` on success, `1` if `pos` or `uci` is NULL or `uci` is not valid
+/// UTF-8, `2` if the move is malformed or illegal. On any nonzero return the
+/// position is left unchanged.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_play_uci(
+    pos: *mut MceFairyPosition,
+    uci: *const c_char,
+) -> c_int {
+    if pos.is_null() {
+        return 1;
+    }
+    let uci = cstr!(uci, 1);
+    // SAFETY: `pos` is non-null (checked) and, per the ownership contract,
+    // points to a live, caller-owned `MceFairyPosition`. This is the only API
+    // that mutates the handle, so an exclusive (`&mut`) borrow does not alias any
+    // other live reference for the duration of this call.
+    let pos = unsafe { &mut *pos };
+    let played = catch_unwind(AssertUnwindSafe(|| match pos.inner.parse_uci(uci) {
+        // `parse_uci` only returns a *legal* move, so `play` cannot panic on it.
+        Some(mv) => Some(pos.inner.play(&mv)),
+        None => None,
+    }));
+    match played {
+        Ok(Some(next)) => {
+            pos.inner = next;
+            0
+        }
+        Ok(None) => 2,
+        Err(_) => 2,
+    }
+}
+
+/// Returns `1` if the side to move is in check, `0` if not. Returns `0` if `pos`
+/// is NULL or the underlying call panics.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_is_check(pos: *const MceFairyPosition) -> c_int {
+    let pos = pos_ref!(pos, 0);
+    match catch_unwind(AssertUnwindSafe(|| pos.inner.is_check())) {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}
+
+/// Returns the fairy game outcome as an [`MceOutcome`] code (an `int`), with the
+/// same encoding as [`mce_position_outcome`]. Returns `ONGOING` if `pos` is NULL
+/// or the call panics.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_outcome(pos: *const MceFairyPosition) -> MceOutcome {
+    let pos = pos_ref!(pos, MceOutcome::Ongoing);
+    match catch_unwind(AssertUnwindSafe(|| pos.inner.outcome())) {
+        Ok(Some(mce::geometry::WideOutcome::Decisive {
+            winner: Color::White,
+        })) => MceOutcome::WhiteWins,
+        Ok(Some(mce::geometry::WideOutcome::Decisive {
+            winner: Color::Black,
+        })) => MceOutcome::BlackWins,
+        Ok(Some(mce::geometry::WideOutcome::Draw)) => MceOutcome::Draw,
+        _ => MceOutcome::Ongoing,
+    }
+}
+
+/// Counts the leaf nodes reachable in exactly `depth` plies from this fairy
+/// position (a perft). Returns `0` if `pos` is NULL or the computation panics.
+/// `depth == 0` legitimately returns `1`.
+#[no_mangle]
+pub extern "C" fn mce_fairy_perft(pos: *const MceFairyPosition, depth: u32) -> u64 {
+    let pos = pos_ref!(pos, 0);
+    catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
+}
+
 /// Writes `s` (plus a NUL) into `buf`/`buflen` per the crate buffer contract and
 /// returns `s.len() + 1` (the bytes needed including the terminator).
 ///
@@ -439,5 +638,94 @@ mod tests {
         let pos = mce_position_startpos(v.as_ptr());
         assert_eq!(mce_perft(pos, 1), 20);
         mce_position_free(pos);
+    }
+
+    #[test]
+    fn fairy_startpos_legal_moves_and_perft() {
+        // Construct a fairy variant by name and run perft — the acceptance gate.
+        // FSF-confirmed Xiangqi startpos counts (tests/perft_xiangqi.rs).
+        let v = cs("xiangqi");
+        let pos = mce_fairy_position_startpos(v.as_ptr());
+        assert!(!pos.is_null());
+
+        let need = mce_fairy_position_legal_moves(pos, ptr::null_mut(), 0);
+        let mut buf = vec![0u8; need];
+        let got = mce_fairy_position_legal_moves(pos, buf.as_mut_ptr().cast(), buf.len());
+        assert_eq!(got, need);
+        let s = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
+        assert_eq!(s.split_whitespace().count(), 44);
+
+        assert_eq!(mce_fairy_perft(pos, 0), 1);
+        assert_eq!(mce_fairy_perft(pos, 1), 44);
+        assert_eq!(mce_fairy_perft(pos, 2), 1920);
+        assert_eq!(mce_fairy_perft(pos, 3), 79666);
+        assert_eq!(mce_fairy_position_is_check(pos), 0);
+        assert_eq!(mce_fairy_position_outcome(pos), MceOutcome::Ongoing);
+
+        mce_fairy_position_free(pos);
+
+        // A second geometry (9x9 Shogi).
+        let s = cs("shogi");
+        let shogi = mce_fairy_position_startpos(s.as_ptr());
+        assert_eq!(mce_fairy_perft(shogi, 1), 30);
+        assert_eq!(mce_fairy_perft(shogi, 2), 900);
+        mce_fairy_position_free(shogi);
+    }
+
+    #[test]
+    fn fairy_fen_roundtrip_and_play() {
+        let v = cs("xiangqi");
+        let pos = mce_fairy_position_startpos(v.as_ptr());
+
+        let need = mce_fairy_position_to_fen(pos, ptr::null_mut(), 0);
+        let mut buf = vec![0u8; need];
+        mce_fairy_position_to_fen(pos, buf.as_mut_ptr().cast(), buf.len());
+        let fen = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
+
+        // Re-parse the startpos FEN under the variant.
+        let fenc = cs(fen);
+        let reparsed = mce_fairy_position_new_from_fen(fenc.as_ptr(), v.as_ptr());
+        assert!(!reparsed.is_null());
+        mce_fairy_position_free(reparsed);
+
+        // A bad move is rejected with code 2 and leaves the position unchanged.
+        let bad = cs("a0a9");
+        assert_eq!(mce_fairy_position_play_uci(pos, bad.as_ptr()), 2);
+        let garbage = cs("zzzz");
+        assert_eq!(mce_fairy_position_play_uci(pos, garbage.as_ptr()), 2);
+
+        // Alias resolution: "cchess" -> xiangqi (same startpos FEN).
+        let alias = cs("cchess");
+        let aliased = mce_fairy_position_startpos(alias.as_ptr());
+        let need2 = mce_fairy_position_to_fen(aliased, ptr::null_mut(), 0);
+        let mut buf2 = vec![0u8; need2];
+        mce_fairy_position_to_fen(aliased, buf2.as_mut_ptr().cast(), buf2.len());
+        let fen2 = CStr::from_bytes_until_nul(&buf2).unwrap().to_str().unwrap();
+        assert_eq!(fen, fen2);
+        mce_fairy_position_free(aliased);
+
+        mce_fairy_position_free(pos);
+    }
+
+    #[test]
+    fn fairy_null_and_bad_inputs_are_rejected() {
+        assert!(mce_fairy_position_startpos(ptr::null()).is_null());
+        let bad = cs("notafairyvariant");
+        assert!(mce_fairy_position_startpos(bad.as_ptr()).is_null());
+
+        let v = cs("xiangqi");
+        let badfen = cs("not a fen");
+        assert!(mce_fairy_position_new_from_fen(badfen.as_ptr(), v.as_ptr()).is_null());
+
+        // NULL handle: documented safe error values, no crash.
+        assert_eq!(mce_fairy_perft(ptr::null(), 1), 0);
+        assert_eq!(
+            mce_fairy_position_to_fen(ptr::null(), ptr::null_mut(), 0),
+            0
+        );
+        assert_eq!(mce_fairy_position_is_check(ptr::null()), 0);
+        assert_eq!(mce_fairy_position_outcome(ptr::null()), MceOutcome::Ongoing);
+        assert_eq!(mce_fairy_position_play_uci(ptr::null_mut(), v.as_ptr()), 1);
+        mce_fairy_position_free(ptr::null_mut()); // no-op
     }
 }
