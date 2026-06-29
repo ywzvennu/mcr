@@ -703,6 +703,32 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Alice chess two-board transfer (default OFF) ---------------------
+
+    /// Returns `true` if this variant is **Alice chess**: the game is played over
+    /// two mirror 8x8 boards (A and B), at most one piece per square across *both*
+    /// boards, and a piece **moves** by normal chess rules on the board it
+    /// currently occupies and then **transfers** to the same square on the *other*
+    /// board (`docs`/Wikipedia "Alice chess").
+    ///
+    /// The default is `false`. While it is `false` the generic engine never
+    /// consults the per-piece board-membership mask
+    /// ([`GenericState::board_b`](super::position::GenericState::board_b), which
+    /// stays empty), never restricts movement or king-safety to a single plane,
+    /// and never applies the post-move transfer — so every other variant produces
+    /// byte-identical moves, state, and FEN to a build without the Alice mechanic.
+    /// Only [`Alice`](super::variants::alice) overrides this to `true`.
+    ///
+    /// When `true`, move generation, legality (king-safety), and move application
+    /// all route through the dedicated Alice path, which reads each piece's plane
+    /// from the `board_b` mask: a piece on plane B is in `board_b`, a piece on
+    /// plane A is not. Captures, checks, and blocking are all **same-plane** only;
+    /// the destination of every move must be **vacant on the opposite plane** (the
+    /// plane the piece transfers to).
+    fn is_alice() -> bool {
+        false
+    }
+
     // --- Sittuyin placement phase (default OFF) ---------------------------
 
     /// Returns `true` if this variant has a **setup / placement phase**: the
@@ -1292,6 +1318,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             halfmove_clock: 0,
             fullmove_number: 1,
             consecutive_passes: 0,
+            board_b: crate::geometry::Bitboard::EMPTY,
         };
         (board, state)
     }
