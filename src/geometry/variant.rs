@@ -342,6 +342,28 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if `color`'s royal pieces (those [`royal_squares`] reports)
+    /// currently impose a king-safety constraint — a move may not leave them
+    /// unsafe and the side can be checked / mated. Only consulted on the
+    /// multi-royal path ([`multi_royal`](WideVariant::multi_royal) `true`).
+    ///
+    /// The default is `true`: every royal is always royal (Spartan, Chak), so the
+    /// multi-royal path is byte-identical. Sho Shogi overrides it for its
+    /// **count-thresholded pseudo-royalty** (FSF `extinctionPseudoRoyal` with
+    /// `extinctionPieceCount = 0`): a King and a Crown Prince are royal **only
+    /// while a side holds at most one of them**. While a side has **both**, neither
+    /// is royal — it may leave either (or both) en prise and play on, and is never
+    /// in check — so the constraint is **inactive** and every pseudo-legal move is
+    /// legal. When it returns `false` the multi-royal generator emits the side's
+    /// pseudo-legal moves unverified, and the per-move survival predicates report
+    /// the side as safe. With the constraint active there is exactly one royal, so
+    /// it reduces to ordinary single-king check.
+    ///
+    /// [`royal_squares`]: WideVariant::royal_squares
+    fn royal_constraint_active(_board: &Board<G>, _color: Color) -> bool {
+        true
+    }
+
     /// Returns the **forward step** a Berolina-style pawn (the Spartan Hoplite)
     /// uses for its *non-capturing* move: a diagonal advance. Returns the two
     /// diagonal-forward landing squares from `from` for `color`, or

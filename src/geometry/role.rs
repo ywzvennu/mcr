@@ -571,6 +571,39 @@ pub enum WideRole {
     /// bare letter, distinct by the `*` prefix): its token is `*X` (white) / `*x`
     /// (black), and the `compare-fairy` harness maps `*x → b` when driving Shatranj.
     Alfil = 57,
+
+    // --- Sho Shogi (old 9x9 Shogi without drops) royals (§ Milestone 10) ---
+    //
+    // Sho Shogi reuses the whole Shogi army and its `+`-promotions, and adds the
+    // **Drunk Elephant** (酔象) and its promoted form the **Crown Prince** (太子,
+    // a SECOND royal piece). FSF (`UCI_Variant shoshogi`) spells the Drunk
+    // Elephant `e` and the Crown Prince `+E`. Both are genuinely-new movements,
+    // so each needs its own role — but the single-letter `*` overflow bank is
+    // **exhausted** (every `a..=z` already names a `*<letter>` overflow role).
+    // They therefore land in a **second overflow bank** spelled with the prefix
+    // [`OVERFLOW_PREFIX`] **doubled** (`**`) plus a recycled base letter whose
+    // case carries the colour (see [`is_overflow2`](WideRole::is_overflow2) /
+    // [`overflow2_from_base`](WideRole::overflow2_from_base)). The promotion
+    // Drunk Elephant → Crown Prince is the variant's
+    // [`role_promoted_to`](super::WideVariant::role_promoted_to) (like Chak's King
+    // → Divine Lord), not the global `+`-token machinery, so neither role is
+    // [`is_promoted`](WideRole::is_promoted).
+    /// Drunk Elephant (酔象, FSF `e`) — steps one square to any of **seven**
+    /// directions: the four diagonals (Ferz) plus one step forward or sideways
+    /// (every King step except the straight-backward one). Promotes to a Crown
+    /// Prince. (Sho Shogi.) A **second-bank overflow role**: its FEN token is the
+    /// doubled prefix `**` plus the recycled Elephant letter `e`, `**E` (white) /
+    /// `**e` (black); the `compare-fairy` harness maps `**e → e` when driving Sho
+    /// Shogi.
+    DrunkElephant = 58,
+    /// Crown Prince (太子, FSF `+E`) — the promoted Drunk Elephant: a full one-step
+    /// King in every direction, and a **second royal** piece (a side is lost only
+    /// when **both** its King and Crown Prince are captured / mated, FSF
+    /// `extinctionPseudoRoyal` with `extinctionPieceCount = 0` — while a side holds
+    /// both, neither is royal). (Sho Shogi.) A **second-bank overflow role**: its
+    /// FEN token is the doubled prefix `**` plus the recycled Cannon letter `c`
+    /// ("Crown"), `**C` (white) / `**c` (black); the harness maps `**c → +E`.
+    CrownPrince = 59,
 }
 
 impl WideRole {
@@ -578,7 +611,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 58;
+    pub const COUNT: usize = 60;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -640,6 +673,8 @@ impl WideRole {
         WideRole::RightQuail,
         WideRole::Pheasant,
         WideRole::Alfil,
+        WideRole::DrunkElephant,
+        WideRole::CrownPrince,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -823,6 +858,15 @@ impl WideRole {
             // by the `*` prefix). The `compare-fairy` harness maps `*x → b` when
             // driving Shatranj.
             WideRole::Alfil => 'x',
+            // Sho Shogi royals — **second-bank** overflow roles past the exhausted
+            // single-`*` alphabet. Each FEN token is the doubled prefix `**` plus a
+            // recycled base letter (returned here), the board FEN I/O adding the
+            // prefix. The Drunk Elephant recycles the Elephant's `e` (FSF's Drunk
+            // Elephant letter); the Crown Prince recycles the Cannon's `c`
+            // ("Crown"). The `compare-fairy` harness maps `**e → e`, `**c → +E`
+            // when driving Sho Shogi.
+            WideRole::DrunkElephant => 'e',
+            WideRole::CrownPrince => 'c',
             // Shogi promoted pieces share their base role's letter: their FEN
             // token is the base letter with a `+` prefix (`+P`, `+L`, `+N`, `+S`,
             // `+R`, `+B`), so the bare `char()` returns the base letter and the
@@ -1000,6 +1044,38 @@ impl WideRole {
         }
     }
 
+    /// Returns `true` if this is a **second-bank** overflow role — a fairy role
+    /// added after *both* the single-letter FEN alphabet (`a..=z`) and the first
+    /// `*<letter>` overflow bank were exhausted. Like a single-bank overflow role
+    /// it has no bare letter; its FEN token is the [`OVERFLOW_PREFIX`] **doubled**
+    /// (`**`) followed by a recycled base letter (returned by
+    /// [`char`](WideRole::char)) whose case carries the colour, and the board FEN
+    /// parser / writer handle the doubled prefix. The two Sho Shogi royals (the
+    /// Drunk Elephant and its promoted Crown Prince) are the first such roles.
+    #[must_use]
+    #[inline]
+    pub const fn is_overflow2(self) -> bool {
+        matches!(self, WideRole::DrunkElephant | WideRole::CrownPrince)
+    }
+
+    /// Maps a recycled base letter (after a doubled [`OVERFLOW_PREFIX`], `**`) back
+    /// to its second-bank overflow role, returning `None` if the letter does not
+    /// name one. The inverse of [`char`](WideRole::char) for the second bank; used
+    /// by the board FEN parser when it sees a `**`-prefixed token. Accepts either
+    /// case (the case carries colour, handled by the caller).
+    #[must_use]
+    #[inline]
+    pub const fn overflow2_from_base(ch: char) -> Option<WideRole> {
+        match ch.to_ascii_lowercase() {
+            // Drunk Elephant: recycles the Elephant's letter `e` (FSF's Drunk
+            // Elephant letter, distinct by the `**` prefix).
+            'e' => Some(WideRole::DrunkElephant),
+            // Crown Prince: recycles the Cannon's letter `c` ("Crown").
+            'c' => Some(WideRole::CrownPrince),
+            _ => None,
+        }
+    }
+
     /// Returns the uppercase FEN/SAN character for this role.
     #[must_use]
     #[inline]
@@ -1120,6 +1196,8 @@ impl fmt::Display for WideRole {
             WideRole::RightQuail => "right-quail",
             WideRole::Pheasant => "pheasant",
             WideRole::Alfil => "alfil",
+            WideRole::DrunkElephant => "drunk-elephant",
+            WideRole::CrownPrince => "crown-prince",
         })
     }
 }
@@ -1171,7 +1249,7 @@ mod tests {
             // Giraffe, whose `w` was reclaimed by the Orda Kheshig) share a recycled
             // base letter (handled by the `*` prefix); all are excluded from the
             // bare-letter round-trip.
-            if role.is_promoted() || role.is_overflow() {
+            if role.is_promoted() || role.is_overflow() || role.is_overflow2() {
                 continue;
             }
             let ch = role.char();
@@ -1223,7 +1301,7 @@ mod tests {
         // excluded from the distinctness check.
         let chars: Vec<char> = WideRole::ALL
             .into_iter()
-            .filter(|r| !r.is_promoted() && !r.is_overflow())
+            .filter(|r| !r.is_promoted() && !r.is_overflow() && !r.is_overflow2())
             .map(WideRole::char)
             .filter(|&c| c != '?')
             .collect();
@@ -1264,5 +1342,41 @@ mod tests {
         assert_eq!(WideRole::overflow_from_base('x'), Some(WideRole::Alfil));
         // A character that names no overflow role yields `None`.
         assert_eq!(WideRole::overflow_from_base('?'), None);
+    }
+
+    #[test]
+    fn second_bank_overflow_roles_round_trip_through_the_doubled_prefix() {
+        // The Sho Shogi royals are second-bank overflow roles (`is_overflow2`):
+        // they have no bare letter and are *not* single-`*` overflow roles, so their
+        // FEN token is the doubled prefix `**` plus a recycled base letter resolved
+        // by `overflow2_from_base`.
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow2()) {
+            assert!(!role.is_overflow(), "a second-bank role is not single-bank");
+            assert!(
+                !role.is_promoted(),
+                "a second-bank role is not `+`-promoted"
+            );
+            let base = role.char();
+            assert_ne!(base, '?', "second-bank base letter is real");
+            assert_eq!(WideRole::overflow2_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow2_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+        }
+        // The Drunk Elephant recycles the Elephant's `e`; the Crown Prince the
+        // Cannon's `c` ("Crown"). Both are distinct from every single-`*` base.
+        assert_eq!(WideRole::DrunkElephant.char(), 'e');
+        assert_eq!(
+            WideRole::overflow2_from_base('e'),
+            Some(WideRole::DrunkElephant)
+        );
+        assert_eq!(WideRole::CrownPrince.char(), 'c');
+        assert_eq!(
+            WideRole::overflow2_from_base('c'),
+            Some(WideRole::CrownPrince)
+        );
+        // A character that names no second-bank role yields `None`.
+        assert_eq!(WideRole::overflow2_from_base('z'), None);
     }
 }
