@@ -813,6 +813,13 @@ impl WidePgn {
         self.variant
     }
 
+    /// The extra header tag pairs (everything other than the structural
+    /// `Variant` / `SetUp` / `FEN` tags), in stored order.
+    #[must_use]
+    pub fn tags(&self) -> &[(String, String)] {
+        &self.tags
+    }
+
     /// The validated mainline moves, in play order.
     #[must_use]
     pub fn moves(&self) -> &[WideMove] {
