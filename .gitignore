@@ -3,6 +3,10 @@
 **/*.rs.bk
 *.pdb
 
+# cargo-mutants mutation-testing output (report dir, regenerated on each run).
+mutants.out/
+mutants.out.old/
+
 # Fuzzing
 /fuzz/target
 /fuzz/corpus

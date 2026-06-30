@@ -1,0 +1,63 @@
+# cargo-mutants configuration (https://mutants.rs)
+#
+# Mutation testing for the clean-room `mce` library: cargo-mutants rewrites one
+# expression at a time (a "mutant" — e.g. flips a `<` to `<=`, replaces a body
+# with `Default::default()`) and re-runs the test suite. A mutant that the suite
+# still passes ("MISSED" / survived) is a change to movegen/rules that the perft
+# pins + unit tests did NOT catch — i.e. a genuinely-untested code path. A
+# "CAUGHT" mutant is one the suite rejects, which is the desired outcome.
+#
+# This run is INFORMATIONAL (see the gated `mutants` CI job): it surfaces
+# surviving mutants as a report; it is not (yet) a hard gate.
+
+# ---------------------------------------------------------------------------
+# Scope: mutate the library movegen/rules only.
+# ---------------------------------------------------------------------------
+# Focus on the geometry layer (the generic engine + the per-variant generators
+# in `src/geometry/variants/`) and the concrete top-level rule modules in
+# `src/`. These are the move-generation and legality code paths the perft pins
+# are meant to pin down.
+examine_globs = [
+    "src/**/*.rs",
+]
+
+# Exclude code that is not movegen/rules and would only add noise:
+#   - the GPL-fenced, NON-workspace sibling crates (`compare-fairy/`, `compare/`,
+#     `fuzz/`): they drive/ link GPL engines and are never published. They are
+#     separate packages outside this manifest, so cargo-mutants does not mutate
+#     them anyway, but they are named here so the boundary is explicit.
+#   - generated/round-trip test helpers and serde glue that carry no rules logic.
+exclude_globs = [
+    "compare-fairy/**",
+    "compare/**",
+    "fuzz/**",
+    "cli/**",
+    "bindings/**",
+    "benches/**",
+    "tests/**",
+    "src/geometry/notation_tests.rs",
+    "src/serde_impls.rs",
+]
+
+# ---------------------------------------------------------------------------
+# Test run per mutant: the FAST suite only.
+# ---------------------------------------------------------------------------
+# cargo-mutants re-runs `cargo test` for every mutant. `cargo test` skips
+# `#[ignore]`d tests by default, so the expensive deep `--include-ignored` perft
+# sweeps (which the gated `fairy-differential` job runs) are NOT run here — only
+# the cheap non-ignored perft pins + unit tests, which are exactly what should
+# catch a movegen/rules mutant. `--all-features` is passed so feature-gated rule
+# paths (the `magic` attack table, `parallel`, `serde`) are also exercised, and
+# so the build matches the all-features test gate.
+test_tool = "cargo"
+additional_cargo_test_args = ["--all-features"]
+
+# ---------------------------------------------------------------------------
+# Timeouts: keep per-mutant runs bounded.
+# ---------------------------------------------------------------------------
+# Each mutant is tested against the fast suite; cargo-mutants auto-derives the
+# timeout from the unmutated ("baseline") test time. The multiplier guards
+# against a mutant that sends movegen into a (near-)infinite loop, and the
+# minimum keeps fast suites from timing out on transient CI slowness.
+timeout_multiplier = 3.0
+minimum_test_timeout = 120
