@@ -46,12 +46,12 @@ use mce::geometry::{
     MakpongRules, MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules,
     OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
     ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WideRole,
-    WideVariant, XiangfuRules, XiangqiRules,
+    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WashogiRules,
+    WideRole, WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
-    Minixiangqi7x7, Shogi9x9, Tori7x7, Xiangqi9x10,
+    Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11, Xiangqi9x10,
 };
 use mce::Color;
 
@@ -859,6 +859,37 @@ variant_test!(
         "3k3/2*G4/7/3*I3/7/2*i4/3K3[*Y*y] w - - 0 1",
         "2k4/1*Y5/7/3*A3/7/5*y1/4K2[*Y*A*y*a] w - - 0 1",
         "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/7/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[*Y*y] w - - 0 1",
+    ]
+);
+
+// -- Wa Shogi (11x11 animal shogi: forward-biased steppers and directional
+//    sliders) ----------------------------------------------------------------
+//
+// Twenty-one of Wa's thirty-one piece kinds are forward-biased (a Sparrow Pawn, the
+// forward-sliding Oxcart / Liberated Horse / Running Rabbit, the Cloud Eagle, and
+// the rest), routed through the `role_attack_is_directional` colour-flipped
+// reverse-projection — correct because every Wa piece is left-right symmetric. The
+// remaining ten (Crane King, Heavenly Horse, Treacherous Fox, Plodding Ox, Bear's
+// Eyes, Gliding Swallow, Swallow's Wings, Tenacious Falcon and the role-sharing
+// promotions) are fully symmetric and take the default reverse projection. This
+// corpus exercises both paths: the startpos, a contact midgame with the armies
+// engaged on several files, a promoted-piece board (a Gliding Swallow, Tenacious
+// Falcon and Heavenly Horse of each colour) and a drop/promotion midgame with hands.
+// Rules-validated (no FSF/HaChu perft oracle); the FENs are hand-constructed.
+
+variant_test!(
+    washogi,
+    Washogi11x11,
+    WashogiRules,
+    "washogi",
+    [
+        "**f**j**h**l**nk**o**k**g**m**d/1**v3**q3**t1/\
+**b**b**b**r**b**b**b**u**b**b**b/11/11/11/11/11/\
+**B**B**B**U**B**B**B**R**B**B**B/1**T3**Q3**V1/\
+**D**M**G**K**OK**N**L**H**J**F[] w - - 0 1",
+        "5k5/11/11/3**v3**t3/11/5K5/11/3**V3**T3/11/11/11 w - - 0 1",
+        "5k5/11/11/3=x3=z3/5=h5/5K5/5=H5/3=X3=Z3/11/11/11[**b**B] w - - 0 1",
+        "5k5/11/4**b1**b4/11/11/5K5/11/4**B1**B4/11/11/11[**b**B**t**T**q**Q] w - - 0 1",
     ]
 );
 
