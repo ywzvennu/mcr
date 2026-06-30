@@ -3357,6 +3357,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if king_sq.rank() != rank {
             return;
         }
+        // A royal king gets the post-castle discovered-check test below; a non-royal
+        // king (Duck) has no check and must not, matching its empty `king_danger`.
+        let royal = !V::royal_squares(&self.board, us).is_empty();
 
         // Castle destinations come from the variant's `castle_dest_files` hook.
         // The default is the standard 8x8 geometry (kingside king to file 6 / g
@@ -3395,6 +3398,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             let king_walk = between(king_sq, king_dest).with(king_dest);
             if !(king_walk & king_danger).is_empty() {
                 continue;
+            }
+
+            // The king must also be safe on its destination under the *post*-castle
+            // occupancy: king and rook off their start squares with the rook on its
+            // destination. In a randomised (Chess960 / Shredder-X-FEN) back rank a
+            // castling rook can shield the king's landing square, so its departure
+            // may open a discovered check that `king_danger` — computed with the
+            // rook still on its home square — misses. For the standard corner-rook
+            // geometries (a/h on chess, a/j on Capablanca) no castling rook ever
+            // stands between an enemy slider and an interior landing square, so this
+            // test rejects nothing there and every non-randomised path stays
+            // byte-identical. Skipped for a non-royal king (Duck), which has no
+            // check at all and is called with an empty `king_danger`.
+            if royal {
+                let after = occupied.without(king_sq).without(rook_from).with(rook_dest);
+                if !self
+                    .attackers_to(king_dest, us.opposite(), after)
+                    .is_empty()
+                {
+                    continue;
+                }
             }
 
             out.push(WideMove::new(king_sq, king_dest, kind));
@@ -5241,12 +5265,23 @@ impl core::fmt::Display for WideFenError {
 #[cfg(feature = "std")]
 impl std::error::Error for WideFenError {}
 
-/// Parses the castling field (`-` or a subset of `KQkq`-style letters) into
-/// [`GenericCastling`], reading each named rook's start file from the board.
+/// Parses the castling field into [`GenericCastling`], reading each named rook's
+/// start file from the board.
 ///
-/// Standard chess uses `K`/`k` for the kingside (rightmost) rook and `Q`/`q` for
-/// the queenside (leftmost) rook of white / black. The rook's start file is the
-/// file of the matching rook on that side's back rank.
+/// Two dialects are accepted, mirroring Fairy-Stockfish:
+///
+/// * **X-FEN** — `K`/`k` name the kingside (rightmost) rook and `Q`/`q` the
+///   queenside (leftmost) rook of white / black; the rook's start file is read off
+///   that side's back rank. This is the only form a non-randomised start ever
+///   uses, so every existing variant keeps the identical `KQkq` parse.
+/// * **Shredder-FEN** — an explicit rook-file letter (uppercase = white,
+///   lowercase = black) names the rook directly by its start file, with the side
+///   inferred from the rook's file relative to its king. This is how FSF writes a
+///   randomised (Chess960-style) back rank, e.g. Capablanca's `JAja`. A file
+///   letter is unambiguous on the ≤10-wide castling boards because the X-FEN
+///   markers `K`/`Q` fall outside the `a..j` file range. The arm only fires on
+///   input the `KQkq` parser previously rejected, so it adds support without
+///   changing any non-randomised result.
 fn parse_castling<G: Geometry, V: WideVariant<G>>(
     field: &str,
     board: &Board<G>,
@@ -5256,38 +5291,54 @@ fn parse_castling<G: Geometry, V: WideVariant<G>>(
         return Ok(rights);
     }
     for ch in field.chars() {
-        let (color, side) = match ch {
-            'K' => (Color::White, KINGSIDE),
-            'Q' => (Color::White, QUEENSIDE),
-            'k' => (Color::Black, KINGSIDE),
-            'q' => (Color::Black, QUEENSIDE),
-            _ => return Err(WideFenError::BadCastling),
-        };
-        // The rank the king and rooks castle on — the back rank by default, but a
-        // variant (Shako) may place them on a different rank.
-        let rank = V::castle_rank(color);
-        // Find the rook on the named side: the outermost friendly rook on the
-        // back rank toward the kingside (last file) or queenside (file 0).
-        let rooks = board.pieces(color, WideRole::Rook);
-        let mut chosen: Option<u8> = None;
-        for file in 0..G::WIDTH {
-            if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
-                if rooks.contains(sq) {
-                    match side {
-                        // Kingside: take the rightmost rook (keep updating).
-                        KINGSIDE => chosen = Some(file),
-                        // Queenside: take the leftmost rook (first one found).
-                        _ => {
-                            if chosen.is_none() {
-                                chosen = Some(file);
-                            }
-                        }
-                    }
-                }
+        match ch {
+            'K' | 'Q' | 'k' | 'q' => {
+                let (color, side) = match ch {
+                    'K' => (Color::White, KINGSIDE),
+                    'Q' => (Color::White, QUEENSIDE),
+                    'k' => (Color::Black, KINGSIDE),
+                    _ => (Color::Black, QUEENSIDE),
+                };
+                // The rank the king and rooks castle on — the back rank by default,
+                // but a variant (Shako) may place them on a different rank.
+                let rank = V::castle_rank(color);
+                let file = outermost_rook_file::<G>(board, color, side, rank)
+                    .ok_or(WideFenError::BadCastling)?;
+                rights.set(color, side, Some(file));
             }
+            // Shredder-FEN: an explicit rook-file letter.
+            'A'..='Z' | 'a'..='z' => {
+                let color = if ch.is_ascii_uppercase() {
+                    Color::White
+                } else {
+                    Color::Black
+                };
+                let file = (ch.to_ascii_lowercase() as u8) - b'a';
+                if file >= G::WIDTH {
+                    return Err(WideFenError::BadCastling);
+                }
+                let rank = V::castle_rank(color);
+                // The named square must actually hold a friendly rook, and the king
+                // must share the castle rank so its file decides the side.
+                let sq =
+                    Square::<G>::from_file_rank(file, rank).ok_or(WideFenError::BadCastling)?;
+                if board.piece_at(sq) != Some(WidePiece::new(color, WideRole::Rook)) {
+                    return Err(WideFenError::BadCastling);
+                }
+                let king_file = board
+                    .king_of(color)
+                    .filter(|k| k.rank() == rank)
+                    .map(Square::file)
+                    .ok_or(WideFenError::BadCastling)?;
+                let side = if file > king_file {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                rights.set(color, side, Some(file));
+            }
+            _ => return Err(WideFenError::BadCastling),
         }
-        let file = chosen.ok_or(WideFenError::BadCastling)?;
-        rights.set(color, side, Some(file));
     }
     Ok(rights)
 }
