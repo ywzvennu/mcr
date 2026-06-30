@@ -407,16 +407,22 @@ const SPECS: &[Spec] = &[
 ///
 /// What stays held back:
 ///
-/// * **Shako** — a confirmed real mce movegen bug: FSF forbids castling the king
-///   across a square a **cannon** attacks over a screen, but mce's castling
-///   king-walk danger map is not cannon-aware on the transit square, so it allows
-///   the castle (repro: `c1q1ck4/vrn6v/2pp2p1r1/4p1n2p/pp3p1ppb/1Q2PP4/PN1P3P2/
-///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mce's `f2d2` is
-///   illegal because the e2 transit square is hit by the e5 cannon over the e3
-///   screen). A focused cannon-aware castling fix, tracked separately.
 /// * **Synochess** — a deeper-sweep perft divergence still under triage (dialect
 ///   target vs movegen); tracked as issue #337.
-const HELD_BACK: &[WideVariantId] = &[WideVariantId::Shako, WideVariantId::Synochess];
+///
+/// Resolved and released back into the default sweep:
+///
+/// * **Shako** (issue #335) — FSF forbids castling the king across a square a
+///   **cannon** attacks over a screen, but mce's castling king-walk danger map
+///   (built by *forward*-projecting each enemy piece) missed a cannon's
+///   over-screen capture on the *empty* transit square the king walks onto. The
+///   fix re-tests each transit square with the king placed on it (see
+///   `GenericPosition::gen_castles`), so the cannon's forward projection lands on
+///   it. Repro: `c1q1ck4/vrn6v/2pp2p1r1/4p1n2p/pp3p1ppb/1Q2PP4/PN1P3P2/
+///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mce's `f2d2` is now
+///   correctly illegal (the e2 transit square is hit by the e5 cannon over the e3
+///   screen). Now clean under the differential fuzzer.
+const HELD_BACK: &[WideVariantId] = &[WideVariantId::Synochess];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
