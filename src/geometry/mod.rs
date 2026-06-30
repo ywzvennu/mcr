@@ -52,7 +52,7 @@ mod wide_move;
 mod zobrist;
 
 pub use any::{AnyWideVariant, UnknownWideVariant, WideVariantId};
-pub use backing::BitboardBacking;
+pub use backing::{BitboardBacking, U256};
 pub use binary::{decode_game, encode_game, WireError};
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
@@ -102,7 +102,8 @@ pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 /// and `HEIGHT` for you, so most implementors never write them by hand.
 pub trait Geometry: Copy + 'static {
     /// The integer backing a [`Bitboard<Self>`]: `u64` for 8x8, `u128` for
-    /// wider boards (up to 128 squares).
+    /// wider boards up to 128 squares, and [`U256`] beyond that (e.g. 12x12 Chu
+    /// Shogi at 144 squares).
     type Bits: BitboardBacking;
 
     /// The number of files (board width).
@@ -178,6 +179,68 @@ pub const fn board_mask_u128(squares: u8) -> u128 {
     }
 }
 
+/// Builds the first-file mask for a board over a [`U256`] backing.
+///
+/// One bit at file `0` of each of `height` ranks, `width` apart. Used by boards
+/// wider than 128 squares (e.g. 12x12 Chu Shogi); cannot use the operator impls
+/// since those are not `const`, so it accumulates into the limbs directly.
+#[must_use]
+pub const fn file_a_mask_u256(width: u8, height: u8) -> U256 {
+    let mut lo: u128 = 0;
+    let mut hi: u128 = 0;
+    let mut rank = 0u8;
+    while rank < height {
+        let n = (rank * width) as u32;
+        if n < 128 {
+            lo |= 1u128 << n;
+        } else {
+            hi |= 1u128 << (n - 128);
+        }
+        rank += 1;
+    }
+    U256::from_parts(lo, hi)
+}
+
+/// Builds the last-file mask (file `width - 1`) for a board over a [`U256`]
+/// backing.
+#[must_use]
+pub const fn last_file_mask_u256(width: u8, height: u8) -> U256 {
+    let mut lo: u128 = 0;
+    let mut hi: u128 = 0;
+    let mut rank = 0u8;
+    while rank < height {
+        let n = (rank * width + width - 1) as u32;
+        if n < 128 {
+            lo |= 1u128 << n;
+        } else {
+            hi |= 1u128 << (n - 128);
+        }
+        rank += 1;
+    }
+    U256::from_parts(lo, hi)
+}
+
+/// Builds the board mask (the `squares` low bits) over a [`U256`] backing.
+///
+/// `squares` must be `<= 256`; passing `256` yields all ones.
+#[must_use]
+pub const fn board_mask_u256(squares: u8) -> U256 {
+    let s = squares as u32;
+    if s >= 256 {
+        U256::from_parts(!0u128, !0u128)
+    } else if s >= 128 {
+        // All low bits set; the high limb holds the remaining `s - 128` bits.
+        let hi = if s == 128 {
+            0
+        } else {
+            (1u128 << (s - 128)) - 1
+        };
+        U256::from_parts(!0u128, hi)
+    } else {
+        U256::from_parts((1u128 << s) - 1, 0)
+    }
+}
+
 /// Defines a [`Geometry`] marker type with masks derived from its width and
 /// height.
 ///
@@ -226,6 +289,24 @@ macro_rules! geometry {
             const LAST_FILE_MASK: u128 =
                 $crate::geometry::file_a_mask_u128($width, $height) << ($width - 1);
             const BOARD_MASK: u128 = $crate::geometry::board_mask_u128($width * $height);
+        }
+    };
+    ($(#[$meta:meta])* $name:ident, u256, $width:expr, $height:expr) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+        pub struct $name;
+
+        impl $crate::geometry::Geometry for $name {
+            type Bits = $crate::geometry::U256;
+            const WIDTH: u8 = $width;
+            const HEIGHT: u8 = $height;
+            const SQUARES: u8 = $width * $height;
+            const FILE_A_MASK: $crate::geometry::U256 =
+                $crate::geometry::file_a_mask_u256($width, $height);
+            const LAST_FILE_MASK: $crate::geometry::U256 =
+                $crate::geometry::last_file_mask_u256($width, $height);
+            const BOARD_MASK: $crate::geometry::U256 =
+                $crate::geometry::board_mask_u256($width * $height);
         }
     };
 }
@@ -400,9 +481,28 @@ geometry!(
     7
 );
 
+geometry!(
+    /// The Chu Shogi board: twelve files by twelve ranks (144 squares), backed
+    /// by [`U256`].
+    ///
+    /// This is the first geometry to exceed the 128-square ceiling of a `u128`
+    /// backing: `12 * 12 = 144 > 128`, so it uses the two-limb [`U256`] backing,
+    /// exercising the limb-boundary shifts and high-square masking. A square
+    /// index reaches `143` (in the high limb), and edge-masked east/west shifts
+    /// must not wrap past the twelfth file. Files run a..l, ranks 1..12.
+    ///
+    /// It hosts Chu Shogi — the 12x12 large shogi with no drops, a deep promotion
+    /// zone, ~21 piece types including ranging sliders and the double-moving
+    /// **Lion**. The geometry is reused by the still-larger shogi variants.
+    Chu12x12,
+    u256,
+    12,
+    12
+);
+
 #[cfg(test)]
 mod tests {
-    use super::{Bitboard, Cap10x8, Chess8x8, Geometry, Square};
+    use super::{Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Geometry, Square};
     use crate::{Bitboard as CBitboard, Square as CSquare};
     use alloc::vec::Vec;
 
@@ -609,6 +709,80 @@ mod tests {
         assert_eq!(
             Bitboard::<Cap10x8>::from_square(f8).east(),
             Bitboard::<Cap10x8>::from_square(Square::new(9))
+        );
+    }
+
+    // ----- u256 geometry: 144 squares, crossing the 128-bit limb seam ---------
+
+    #[test]
+    fn chu12x12_constants() {
+        assert_eq!(Chu12x12::WIDTH, 12);
+        assert_eq!(Chu12x12::HEIGHT, 12);
+        assert_eq!(Chu12x12::SQUARES, 144);
+        // One bit per rank on the first/last file.
+        assert_eq!(Chu12x12::FILE_A_MASK.count_ones(), 12);
+        assert_eq!(Chu12x12::LAST_FILE_MASK.count_ones(), 12);
+        // BOARD_MASK is exactly the 144 low bits, spanning both limbs.
+        assert_eq!(Chu12x12::BOARD_MASK.count_ones(), 144);
+        assert_eq!(Bitboard::<Chu12x12>::FULL.count(), 144);
+        // No off-board high bits survive in FULL.
+        assert_eq!(
+            !Bitboard::<Chu12x12>::FULL & Bitboard::<Chu12x12>::FULL,
+            Bitboard::EMPTY
+        );
+    }
+
+    #[test]
+    fn chu12x12_square_file_rank_high_squares() {
+        // Index 131 lives in the high limb: file 11, rank 10.
+        let s = Square::<Chu12x12>::from_file_rank(11, 10).unwrap();
+        assert_eq!(s.index(), 131);
+        assert_eq!((s.file(), s.rank()), (11, 10));
+        // The very last square, index 143, also in the high limb.
+        let last = Square::<Chu12x12>::new(143);
+        assert_eq!((last.file(), last.rank()), (11, 11));
+        assert!(Square::<Chu12x12>::try_new(144).is_none());
+        assert!(Square::<Chu12x12>::from_file_rank(12, 0).is_none());
+    }
+
+    #[test]
+    fn chu12x12_north_south_cross_the_limb_seam() {
+        // File 5, rank 9 -> index 113 (low limb). North (+12) -> index 125 still
+        // low; another north -> index 137, which is in the HIGH limb: the shift
+        // must carry across the 128-bit seam.
+        let s = Square::<Chu12x12>::from_file_rank(5, 9).unwrap();
+        assert_eq!(s.index(), 113);
+        let n1 = Bitboard::<Chu12x12>::from_square(s).north();
+        assert_eq!(n1, Bitboard::from_square(Square::new(125)));
+        let n2 = n1.north();
+        assert_eq!(n2.0.hi, 1u128 << (137 - 128)); // landed in the high limb
+        assert_eq!(n2.0.lo, 0);
+        assert_eq!(n2, Bitboard::from_square(Square::new(137)));
+        // South back across the seam returns to the low limb.
+        assert_eq!(n2.south(), n1);
+        assert_eq!(n1.south(), Bitboard::from_square(s));
+        // North off the top rank vanishes (no wrap into off-board high bits).
+        let top = Bitboard::<Chu12x12>::from_square(Square::new(143));
+        assert_eq!(top.north(), Bitboard::EMPTY);
+    }
+
+    #[test]
+    fn chu12x12_east_west_do_not_leak_across_files_in_high_limb() {
+        // Last file, top ranks (high-limb squares): east must vanish.
+        assert_eq!(Bitboard::<Chu12x12>::LAST_FILE.east(), Bitboard::EMPTY);
+        assert_eq!(Bitboard::<Chu12x12>::FILE_A.west(), Bitboard::EMPTY);
+        // A high-limb last-file square (file 11, rank 11 = index 143): east empty.
+        let hi = Square::<Chu12x12>::new(143);
+        assert_eq!(
+            Bitboard::<Chu12x12>::from_square(hi).east(),
+            Bitboard::EMPTY
+        );
+        // Interior high-limb move: file 0, rank 11 (index 132) east -> index 133.
+        let a11 = Square::<Chu12x12>::from_file_rank(0, 11).unwrap();
+        assert_eq!(a11.index(), 132);
+        assert_eq!(
+            Bitboard::<Chu12x12>::from_square(a11).east(),
+            Bitboard::from_square(Square::new(133))
         );
     }
 
