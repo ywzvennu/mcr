@@ -26,11 +26,15 @@
 use serde::de::{Error as DeError, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::geometry::{
+    Board as WideBoard, GenericPlacement, GenericPosition, Geometry, WideRole, WideVariant,
+};
 use crate::{
     AnyVariant, Board, CastleSide, CastlingRights, Color, File, Move, MoveKind, Position, Square,
     VariantId,
 };
 use alloc::string::String;
+use alloc::vec::Vec;
 
 // -- Square -----------------------------------------------------------------
 
@@ -182,5 +186,95 @@ impl<'de> Deserialize<'de> for AnyVariant {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let AnyVariantRepr { variant, fen } = AnyVariantRepr::deserialize(deserializer)?;
         AnyVariant::from_fen(variant, &fen).map_err(DeError::custom)
+    }
+}
+
+// === geometry layer ========================================================
+//
+// The wide (large-board, fairy-variant) layer mirrors the concrete layer's
+// choices: the generic [`WideBoard`] and [`GenericPosition`] serialize as their
+// **FEN strings** (placement for the board; the full six-field FEN — pockets,
+// gating, Duck, promoted markers, and all — for the position), which are compact,
+// stable, and free of the private Zobrist hash and bitboard layout. Both are
+// generic over the geometry `G` (and the variant marker `V`); each concrete
+// `pub type` alias (`Xiangqi`, `Shogi`, `Seirawan`, …) is a distinct type, so its
+// FEN dialect is fixed at the type level and the round-trip is lossless for every
+// legal value. The placement-phase pocket [`GenericPlacement`] serializes through
+// a small explicit shape — its per-role counts for each side — rather than its
+// private fixed-size arrays. ([`WideMove`](crate::geometry::WideMove) and the wide
+// scalar enums carry their own impls at their definition sites.)
+
+// -- Board<G> ---------------------------------------------------------------
+
+impl<G: Geometry> Serialize for WideBoard<G> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_fen_placement())
+    }
+}
+
+impl<'de, G: Geometry> Deserialize<'de> for WideBoard<G> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let placement = <&str>::deserialize(deserializer)?;
+        WideBoard::<G>::from_fen_placement(placement).map_err(DeError::custom)
+    }
+}
+
+// -- GenericPosition<G, V> --------------------------------------------------
+
+impl<G: Geometry, V: WideVariant<G>> Serialize for GenericPosition<G, V> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_fen())
+    }
+}
+
+impl<'de, G: Geometry, V: WideVariant<G>> Deserialize<'de> for GenericPosition<G, V> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fen = <&str>::deserialize(deserializer)?;
+        GenericPosition::<G, V>::from_fen(fen).map_err(DeError::custom)
+    }
+}
+
+// -- GenericPlacement -------------------------------------------------------
+
+/// The wire shape of a [`GenericPlacement`] pocket: one undeployed-piece count per
+/// [`WideRole`] for each side, in [`WideRole::index`] order. This is exactly what
+/// the public [`GenericPlacement::count`] accessor reports, and it round-trips
+/// every pocket without leaking the type's private fixed-size count arrays.
+#[derive(Serialize, Deserialize)]
+struct GenericPlacementRepr {
+    white: Vec<u8>,
+    black: Vec<u8>,
+}
+
+impl Serialize for GenericPlacement {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let counts = |color: Color| -> Vec<u8> {
+            (0..WideRole::COUNT)
+                .map(|i| match WideRole::from_index(i) {
+                    Some(role) => self.count(color, role),
+                    None => 0,
+                })
+                .collect()
+        };
+        GenericPlacementRepr {
+            white: counts(Color::White),
+            black: counts(Color::Black),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for GenericPlacement {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let GenericPlacementRepr { white, black } =
+            GenericPlacementRepr::deserialize(deserializer)?;
+        if white.len() != WideRole::COUNT || black.len() != WideRole::COUNT {
+            return Err(DeError::custom("pocket must carry one count per WideRole"));
+        }
+        let mut white_counts = [0u8; WideRole::COUNT];
+        let mut black_counts = [0u8; WideRole::COUNT];
+        white_counts.copy_from_slice(&white);
+        black_counts.copy_from_slice(&black);
+        Ok(GenericPlacement::new(white_counts, black_counts))
     }
 }

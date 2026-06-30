@@ -8,6 +8,11 @@
 
 #![cfg(feature = "serde")]
 
+use mce::geometry::{
+    Board as WideBoard, CannonShogi, Chess8x8, GateRole, GateSquare, GenericPlacement,
+    GenericPosition, Geometry, Seirawan, Shogi, Shogi9x9, Sittuyin, Square as WideSquare, WideMove,
+    WideMoveKind, WideRole, WideVariant, Xiangqi, Xiangqi9x10,
+};
 use mce::{
     AnyVariant, Bitboard, Board, CheckCounters, Color, CrazyhouseState, EndReason, File, Move,
     MoveKind, Outcome, Piece, Position, Rank, Role, Square, VariantId,
@@ -245,4 +250,149 @@ fn crazyhouse_state_round_trips() {
         after, back,
         "crazyhouse pocket state must survive (json {json})"
     );
+}
+
+// === geometry (wide / fairy-variant) layer =================================
+
+/// Serializes a generic position, asserts the JSON is exactly its quoted FEN, and
+/// asserts the deserialized position re-serializes to the same FEN. (A
+/// `GenericPosition` has no `PartialEq`; its FEN is its canonical lossless form.)
+#[track_caller]
+fn position_round_trips<G, V>(pos: GenericPosition<G, V>)
+where
+    G: Geometry,
+    V: WideVariant<G>,
+{
+    let fen = pos.to_fen();
+    let json = serde_json::to_string(&pos).expect("serialize");
+    assert_eq!(json, format!("{fen:?}"), "serialized form must be the FEN");
+    let back: GenericPosition<G, V> = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back.to_fen(), fen, "round trip changed the position");
+}
+
+#[test]
+fn generic_positions_round_trip_via_fen() {
+    // A representative position per family: an 8x8 gating variant with reserves in
+    // hand (Seirawan), a hand/drop variant (Shogi), a non-power-of-two board
+    // (Xiangqi, 9x10), a setup-phase placement-pocket variant (Sittuyin), and an
+    // overflow-role variant whose `WideRole` index runs past 64 (Cannon Shogi).
+    position_round_trips(Seirawan::startpos());
+    position_round_trips(Shogi::startpos());
+    position_round_trips(Xiangqi::startpos());
+    position_round_trips(Sittuyin::startpos());
+    position_round_trips(CannonShogi::startpos());
+
+    // A non-startpos FEN with a mid-game clock (the documented mce Xiangqi
+    // dialect, side to move flipped).
+    position_round_trips(
+        Xiangqi::from_fen("rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR b - - 3 7")
+            .expect("valid xiangqi fen"),
+    );
+}
+
+#[test]
+fn generic_position_rejects_malformed_fen() {
+    assert!(serde_json::from_str::<Seirawan>("\"not a fen\"").is_err());
+    assert!(serde_json::from_str::<Shogi>("\"garbage\"").is_err());
+}
+
+#[test]
+fn wide_board_round_trips_via_fen_placement() {
+    let cases = [
+        WideBoard::<Chess8x8>::from_fen_placement("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+            .expect("valid 8x8 placement"),
+        WideBoard::<Chess8x8>::empty(),
+    ];
+    for board in cases {
+        let json = serde_json::to_string(&board).expect("serialize");
+        let back: WideBoard<Chess8x8> = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(board, back, "board round trip changed the value");
+    }
+    // The serialized form is exactly the FEN placement string.
+    let board =
+        WideBoard::<Chess8x8>::from_fen_placement("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+            .unwrap();
+    let json = serde_json::to_string(&board).unwrap();
+    assert_eq!(json, "\"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR\"");
+
+    // A 9x10 Xiangqi board, exercising a non-8x8 geometry.
+    let xq = WideBoard::<Xiangqi9x10>::from_fen_placement(
+        "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR",
+    )
+    .expect("valid xiangqi placement");
+    round_trip(xq);
+}
+
+#[test]
+fn wide_moves_round_trip_every_kind() {
+    let from = WideSquare::<Chess8x8>::new(12);
+    let to = WideSquare::<Chess8x8>::new(28);
+    let plain = [
+        WideMove::new(from, to, WideMoveKind::Quiet),
+        WideMove::new(from, to, WideMoveKind::Capture),
+        WideMove::new(from, to, WideMoveKind::DoublePawnPush),
+        WideMove::new(from, to, WideMoveKind::EnPassant),
+        WideMove::new(from, to, WideMoveKind::CastleKingside),
+        WideMove::new(from, to, WideMoveKind::CastleQueenside),
+    ];
+    for mv in plain {
+        round_trip(mv);
+    }
+
+    // Promotions and drops over every role index, including the overflow roles
+    // (index >= 64) that pushed the packed role field to seven bits.
+    for role in (0..WideRole::COUNT).filter_map(WideRole::from_index) {
+        round_trip(WideMove::new(
+            from,
+            to,
+            WideMoveKind::Promotion {
+                role,
+                capture: false,
+            },
+        ));
+        round_trip(WideMove::new(
+            from,
+            to,
+            WideMoveKind::Promotion {
+                role,
+                capture: true,
+            },
+        ));
+        round_trip(WideMove::drop(role, to));
+    }
+
+    // The fairy addenda: a Seirawan gate, an S-House hand-gate, and a Duck
+    // placement, each on top of a base move.
+    let base = WideMove::new(from, to, WideMoveKind::Quiet);
+    round_trip(base.with_gate(GateRole::Hawk, GateSquare::Origin));
+    round_trip(base.with_gate(GateRole::Elephant, GateSquare::RookOrigin));
+    round_trip(base.with_hand_gate::<Chess8x8>(WideRole::Knight, GateSquare::Origin));
+    round_trip(base.with_hand_gate::<Chess8x8>(WideRole::Rook, GateSquare::RookOrigin));
+    round_trip(base.with_duck::<Chess8x8>(WideSquare::<Chess8x8>::new(40)));
+
+    // A drop on a wide board with a high square index.
+    let s = WideSquare::<Shogi9x9>::new(80);
+    round_trip(WideMove::drop(WideRole::Pawn, s));
+}
+
+#[test]
+fn generic_placement_round_trips() {
+    round_trip(GenericPlacement::NONE);
+
+    let mut white = [0u8; WideRole::COUNT];
+    let mut black = [0u8; WideRole::COUNT];
+    white[WideRole::Pawn.index()] = 3;
+    white[WideRole::Knight.index()] = 1;
+    black[WideRole::Queen.index()] = 2;
+    // An overflow-index role, to cover the full count array.
+    if let Some(role) = WideRole::from_index(WideRole::COUNT - 1) {
+        black[role.index()] = 1;
+    }
+    round_trip(GenericPlacement::new(white, black));
+}
+
+#[test]
+fn generic_placement_rejects_wrong_length() {
+    // The pocket wire shape must carry exactly one count per role per side.
+    assert!(serde_json::from_str::<GenericPlacement>(r#"{"white":[1,2,3],"black":[]}"#).is_err());
 }

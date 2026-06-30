@@ -203,6 +203,7 @@ const HAND_GATE_ON_ROOK: u64 = 1 << 48;
 /// back-rank piece's first move: a Hawk (Bishop + Knight) or an Elephant
 /// (Rook + Knight). See [`WideMove::with_gate`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GateRole {
     /// Gate the Hawk ([`WideRole::Hawk`]).
     Hawk,
@@ -246,6 +247,7 @@ impl GateRole {
 /// square, or — for a castling base move — on the castling rook's vacated
 /// square. A non-castling gate always targets the origin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GateSquare {
     /// Gate onto the square the moving piece (or king) vacated — its origin.
     Origin,
@@ -705,6 +707,123 @@ impl fmt::Display for WideMove {
             write!(f, "={}", role.char())?;
         }
         Ok(())
+    }
+}
+
+// -- serde ------------------------------------------------------------------
+//
+// `WideMove` packs its whole state into a private `u64`. Rather than leak that
+// bit layout onto the wire — and mirroring the concrete `Move`, which serializes
+// through a public `{ from, to, kind }` shape rather than its packed integer — it
+// serializes through [`WideMoveData`]: the public origin and destination square
+// *indices* (geometry-free `u8`s, `0..128`), the [`WideMoveKind`] (which already
+// carries any promotion / drop role), and the three optional fairy addenda — the
+// Seirawan gate, the S-House hand-gate, and the Duck placement. A move rebuilds
+// losslessly from these, with no geometry needed (the squares are plain indices),
+// so the non-generic `Deserialize` impl has everything it requires.
+#[cfg(feature = "serde")]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct WideMoveData {
+    from: u8,
+    to: u8,
+    kind: WideMoveKind,
+    /// The Seirawan reserve this move gates in, and onto which vacated square.
+    gate: Option<(GateRole, GateSquare)>,
+    /// The arbitrary hand piece this move gates in (S-House), and onto which
+    /// vacated square.
+    hand_gate: Option<(WideRole, GateSquare)>,
+    /// The square the neutral Duck is placed on this ply (Duck chess), as an
+    /// index.
+    duck: Option<u8>,
+}
+
+#[cfg(feature = "serde")]
+impl WideMove {
+    /// Builds the public wire shape from this move's accessors.
+    fn to_data(self) -> WideMoveData {
+        WideMoveData {
+            from: self.from_index(),
+            to: self.to_index(),
+            kind: self.kind(),
+            gate: self.gate().map(|g| (g, self.gate_square())),
+            hand_gate: self.hand_gate().map(|r| (r, self.hand_gate_square())),
+            duck: self.duck_to_index(),
+        }
+    }
+
+    /// Rebuilds a move from its public wire shape. Geometry-free: the squares are
+    /// plain indices, so `pack` (not the typed `new`) reassembles the base word,
+    /// and the gate / hand-gate / Duck addenda are reapplied through the same
+    /// bit layout the typed builders use.
+    fn from_data(data: WideMoveData) -> WideMove {
+        let WideMoveData {
+            from,
+            to,
+            kind,
+            gate,
+            hand_gate,
+            duck,
+        } = data;
+        let mut mv = match kind {
+            WideMoveKind::Quiet => WideMove::pack(from, to, 0, KIND_QUIET),
+            WideMoveKind::Capture => WideMove::pack(from, to, 0, KIND_CAPTURE),
+            WideMoveKind::DoublePawnPush => WideMove::pack(from, to, 0, KIND_DOUBLE_PUSH),
+            WideMoveKind::EnPassant => WideMove::pack(from, to, 0, KIND_EN_PASSANT),
+            WideMoveKind::CastleKingside => WideMove::pack(from, to, 0, KIND_CASTLE_K),
+            WideMoveKind::CastleQueenside => WideMove::pack(from, to, 0, KIND_CASTLE_Q),
+            WideMoveKind::Promotion { role, capture } => WideMove::pack(
+                from,
+                to,
+                role.index() as u32,
+                if capture {
+                    KIND_PROMOTION_CAPTURE
+                } else {
+                    KIND_PROMOTION
+                },
+            ),
+            // A drop is `from == to == square`; the role rides in the role field.
+            WideMoveKind::Drop { role } => WideMove::pack(to, to, role.index() as u32, KIND_DROP),
+        };
+        if let Some((role, square)) = gate {
+            mv = mv.with_gate(role, square);
+        }
+        if let Some((role, square)) = hand_gate {
+            // The hand-gate fields are geometry-free bits in the high word; set
+            // them straight (the typed `with_hand_gate` only ever touches these
+            // same bits, and ignores its geometry parameter).
+            let mut bits =
+                mv.0 & !((HAND_GATE_ROLE_MASK << HAND_GATE_ROLE_SHIFT) | HAND_GATE_ON_ROOK);
+            bits |= HAND_GATE_PRESENT;
+            bits |= ((role.index() as u64) & HAND_GATE_ROLE_MASK) << HAND_GATE_ROLE_SHIFT;
+            if matches!(square, GateSquare::RookOrigin) {
+                bits |= HAND_GATE_ON_ROOK;
+            }
+            mv = WideMove(bits);
+        }
+        if let Some(index) = duck {
+            // The Duck addendum is the high word; the base move is the low 32 bits.
+            mv = WideMove(
+                (mv.0 & 0x0000_0000_ffff_ffff)
+                    | DUCK_PRESENT
+                    | ((index as u64) << DUCK_SQUARE_SHIFT),
+            );
+        }
+        mv
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for WideMove {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&self.to_data(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for WideMove {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let data = <WideMoveData as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(WideMove::from_data(data))
     }
 }
 
