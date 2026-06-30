@@ -39,6 +39,8 @@ pub mod binary;
 mod bitboard;
 mod board;
 pub mod book;
+mod collection;
+pub mod epd;
 pub mod game;
 mod notation;
 pub mod position;
@@ -55,6 +57,8 @@ pub use binary::{decode_game, encode_game, WireError};
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
 pub use book::{weighted_pick, WideBook, WideBookEntry};
+pub use collection::{WideGameRecord, WidePgnCollection};
+pub use epd::{WideEpd, WideEpdError};
 pub use game::{GenericGame, WideIllegalMove, COUNTING_LIMIT_PLIES};
 pub use notation::{WidePgn, WidePgnError, WidePgnResult, WideSanError};
 pub use position::{
