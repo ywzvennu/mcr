@@ -114,7 +114,7 @@ const CASES: &[Case] = &[
 /// the three prefixes (`**`, `*`, `+`) and the bare-letter swaps never collide;
 /// case is preserved (it carries colour). The side-to-move / clock fields are left
 /// intact.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts.next().unwrap_or("");
     let mut out = String::with_capacity(placement.len());

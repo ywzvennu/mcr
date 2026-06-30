@@ -91,7 +91,7 @@ const CASES: &[Case] = &[
 
 /// Rewrites an mce-dialect Chennis FEN's placement field to FSF's spelling. See the
 /// [module docs](self) for the token table.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts.next().unwrap_or("");
     let mut out = String::with_capacity(placement.len());

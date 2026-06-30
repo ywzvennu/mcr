@@ -68,7 +68,7 @@ const CASES: &[Case] = &[
 /// Translates an mce-dialect Shatar FEN to FSF's dialect by mapping the Bers
 /// letter `d → j` (both cases). Every other letter — the standard army and the
 /// structural fields — is FSF-identical, so the swap is safe over the whole FEN.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.chars()
         .map(|c| match c {
             'd' => 'j',

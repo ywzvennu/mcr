@@ -110,6 +110,44 @@ fn startpos_deep() {
     check(STARTPOS, &[(5, 445160174)]);
 }
 
+/// Regression for the `Shinobi::startpos()` constructor itself (issue #239): it
+/// must build the **FSF-confirmed** start, not merely parse a hand-written FEN.
+///
+/// The latent bug: `SHINOBI_START_PLACEMENT` spelled the clan back rank with bare
+/// `Y`/`F`, which parse to the Orda **Archer** / **Lancer** — not the Shogi Knight
+/// (`*N`) and Commoner (`*U`). It evaded every test because `perft_shinobi` and the
+/// `compare-fairy` harness both drove hand-written, correctly-spelled FENs and
+/// never the constructor, so `startpos()` quietly returned a different position
+/// (perft 107 / 2138 / 202874) from the pinned FSF-correct one (112 / 2238 /
+/// 224144). This test closes the gap by exercising the constructor directly.
+#[test]
+fn startpos_constructor_matches_fsf_confirmed_start() {
+    let start = Shinobi::startpos();
+    // The board placement (the clan back rank especially) must equal the
+    // FSF-confirmed `STARTPOS` byte for byte. The `[..]` hand holds the same
+    // multiset either way but may serialize in a different role order, so compare
+    // the placement prefix here and let the perft counts below pin the holdings.
+    assert_eq!(
+        start.to_fen().split('[').next(),
+        STARTPOS.split('[').next(),
+        "Shinobi::startpos() board placement must equal the FSF-confirmed start FEN"
+    );
+    assert!(
+        start.to_fen().contains("L*N1*UK1*NL"),
+        "the clan back rank must be Lance / Shogi Knight / Commoner / King (`L*N1*UK1*NL`), \
+not the Orda Archer/Lancer (`LY1FK1YL`)"
+    );
+    // The constructor's own perft must hit the FSF-confirmed counts, independent of
+    // any FEN round trip.
+    for &(depth, expected) in &[(1u32, 112u64), (2, 2238), (3, 224144)] {
+        assert_eq!(
+            gperft::<Chess8x8, _>(&start, depth),
+            expected,
+            "Shinobi::startpos() perft({depth}) must equal the FSF-confirmed {expected}"
+        );
+    }
+}
+
 // -- Middlegame A: developed, depleted reserve (FSF-confirmed) --------------
 
 #[test]

@@ -64,7 +64,7 @@ const CASES: &[Case] = &[
 /// Translates an mce-dialect Sittuyin FEN to FSF's dialect by swapping the Met
 /// letter `m`↔`f` (both cases). Safe over the whole FEN: only the placement /
 /// pocket field carries piece letters in Sittuyin (no castling, no en passant).
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.chars()
         .map(|c| match c {
             'm' => 'f',

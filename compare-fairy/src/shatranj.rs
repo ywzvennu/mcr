@@ -72,7 +72,7 @@ const CASES: &[Case] = &[
 /// The Alfil is an mce **overflow** role: its token is the two characters `*x`
 /// (white `*X`), so it is collapsed to FSF's single `b`/`B` before the per-char
 /// swap. No other mce token starts with `*`, so a plain sequence replace is safe.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.replace("*X", "B")
         .replace("*x", "b")
         .chars()

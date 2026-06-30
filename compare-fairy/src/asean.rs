@@ -26,7 +26,7 @@ use crate::uci::Engine;
 /// becomes `q`/`Q`. Only the placement field is touched; the rest passes through
 /// (ASEAN has no en-passant target and no castling rights, so nothing else needs
 /// rewriting).
-fn fen_to_fsf(fen: &str) -> String {
+pub(crate) fn fen_to_fsf(fen: &str) -> String {
     let rewrite_placement = |placement: &str| -> String {
         placement
             .chars()

@@ -13,8 +13,8 @@
 //!   castling — the only side that castles. Its pawns, however, promote into a
 //!   **Commoner** (see below), not into `N/B/R/Q`.
 //! * **White = the clan.** A back rank of Lances, Shogi Knights, a Commoner and
-//!   the King (`LY1FK1YL` in mce letters), a rank of standard pawns, and a
-//!   **starting hand** `[LYMMDA]` (two Fers, a Lance, a Shogi Knight, a Bers, and
+//!   the King (`L*N1*UK1*NL` in mce letters), a rank of standard pawns, and a
+//!   **starting hand** `[L*NMMDA]` (two Fers, a Lance, a Shogi Knight, a Bers, and
 //!   an Archbishop) it may drop. The clan pieces, in mce roles:
 //!   * **Commoner** ([`WideRole::Commoner`]) — a non-royal king-mover (one step in
 //!     any of the eight directions); it may be captured freely and never defines
@@ -95,10 +95,13 @@ use crate::Color;
 pub struct ShinobiRules;
 
 /// The confirmed Shinobi starting placement, in mce's role letters (Black = the
-/// standard army; White = `L Y _ F K _ Y L` on the back rank — Lance, Shogi
-/// Knight, Commoner, King — over a rank of standard pawns). The hand rides in the
-/// FEN's `[..]` holdings bracket, not here.
-const SHINOBI_START_PLACEMENT: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/LY1FK1YL";
+/// standard army; White = `L *N _ *U K _ *N L` on the back rank — Lance, Shogi
+/// Knight, Commoner, King — over a rank of standard pawns). The Shogi Knight and
+/// Commoner are **overflow** roles with no bare letter, so they carry the `*`
+/// prefix (`*N` = Shogi Knight, `*U` = Commoner); a plain `Y`/`F` would parse as
+/// the Orda Archer / Lancer instead. The hand rides in the FEN's `[..]` holdings
+/// bracket, not here.
+const SHINOBI_START_PLACEMENT: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/L*N1*UK1*NL";
 
 /// The four diagonal one-step (ferz) offsets — the Bers's diagonal component and
 /// the Fers's whole move.
@@ -126,7 +129,7 @@ impl WideVariant<Chess8x8> for ShinobiRules {
         let mut castling = GenericCastling::NONE;
         castling.set(Color::Black, 0, Some(Chess8x8::WIDTH - 1));
         castling.set(Color::Black, 1, Some(0));
-        // White's starting reserve `[LYMMDA]`: a Lance, a Shogi Knight, two Fers
+        // White's starting reserve `[L*NMMDA]`: a Lance, a Shogi Knight, two Fers
         // (Met), a Bers (General), and an Archbishop (Hawk). Black has none.
         let mut white = [0u8; WideRole::COUNT];
         white[WideRole::Lance.index()] = 1;

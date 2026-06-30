@@ -94,7 +94,7 @@ const CASES: &[Case] = &[
 /// The King `k`/`K` is shared. The order matters: map the **Yurt** (`s→y`)
 /// **before** the Archer would re-read a `y`, so each source letter is rewritten
 /// exactly once via a single simultaneous `match`.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     // Only the placement field (before the first space) holds piece letters; the
     // side-to-move / castling / en-passant fields must be left intact (otherwise
     // a white-to-move `w` would be mangled into the Kheshig's `h`).
