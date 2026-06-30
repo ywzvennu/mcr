@@ -62,3 +62,31 @@ path = "fuzz_targets/san_roundtrip.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "wide_fen_roundtrip"
+path = "fuzz_targets/wide_fen_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wide_uci_parse"
+path = "fuzz_targets/wide_uci_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wide_movegen_play"
+path = "fuzz_targets/wide_movegen_play.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "any_wide_from_str"
+path = "fuzz_targets/any_wide_from_str.rs"
+test = false
+doc = false
+bench = false
