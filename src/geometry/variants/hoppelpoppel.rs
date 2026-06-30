@@ -54,6 +54,32 @@
 //! standard pawns / king / rooks / queen. The two FENs are the same position; the
 //! `compare-fairy/` harness rewrites mce's `*h → n`, `*b → b` when driving FSF.
 //! Both sides have full castling rights (`KQkq`).
+//!
+//! ## Insufficient material — deliberately **default-off** (#350)
+//!
+//! Hoppel-Poppel does **not** opt into the
+//! [`is_insufficient_material`](WideVariant::is_insufficient_material) hook, even
+//! though Fairy-Stockfish *does* adjudicate material draws here. The reason is a
+//! genuine classification divergence the standard-army
+//! [`standard_insufficient_material`] helper cannot express:
+//!
+//! FSF classes both [`WideRole::KnightBishop`] (`KNIBIS`) and
+//! [`WideRole::BishopKnight`] (`BISKNI`) as **unbound minors** — neither is a major
+//! piece nor colour-bound — so it draws **king + one such piece vs king** exactly
+//! as it draws K+N vs K. Verified against `UCI_Variant hoppelpoppel`: both
+//! `K+KnightBishop vs K` and `K+BishopKnight vs K` report insufficient. The
+//! standard helper, however, only knows the three standard classes (king, knight,
+//! colour-bound bishop); it treats every other role — including these two — as
+//! **mating material** (an "other" piece), so it would report those same positions
+//! as *sufficient*. Using the helper here would therefore **contradict** FSF, and
+//! reproducing FSF faithfully would need a Hoppel-Poppel-specific minor
+//! classification (KnightBishop / BishopKnight as unbound minors, with the K+two
+//! threshold). That is out of scope for #350's conservative, default-off
+//! adjudication hook, so the variant is correctly left off: it simply reports no
+//! material draw (the pre-#350 status quo), never a *wrong* one. The hook is
+//! adjudication-only and never touched movegen, so perft is unaffected either way.
+//!
+//! [`standard_insufficient_material`]: crate::geometry::variant::standard_insufficient_material
 
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,

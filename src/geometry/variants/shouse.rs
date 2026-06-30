@@ -53,6 +53,19 @@
 //! the crazyhouse hand (the starting Hawk/Elephant reserves) and the
 //! `KQBCDFGkqbcdfg` castling field carries the castling rights plus the
 //! gating-eligible back-rank files, exactly as in Seirawan.
+//!
+//! ## Insufficient material — deliberately **default-off** (#350)
+//!
+//! Unlike plain [Seirawan](super::seirawan) — which opts into the material-draw
+//! hook once its gating reserve empties — S-House does **not**, because it is a
+//! **captures-to-hand** (crazyhouse) variant: every capture banks the taken piece
+//! into the hand, from which it may be **dropped** back onto the board. Material is
+//! therefore never exhausted — even a bare-king position can sprout a queen on the
+//! next ply — so no insufficient-material draw can ever hold. This mirrors
+//! Fairy-Stockfish's `has_insufficient_material`, whose very first guard returns
+//! "sufficient" whenever `captures_to_hand()` is set; verified against
+//! `UCI_Variant shouse`, where even `KvK` with an empty hand is *not* drawn. The
+//! hook stays at its `false` default and the variant reports no material draw.
 
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
