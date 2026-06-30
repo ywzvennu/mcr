@@ -35,6 +35,7 @@
 mod any;
 pub mod attacks;
 mod backing;
+pub mod binary;
 mod bitboard;
 mod board;
 pub mod book;
@@ -50,6 +51,7 @@ mod zobrist;
 
 pub use any::{AnyWideVariant, UnknownWideVariant, WideVariantId};
 pub use backing::BitboardBacking;
+pub use binary::{decode_game, encode_game, WireError};
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
 pub use book::{weighted_pick, WideBook, WideBookEntry};

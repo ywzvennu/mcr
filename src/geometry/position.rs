@@ -669,6 +669,37 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         self.state.fullmove_number
     }
 
+    /// Returns a reference to the non-board [`GenericState`]: side to move,
+    /// castling, en passant, Seirawan gating, the Duck square, the hand / setup
+    /// pocket, the two clocks, the Janggi pass counter, and the Alice plane mask.
+    ///
+    /// The board is [`board`](Self::board) and the crazyhouse promoted mask is
+    /// [`promoted`](Self::promoted); together with this state they are exactly what
+    /// the compact binary wire codec ([`to_bytes`](Self::to_bytes)) round-trips.
+    #[must_use]
+    #[inline]
+    pub fn state(&self) -> &GenericState<G> {
+        &self.state
+    }
+
+    /// Returns the crazyhouse **promoted mask**: the squares whose occupant
+    /// reached the board by promotion (so capturing one banks a Pawn).
+    /// [`Bitboard::EMPTY`] for every variant whose
+    /// [`WideVariant::demotes_promoted_captures`] is `false` (all but Capahouse).
+    #[must_use]
+    #[inline]
+    pub fn promoted(&self) -> Bitboard<G> {
+        self.promoted
+    }
+
+    /// Overwrites the crazyhouse promoted mask. Used by the binary wire decoder
+    /// to restore a position's full state after [`from_parts`](Self::from_parts),
+    /// which always starts the mask empty.
+    #[inline]
+    pub(crate) fn set_promoted(&mut self, mask: Bitboard<G>) {
+        self.promoted = mask;
+    }
+
     /// Returns the number of `role` pieces `color` holds **in hand** (a Shogi
     /// hand or a Sittuyin placement pocket); `0` for a variant with neither.
     #[must_use]
