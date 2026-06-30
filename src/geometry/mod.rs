@@ -37,6 +37,7 @@ pub mod attacks;
 mod backing;
 mod bitboard;
 mod board;
+pub mod book;
 pub mod game;
 mod notation;
 pub mod position;
@@ -51,6 +52,7 @@ pub use any::{AnyWideVariant, UnknownWideVariant, WideVariantId};
 pub use backing::BitboardBacking;
 pub use bitboard::{Bitboard, Squares};
 pub use board::{Board, ParseBoardError, WidePiece};
+pub use book::{weighted_pick, WideBook, WideBookEntry};
 pub use game::{GenericGame, WideIllegalMove, COUNTING_LIMIT_PLIES};
 pub use notation::{WidePgn, WidePgnError, WidePgnResult, WideSanError};
 pub use position::{

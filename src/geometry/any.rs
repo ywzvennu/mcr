@@ -225,6 +225,19 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// A stable 64-bit Zobrist key identifying this position — the same
+            /// value as
+            /// [`GenericPosition::zobrist`](super::GenericPosition::zobrist) for
+            /// the wrapped variant. Suitable for opening-book lookup (see
+            /// [`WideBook`](super::WideBook)), repetition detection, and position
+            /// deduplication, without naming the variant's geometry / rule types.
+            #[must_use]
+            pub fn position_key(&self) -> u64 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.zobrist(), )+
+                }
+            }
+
             /// Applies `mv`, returning the successor position in the same variant
             /// arm. The move must be legal (as for
             /// [`GenericPosition::play`](super::GenericPosition::play)).
