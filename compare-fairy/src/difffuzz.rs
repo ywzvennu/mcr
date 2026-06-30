@@ -16,6 +16,16 @@
 //! **no `rand` crate, no clock**. The seed is a fixed default (overridable with
 //! `--seed`), so every reported divergence is exactly reproducible.
 //!
+//! Scope: the **default** sweep (the fixed seed, three games, thirty plies) is a
+//! zero-divergence gate over every fuzzable variant except the documented
+//! [`HELD_BACK`] follow-ups — this is what the harness asserts. Driving it harder
+//! (`--games` / `--plies` / other `--seed`s) turns it into an investigative tool
+//! that reaches rarer states and may surface further candidates to triage; that is
+//! the fuzzer working as intended, the same way Minixiangqi's random games first
+//! exposed the latent Xiangqi bugs. Two real movegen bugs it has already surfaced
+//! and fixed: the Shinobi start array (Archer/Lancer for Shogi Knight/Commoner) and
+//! the Tori Pheasant drop-interposition (a jumped check wrongly blockable).
+//!
 //! GPL FENCE unchanged: FSF is driven purely as a UCI subprocess (see `uci.rs`); no
 //! GPL code is linked, and the INI it reads is a plain data file.
 //!
