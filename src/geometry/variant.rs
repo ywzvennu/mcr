@@ -1592,6 +1592,68 @@ pub enum WideEndReason {
     MoveRule,
 }
 
+/// The standard-chess **insufficient-material** test, shared by the wide variants
+/// whose army is the standard chess set — optionally extended with always-mating
+/// compounds such as the Capablanca / Grand archbishop and chancellor
+/// ([`WideRole::Hawk`] / [`WideRole::Elephant`]).
+///
+/// It mirrors [`crate::Position::is_insufficient_material`] and is exactly
+/// Fairy-Stockfish's `has_insufficient_material` reduced to the standard piece
+/// classification (rook / queen / compound = major, knight = unbound minor,
+/// bishop = colour-bound minor):
+///
+/// - **King vs king** is a draw.
+/// - **King and a single minor** (one bishop or one knight, either side) **vs
+///   king** is a draw.
+/// - **Bishops only, all on one colour complex** (any number, either side) is a
+///   draw — none can ever guard the other colour, so mate is impossible.
+///
+/// Everything else is **sufficient**: any pawn, rook, queen, or mating compound
+/// (anything that is not a king, knight, or bishop), bishops on both colours, and
+/// any knight standing beside another minor (`K+N+N` is *not* an automatic draw —
+/// it is unforced but a helpmate exists). A square's colour is its `(file + rank)`
+/// parity, so the test is correct on any rectangular [`Geometry`], not only 8x8.
+///
+/// Consulted only by [`GenericPosition::end_reason`](super::GenericPosition)
+/// through the opt-in [`WideVariant::is_insufficient_material`] hook, never by the
+/// move generator — so a variant that enables it stays byte-identical under perft.
+pub(crate) fn standard_insufficient_material<G: Geometry>(board: &Board<G>) -> bool {
+    let knights = board.by_role(WideRole::Knight);
+    let bishops = board.by_role(WideRole::Bishop);
+    let kings = board.by_role(WideRole::King);
+    // Any occupied square that is neither a king nor a minor holds a pawn, rook,
+    // queen, or mating compound — all sufficient to (help-)force mate.
+    let others = board.occupied() & !(kings | knights | bishops);
+    if !others.is_empty() {
+        return false;
+    }
+    let minors = knights | bishops;
+    match minors.count() {
+        0 | 1 => true,
+        // A knight alongside any further minor is treated as sufficient (it can
+        // help-mate, and K+N+N is not an automatic draw); only an all-one-colour
+        // bishop battery is the guaranteed draw.
+        _ if !knights.is_empty() => false,
+        _ => bishops_share_one_colour(bishops),
+    }
+}
+
+/// Returns `true` if every bishop in `bishops` stands on the same colour complex
+/// (so the set can never guard a square of the other colour). Empty and singleton
+/// sets trivially qualify. The colour of a square is its `(file + rank)` parity.
+fn bishops_share_one_colour<G: Geometry>(bishops: Bitboard<G>) -> bool {
+    let mut colour: Option<u8> = None;
+    for square in bishops {
+        let parity = (square.file() + square.rank()) & 1;
+        match colour {
+            None => colour = Some(parity),
+            Some(seen) if seen != parity => return false,
+            Some(_) => {}
+        }
+    }
+    true
+}
+
 /// The standard-chess wide variant over an 8x8 [`Geometry`]: the reference
 /// instantiation that proves the generic engine reproduces concrete perft.
 ///

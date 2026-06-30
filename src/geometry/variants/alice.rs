@@ -90,6 +90,17 @@ impl WideVariant<Chess8x8> for AliceRules {
     fn is_alice() -> bool {
         true
     }
+
+    /// Alice keeps the **standard chess army**, so a position with no mating
+    /// material is the ordinary insufficient-material draw (king vs king, king and
+    /// a lone minor vs king, or same-colour bishops only). The looking-glass
+    /// transfer never *adds* mating power, so the standard rule is a sound (and
+    /// conservative) draw test here; Fairy-Stockfish has no Alice variant, so it is
+    /// matched to standard chess rather than an FSF oracle. Adjudication-only and
+    /// behind the default-off hook, so perft is byte-identical.
+    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+        crate::geometry::variant::standard_insufficient_material(board)
+    }
 }
 
 /// Alice chess as a [`GenericPosition`] over the 8x8 geometry.
@@ -101,3 +112,56 @@ impl WideVariant<Chess8x8> for AliceRules {
 /// is then maintained internally as each move transfers its mover to the other
 /// board.
 pub type Alice = GenericPosition<Chess8x8, AliceRules>;
+
+#[cfg(test)]
+mod insufficient_material_tests {
+    use super::Alice;
+    use crate::geometry::{WideEndReason, WideOutcome};
+
+    fn end_reason(fen: &str) -> Option<WideEndReason> {
+        Alice::from_fen(fen).expect("valid alice fen").end_reason()
+    }
+
+    #[test]
+    fn lone_kings_draw() {
+        let pos = Alice::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").expect("valid fen");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
+        assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn king_and_single_minor_draw() {
+        // K + N vs K and K + B vs K are both dead draws.
+        assert_eq!(
+            end_reason("4k3/8/8/8/8/8/8/4KN2 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+        assert_eq!(
+            end_reason("4k3/8/8/8/8/8/8/4KB2 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn same_colour_bishops_draw() {
+        // White Ba1 (dark) and black Bh8 (dark): same complex, no mate possible.
+        assert_eq!(
+            end_reason("4k2b/8/8/8/8/8/8/B3K3 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn opposite_colour_bishops_are_sufficient() {
+        // White Ba1 (dark) vs black Bg8 (light): opposite complexes can mate, so
+        // the game is not adjudicated drawn.
+        assert_eq!(end_reason("4k1b1/8/8/8/8/8/8/B3K3 w - - 0 1"), None);
+    }
+
+    #[test]
+    fn rook_and_two_knights_are_sufficient() {
+        // A lone rook can force mate; K+N+N is not an automatic draw.
+        assert_eq!(end_reason("4k3/8/8/8/8/8/8/R3K3 w - - 0 1"), None);
+        assert_eq!(end_reason("4k3/8/8/8/8/8/8/2N1KN2 w - - 0 1"), None);
+    }
+}
