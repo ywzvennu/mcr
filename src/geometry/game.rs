@@ -157,6 +157,12 @@ pub struct GenericGame<G: Geometry, V: WideVariant<G>> {
     /// The counting state (Makruk / Cambodian / ASEAN); inert (`limit == 0`) unless
     /// the variant counts and a triggering position has been reached.
     counting: Counting,
+    /// The current position's incrementally-maintained Zobrist key
+    /// ([`GenericPosition::zobrist`]). Maintained across [`play`](Self::play) only
+    /// for variants that [track repetition](WideVariant::tracks_repetition) (the
+    /// only ones that consult it); inert and unread otherwise. It always equals a
+    /// from-scratch `self.position.zobrist()` recompute.
+    key: u64,
 }
 
 impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
@@ -164,12 +170,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// repetition) and the counting state (when it counts) from it.
     #[must_use]
     pub fn new(position: GenericPosition<G, V>) -> Self {
+        // Seed the incremental Zobrist key from a from-scratch compute (a no-op cost
+        // for the non-tracking variants that never read it again).
+        let key = position.zobrist();
         let mut history = Vec::new();
         if V::tracks_repetition() {
             // The seed position has no preceding move, so it neither checks nor
             // chases; record only its facing flag (for bikjang).
             history.push(HistoryEntry {
-                key: position.repetition_key(),
+                key,
                 turn: position.turn(),
                 in_check: position.is_check(),
                 chase: false,
@@ -182,6 +191,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             // No count is active until a triggering move is played (FSF likewise
             // starts a fresh game with `countingLimit == 0`).
             counting: Counting::default(),
+            key,
         }
     }
 
@@ -219,17 +229,29 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         // Snapshot the pre-move board for the counting material deltas (capture /
         // promotion detection), exactly as Fairy-Stockfish's `do_move` reads them.
         let before = *self.position.board();
-        self.position = self.position.play(mv);
         if V::tracks_repetition() {
+            // Maintain the Zobrist key incrementally: XOR the old state half out,
+            // apply the move in place (capturing the board edits in an `Undo`), then
+            // XOR the board delta and the new state half in. This reproduces a
+            // from-scratch `zobrist()` recompute without rescanning the board, and
+            // touches only this repetition-tracking path — never the bare perft
+            // make/unmake — so perft stays byte-identical.
+            let old_state = self.position.zobrist_state_part();
+            let undo = self.position.apply_with_undo(mv);
+            self.key ^= self.position.zobrist_board_delta(&undo)
+                ^ old_state
+                ^ self.position.zobrist_state_part();
             let chase = V::perpetual_chase_loses()
                 && Self::chase_targets(&self.position, mv.from::<G>(), mv.to::<G>()).is_some();
             self.history.push(HistoryEntry {
-                key: self.position.repetition_key(),
+                key: self.key,
                 turn: self.position.turn(),
                 in_check: self.position.is_check(),
                 chase,
                 facing: V::has_bikjang() && self.position.is_facing_generals(),
             });
+        } else {
+            self.position = self.position.play(mv);
         }
         if let Some(rule) = V::counting_rule() {
             self.counting = Self::update_counting(self.counting, &before, &self.position, rule);
@@ -244,8 +266,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         if !V::tracks_repetition() {
             return 0;
         }
-        let key = self.position.repetition_key();
-        self.history.iter().filter(|e| e.key == key).count()
+        self.history.iter().filter(|e| e.key == self.key).count()
+    }
+
+    /// A stable 64-bit **Zobrist** position key for the current position — the same
+    /// value as [`self.position().zobrist()`](GenericPosition::zobrist), suitable for
+    /// opening books and position deduplication. For a
+    /// [repetition-tracking](WideVariant::tracks_repetition) variant this is the
+    /// incrementally-maintained key (no recompute); otherwise it is computed on
+    /// demand.
+    #[must_use]
+    #[inline]
+    pub fn position_key(&self) -> u64 {
+        if V::tracks_repetition() {
+            self.key
+        } else {
+            self.position.zobrist()
+        }
     }
 
     /// The reason the game has ended, or `None` if it is still in progress.
@@ -332,7 +369,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// check is scored first); otherwise the recurrence is the variant's repetition
     /// draw.
     fn repetition_adjudication(&self) -> Option<(WideEndReason, WideOutcome)> {
-        let key = self.position.repetition_key();
+        let key = self.key;
         // Index of the earliest occurrence of the current key.
         let first = self.history.iter().position(|e| e.key == key)?;
         let count = self.history[first..]
@@ -695,7 +732,7 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, Janggi, Makruk, Minixiangqi, Shogi, Xiangqi,
+        Asean, Cambodian, Janggi, Makruk, Minishogi, Minixiangqi, Shogi, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1075,5 +1112,38 @@ mod tests {
         let pos = DrawChess::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").expect("valid fen");
         assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
         assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    // -- Incremental Zobrist key (issue #311) -----------------------------
+
+    /// Walks the legal-move tree to `depth`, asserting at every node that the key
+    /// [`GenericGame::play`] maintains **incrementally** equals a from-scratch
+    /// recompute of the current position.
+    fn walk_game_key<G: Geometry, V: WideVariant<G>>(game: &GenericGame<G, V>, depth: u32) {
+        assert_eq!(
+            game.position_key(),
+            game.position().zobrist(),
+            "maintained game key diverged from recompute at {}",
+            game.position().to_fen(),
+        );
+        if depth == 0 || game.is_over() {
+            return;
+        }
+        for mv in game.legal_moves() {
+            let mut child = game.clone();
+            child.play(&mv).expect("legal move");
+            walk_game_key(&child, depth - 1);
+        }
+    }
+
+    #[test]
+    fn incremental_game_key_matches_recompute() {
+        // The repetition-tracking variants are the ones that maintain the key
+        // incrementally through `play`; walk each from its starting position.
+        walk_game_key(&GenericGame::new(Shogi::startpos()), 2);
+        walk_game_key(&GenericGame::new(Minishogi::startpos()), 3);
+        walk_game_key(&GenericGame::new(Xiangqi::startpos()), 2);
+        walk_game_key(&GenericGame::new(Minixiangqi::startpos()), 3);
+        walk_game_key(&GenericGame::new(Janggi::startpos()), 2);
     }
 }
