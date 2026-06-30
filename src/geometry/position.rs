@@ -25,8 +25,8 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use super::attacks::{
-    between, bishop_attacks_masked, king_attack_lines, line, queen_attacks_masked,
-    rook_attacks_masked, KingLineMasks,
+    between, bishop_attacks_masked, king_attack_lines, king_attack_lines_diag_capped, line,
+    queen_attacks_masked, rook_attacks_masked, KingLineMasks,
 };
 use super::role::WideRole;
 use super::variant::{RoyalSlider, WideEndReason, WideVariant};
@@ -2147,7 +2147,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             reach_slice,
             true,
         );
-        let king_lines = king_attack_lines::<G>(king);
+        // The fast-accept king-line mask. For a variant with no long-range diagonal
+        // king attacker (no bishop/queen reaching the king down a board diagonal —
+        // every diagonal threat is a hobbled leaper leg or a palace screen within a
+        // few squares), the diagonal extent is capped, so a move on a far-diagonal
+        // square is fast-accepted instead of needlessly verified. The authoritative
+        // `king_safe_after` is unchanged, so the produced set stays byte-identical
+        // (a debug_assert re-checks every capped fast-accept against the full
+        // verify). Default `None` keeps the full board-length diagonals for every
+        // diagonal-slider variant (Shako, Synochess, …).
+        let king_lines = match V::king_diag_attack_radius() {
+            Some(radius) => king_attack_lines_diag_capped::<G>(king, radius),
+            None => king_attack_lines::<G>(king),
+        };
 
         // Janggi bikjang: facing the enemy general on an open line is *also* a check
         // the side to move must resolve. It does not enter `king_safe_after` (it is
@@ -2184,9 +2196,32 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
             }
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {
-                // Provably safe: no apply/unmake, no scan.
+                // Provably safe: no apply/unmake, no scan. When the variant caps the
+                // diagonal extent of the king lines (no long-range diagonal king
+                // attacker), the smaller mask widens this fast-accept; the
+                // make/unmake verify it skips would reach the same verdict, asserted
+                // in debug builds.
+                debug_assert!(
+                    V::king_diag_attack_radius().is_none()
+                        || scratch.cannon_move_is_legal(
+                            &mv,
+                            us,
+                            &attackers,
+                            king_masks,
+                            reach_slice,
+                            facing_check,
+                        ),
+                    "diagonal-capped fast-accept must agree with the full king-safety verify"
+                );
                 out.push(mv);
-            } else if scratch.cannon_move_is_legal(&mv, us, &attackers, king_masks, reach_slice) {
+            } else if scratch.cannon_move_is_legal(
+                &mv,
+                us,
+                &attackers,
+                king_masks,
+                reach_slice,
+                facing_check,
+            ) {
                 out.push(mv);
             }
         });
@@ -2204,7 +2239,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             let mut drops = WideMoveList::new();
             self.gen_hand_drops(&mut drops);
             drops.for_each(|mv| {
-                if scratch.cannon_move_is_legal(&mv, us, &attackers, king_masks, reach_slice) {
+                if scratch.cannon_move_is_legal(
+                    &mv,
+                    us,
+                    &attackers,
+                    king_masks,
+                    reach_slice,
+                    facing_check,
+                ) {
                     out.push(mv);
                 }
             });
@@ -2241,11 +2283,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         attackers: &EnemyAttackers,
         king_masks: KingLineMasks<G>,
         reach: Option<&[Bitboard<G>]>,
+        faced_before: bool,
     ) -> bool {
         // The bikjang facing rule needs whether the mover's general faced **before**
-        // the move; capture it from the pre-move board (`self` still holds it here,
-        // the make below being the first edit).
-        let faced_before = V::restricts_facing_general() && generals_face::<G>(&self.board);
+        // the move. That is a property of the (pre-move) node position, identical for
+        // every sibling move verified against this scratch — `self` always holds the
+        // restored node board here, the make below being the first edit — so the
+        // caller computes it once per node (`facing_check`) and passes it in rather
+        // than re-running `generals_face` for every move. Always `false` when the
+        // variant has no facing rule (`restricts_facing_general() == false`).
+        debug_assert_eq!(
+            faced_before,
+            V::restricts_facing_general() && generals_face::<G>(&self.board),
+            "faced_before must equal the pre-move facing state of the scratch board"
+        );
         // Fairy-Stockfish's special-cased en-passant legality re-checks only real
         // slider attacks through the two vacated pawn squares, never the
         // flying-general pseudo-attacker, so an en-passant that *reveals* a king

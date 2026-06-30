@@ -1106,6 +1106,42 @@ pub fn king_attack_lines<G: Geometry>(king: Square<G>) -> Bitboard<G> {
     lines.without(king)
 }
 
+/// Like [`king_attack_lines`] but with the king's two diagonals **truncated to
+/// `diag_radius` squares per direction** — the rank and file stay full length.
+///
+/// This is the king-line geometry for a cannon-royal variant that has **no
+/// long-range diagonal king attacker** (Janggi, Xiangqi): no piece slides to the
+/// king along a board diagonal, so the only diagonal squares whose occupancy can
+/// change the king's safety are the few near ones — a hobbled leaper's leg (the
+/// Horse's diagonal-neighbour leg; the Janggi Elephant's two legs, both within two
+/// diagonal steps) and a palace screen (the cannon's palace-diagonal jump screen,
+/// or a palace-diagonal chariot blocker, one step away). Capping the diagonals at
+/// `diag_radius` therefore drops only squares that provably cannot bear on the
+/// king, so a move touching one of them is safely fast-accepted rather than
+/// verified. The rank and file are kept full because a chariot or cannon attacks
+/// the king along the whole of them.
+///
+/// A `diag_radius` at least the board's diagonal length reproduces
+/// [`king_attack_lines`] exactly; callers pass the smallest radius that still
+/// covers every near-diagonal threat (`2` for Janggi/Xiangqi).
+#[must_use]
+#[inline]
+pub fn king_attack_lines_diag_capped<G: Geometry>(king: Square<G>, diag_radius: u8) -> Bitboard<G> {
+    let mut lines = file_mask::<G>(king) | rank_mask::<G>(king);
+    lines = lines.without(king);
+    for &(df, dr) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+        let mut cur = king.offset(df, dr);
+        let mut steps = 0u8;
+        while steps < diag_radius {
+            let Some(sq) = cur else { break };
+            lines.set(sq);
+            cur = sq.offset(df, dr);
+            steps += 1;
+        }
+    }
+    lines
+}
+
 // ---------------------------------------------------------------------------
 // Geometry rays: `between` and `line`.
 // ---------------------------------------------------------------------------

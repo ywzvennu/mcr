@@ -448,6 +448,16 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
         true
     }
 
+    fn king_diag_attack_radius() -> Option<u8> {
+        // Janggi has no diagonal slider: every diagonal threat to the general is a
+        // hobbled-leaper leg or a palace screen within two diagonal steps (the Horse
+        // leg at one step, the Elephant's two legs within two, the cannon's
+        // palace-diagonal jump screen and a palace-diagonal chariot blocker one step
+        // away). Capping the fast-accept king diagonals at two squares is therefore
+        // exact — see [`WideVariant::king_diag_attack_radius`].
+        Some(2)
+    }
+
     // --- Bikjang + repetition (terminal only; perft unaffected) ------------
     //
     // Both rules are adjudicated outside move generation (bikjang from the single
