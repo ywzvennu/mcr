@@ -164,6 +164,28 @@ impl WideVariant<Chess8x8> for KnightmateRules {
         // independent of the royal piece's own movement.
         true
     }
+
+    /// Knightmate's army classifies **exactly** as the standard
+    /// `standard_insufficient_material` helper: the royal piece is
+    /// [`WideRole::King`] (Fairy-Stockfish's `KING` type, *restricted* in the
+    /// material count regardless of its knight movement), the Bishop is the only
+    /// colour-bound minor, and the Commoner — like FSF's `COMMONER` — is mating
+    /// material, so a position holding any Commoner, Rook, Queen, or Pawn is
+    /// sufficient. There is **no** bare Knight role (the opening knights are
+    /// Commoners), so the helper's knight arm never fires. The variant therefore
+    /// adjudicates the ordinary draws — king vs king, king and a lone bishop vs
+    /// king, and same-colour bishops only.
+    ///
+    /// This is **byte-confirmed against** Fairy-Stockfish `UCI_Variant knightmate`'s
+    /// `has_insufficient_material`: `KvK` and `K+B vs K` are drawn, while
+    /// `K+Commoner vs K`, `K+R vs K`, and opposite-colour bishops are not — exactly
+    /// what the helper returns. (Hoppel-Poppel, by contrast, stays default-off: its
+    /// Knight-Bishop / Bishop-Knight are *unbound* minors FSF draws against a bare
+    /// king but the standard-army helper does not classify — see its module docs.)
+    /// Adjudication-only and behind the default-off hook, so perft is byte-identical.
+    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+        crate::geometry::variant::standard_insufficient_material(board)
+    }
 }
 
 /// Knightmate as a [`GenericPosition`] over the 8x8 [`Chess8x8`] geometry.
@@ -295,5 +317,65 @@ mod tests {
         assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 324);
         assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 6765);
         assert_eq!(gperft::<Chess8x8, _>(&pos, 4), 139774);
+    }
+}
+
+#[cfg(test)]
+mod insufficient_material_tests {
+    use super::Knightmate;
+    use crate::geometry::{WideEndReason, WideOutcome};
+
+    fn end_reason(fen: &str) -> Option<WideEndReason> {
+        Knightmate::from_fen(fen)
+            .expect("valid knightmate fen")
+            .end_reason()
+    }
+
+    // Every assertion below is byte-confirmed against Fairy-Stockfish
+    // `UCI_Variant knightmate`'s `has_insufficient_material`.
+
+    #[test]
+    fn lone_royal_knights_draw() {
+        // Two bare royal Knights (the king slot) cannot mate — FSF: insufficient.
+        let pos = Knightmate::from_fen("5k2/8/8/8/8/8/8/5K2 w - - 0 1").expect("valid fen");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
+        assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn king_and_single_bishop_draw() {
+        // Royal Knight + lone Bishop vs royal Knight is a dead draw (FSF: draw).
+        assert_eq!(
+            end_reason("5k2/8/8/8/8/8/8/5KB1 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn same_colour_bishops_draw() {
+        // White Ba1 (dark) and black Bh8 (dark) share one complex (FSF: draw).
+        assert_eq!(
+            end_reason("4k2b/8/8/8/8/8/8/B4K2 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn opposite_colour_bishops_are_sufficient() {
+        // White Ba1 (dark) vs black Bg8 (light): opposite complexes can mate.
+        assert_eq!(end_reason("4k1b1/8/8/8/8/8/8/B4K2 w - - 0 1"), None);
+    }
+
+    #[test]
+    fn commoner_is_sufficient() {
+        // The Commoner (`*U`/`*u`) is mating material (FSF classes it major), so a
+        // royal Knight + Commoner vs royal Knight is NOT an insufficient draw.
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5K*U1 w - - 0 1"), None);
+    }
+
+    #[test]
+    fn rook_is_sufficient() {
+        // A lone Rook can force mate (FSF: sufficient).
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR1 w - - 0 1"), None);
     }
 }

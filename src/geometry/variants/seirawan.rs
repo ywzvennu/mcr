@@ -139,6 +139,32 @@ impl WideVariant<Chess8x8> for SeirawanRules {
         // gating-eligible.
         GenericGating::new(Self::opening_eligible(), [true, true], [true, true])
     }
+
+    /// Once **both** sides have spent their gating reserve, Seirawan is plain
+    /// standard-army 8x8 chess, so the ordinary insufficient-material draw applies:
+    /// king vs king, king and a lone minor (bishop or knight) vs king, and
+    /// same-colour bishops only. The Hawk (B+N) and Elephant (R+N) count as mating
+    /// material, exactly as the `standard_insufficient_material` helper classifies
+    /// the census compounds.
+    ///
+    /// **The reserve gates the material.** While **either** side still holds a Hawk
+    /// or Elephant in reserve, that piece can still enter the board on a back-rank
+    /// piece's first move, so the material is never settled and the position is
+    /// **never** insufficient — this guard reproduces Fairy-Stockfish's
+    /// `has_insufficient_material`, whose very first test returns "sufficient" while
+    /// `count_in_hand(c, ALL_PIECES)` is non-zero (verified against FSF
+    /// `UCI_Variant seirawan`: `KvK[He]` and `K+B vs K` with a lone enemy reserve
+    /// are both *not* drawn, while the same positions with empty reserves are). Only
+    /// when neither reserve remains does the standard material test decide.
+    ///
+    /// Adjudication-only and behind the default-off hook, so perft stays
+    /// byte-identical.
+    fn is_insufficient_material(board: &Board<Chess8x8>, state: &GenericState<Chess8x8>) -> bool {
+        if state.gating.any_reserve(Color::White) || state.gating.any_reserve(Color::Black) {
+            return false;
+        }
+        crate::geometry::variant::standard_insufficient_material(board)
+    }
 }
 
 /// Seirawan chess (S-Chess) as a [`GenericPosition`] over the 8x8 [`Chess8x8`]
@@ -151,3 +177,82 @@ impl WideVariant<Chess8x8> for SeirawanRules {
 /// the generic compound movement defaults; only the reserves, gating, and the
 /// widened promotion set distinguish it from standard chess.
 pub type Seirawan = GenericPosition<Chess8x8, SeirawanRules>;
+
+#[cfg(test)]
+mod insufficient_material_tests {
+    use super::Seirawan;
+    use crate::geometry::{WideEndReason, WideOutcome};
+
+    fn end_reason(fen: &str) -> Option<WideEndReason> {
+        Seirawan::from_fen(fen)
+            .expect("valid seirawan fen")
+            .end_reason()
+    }
+
+    // --- reserve empty: the standard material draws apply ------------------
+
+    #[test]
+    fn lone_kings_empty_reserve_draw() {
+        let pos = Seirawan::from_fen("5k2/8/8/8/8/8/8/5K2[] w - - 0 1").expect("valid fen");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
+        assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn king_and_single_minor_empty_reserve_draw() {
+        // K + N vs K and K + B vs K with no reserve left are dead draws.
+        assert_eq!(
+            end_reason("5k2/8/8/8/8/8/8/5KN1[] w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+        assert_eq!(
+            end_reason("5k2/8/8/8/8/8/8/5KB1[] w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn same_colour_bishops_empty_reserve_draw() {
+        // White Ba1 (dark) and black Bh8 (dark): one complex, no mate possible.
+        assert_eq!(
+            end_reason("4k2b/8/8/8/8/8/8/B4K2[] w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    // --- reserve NON-empty: never insufficient (a piece can still gate) ----
+
+    #[test]
+    fn lone_kings_with_reserve_not_insufficient() {
+        // A reserve Hawk (white) and Elephant (black) can still enter on a
+        // back-rank first move, so the bare-king position is not yet settled. FSF
+        // `UCI_Variant seirawan` agrees: `KvK[He]` is not insufficient.
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5K2[He] w - - 0 1"), None);
+    }
+
+    #[test]
+    fn single_minor_with_enemy_reserve_not_insufficient() {
+        // White is a lone king-and-bishop but Black still holds an Elephant in
+        // reserve, so Black is not insufficient and the game is not drawn — matching
+        // FSF, whose per-colour test reports Black sufficient while its hand is
+        // non-empty.
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KB1[e] w - - 0 1"), None);
+    }
+
+    // --- material controls (empty reserve, still sufficient) ---------------
+
+    #[test]
+    fn opposite_colour_bishops_are_sufficient() {
+        // White Ba1 (dark) vs black Bg8 (light): opposite complexes can mate.
+        assert_eq!(end_reason("4k1b1/8/8/8/8/8/8/B4K2[] w - - 0 1"), None);
+    }
+
+    #[test]
+    fn rook_and_compounds_are_sufficient() {
+        // A lone rook mates; the Hawk (B+N) and Elephant (R+N) compounds are mating
+        // material even with the reserve spent.
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR1[] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KH1[] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KE1[] w - - 0 1"), None);
+    }
+}
