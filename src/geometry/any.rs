@@ -343,6 +343,45 @@ macro_rules! wide_variants {
                     $( AnyWideVariant::$variant(p) => p.parse_san(san).ok(), )+
                 }
             }
+
+            /// Encodes this position to the compact, self-describing binary wire
+            /// format: a tag byte, the 1-byte [`WideVariantId`] selector, then the
+            /// variant's compact [`GenericPosition`](super::GenericPosition) body.
+            /// Smaller than the FEN for every variant; the inverse is
+            /// [`from_bytes`](Self::from_bytes). See [`super::binary`].
+            #[must_use]
+            pub fn to_bytes(&self) -> Vec<u8> {
+                let mut out = Vec::new();
+                out.push(super::binary::TAG_ANY_POSITION);
+                out.push(self.variant_id().to_index());
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.encode_body(&mut out), )+
+                }
+                out
+            }
+
+            /// Decodes a position previously produced by [`to_bytes`](Self::to_bytes),
+            /// dispatching on the embedded [`WideVariantId`] to the matching variant
+            /// arm.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`super::binary::WireError`] if `bytes` is truncated, carries
+            /// the wrong tag, names an unknown variant, or holds an out-of-range
+            /// square / role — without panicking on any input.
+            pub fn from_bytes(bytes: &[u8]) -> Result<Self, super::binary::WireError> {
+                use super::binary::WireError;
+                let (&tag, rest) = bytes.split_first().ok_or(WireError::Truncated)?;
+                if tag != super::binary::TAG_ANY_POSITION {
+                    return Err(WireError::BadTag(tag));
+                }
+                let (&vid, rest) = rest.split_first().ok_or(WireError::Truncated)?;
+                let id = WideVariantId::from_index(vid).ok_or(WireError::UnknownVariant(vid))?;
+                match id {
+                    $( WideVariantId::$variant =>
+                        Ok(AnyWideVariant::$variant(<$alias>::decode_body(rest)?)), )+
+                }
+            }
         }
     };
 }
@@ -395,6 +434,26 @@ wide_variants! {
     Tori, Tori, "tori", "torishogi";
     Xiangfu, Xiangfu, "xiangfu";
     Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
+}
+
+impl WideVariantId {
+    /// This identifier's stable index in [`WideVariantId::ALL`] (its declaration
+    /// order), the 1-byte variant tag the self-describing binary wire format
+    /// stores. The inverse of [`from_index`](Self::from_index).
+    #[must_use]
+    pub fn to_index(self) -> u8 {
+        Self::ALL
+            .iter()
+            .position(|&id| id == self)
+            .expect("every WideVariantId is in ALL") as u8
+    }
+
+    /// Builds an identifier from its [`to_index`](Self::to_index) tag, returning
+    /// `None` if `index` names no variant (the wire decoder rejects such input).
+    #[must_use]
+    pub fn from_index(index: u8) -> Option<WideVariantId> {
+        Self::ALL.get(index as usize).copied()
+    }
 }
 
 #[cfg(test)]

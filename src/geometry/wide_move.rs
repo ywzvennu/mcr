@@ -336,6 +336,24 @@ impl WideMove {
         WideMove::pack(s, s, role.index() as u32, KIND_DROP)
     }
 
+    /// The raw packed `u64` word backing this move (the bit layout in the module
+    /// docs). The stable representation the compact binary wire codec serializes;
+    /// every accessor above derives from it, so it round-trips exactly.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn to_raw(self) -> u64 {
+        self.0
+    }
+
+    /// Rebuilds a move from a raw packed `u64` word, the inverse of
+    /// [`to_raw`](Self::to_raw). Any bit pattern is a representable move (an
+    /// out-of-range role index decodes as `Pawn`), so this never fails.
+    #[must_use]
+    #[inline]
+    pub(crate) const fn from_raw(bits: u64) -> WideMove {
+        WideMove(bits)
+    }
+
     /// The low 32 bits: the base move, with the Duck addendum stripped.
     #[inline]
     const fn base(self) -> u32 {
