@@ -794,9 +794,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     // A board-aware attacker (the Janggi cannon) projects from its
                     // own origin against the whole board; the default-off hook
                     // returns `None` for every other variant, keeping the
-                    // occupancy-only projection byte-identical.
+                    // occupancy-only projection byte-identical. This is a *threat*
+                    // query, so it takes the board-aware **threat** set
+                    // (`role_threats_board`, default = `role_attacks_board`), which
+                    // for Empire excludes the move-only quiet Queen slides that are
+                    // not attacks (issue #359).
                     let att = if V::uses_board_attacks() {
-                        V::role_attacks_board(role, attacker, from, b)
+                        V::role_threats_board(role, attacker, from, b)
                             .unwrap_or_else(|| V::role_attacks(role, attacker, from, occupied))
                     } else {
                         V::role_attacks(role, attacker, from, occupied)
@@ -1686,13 +1690,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // the masks are still built per king to satisfy the shared signature and are
         // otherwise inert here.
         if V::royals_all_must_survive() {
-            kings
-                .into_iter()
-                .all(|k| self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None))
+            kings.into_iter().all(|k| {
+                self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None, true)
+            })
         } else {
-            kings
-                .into_iter()
-                .any(|k| self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None))
+            kings.into_iter().any(|k| {
+                self.king_safe_after(k, them, attackers, KingLineMasks::new(k), None, true)
+            })
         }
     }
 
@@ -2135,8 +2139,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // unchanged behaviour). Built per node and reused by every sibling move.
         let reach = attackers.reach_supersets::<G, V>(king);
         let reach_slice = reach.as_ref().map(|r| &r[..attackers.len()]);
-        let in_check =
-            !self.king_safe_after(king, us.opposite(), &attackers, king_masks, reach_slice);
+        let in_check = !self.king_safe_after(
+            king,
+            us.opposite(),
+            &attackers,
+            king_masks,
+            reach_slice,
+            true,
+        );
         let king_lines = king_attack_lines::<G>(king);
 
         // Janggi bikjang: facing the enemy general on an open line is *also* a check
@@ -2236,6 +2246,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // the move; capture it from the pre-move board (`self` still holds it here,
         // the make below being the first edit).
         let faced_before = V::restricts_facing_general() && generals_face::<G>(&self.board);
+        // Fairy-Stockfish's special-cased en-passant legality re-checks only real
+        // slider attacks through the two vacated pawn squares, never the
+        // flying-general pseudo-attacker, so an en-passant that *reveals* a king
+        // face-off is legal there (issue #359). Mirror that by skipping the facing
+        // term of `king_safe_after` for an en-passant move; every other move (and the
+        // ordinary horizontal-pin slider check) keeps the full test.
+        let consider_facing = !matches!(mv.kind(), WideMoveKind::EnPassant);
         let undo = self.apply_with_undo(mv);
         // `apply` flipped the side to move; our king is now the non-mover's.
         let mut legal = match self.board.king_of(us) {
@@ -2248,10 +2265,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // the cached node geometry can go stale.
             Some(king) => {
                 if king == king_masks.square() {
-                    self.king_safe_after(king, us.opposite(), attackers, king_masks, reach)
+                    self.king_safe_after(
+                        king,
+                        us.opposite(),
+                        attackers,
+                        king_masks,
+                        reach,
+                        consider_facing,
+                    )
                 } else {
                     let masks = KingLineMasks::new(king);
-                    self.king_safe_after(king, us.opposite(), attackers, masks, None)
+                    self.king_safe_after(
+                        king,
+                        us.opposite(),
+                        attackers,
+                        masks,
+                        None,
+                        consider_facing,
+                    )
                 }
             }
             // A move that captured our own king cannot arise from a legal pseudo
@@ -2298,6 +2329,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// it from the king square is wasted work. The set of fielded roles is fixed
     /// for a node, so it is computed once in [`EnemyAttackers::new`] and reused for
     /// every sibling move. The result is identical to `!royal_attacked(...)`.
+    ///
+    /// `consider_facing` selects whether the default-off flying-general / king
+    /// face-off ([`extra_royal_attack`](WideVariant::extra_royal_attack)) counts as
+    /// an attack here. It is `true` everywhere except when verifying an **en-passant**
+    /// capture on the cannon-verify path: Fairy-Stockfish's special-cased en-passant
+    /// legality re-checks only real **slider** attacks through the vacated squares
+    /// and never re-evaluates the flying-general pseudo-attacker, so an en-passant
+    /// that *reveals* a king face-off is legal in FSF (issue #359). Passing `false`
+    /// for en passant reproduces that exactly; every other move keeps the full check.
     #[inline]
     fn king_safe_after(
         &self,
@@ -2306,6 +2346,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         attackers: &EnemyAttackers,
         king_masks: KingLineMasks<G>,
         reach: Option<&[Bitboard<G>]>,
+        consider_facing: bool,
     ) -> bool {
         debug_assert_eq!(king_masks.square(), king);
         let board = &self.board;
@@ -2358,7 +2399,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // default-off hook leaves every other variant byte-identical.
                 let hits = pieces.into_iter().any(|from| {
                     let att = if V::uses_board_attacks() {
-                        V::role_attacks_board(role, by, from, board)
+                        V::role_threats_board(role, by, from, board)
                             .unwrap_or_else(|| V::role_attacks(role, by, from, occupied))
                     } else {
                         V::role_attacks(role, by, from, occupied)
@@ -2382,8 +2423,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 return false;
             }
         }
-        // The Xiangqi flying-general file attack (default-off elsewhere).
-        if V::has_flying_general() && V::extra_royal_attack(board, king, by, occupied) {
+        // The Xiangqi flying-general file attack (default-off elsewhere). Skipped
+        // when `consider_facing` is false — an en-passant capture, whose FSF legality
+        // ignores this pseudo-attacker (issue #359).
+        if consider_facing
+            && V::has_flying_general()
+            && V::extra_royal_attack(board, king, by, occupied)
+        {
             return false;
         }
         true

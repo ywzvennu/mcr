@@ -87,6 +87,28 @@ const FLAG_RACE: &str = "4k3/8/8/8/8/8/4K3/8 w - - 0 1";
 /// file or rank, so many otherwise-legal king steps are pruned.
 const FLYING_GENERAL: &str = "8/8/3k4/8/8/8/3K4/8 w - - 0 1";
 
+/// Issue #359 regression — the deep middlegame the #354 differential fuzzer flagged.
+/// mce reported one fewer legal move than FSF after the White Tower played `h1h3`,
+/// because the threat projection in `attackers_to` folded an Empire piece's quiet
+/// **Queen move** (here the Tower's `h3`–`c8` diagonal) into its *attack* set,
+/// falsely marking `c8` attacked and forbidding Black's legal queenside castle. The
+/// fix projects only the short **capture** pattern as a threat, so these counts now
+/// match FSF (which gives `h1h3` 38 children, not mce's prior 37).
+const ISSUE_359_REPRO: &str =
+    "r3kb1r/5ppp/2p4n/pp1pp3/P4Z2/2PZ1Pqb/*T*E*C2*E2/3*DK1*C*T w kq - 2 14";
+
+/// Issue #359 regression — the position **after** `h1h3` in [`ISSUE_359_REPRO`],
+/// Black to move, where the missing move was Black's queenside castle `e8c8`.
+const ISSUE_359_POST_H1H3: &str =
+    "r3kb1r/5ppp/2p4n/pp1pp3/P4Z2/2PZ1Pq*T/*T*E*C2*E2/3*DK1*C1 b kq - 0 14";
+
+/// Issue #359 regression — an en-passant capture that **reveals** a flying-general
+/// king face-off down the vacated file (`d5xe6` opens the d-file between the kings
+/// on `d1`/`d8`). Fairy-Stockfish's special-cased en-passant legality re-checks only
+/// real slider attacks and never the flying-general pseudo-attacker, so it counts
+/// `d5e6` as legal; mce previously over-filtered it. The pinned counts match FSF.
+const ISSUE_359_EP_FLYING_GENERAL: &str = "3k4/8/8/3Pp3/8/8/8/3K4 w - e6 0 1";
+
 /// Asserts the generic Empire perft equals each pinned `(depth, nodes)` count. Every
 /// number here also matched FSF empire `go perft` on the same FEN.
 fn check(fen: &str, cases: &[(u32, u64)]) {
@@ -163,6 +185,29 @@ fn flying_general_cheap() {
     check(
         FLYING_GENERAL,
         &[(1, 6), (2, 30), (3, 174), (4, 1162), (5, 7350)],
+    );
+}
+
+// -- Issue #359 regressions (FSF-confirmed) ---------------------------------
+
+#[test]
+fn issue_359_repro_cheap() {
+    // `h1h3` must have 38 children, not 37: Black's queenside castle is legal.
+    check(ISSUE_359_REPRO, &[(1, 36), (2, 1570), (3, 60904)]);
+}
+
+#[test]
+fn issue_359_post_h1h3_cheap() {
+    // The post-`h1h3` node itself: 38 legal moves, including `e8c8`.
+    check(ISSUE_359_POST_H1H3, &[(1, 38), (2, 1821), (3, 67675)]);
+}
+
+#[test]
+fn issue_359_ep_flying_general_cheap() {
+    // En passant revealing a flying-general face-off is legal (matches FSF).
+    check(
+        ISSUE_359_EP_FLYING_GENERAL,
+        &[(1, 7), (2, 34), (3, 234), (4, 1424)],
     );
 }
 

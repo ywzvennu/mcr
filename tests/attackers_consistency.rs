@@ -90,16 +90,18 @@ const SEEDS: [u64; 6] = [
 ///
 /// For most roles the forward set is the occupancy-only
 /// [`WideVariant::role_attacks`] — the same per-piece projection the move
-/// generator uses. But a role whose attack set depends on *which* occupied
+/// generator uses. But a role whose **threat** set depends on *which* occupied
 /// squares hold *which* pieces (the Janggi screen-cannon: screen ≠ cannon, may
 /// not capture a cannon, plus the palace-diagonal jump) is computed from the
-/// **whole board** via the board-aware [`WideVariant::role_attacks_board`] hook.
-/// When the variant sets [`WideVariant::uses_board_attacks`] and that hook
-/// returns `Some` for the role, this uses it — exactly as the generator and the
-/// cannon-verify king-safety path do — so the board-aware role is forward-projected
-/// correctly. The hook returns `None` for every other role (and the default-off
-/// variants never set `uses_board_attacks`), so the 13 existing cases keep using
-/// the plain `role_attacks` path unchanged.
+/// **whole board** via the board-aware [`WideVariant::role_threats_board`] hook —
+/// the pure threat set, which for Empire's "move like a Queen, capture short" pieces
+/// excludes the quiet Queen slides that are moves but not attacks. When the variant
+/// sets [`WideVariant::uses_board_attacks`] and that hook returns `Some` for the
+/// role, this uses it — exactly as `attackers_to` and the cannon-verify king-safety
+/// path do — so the board-aware role is forward-projected correctly. The hook
+/// returns `None` for every other role (and the default-off variants never set
+/// `uses_board_attacks`), so the existing cases keep using the plain `role_attacks`
+/// path unchanged.
 ///
 /// This is the ground truth `attackers_to` (the reverse projection) must reproduce.
 fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
@@ -117,10 +119,11 @@ fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
             continue;
         }
         for from in pieces {
-            // Prefer the board-aware set for any role the variant computes from the
-            // whole board (Janggi's cannon); fall back to the occupancy-only set.
+            // Prefer the board-aware *threat* set for any role the variant computes
+            // from the whole board (Janggi's cannon, Empire's capture-short pieces);
+            // fall back to the occupancy-only set. This mirrors `attackers_to`.
             let attacks = if board_aware {
-                V::role_attacks_board(role, by, from, board)
+                V::role_threats_board(role, by, from, board)
                     .unwrap_or_else(|| V::role_attacks(role, by, from, occupied))
             } else {
                 V::role_attacks(role, by, from, occupied)
