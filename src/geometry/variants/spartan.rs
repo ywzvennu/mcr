@@ -253,16 +253,32 @@ impl WideVariant<Chess8x8> for SpartanRules {
     }
 
     fn promotion_targets(color: Color, board: &Board<Chess8x8>) -> Vec<WideRole> {
-        // A Hoplite promotes to Lieutenant/General/Captain/Warlord, plus a King
-        // **only while its side has a single king** (regaining the lost second
-        // king). White (the Persian side) never reaches this path with a Hoplite —
-        // it has standard pawns and the default `N/B/R/Q` targets — but the rule is
-        // expressed generically over the side's king count.
-        let mut roles = Self::promotion_config().roles;
-        if board.kings_of(color).count() < 2 {
-            roles.push(WideRole::King);
+        // Promotion is **per army**, so the target set depends on the *promoting
+        // side*, not just the board. The generic engine routes *every* promotion
+        // through this hook, White's included, so White must be handled explicitly:
+        // `promotion_config`'s default set is the Spartan one, and a colour-blind
+        // body would (wrongly) hand a White pawn the four Spartan promotions plus an
+        // illegal King.
+        match color {
+            // White = Persians: a standard pawn promotes to the standard `N/B/R/Q`
+            // — never to a Spartan piece, never to a King.
+            Color::White => alloc::vec![
+                WideRole::Knight,
+                WideRole::Bishop,
+                WideRole::Rook,
+                WideRole::Queen,
+            ],
+            // Black = Spartans: a Hoplite promotes to Lieutenant/General/Captain/
+            // Warlord, plus a King **only while its side has a single king**
+            // (regaining the lost second king).
+            Color::Black => {
+                let mut roles = Self::promotion_config().roles;
+                if board.kings_of(color).count() < 2 {
+                    roles.push(WideRole::King);
+                }
+                roles
+            }
         }
-        roles
     }
 }
 
