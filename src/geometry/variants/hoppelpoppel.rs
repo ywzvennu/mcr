@@ -61,7 +61,7 @@
 //! [`is_insufficient_material`](WideVariant::is_insufficient_material) hook, even
 //! though Fairy-Stockfish *does* adjudicate material draws here. The reason is a
 //! genuine classification divergence the standard-army
-//! [`standard_insufficient_material`] helper cannot express:
+//! `standard_insufficient_material` helper cannot express:
 //!
 //! FSF classes both [`WideRole::KnightBishop`] (`KNIBIS`) and
 //! [`WideRole::BishopKnight`] (`BISKNI`) as **unbound minors** — neither is a major
@@ -78,8 +78,6 @@
 //! adjudication hook, so the variant is correctly left off: it simply reports no
 //! material draw (the pre-#350 status quo), never a *wrong* one. The hook is
 //! adjudication-only and never touched movegen, so perft is unaffected either way.
-//!
-//! [`standard_insufficient_material`]: crate::geometry::variant::standard_insufficient_material
 
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,

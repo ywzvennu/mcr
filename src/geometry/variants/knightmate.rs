@@ -166,7 +166,7 @@ impl WideVariant<Chess8x8> for KnightmateRules {
     }
 
     /// Knightmate's army classifies **exactly** as the standard
-    /// [`standard_insufficient_material`] helper: the royal piece is
+    /// `standard_insufficient_material` helper: the royal piece is
     /// [`WideRole::King`] (Fairy-Stockfish's `KING` type, *restricted* in the
     /// material count regardless of its knight movement), the Bishop is the only
     /// colour-bound minor, and the Commoner — like FSF's `COMMONER` — is mating
@@ -183,8 +183,6 @@ impl WideVariant<Chess8x8> for KnightmateRules {
     /// Knight-Bishop / Bishop-Knight are *unbound* minors FSF draws against a bare
     /// king but the standard-army helper does not classify — see its module docs.)
     /// Adjudication-only and behind the default-off hook, so perft is byte-identical.
-    ///
-    /// [`standard_insufficient_material`]: crate::geometry::variant::standard_insufficient_material
     fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
@@ -348,7 +346,7 @@ mod insufficient_material_tests {
     fn king_and_single_bishop_draw() {
         // Royal Knight + lone Bishop vs royal Knight is a dead draw (FSF: draw).
         assert_eq!(
-            end_reason("5k2/8/8/8/8/8/8/5KB2 w - - 0 1"),
+            end_reason("5k2/8/8/8/8/8/8/5KB1 w - - 0 1"),
             Some(WideEndReason::InsufficientMaterial)
         );
     }
@@ -378,6 +376,6 @@ mod insufficient_material_tests {
     #[test]
     fn rook_is_sufficient() {
         // A lone Rook can force mate (FSF: sufficient).
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR2 w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR1 w - - 0 1"), None);
     }
 }

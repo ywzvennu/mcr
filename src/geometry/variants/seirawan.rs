@@ -144,7 +144,7 @@ impl WideVariant<Chess8x8> for SeirawanRules {
     /// standard-army 8x8 chess, so the ordinary insufficient-material draw applies:
     /// king vs king, king and a lone minor (bishop or knight) vs king, and
     /// same-colour bishops only. The Hawk (B+N) and Elephant (R+N) count as mating
-    /// material, exactly as the [`standard_insufficient_material`] helper classifies
+    /// material, exactly as the `standard_insufficient_material` helper classifies
     /// the census compounds.
     ///
     /// **The reserve gates the material.** While **either** side still holds a Hawk
@@ -159,8 +159,6 @@ impl WideVariant<Chess8x8> for SeirawanRules {
     ///
     /// Adjudication-only and behind the default-off hook, so perft stays
     /// byte-identical.
-    ///
-    /// [`standard_insufficient_material`]: crate::geometry::variant::standard_insufficient_material
     fn is_insufficient_material(board: &Board<Chess8x8>, state: &GenericState<Chess8x8>) -> bool {
         if state.gating.any_reserve(Color::White) || state.gating.any_reserve(Color::Black) {
             return false;
@@ -204,11 +202,11 @@ mod insufficient_material_tests {
     fn king_and_single_minor_empty_reserve_draw() {
         // K + N vs K and K + B vs K with no reserve left are dead draws.
         assert_eq!(
-            end_reason("5k2/8/8/8/8/8/8/5KN2[] w - - 0 1"),
+            end_reason("5k2/8/8/8/8/8/8/5KN1[] w - - 0 1"),
             Some(WideEndReason::InsufficientMaterial)
         );
         assert_eq!(
-            end_reason("5k2/8/8/8/8/8/8/5KB2[] w - - 0 1"),
+            end_reason("5k2/8/8/8/8/8/8/5KB1[] w - - 0 1"),
             Some(WideEndReason::InsufficientMaterial)
         );
     }
@@ -238,7 +236,7 @@ mod insufficient_material_tests {
         // reserve, so Black is not insufficient and the game is not drawn — matching
         // FSF, whose per-colour test reports Black sufficient while its hand is
         // non-empty.
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KB2[e] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KB1[e] w - - 0 1"), None);
     }
 
     // --- material controls (empty reserve, still sufficient) ---------------
@@ -253,8 +251,8 @@ mod insufficient_material_tests {
     fn rook_and_compounds_are_sufficient() {
         // A lone rook mates; the Hawk (B+N) and Elephant (R+N) compounds are mating
         // material even with the reserve spent.
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR2[] w - - 0 1"), None);
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KH2[] w - - 0 1"), None);
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KE2[] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR1[] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KH1[] w - - 0 1"), None);
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KE1[] w - - 0 1"), None);
     }
 }
