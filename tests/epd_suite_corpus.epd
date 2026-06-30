@@ -1,0 +1,46 @@
+# Pinned EPD test corpus for the mce EPD/perft runner (issue #356).
+#
+# Each record is `<variant> <EPD>` where <variant> is a tag the runner maps to
+# either the concrete standard-chess engine (`standard`) or a wide-layer
+# `WideVariantId` (every other tag). The EPD that follows is the variant's
+# structural FEN fields (the two move clocks dropped) plus a list of operations:
+#
+#   * `Dn <count>`  -- perft node count to depth n (the classic CPW perft-suite
+#                      opcode, also documented by `mce::Epd`). The runner builds
+#                      the position, runs perft(n), and asserts it equals <count>.
+#   * `bm <SAN>...`  -- best move(s): each must parse via the variant's SAN parser
+#                      AND be present in `legal_moves()`.
+#   * `am <SAN>...`  -- avoid move(s): each must parse and be legal-but-flagged
+#                      (present in `legal_moves()`); mce is a movegen library, not
+#                      a search engine, so this validates legality/parse, not the
+#                      engine's choice.
+#   * `id "..."`     -- a human-readable record identifier.
+#
+# Every perft count is FSF-confirmed and reuses the figures already pinned in the
+# crate's tests/perft_*.rs suites; the standard-chess counts are the published
+# CPW/Kiwipete numbers. Blank lines and lines beginning with `#` are ignored.
+
+# --- standard chess, via the geometry-backed concrete engine ----------------
+standard rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - bm e4 Nf3; D1 20; D2 400; D3 8902; id "cpw-startpos";
+standard r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - bm O-O; am O-O-O; D1 48; D2 2039; D3 97862; id "kiwipete";
+standard 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - D1 14; D2 191; D3 2812; id "cpw-pos3";
+standard r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - D1 6; D2 264; D3 9467; id "cpw-pos4";
+standard rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - D1 44; D2 1486; id "cpw-pos5";
+standard r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - D1 46; D2 2079; id "cpw-pos6";
+
+# --- xiangqi (Chinese chess, 9x10), FSF-confirmed (tests/perft_xiangqi.rs) ---
+xiangqi rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - bm Ra2; D1 44; D2 1920; D3 79666; id "xq-startpos";
+xiangqi r1oukuo1r/9/1cj3jc1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1CJ3JC1/9/R1OUKUO1R w - - D1 36; D2 1292; id "xq-mid";
+xiangqi rjoukuojr/9/4c4/z1z1C1z1z/9/9/Z1Z3Z1Z/1C5c1/9/RJOUKUOJR b - - D1 11; D2 373; id "xq-cannon-cap";
+
+# --- makruk (Thai chess), FSF-confirmed (tests/perft_makruk.rs) -------------
+makruk rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w - - bm e4; D1 23; D2 529; D3 12012; id "makruk-startpos";
+makruk rnsmksnr/8/1ppppppp/p7/4P3/PPPP1PPP/8/RNSKMSNR b - - D1 25; D2 576; id "makruk-mid";
+
+# --- shatranj, FSF-confirmed (tests/perft_shatranj.rs) ----------------------
+shatranj rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - am Na3; D1 16; D2 256; D3 4176; id "shatranj-startpos";
+shatranj rn1km1nr/pppppppp/3*x*x3/8/8/3*X*X3/PPPPPPPP/RN1KM1NR w - - D1 17; D2 289; id "shatranj-mid";
+
+# --- capablanca (10x8), FSF-confirmed (tests/perft_capablanca.rs) -----------
+capablanca rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - D1 28; D2 784; D3 25228; id "capablanca-startpos";
+capablanca r4k3r/pppppppppp/10/10/10/10/PPPPPPPPPP/R4K3R w KQkq - D1 31; D2 961; id "capablanca-castle";
