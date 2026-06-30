@@ -75,6 +75,28 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --all-features
 
+  # Supply-chain & license audit via cargo-deny. The crate is permissively
+  # dual-licensed (MIT OR Apache-2.0), so this gate enforces that its entire
+  # runtime/build dependency graph stays advisory-free and license-compatible
+  # (permissive only — no copyleft) and is sourced only from crates.io. The
+  # config lives in `deny.toml` at the repo root. The GPL-fenced compare-fairy /
+  # compare and fuzz crates are non-workspace and absent from mce's dependency
+  # graph, so they are out of scope here. A single deny check is cheap (no
+  # compile), so it runs on every push and PR rather than being schedule-gated.
+  cargo-deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The action installs cargo-deny and fetches the RUSTSEC advisory DB; with
+      # `[graph] all-features = true` in deny.toml the optional serde/rayon trees
+      # are included in the audit.
+      - name: Supply-chain & license audit (cargo-deny)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
   # no_std gate: prove the crate still compiles with the default `std` feature
   # off, both on the host and on bare-metal / wasm targets that have no standard
   # library at all. This is the regression guard for issue #113 — the core
