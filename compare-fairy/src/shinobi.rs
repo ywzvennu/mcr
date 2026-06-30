@@ -88,19 +88,33 @@ const CASES: &[Case] = &[
 /// no remapped letter, so the swap is safe over the whole FEN (including the
 /// `[..]` hand bracket).
 pub(crate) fn to_fsf_dialect(fen: &str) -> String {
-    let stage = fen
+    // Remap only the placement field (board + `[..]` hand bracket, before the
+    // first space). The clan tokens `*U`/`*N`/`A` live exclusively there; the
+    // trailing fields legitimately carry file letters `a`-`h` (an en-passant
+    // square such as `a3`, or castling letters), which must be left intact — a
+    // whole-FEN `a → j` rewrite would corrupt an a-file en-passant target into the
+    // nonsensical `j3`.
+    let (placement, rest) = match fen.split_once(' ') {
+        Some((p, r)) => (p, Some(r)),
+        None => (fen, None),
+    };
+    let stage = placement
         .replace("*U", "C")
         .replace("*u", "c")
         .replace("*N", "H")
         .replace("*n", "h");
-    stage
+    let mapped: String = stage
         .chars()
         .map(|c| match c {
             'a' => 'j',
             'A' => 'J',
             other => other,
         })
-        .collect()
+        .collect();
+    match rest {
+        Some(r) => format!("{mapped} {r}"),
+        None => mapped,
+    }
 }
 
 /// A measured Shinobi comparison row.

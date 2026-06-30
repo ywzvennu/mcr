@@ -72,3 +72,23 @@ fn promoted_cheap() {
 fn quails_cheap() {
     check(QUAILS, &[(1, 92), (2, 7697), (3, 413805)]);
 }
+
+/// Regression for the Pheasant check-interposition drop bug (issue #239): the Tori
+/// **Pheasant** leaps two squares straight forward (a Dabbaba jump), so a check it
+/// delivers along a file **cannot be blocked** by interposing on the intervening
+/// square. mce's hand-drop check mask used `between(king, checker)` unconditionally,
+/// letting a held Swallow be (illegally) dropped onto that square to "block" the
+/// jump — after which the Pheasant simply captured the king. The fix gates the drop
+/// interposition on `role_is_slider`, mirroring the move generator's check mask.
+///
+/// Here Black's Pheasant on f3 checks the White king on f1 (the f3 -> f1 jump over
+/// f2); the only legal replies are the two king steps and capturing the checker, so
+/// perft(1) is 3 — not 4 (the bug also counted the bogus `S@f2` interposition drop).
+/// This position is reached by the #239 differential fuzzer; FSF confirms 3/134.
+#[test]
+fn pheasant_check_cannot_be_blocked_by_a_drop() {
+    const CHECK_BY_PHEASANT: &str =
+        "*r*z1k2*v/2*a*k*k1*y/*y1*y*y*y1*Y/1*y*y1*Y*y1/*Y*Y*Y1*Y*z1/1*g1*k2*A/*V*Z2*KK*R[*Y*z] \
+w - - 0 15";
+    check(CHECK_BY_PHEASANT, &[(1, 3), (2, 134), (3, 4743)]);
+}

@@ -2883,9 +2883,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     let checkers = self.attackers_to(king_sq, them, occupied);
                     match checkers.count() {
                         0 => Bitboard::FULL,
-                        // A drop cannot capture, so only the between-squares resolve
-                        // a single check.
-                        1 => between(king_sq, checkers.lsb().expect("one checker")),
+                        // A drop cannot capture, so only an interposition resolves a
+                        // single check — and only when the checker is a **slider**. A
+                        // leaper that checks along a line (Tori's Pheasant jumping two
+                        // squares straight to the king) cannot be blocked, so `between`
+                        // must not offer the intervening square as a (false) drop
+                        // block. Mirrors the move-generation check mask's
+                        // [`role_is_slider`](WideVariant::role_is_slider) gate; for a
+                        // non-collinear leaper `between` is empty either way, so this
+                        // is byte-identical for every existing hand variant.
+                        1 => {
+                            let checker = checkers.lsb().expect("one checker");
+                            if self.board.role_at(checker).is_some_and(V::role_is_slider) {
+                                between(king_sq, checker)
+                            } else {
+                                Bitboard::EMPTY
+                            }
+                        }
                         // Double check: no drop is legal.
                         _ => return,
                     }

@@ -443,16 +443,25 @@ fn check_node(
     let fen = pos.to_fen();
     let fsf_fen = (spec.dialect)(&fen);
 
+    // Re-parse the mce side from the FEN string FSF is fed, so both engines
+    // evaluate the *same stateless position*. FSF's `position fen` carries no move
+    // history, so comparing it against an in-game mce position would wrongly flag
+    // history-only state that the FEN does not encode (e.g. Janggi's
+    // consecutive-pass adjudication) as a movegen divergence. Re-parsing makes the
+    // comparison FEN-to-FEN; a failure here would itself be an mce round-trip bug.
+    let node = AnyWideVariant::from_fen(spec.id, &fen)
+        .map_err(|e| format!("mce failed to re-parse its own FEN {fen:?}: {e:?}"))?;
+
     // ---- mce side: perft(1) is the legal-move count; perft(2)'s divide is each
     // legal move's child perft(1). -------------------------------------------
-    let moves = pos.legal_moves();
+    let moves = node.legal_moves();
     let mce_p1 = moves.len() as u64;
     let mut mce_divide: Vec<(String, u64)> = Vec::with_capacity(moves.len());
     let mut mce_p2 = 0u64;
     for mv in &moves {
-        let child_nodes = pos.play(mv).perft(1);
+        let child_nodes = node.play(mv).perft(1);
         mce_p2 += child_nodes;
-        mce_divide.push((pos.to_uci(mv), child_nodes));
+        mce_divide.push((node.to_uci(mv), child_nodes));
     }
 
     // ---- FSF side -----------------------------------------------------------
@@ -846,7 +855,8 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // 47 shipped variants minus the 3 excluded.
+        // 47 shipped variants minus the 3 documented exclusions (Alice / Duck /
+        // Jieqi by design).
         assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 3);
     }
 }
