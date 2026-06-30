@@ -173,6 +173,20 @@ impl WideVariant<Grand10x10> for GrandRules {
     fn has_castling() -> bool {
         false
     }
+
+    /// Grand keeps the standard chess army plus the always-mating Cardinal
+    /// ([`WideRole::Hawk`]) and Marshal ([`WideRole::Elephant`]), so the ordinary
+    /// insufficient-material draw applies on the 10x10 board: king vs king, king
+    /// and a lone minor (bishop or knight) vs king, and same-colour bishops only.
+    /// The two compounds count as mating material (matching Fairy-Stockfish, which
+    /// classes the cardinal and marshal as major pieces). Adjudication-only and
+    /// behind the default-off hook, so perft stays byte-identical.
+    fn is_insufficient_material(
+        board: &Board<Grand10x10>,
+        _state: &GenericState<Grand10x10>,
+    ) -> bool {
+        crate::geometry::variant::standard_insufficient_material(board)
+    }
 }
 
 /// Grand chess as a [`GenericPosition`] over the 10x10 [`Grand10x10`] geometry.
@@ -184,3 +198,64 @@ impl WideVariant<Grand10x10> for GrandRules {
 /// only the array, no-castling, pawn rules, promotion zone, and
 /// promote-to-captured rule distinguish it.
 pub type Grand = GenericPosition<Grand10x10, GrandRules>;
+
+#[cfg(test)]
+mod insufficient_material_tests {
+    use super::Grand;
+    use crate::geometry::{WideEndReason, WideOutcome};
+
+    fn end_reason(fen: &str) -> Option<WideEndReason> {
+        Grand::from_fen(fen).expect("valid grand fen").end_reason()
+    }
+
+    #[test]
+    fn lone_kings_draw() {
+        let pos = Grand::from_fen("5k4/10/10/10/10/10/10/10/10/5K4 w - - 0 1").expect("valid fen");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
+        assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn king_and_single_minor_draw() {
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/10/10/5KN3 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/10/10/5KB3 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn same_colour_bishops_draw() {
+        // White Ba1 and black Bb10 are both on the dark complex.
+        assert_eq!(
+            end_reason("1b3k4/10/10/10/10/10/10/10/10/B4K4 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn opposite_colour_bishops_are_sufficient() {
+        // White Ba1 (dark) vs black Bc10 (light): a mate exists, not adjudicated.
+        assert_eq!(
+            end_reason("2b2k4/10/10/10/10/10/10/10/10/B4K4 w - - 0 1"),
+            None
+        );
+    }
+
+    #[test]
+    fn compound_pieces_are_sufficient() {
+        // The Marshal (R+N, `E`) and Cardinal (B+N, `A`) are major pieces: a lone
+        // one beside the king is not an insufficient-material draw.
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/10/10/5KE3 w - - 0 1"),
+            None
+        );
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/10/10/5KA3 w - - 0 1"),
+            None
+        );
+    }
+}

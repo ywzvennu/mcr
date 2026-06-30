@@ -124,6 +124,18 @@ impl WideVariant<Cap10x8> for CapablancaRules {
             (2, 3)
         }
     }
+
+    /// Capablanca keeps the standard chess army plus the always-mating
+    /// Archbishop ([`WideRole::Hawk`]) and Chancellor ([`WideRole::Elephant`]), so
+    /// the ordinary insufficient-material draw applies on the wider board: king vs
+    /// king, king and a lone minor (bishop or knight) vs king, and same-colour
+    /// bishops only. The two compounds count as mating material (matching
+    /// Fairy-Stockfish, which classes the archbishop and chancellor as major
+    /// pieces). Adjudication-only and behind the default-off hook, so perft stays
+    /// byte-identical.
+    fn is_insufficient_material(board: &Board<Cap10x8>, _state: &GenericState<Cap10x8>) -> bool {
+        crate::geometry::variant::standard_insufficient_material(board)
+    }
 }
 
 /// Capablanca chess as a [`GenericPosition`] over the 10x8 [`Cap10x8`] geometry.
@@ -135,3 +147,57 @@ impl WideVariant<Cap10x8> for CapablancaRules {
 /// compound defaults, so only the array, promotion set, and castle files
 /// distinguish it.
 pub type Capablanca = GenericPosition<Cap10x8, CapablancaRules>;
+
+#[cfg(test)]
+mod insufficient_material_tests {
+    use super::Capablanca;
+    use crate::geometry::{WideEndReason, WideOutcome};
+
+    fn end_reason(fen: &str) -> Option<WideEndReason> {
+        Capablanca::from_fen(fen)
+            .expect("valid capablanca fen")
+            .end_reason()
+    }
+
+    #[test]
+    fn lone_kings_draw() {
+        let pos = Capablanca::from_fen("5k4/10/10/10/10/10/10/5K4 w - - 0 1").expect("valid fen");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
+        assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn king_and_single_minor_draw() {
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/5KN3 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+        assert_eq!(
+            end_reason("5k4/10/10/10/10/10/10/5KB3 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn same_colour_bishops_draw() {
+        // White Ba1 and black Bb8 are both on the dark complex.
+        assert_eq!(
+            end_reason("1b3k4/10/10/10/10/10/10/B4K4 w - - 0 1"),
+            Some(WideEndReason::InsufficientMaterial)
+        );
+    }
+
+    #[test]
+    fn opposite_colour_bishops_are_sufficient() {
+        // White Ba1 (dark) vs black Bc8 (light): a mate exists, not adjudicated.
+        assert_eq!(end_reason("2b2k4/10/10/10/10/10/10/B4K4 w - - 0 1"), None);
+    }
+
+    #[test]
+    fn compound_pieces_are_sufficient() {
+        // The Chancellor (R+N, `E`) and Archbishop (B+N, `A`) are major pieces:
+        // a lone one beside the king is not an insufficient-material draw.
+        assert_eq!(end_reason("5k4/10/10/10/10/10/10/5KE3 w - - 0 1"), None);
+        assert_eq!(end_reason("5k4/10/10/10/10/10/10/5KA3 w - - 0 1"), None);
+    }
+}
