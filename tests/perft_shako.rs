@@ -74,6 +74,20 @@ const CASTLING: &str = "c8c/vr3k2rv/pppppppppp/10/10/10/10/PPPPPPPPPP/VR3K2RV/C8
 /// the board). FSF-confirmed.
 const PROMO: &str = "5k4/1P8/10/10/10/10/10/10/10/5K3C w - - 0 1";
 
+/// Cannon-aware castling king-walk regression (issue #335), white to move. The
+/// white king is home on f2 and the queenside castle f2 -> d2 must walk across
+/// e2, which is attacked by the black cannon on e5 **over the white knight on e3
+/// as its screen**. FSF forbids that castle; mce used to allow it because its
+/// king-walk danger map was built by *forward*-projecting each enemy piece, and a
+/// cannon's forward projection lands its over-screen capture on the first
+/// *occupied* square beyond the screen (here e1, not the empty transit square e2).
+/// The fix re-tests each transit square with the king placed on it, so the
+/// cannon's forward projection sees e2 as its target. This position is the one the
+/// #239 differential fuzzer surfaced (reached from the pinned mid-game FEN after
+/// `e10e5`); the depth-1 count is `67` (it was `68` with the spurious `f2d2`).
+const CANNON_CASTLE_335: &str =
+    "c1q2k4/vrn6v/2pp2p1r1/4p1n2p/pp3p1ppb/1Q2cP4/PN1P3P2/1PP1N1P1Pb/1R3KB2R/1V1CB3VC w Q - 0 18";
+
 /// Asserts the generic Shako perft equals each pinned `(depth, nodes)` count.
 /// Every number here also matched FSF shako `go perft` on the same position.
 fn check(fen: &str, cases: &[(u32, u64)]) {
@@ -144,4 +158,14 @@ fn castling_cheap() {
 #[test]
 fn promotion_cheap() {
     check(PROMO, &[(1, 23), (2, 111), (3, 3050), (4, 19737)]);
+}
+
+// -- Cannon-aware castling king-walk (issue #335, FSF-confirmed) ------------
+
+#[test]
+fn cannon_castle_king_walk_335() {
+    // FSF shako `go perft`: 67 / 4160 / 268485. mce previously reported 68 at
+    // depth 1 (a spurious `f2d2` castle across the cannon-attacked e2 transit
+    // square).
+    check(CANNON_CASTLE_335, &[(1, 67), (2, 4160), (3, 268485)]);
 }

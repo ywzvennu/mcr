@@ -3400,6 +3400,43 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 continue;
             }
 
+            // Cannon-aware transit safety (Shako and any cannon-castling variant).
+            // `king_danger` is built by projecting each enemy piece *forward*
+            // ([`attacked_by`](Self::attacked_by)), which for a cannon yields only
+            // its current capture target — the first piece beyond its screen. An
+            // **empty** transit square the king would step onto is skipped by that
+            // projection (the cannon's ray runs through it to the next occupant), so
+            // the map misses a cannon that *would* capture the king were it standing
+            // there. The cannon is also `role_attack_is_leg_asymmetric`, so
+            // [`attackers_to`](Self::attackers_to) forward-projects it too and shows
+            // no attacker on an empty square — by design, to avoid a phantom on a
+            // square a cannon cannot actually capture. So re-test each
+            // strictly-between transit square with the **king placed on it** (and
+            // lifted from its origin, matching the `king_danger` convention): the
+            // cannon's forward projection then lands its over-screen capture on the
+            // occupied transit square, exactly the danger the king walks into. A
+            // plain slider's attack on the square is unaffected by the king sitting
+            // on its endpoint, so this stays correct for non-cannon attackers too.
+            // The destination square is covered by the post-castle `royal` test
+            // below. Gated behind `has_cannons()` (default-off), so every non-cannon
+            // castling variant (standard, Capablanca, Seirawan, …) is byte-identical,
+            // and the loop body is reached only for an actual castle candidate
+            // (castling rights present), so cannon variants without castling
+            // (Xiangqi, Janggi) never run it.
+            if V::has_cannons() {
+                let mut transit_attacked = false;
+                for s in between(king_sq, king_dest) {
+                    let occ_at_s = occupied.without(king_sq).with(s);
+                    if !self.attackers_to(s, us.opposite(), occ_at_s).is_empty() {
+                        transit_attacked = true;
+                        break;
+                    }
+                }
+                if transit_attacked {
+                    continue;
+                }
+            }
+
             // The king must also be safe on its destination under the *post*-castle
             // occupancy: king and rook off their start squares with the rook on its
             // destination. In a randomised (Chess960 / Shredder-X-FEN) back rank a
