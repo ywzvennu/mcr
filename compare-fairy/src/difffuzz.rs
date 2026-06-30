@@ -405,12 +405,8 @@ const SPECS: &[Spec] = &[
 ///   castle of the already-moved king. That exact node is skipped (see
 ///   [`is_schess_corner_castle_artifact`]); every other S-Chess node is checked.
 ///
-/// What stays held back:
-///
-/// * **Synochess** — a deeper-sweep perft divergence still under triage (dialect
-///   target vs movegen); tracked as issue #337.
-///
-/// Resolved and released back into the default sweep:
+/// Resolved and released back into the default sweep (`HELD_BACK` is now EMPTY —
+/// the entire variant set runs clean under the differential fuzzer):
 ///
 /// * **Shako** (issue #335) — FSF forbids castling the king across a square a
 ///   **cannon** attacks over a screen, but mce's castling king-walk danger map
@@ -422,7 +418,14 @@ const SPECS: &[Spec] = &[
 ///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mce's `f2d2` is now
 ///   correctly illegal (the e2 transit square is hit by the e5 cannon over the e3
 ///   screen). Now clean under the differential fuzzer.
-const HELD_BACK: &[WideVariantId] = &[WideVariantId::Synochess];
+///
+/// * **Synochess** (issue #337) — its "deeper-sweep `z`-piece divergence" was the
+///   SAME cannon-aware castling-king-walk bug (Synochess reuses the Janggi cannon):
+///   the divergent nodes were castles of a king walking across a square a cannon
+///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
+///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
+///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
+const HELD_BACK: &[WideVariantId] = &[];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
