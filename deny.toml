@@ -1,0 +1,71 @@
+# cargo-deny configuration — supply-chain & license audit for the mce library.
+#
+# `mce` is a clean-room, dual-licensed (MIT OR Apache-2.0) chess library with a
+# near-zero runtime dependency surface: only the optional `serde` and `rayon`
+# features pull anything in. cargo-deny audits the crate graph rooted at the
+# root manifest, which here is exactly that shipped runtime/build graph
+# (serde + rayon and their proc-macro build deps — 14 crates). This file
+# enforces, for that graph, that:
+#   * no RUSTSEC advisory affects it          (advisories),
+#   * every crate is permissively licensed —
+#     i.e. NO copyleft (GPL/AGPL/LGPL/MPL)    (licenses),
+#   * the dependency set stays lean and comes
+#     only from the canonical registry        (bans, sources).
+#
+# Scope note (GPL fence): the GPL-fenced `compare-fairy` / `compare` crates and
+# the `fuzz` crate are SEPARATE, non-workspace crates behind their own
+# Cargo.toml. They are NOT in `mce`'s dependency graph (`cargo tree` never
+# reaches them — they drive Fairy-Stockfish only as a subprocess), so they and
+# the GPL code they touch are correctly out of scope for this audit. The library
+# graph audited here is verified GPL-free.
+
+[graph]
+# Audit every target and feature so a platform- or feature-specific dependency
+# (e.g. windows-sys, wasip2, the optional serde/rayon trees) cannot smuggle in
+# an unvetted license or advisory.
+all-features = true
+
+[advisories]
+# Pull the RUSTSEC advisory database. Security vulnerabilities are always hard
+# errors. `yanked = "deny"` fails the check if a resolved crate version has been
+# yanked from the registry. `unmaintained = "workspace"` flags unmaintained
+# advisories for first-party / workspace crates while staying lenient about deep
+# transitive ones we do not directly control.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+unmaintained = "workspace"
+
+[licenses]
+# Allow-list of permissive licenses. The three actually present in the current
+# graph are MIT, Apache-2.0 and Unicode-3.0 (the latter from `unicode-ident`);
+# the rest are the standard permissive families kept as a forward-looking policy
+# so a routine dependency bump that introduces, say, an ISC- or BSD-licensed
+# crate stays green without weakening the audit. Crucially, NO copyleft license
+# (GPL/AGPL/LGPL/MPL) appears here, so any such crate entering the graph would
+# fail the check by omission.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+]
+confidence-threshold = 0.8
+
+[bans]
+# Lean-graph hygiene: duplicate versions of a crate warn (informational — they
+# do not fail CI), and nothing is hard-banned, so an ordinary `cargo update` is
+# never blocked by this check.
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+# Only the canonical crates.io registry is trusted. No git or alternative
+# registry sources are present in the graph, and any that appear would fail.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
