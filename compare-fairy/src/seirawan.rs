@@ -10,11 +10,18 @@
 //!
 //! ## FEN dialect
 //!
-//! mce uses the **same dialect** Fairy-Stockfish does for S-Chess: the Hawk is
-//! `H`/`h`, the Elephant `E`/`e`, the reserves in hand ride in a `[..]` bracket
-//! after the placement, and the gating rights fold into the castling field
-//! (`KQBCDFGkqbcdfg`-style). So a Seirawan FEN is byte-identical between the two
-//! engines — there is no rewrite step (contrast Capablanca's chancellor letter).
+//! mce spells the Hawk (its [`WideRole::Hawk`](mce::geometry::WideRole)
+//! bishop-knight compound) `a`/`A` on the **board** — the same letter Capablanca's
+//! Archbishop uses, since the two share the role — whereas FSF's S-Chess spells the
+//! board Hawk `h`/`H`. (The Elephant is `e`/`E` in both, and mce's reserve `[..]`
+//! bracket already prints the Hawk as `H`/`h`, matching FSF.) The mismatch only
+//! ever shows once a Hawk is **gated onto the board**: the hand-picked corpus below
+//! keeps both reserves un-gated, so its boards carry no Hawk and a verbatim FEN
+//! happens to match — but a fuzzed game that gates a Hawk produces a board `A`/`a`
+//! that FSF would read as a different piece. [`fen_to_fsf`] therefore rewrites the
+//! Hawk's letter across the *placement* field only (it leaves the gating-rights
+//! castling field — whose file letters span `a`..`h` — and every other field
+//! untouched), exactly as the sibling S-House dialect does (issue #239).
 //!
 //! GPL FENCE unchanged: FSF is driven purely as a subprocess (see `uci.rs`); no
 //! GPL code is linked.
@@ -25,7 +32,32 @@ use mce::geometry::{perft as gperft, Chess8x8, Seirawan};
 
 use crate::uci::Engine;
 
-/// One Seirawan corpus position (mce == FSF dialect).
+/// Rewrite an mce-dialect Seirawan FEN into the FSF dialect: the Hawk's letter
+/// `a`/`A` becomes `h`/`H` in the *placement* field only (which includes the
+/// reserve `[..]` bracket, though mce already prints reserve Hawks as `H`/`h`, so
+/// that part is a no-op). The Elephant `e`/`E`, the gating-rights castling field
+/// (whose file letters span `a`..`h`), and every other field are unchanged. For a
+/// board with no gated Hawk (every hand-picked corpus position) this is the
+/// identity, so the pinned counts are unaffected; it only bites once a fuzzed game
+/// gates a Hawk onto the board.
+pub fn fen_to_fsf(fen: &str) -> String {
+    let map = |c| match c {
+        'a' => 'h',
+        'A' => 'H',
+        other => other,
+    };
+    // Only the placement field (up to the first space) holds piece letters; the
+    // castling field's gating-file letters (a..h) must NOT be rewritten.
+    match fen.split_once(' ') {
+        Some((placement, rest)) => {
+            let mapped: String = placement.chars().map(map).collect();
+            format!("{mapped} {rest}")
+        }
+        None => fen.chars().map(map).collect(),
+    }
+}
+
+/// One Seirawan corpus position, in the **mce dialect** (board Hawk = `a`/`A`).
 struct Case {
     label: &'static str,
     fen: &'static str,
@@ -177,9 +209,11 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
     let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
     let mce_secs = mce_start.elapsed().as_secs_f64();
 
-    // FSF side: the FEN is the same dialect, sent verbatim.
+    // FSF side: rewrite a board Hawk's letter into the FSF dialect (a no-op for
+    // every un-gated corpus board, but correct once a Hawk is gated on).
+    let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("seirawan", false)?;
-    engine.set_position(case.fen)?;
+    engine.set_position(&fsf_fen)?;
     let fsf = engine.go_perft(depth, false)?;
 
     Ok(Row {
