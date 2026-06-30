@@ -90,7 +90,7 @@ const CASES: &[Case] = &[
 /// single-letter compounds follow. The standard army (`pnbrk`/`PNBRK`) and the
 /// structural fields carry no remapped token, so the swap is safe over the whole
 /// FEN (including the `[..]` hand bracket).
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     // Only the placement field (the first whitespace-delimited token, board plus
     // its `[..]` holdings bracket) carries piece tokens. The structural fields —
     // the side-to-move `w`/`b`, the castling rights `KQkq`, the en-passant square,

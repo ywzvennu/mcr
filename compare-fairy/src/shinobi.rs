@@ -87,7 +87,7 @@ const CASES: &[Case] = &[
 /// `d`/`D`, Fers `m`/`M`, Lance `l`/`L`, King `k`/`K` and the standard army carry
 /// no remapped letter, so the swap is safe over the whole FEN (including the
 /// `[..]` hand bracket).
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let stage = fen
         .replace("*U", "C")
         .replace("*u", "c")

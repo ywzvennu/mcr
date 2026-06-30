@@ -68,7 +68,7 @@ const CASES: &[Case] = &[
 /// Knight (`k`/`K`) and the standard army carry no remapped token, so the swap is
 /// safe over the whole FEN. No other mce token starts with `*`, so a plain sequence
 /// replace is unambiguous.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.replace("*U", "M").replace("*u", "m")
 }
 

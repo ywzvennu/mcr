@@ -100,7 +100,7 @@ const CASES: &[Case] = &[
 /// (`*w → w`) from the bare Jaguar (`w → j`): a `*`-prefixed overflow token maps to
 /// its FSF letter, and a bare letter is swapped where mce and FSF differ. The
 /// side-to-move / clock fields are left intact.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts.next().unwrap_or("");
     let mut out = String::with_capacity(placement.len());

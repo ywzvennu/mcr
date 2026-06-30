@@ -95,7 +95,7 @@ const CASES: &[Case] = &[
 /// two-character overflow token `*f`/`*F` maps to FSF's single `f`/`F`. The
 /// Falcon token is rewritten **first** (a `*` followed by `f`/`F`) so the bare
 /// Lancer `f` is then free to become `l`. The King `k`/`K` is shared.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     // Only the placement field (before the first space) holds piece letters; the
     // side-to-move / castling / en-passant fields must be left intact.
     let mut parts = fen.splitn(2, ' ');

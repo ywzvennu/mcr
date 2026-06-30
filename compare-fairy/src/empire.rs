@@ -90,7 +90,7 @@ const CASES: &[Case] = &[
 /// cases) and map the Soldier `z → s`. Applied to the **placement field only** (the
 /// side-to-move / castling / clock fields are left intact); Black is standard chess
 /// and carries none of the remapped letters, so the swap is unambiguous.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts
         .next()

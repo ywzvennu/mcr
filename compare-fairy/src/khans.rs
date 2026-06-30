@@ -98,7 +98,7 @@ const CASES: &[Case] = &[
 /// (before the first space) holds piece letters; the side-to-move / castling /
 /// en-passant fields are left intact (otherwise a white-to-move `w` would be
 /// mangled into the Kheshig's `h`).
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts.next().unwrap_or("");
     let mut out = String::with_capacity(placement.len());

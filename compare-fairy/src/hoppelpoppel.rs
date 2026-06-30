@@ -80,7 +80,7 @@ const CASES: &[Case] = &[
 /// clock fields are left intact); they carry no `*`-prefixed token, so the swap is
 /// unambiguous. The `*b → b` and `*h → n` order matters only in that the `*`
 /// prefix is consumed atomically with its letter.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     let mut parts = fen.splitn(2, ' ');
     let placement = parts
         .next()

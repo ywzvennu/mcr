@@ -32,6 +32,7 @@ mod capahouse;
 mod chak;
 mod chennis;
 mod corpus;
+mod difffuzz;
 mod dobutsu;
 mod dragon;
 mod duck;
@@ -87,6 +88,10 @@ struct Opts {
     build: bool,
     /// One ply deeper per position.
     full: bool,
+    /// Run the differential fuzzer (issue #239) instead of the pinned corpus.
+    difffuzz: bool,
+    /// Differential-fuzzer tunables (only meaningful when `difffuzz` is set).
+    fuzz: difffuzz::Config,
 }
 
 /// A single measured comparison row.
@@ -173,6 +178,18 @@ fn main() {
             "default"
         }
     );
+
+    // ---- differential fuzzer (issue #239) ---------------------------------
+    // When `--difffuzz` is requested, run the seeded random-game perft cross-check
+    // instead of the pinned corpus, and exit with its divergence count.
+    if opts.difffuzz {
+        let divergences = difffuzz::run(&mut engine, &located.bin, &opts.fuzz);
+        engine.quit();
+        if divergences > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
 
     // ---- run the corpus through both engines ------------------------------
     let mut rows: Vec<Row> = Vec::with_capacity(CASES.len());
@@ -360,20 +377,37 @@ fn main() {
     }
 }
 
-/// Parse `--build` / `--full` / `--help`.
+/// Parse `--build` / `--full` / `--difffuzz [--seed N] [--games K] [--plies P]
+/// [--variant X]` / `--help`.
 fn parse_args() -> Opts {
     let mut o = Opts {
         build: false,
         full: false,
+        difffuzz: false,
+        fuzz: difffuzz::Config::default(),
     };
-    for arg in std::env::args().skip(1) {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "--build" => o.build = true,
             "--full" => o.full = true,
+            "--difffuzz" | "--fuzz" => o.difffuzz = true,
+            "--seed" => o.fuzz.seed = parse_value(&mut args, "--seed", parse_seed),
+            "--games" => o.fuzz.games = parse_value(&mut args, "--games", |s| s.parse().ok()),
+            "--plies" => o.fuzz.plies = parse_value(&mut args, "--plies", |s| s.parse().ok()),
+            "--variant" => {
+                o.fuzz.variant = Some(parse_value(&mut args, "--variant", |s| Some(s.to_string())))
+            }
             "--help" | "-h" => {
                 println!("usage: compare-fairy [--build] [--full]");
-                println!("  --build : clone + build Fairy-Stockfish if no binary is found");
-                println!("  --full  : one ply deeper per position");
+                println!("       compare-fairy --difffuzz [--seed N] [--games K] [--plies P] [--variant X]");
+                println!("  --build    : clone + build Fairy-Stockfish if no binary is found");
+                println!("  --full     : one ply deeper per position");
+                println!("  --difffuzz : seeded random-game perft(1..2)+divide fuzzer vs FSF (issue #239)");
+                println!("  --seed N   : fuzzer base seed (decimal or 0x-hex; default 0x239)");
+                println!("  --games K  : random games per variant (default 3)");
+                println!("  --plies P  : max plies per game (default 30)");
+                println!("  --variant X: fuzz only mce variant X (e.g. xiangqi, orda)");
                 println!("  env MCE_FSF_BIN=<path> selects an existing FSF binary");
                 std::process::exit(0);
             }
@@ -381,6 +415,30 @@ fn parse_args() -> Opts {
         }
     }
     o
+}
+
+/// Pull the next CLI token and parse it with `f`, exiting with a clear message if
+/// the value is missing or malformed.
+fn parse_value<T>(
+    args: &mut impl Iterator<Item = String>,
+    flag: &str,
+    f: impl Fn(&str) -> Option<T>,
+) -> T {
+    match args.next().as_deref().and_then(f) {
+        Some(v) => v,
+        None => {
+            eprintln!("error: {flag} needs a valid value");
+            std::process::exit(2);
+        }
+    }
+}
+
+/// Parse a `u64` seed in decimal or `0x`-prefixed hexadecimal.
+fn parse_seed(s: &str) -> Option<u64> {
+    match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        Some(hex) => u64::from_str_radix(hex, 16).ok(),
+        None => s.parse().ok(),
+    }
 }
 
 /// Run one corpus case through both engines and measure it.

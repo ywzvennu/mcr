@@ -85,7 +85,7 @@ const CASES: &[Case] = &[
 /// The Commoner is an mce **overflow** role: its token is the two characters `*u`
 /// (white `*U`), so it is collapsed to FSF's single `a`/`A` before the per-char
 /// swap. No other mce token starts with `*`, so a plain sequence replace is safe.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.replace("*U", "A")
         .replace("*u", "a")
         .chars()

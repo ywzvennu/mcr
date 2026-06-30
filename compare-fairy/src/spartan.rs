@@ -81,7 +81,7 @@ const CASES: &[Case] = &[
 /// `a→w` (both cases). King `k`/`K` and Hoplite `h`/`H` are already shared. The
 /// standard White army (`RNBQKBNR`/`P`) carries none of the remapped letters, so
 /// the swap is safe over the whole FEN.
-fn to_fsf_dialect(fen: &str) -> String {
+pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.chars()
         .map(|c| match c {
             't' => 'l',
