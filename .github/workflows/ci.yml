@@ -9,6 +9,10 @@ on:
     # the fast ubuntu `ci` gate runs, to keep Actions minutes low; the heavier
     # jobs run on push to main and on this weekly schedule.
     - cron: '0 6 * * 1'
+  # Manual trigger so the heavy, schedule-gated `fairy-differential` job (which
+  # builds GPL Fairy-Stockfish, ~2 min) can be run on demand without waiting for
+  # the weekly cron.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -163,3 +167,74 @@ jobs:
 
       - name: Test
         run: cargo test --all-features
+
+  # Always-on guard for the nested, non-workspace `compare-fairy` crate. Because
+  # it lives outside the workspace, root `cargo test` never builds it, so two of
+  # its tests silently rotted before #219. This job builds it and runs its unit
+  # tests — the FSF-free parts: FEN-dialect round-trips, divide-line parsing, and
+  # pinned shallow perft counts. None of these spawn Fairy-Stockfish (FSF is only
+  # ever driven by the differential binary, not the unit tests), so with no
+  # `MCE_FSF_BIN` set they run fully and deterministically. Kept cheap (debug
+  # build, no FSF) so it can stay on every PR and prevent the rot recurring.
+  compare-fairy-unit:
+    name: compare-fairy (unit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: compare-fairy
+
+      # No MCE_FSF_BIN is exported, so every test here is FSF-free by
+      # construction; the differential binary that drives FSF is exercised by the
+      # gated `fairy-differential` job below.
+      - name: compare-fairy unit tests (FSF-free)
+        run: cargo test --manifest-path compare-fairy/Cargo.toml
+
+  # Heavy differential + deep-perft job, GATED to the weekly schedule and manual
+  # `workflow_dispatch` only (never per-PR), because it builds Fairy-Stockfish
+  # from source (~2 min, GPL-3.0+) and runs the slow deep `--ignored` perft
+  # sweep. FSF is GPL: it is built and driven purely AS A SUBPROCESS over a
+  # process boundary (the clean-room `mce` library never links or vendors it),
+  # and the binary is never committed or cached into the repo.
+  fairy-differential:
+    name: fairy-differential (FSF + deep perft)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Build the FSF oracle. `largeboards=yes` enables the 10x10 / large-board
+      # variants (e.g. shako, grand) the differential also covers. The clone goes
+      # to a throwaway `fsf/` dir that is never committed (GPL fence).
+      - name: Build Fairy-Stockfish oracle (GPL, subprocess only)
+        run: |
+          git clone --depth 1 https://github.com/fairy-stockfish/Fairy-Stockfish.git fsf
+          make -C fsf/src -j build ARCH=x86-64 largeboards=yes
+
+      - name: Export FSF environment
+        run: |
+          echo "MCE_FSF_BIN=$GITHUB_WORKSPACE/fsf/src/stockfish" >> "$GITHUB_ENV"
+          echo "MCE_FSF_VARIANTS_INI=$GITHUB_WORKSPACE/fsf/src/variants.ini" >> "$GITHUB_ENV"
+
+      # Full differential: asserts mce's perft node counts equal FSF's across the
+      # shared variants. With MCE_FSF_BIN set the harness runs (rather than
+      # skipping) and exits non-zero on any divergence.
+      - name: compare-fairy differential vs FSF
+        run: cargo run --release --manifest-path compare-fairy/Cargo.toml
+
+      # Deep geometry-layer perft sweep: the expensive `#[ignore]`d layers that
+      # `cargo test` skips for speed. Run here against published reference counts.
+      - name: Deep perft sweep (ignored tests)
+        run: cargo test --release --all-features -- --include-ignored
