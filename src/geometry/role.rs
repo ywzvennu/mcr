@@ -853,6 +853,180 @@ pub enum WideRole {
     /// role**: its FEN token is `=D` (white) / `=d` (black). It has no FSF
     /// counterpart (Jieqi is not an FSF variant).
     Dark = 75,
+
+    // --- Wa Shogi (11x11 animal shogi) army (§ Milestone 13) ------------------
+    //
+    // Wa Shogi (和将棋, https://www.chessvariants.com/rules/wa-shogi) is an
+    // animal-and-bird-themed large shogi on the 11x11 [`Washogi11x11`] geometry. It
+    // is **not** an FSF variant (Fairy-Stockfish has no Wa Shogi), so it is
+    // **rules-validated** against the documented piece moves (chessvariants.com /
+    // shogi.net) cross-checked with the HaChu engine's Betza definitions — there is
+    // no `compare-fairy` rewrite. Its royal piece is the **Crane King**, a plain
+    // royal [`WideRole::King`] (so it needs no new role). The sixteen non-royal base
+    // pieces and the fourteen promoted forms are genuinely-new movers; landing past
+    // the exhausted single-letter alphabet **and** the single-`*` overflow bank,
+    // each base piece is a **second-bank** overflow role (`**`, [`is_overflow2`]) and
+    // each promoted form a **third-tier** overflow role (`=`, [`is_overflow3`]), with
+    // distinct recycled base letters within each tier. The promoted forms are **not**
+    // [`is_promoted`] (no `+`-token): they revert to their base via the variant's
+    // [`role_hand_base`](super::WideVariant::role_hand_base) hook, exactly as the
+    // Tori Shogi birds and Cannon Shogi promoted cannons do.
+    //
+    // [`is_overflow2`]: WideRole::is_overflow2
+    // [`is_overflow3`]: WideRole::is_overflow3
+    /// Sparrow Pawn (雀歩, Betza `fW`) — steps one square straight **forward** (it
+    /// both moves and captures there, like the Shogi pawn). Promotes to a Golden
+    /// Bird. (Wa Shogi.) A **second-bank overflow role**: its FEN token is `**B`
+    /// (white) / `**b` (black).
+    SparrowPawn = 76,
+    /// Oxcart (牛車, Betza `fR`) — slides any number of squares straight **forward**
+    /// only (a forward lance). Promotes to a Plodding Ox. (Wa Shogi.) A
+    /// **second-bank overflow role**: its FEN token is `**D` / `**d`.
+    Oxcart = 77,
+    /// Liberated Horse (奔馬, Betza `fRbW2`) — slides any number of squares straight
+    /// **forward**, or up to two squares straight **backward**. Promotes to a
+    /// Heavenly Horse. (Wa Shogi.) A **second-bank overflow role**: its FEN token is
+    /// `**F` / `**f`.
+    LiberatedHorse = 78,
+    /// Strutting Crow (鵲鳥, Betza `fWbF`) — steps one square straight **forward**
+    /// (orthogonal) or one square **backward** diagonally. Promotes to a Flying
+    /// Falcon. (Wa Shogi.) A **second-bank overflow role**: its FEN token is `**G` /
+    /// `**g`.
+    StruttingCrow = 79,
+    /// Swooping Owl (隼鷹, Betza `fWbF`) — moves identically to the Strutting Crow
+    /// (one step straight forward or one step backward diagonally) but promotes to a
+    /// **Cloud Eagle** instead. (Wa Shogi.) A **second-bank overflow role**: its FEN
+    /// token is `**H` / `**h`.
+    SwoopingOwl = 80,
+    /// Climbing Monkey (登猿, Betza `vWfF`) — steps one square straight **forward** or
+    /// **backward** (vertical Wazir) or one square **forward** diagonally. Promotes
+    /// to a Violent Stag. (Wa Shogi.) A **second-bank overflow role**: its FEN token
+    /// is `**J` / `**j`.
+    ClimbingMonkey = 81,
+    /// Flying Goose (雁飛, Betza `vWfF`) — moves identically to the Climbing Monkey
+    /// (one step straight forward or backward, or one step forward diagonally) but
+    /// promotes to a **Swallow's Wings** instead. (Wa Shogi.) A **second-bank
+    /// overflow role**: its FEN token is `**K` / `**k`.
+    FlyingGoose = 82,
+    /// Flying Cock (鶏飛, Betza `sWfF`) — steps one square **sideways** (orthogonal)
+    /// or one square **forward** diagonally. Promotes to a Raiding Falcon. (Wa
+    /// Shogi.) A **second-bank overflow role**: its FEN token is `**L` / `**l`.
+    FlyingCock = 83,
+    /// Blind Dog (盲犬, Betza `fFsbW`) — steps one square **forward** diagonally, or
+    /// one square **sideways** or **backward** (orthogonal). Promotes to a Violent
+    /// Wolf. (Wa Shogi.) A **second-bank overflow role**: its FEN token is `**M` /
+    /// `**m`.
+    BlindDog = 84,
+    /// Violent Stag (猛鹿, Betza `FfW`) — steps one square in any of the four
+    /// **diagonal** directions (Ferz) or one square straight **forward**. Promotes
+    /// to a Roaming Boar. (Wa Shogi.) A **second-bank overflow role**: its FEN token
+    /// is `**N` / `**n`.
+    ViolentStag = 85,
+    /// Violent Wolf (猛狼, Betza `WfF`) — steps one square in any of the four
+    /// **orthogonal** directions (Wazir) or one square **forward** diagonally.
+    /// Promotes to a Bear's Eyes. (Wa Shogi.) A **second-bank overflow role**: its
+    /// FEN token is `**O` / `**o`.
+    ViolentWolf = 86,
+    /// Swallow's Wings (燕羽, Betza `sRvW`) — slides any number of squares
+    /// **sideways** (a sideways rook) or steps one square straight **forward** or
+    /// **backward**. Promotes to a Gliding Swallow. (Wa Shogi.) A **second-bank
+    /// overflow role**: its FEN token is `**Q` / `**q`.
+    SwallowsWings = 87,
+    /// Running Rabbit (走兎, Betza `fRFbW`) — slides any number of squares straight
+    /// **forward**, steps one square in any **diagonal** direction (Ferz), or one
+    /// square straight **backward**. Promotes to a Treacherous Fox. (Wa Shogi.) A
+    /// **second-bank overflow role**: its FEN token is `**R` / `**r`.
+    RunningRabbit = 88,
+    /// Flying Falcon (飛鷹, Betza `BfW`) — slides any number of squares **diagonally**
+    /// (a bishop) or steps one square straight **forward**. Promotes to a Tenacious
+    /// Falcon. (Wa Shogi.) A **second-bank overflow role**: its FEN token is `**T` /
+    /// `**t`.
+    FlyingFalcon = 89,
+    /// Treacherous Fox (奸狐, Betza `FAvWvD`) — steps one square diagonally (Ferz) or
+    /// **jumps** two squares diagonally (Alfil), and steps one square straight
+    /// forward/backward (vertical Wazir) or **jumps** two squares straight
+    /// forward/backward (vertical Dabbaba). A pure leaper, reaching one or two
+    /// squares in the diagonal and vertical directions. **Never promotes.** (Wa
+    /// Shogi.) A **second-bank overflow role**: its FEN token is `**U` / `**u`.
+    TreacherousFox = 90,
+    /// Cloud Eagle (雲鷲, Betza `vRsWfF3bF`) — slides any number of squares straight
+    /// **forward** or **backward** (vertical rook), steps one square **sideways**,
+    /// slides one to three squares **forward** diagonally, and steps one square
+    /// **backward** diagonally. **Never promotes.** (Wa Shogi.) A **second-bank
+    /// overflow role**: its FEN token is `**V` / `**v`.
+    CloudEagle = 91,
+    /// Golden Bird (金鳥, Betza `WfF`) — the promoted Sparrow Pawn: steps one square
+    /// in any of the four **orthogonal** directions or one square **forward**
+    /// diagonally (the Violent Wolf move). Reverts to a Sparrow Pawn in hand when
+    /// captured. (Wa Shogi.) A **third-tier overflow role**: its FEN token is `=B` /
+    /// `=b`.
+    GoldenBird = 92,
+    /// Plodding Ox (鈍牛, Betza `K`) — the promoted Oxcart: steps one square in any of
+    /// the eight directions (a King's move). Reverts to an Oxcart in hand when
+    /// captured. (Wa Shogi.) A **third-tier overflow role**: its FEN token is `=G` /
+    /// `=g`.
+    PloddingOx = 93,
+    /// Heavenly Horse (天馬, Betza `vN`) — the promoted Liberated Horse: **jumps** to
+    /// the four knight squares with a 2-square **vertical** component (the
+    /// `(±1, ±2)` leaps), forward and backward. Reverts to a Liberated Horse in hand
+    /// when captured. (Wa Shogi.) A **third-tier overflow role**: its FEN token is
+    /// `=H` / `=h`.
+    HeavenlyHorse = 94,
+    /// Promoted Strutting Crow (飛鷹, Betza `BfW`) — moves as a **Flying Falcon**
+    /// (bishop slides plus one step straight forward) but reverts to a Strutting
+    /// Crow in hand when captured (its distinct base identity must survive
+    /// promotion). (Wa Shogi.) A **third-tier overflow role**: its FEN token is `=J`
+    /// / `=j`.
+    PromotedStruttingCrow = 95,
+    /// Promoted Swooping Owl (雲鷲, Betza `vRsWfF3bF`) — moves as a **Cloud Eagle**
+    /// but reverts to a Swooping Owl in hand when captured. (Wa Shogi.) A
+    /// **third-tier overflow role**: its FEN token is `=L` / `=l`.
+    PromotedSwoopingOwl = 96,
+    /// Promoted Flying Goose (燕羽, Betza `sRvW`) — moves as a **Swallow's Wings** but
+    /// reverts to a Flying Goose in hand when captured. (Wa Shogi.) A **third-tier
+    /// overflow role**: its FEN token is `=N` / `=n`.
+    PromotedFlyingGoose = 97,
+    /// Promoted Climbing Monkey (猛鹿, Betza `FfW`) — moves as a **Violent Stag** but
+    /// reverts to a Climbing Monkey in hand when captured. (Wa Shogi.) A
+    /// **third-tier overflow role**: its FEN token is `=O` / `=o`.
+    PromotedClimbingMonkey = 98,
+    /// Raiding Falcon (襲鷹, Betza `vRsWfF`) — the promoted Flying Cock: slides any
+    /// number of squares straight **forward** or **backward** (vertical rook), steps
+    /// one square **sideways**, and steps one square **forward** diagonally. Reverts
+    /// to a Flying Cock in hand when captured. (Wa Shogi.) A **third-tier overflow
+    /// role**: its FEN token is `=P` / `=p`.
+    RaidingFalcon = 99,
+    /// Promoted Blind Dog (猛狼, Betza `WfF`) — moves as a **Violent Wolf** (the four
+    /// orthogonal steps plus one forward diagonal) but reverts to a Blind Dog in
+    /// hand when captured. (Wa Shogi.) A **third-tier overflow role**: its FEN token
+    /// is `=Q` / `=q`.
+    PromotedBlindDog = 100,
+    /// Roaming Boar (猪奔, Betza `FfsW`) — the promoted Violent Stag: steps one square
+    /// in any of the four **diagonal** directions, or one square **forward** or
+    /// **sideways** orthogonally (every King step except straight backward). Reverts
+    /// to a Violent Stag in hand when captured. (Wa Shogi.) A **third-tier overflow
+    /// role**: its FEN token is `=R` / `=r`.
+    RoamingBoar = 101,
+    /// Bear's Eyes (熊目, Betza `K`) — the promoted Violent Wolf: steps one square in
+    /// any of the eight directions (a King's move). Reverts to a Violent Wolf in
+    /// hand when captured. (Wa Shogi.) A **third-tier overflow role**: its FEN token
+    /// is `=V` / `=v`.
+    BearsEyes = 102,
+    /// Gliding Swallow (滑燕, Betza `R`) — the promoted Swallow's Wings: slides any
+    /// number of squares in any **orthogonal** direction (a rook). Reverts to a
+    /// Swallow's Wings in hand when captured. (Wa Shogi.) A **third-tier overflow
+    /// role**: its FEN token is `=X` / `=x`.
+    GlidingSwallow = 103,
+    /// Promoted Running Rabbit (奸狐, Betza `FAvWvD`) — moves as a **Treacherous Fox**
+    /// but reverts to a Running Rabbit in hand when captured. (Wa Shogi.) A
+    /// **third-tier overflow role**: its FEN token is `=Y` / `=y`.
+    PromotedRunningRabbit = 104,
+    /// Tenacious Falcon (堅鷹, Betza `BvRsW`) — the promoted Flying Falcon: slides any
+    /// number of squares **diagonally** (a bishop), slides any number of squares
+    /// straight **forward** or **backward** (vertical rook), and steps one square
+    /// **sideways**. Reverts to a Flying Falcon in hand when captured. (Wa Shogi.) A
+    /// **third-tier overflow role**: its FEN token is `=Z` / `=z`.
+    TenaciousFalcon = 105,
 }
 
 impl WideRole {
@@ -860,7 +1034,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 76;
+    pub const COUNT: usize = 106;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -940,6 +1114,36 @@ impl WideRole {
         WideRole::Champion,
         WideRole::Mahout,
         WideRole::Dark,
+        WideRole::SparrowPawn,
+        WideRole::Oxcart,
+        WideRole::LiberatedHorse,
+        WideRole::StruttingCrow,
+        WideRole::SwoopingOwl,
+        WideRole::ClimbingMonkey,
+        WideRole::FlyingGoose,
+        WideRole::FlyingCock,
+        WideRole::BlindDog,
+        WideRole::ViolentStag,
+        WideRole::ViolentWolf,
+        WideRole::SwallowsWings,
+        WideRole::RunningRabbit,
+        WideRole::FlyingFalcon,
+        WideRole::TreacherousFox,
+        WideRole::CloudEagle,
+        WideRole::GoldenBird,
+        WideRole::PloddingOx,
+        WideRole::HeavenlyHorse,
+        WideRole::PromotedStruttingCrow,
+        WideRole::PromotedSwoopingOwl,
+        WideRole::PromotedFlyingGoose,
+        WideRole::PromotedClimbingMonkey,
+        WideRole::RaidingFalcon,
+        WideRole::PromotedBlindDog,
+        WideRole::RoamingBoar,
+        WideRole::BearsEyes,
+        WideRole::GlidingSwallow,
+        WideRole::PromotedRunningRabbit,
+        WideRole::TenaciousFalcon,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1196,6 +1400,48 @@ impl WideRole {
             // letter and the board FEN I/O adds the `=` prefix. Jieqi is not an FSF
             // variant, so no `compare-fairy` rewrite applies.
             WideRole::Dark => 'd',
+            // Wa Shogi base pieces — **second-bank** overflow roles (`**`). Each FEN
+            // token is the doubled prefix plus a distinct recycled base letter
+            // (returned here), the board FEN I/O adding the prefix. The letters are
+            // chosen distinct from the existing `**` bases (the Sho Shogi royals'
+            // `e`/`c`, Mansindam's `a`/`i`/`s`, the Chennis Pawn's `p`). Wa is not an
+            // FSF variant, so no `compare-fairy` rewrite applies.
+            WideRole::SparrowPawn => 'b',
+            WideRole::Oxcart => 'd',
+            WideRole::LiberatedHorse => 'f',
+            WideRole::StruttingCrow => 'g',
+            WideRole::SwoopingOwl => 'h',
+            WideRole::ClimbingMonkey => 'j',
+            WideRole::FlyingGoose => 'k',
+            WideRole::FlyingCock => 'l',
+            WideRole::BlindDog => 'm',
+            WideRole::ViolentStag => 'n',
+            WideRole::ViolentWolf => 'o',
+            WideRole::SwallowsWings => 'q',
+            WideRole::RunningRabbit => 'r',
+            WideRole::FlyingFalcon => 't',
+            WideRole::TreacherousFox => 'u',
+            WideRole::CloudEagle => 'v',
+            // Wa Shogi promoted forms — **third-tier** overflow roles (`=`). Each FEN
+            // token is the `=` prefix plus a distinct recycled base letter (returned
+            // here), chosen distinct from the existing `=` bases (the Cannon Shogi
+            // army's `a`/`c`/`i`/`u`/`w`/`f`/`e`, Khan's Chess `t`/`s`, Xiang Fu
+            // `k`/`m`, Jieqi `d`). Like the Tori birds they revert to their base via
+            // the variant's `role_hand_base` hook, not the `+`-token machinery.
+            WideRole::GoldenBird => 'b',
+            WideRole::PloddingOx => 'g',
+            WideRole::HeavenlyHorse => 'h',
+            WideRole::PromotedStruttingCrow => 'j',
+            WideRole::PromotedSwoopingOwl => 'l',
+            WideRole::PromotedFlyingGoose => 'n',
+            WideRole::PromotedClimbingMonkey => 'o',
+            WideRole::RaidingFalcon => 'p',
+            WideRole::PromotedBlindDog => 'q',
+            WideRole::RoamingBoar => 'r',
+            WideRole::BearsEyes => 'v',
+            WideRole::GlidingSwallow => 'x',
+            WideRole::PromotedRunningRabbit => 'y',
+            WideRole::TenaciousFalcon => 'z',
         }
     }
 
@@ -1380,6 +1626,22 @@ impl WideRole {
                 | WideRole::Rhino
                 | WideRole::Ship
                 | WideRole::ChennisPawn
+                | WideRole::SparrowPawn
+                | WideRole::Oxcart
+                | WideRole::LiberatedHorse
+                | WideRole::StruttingCrow
+                | WideRole::SwoopingOwl
+                | WideRole::ClimbingMonkey
+                | WideRole::FlyingGoose
+                | WideRole::FlyingCock
+                | WideRole::BlindDog
+                | WideRole::ViolentStag
+                | WideRole::ViolentWolf
+                | WideRole::SwallowsWings
+                | WideRole::RunningRabbit
+                | WideRole::FlyingFalcon
+                | WideRole::TreacherousFox
+                | WideRole::CloudEagle
         )
     }
 
@@ -1406,6 +1668,24 @@ impl WideRole {
             // Chennis: the Pawn recycles its own FSF letter `p` (distinct from the
             // single-`*` Chak Soldier `*p` by the doubled prefix).
             'p' => Some(WideRole::ChennisPawn),
+            // Wa Shogi base pieces — distinct `**` bases chosen clear of the existing
+            // second-bank roles (`e`/`c`/`a`/`i`/`s`/`p`).
+            'b' => Some(WideRole::SparrowPawn),
+            'd' => Some(WideRole::Oxcart),
+            'f' => Some(WideRole::LiberatedHorse),
+            'g' => Some(WideRole::StruttingCrow),
+            'h' => Some(WideRole::SwoopingOwl),
+            'j' => Some(WideRole::ClimbingMonkey),
+            'k' => Some(WideRole::FlyingGoose),
+            'l' => Some(WideRole::FlyingCock),
+            'm' => Some(WideRole::BlindDog),
+            'n' => Some(WideRole::ViolentStag),
+            'o' => Some(WideRole::ViolentWolf),
+            'q' => Some(WideRole::SwallowsWings),
+            'r' => Some(WideRole::RunningRabbit),
+            't' => Some(WideRole::FlyingFalcon),
+            'u' => Some(WideRole::TreacherousFox),
+            'v' => Some(WideRole::CloudEagle),
             _ => None,
         }
     }
@@ -1438,6 +1718,20 @@ impl WideRole {
                 | WideRole::Champion
                 | WideRole::Mahout
                 | WideRole::Dark
+                | WideRole::GoldenBird
+                | WideRole::PloddingOx
+                | WideRole::HeavenlyHorse
+                | WideRole::PromotedStruttingCrow
+                | WideRole::PromotedSwoopingOwl
+                | WideRole::PromotedFlyingGoose
+                | WideRole::PromotedClimbingMonkey
+                | WideRole::RaidingFalcon
+                | WideRole::PromotedBlindDog
+                | WideRole::RoamingBoar
+                | WideRole::BearsEyes
+                | WideRole::GlidingSwallow
+                | WideRole::PromotedRunningRabbit
+                | WideRole::TenaciousFalcon
         )
     }
 
@@ -1473,6 +1767,22 @@ impl WideRole {
             // Jieqi: the face-down Dark piece recycles the free base letter `d`,
             // free within the `=` tier.
             'd' => Some(WideRole::Dark),
+            // Wa Shogi promoted forms — distinct `=` bases chosen clear of the
+            // existing third-tier roles (`a`/`c`/`i`/`u`/`w`/`f`/`e`/`t`/`s`/`k`/`m`/`d`).
+            'b' => Some(WideRole::GoldenBird),
+            'g' => Some(WideRole::PloddingOx),
+            'h' => Some(WideRole::HeavenlyHorse),
+            'j' => Some(WideRole::PromotedStruttingCrow),
+            'l' => Some(WideRole::PromotedSwoopingOwl),
+            'n' => Some(WideRole::PromotedFlyingGoose),
+            'o' => Some(WideRole::PromotedClimbingMonkey),
+            'p' => Some(WideRole::RaidingFalcon),
+            'q' => Some(WideRole::PromotedBlindDog),
+            'r' => Some(WideRole::RoamingBoar),
+            'v' => Some(WideRole::BearsEyes),
+            'x' => Some(WideRole::GlidingSwallow),
+            'y' => Some(WideRole::PromotedRunningRabbit),
+            'z' => Some(WideRole::TenaciousFalcon),
             _ => None,
         }
     }
@@ -1615,6 +1925,36 @@ impl fmt::Display for WideRole {
             WideRole::Champion => "champion",
             WideRole::Mahout => "mahout",
             WideRole::Dark => "dark",
+            WideRole::SparrowPawn => "sparrow-pawn",
+            WideRole::Oxcart => "oxcart",
+            WideRole::LiberatedHorse => "liberated-horse",
+            WideRole::StruttingCrow => "strutting-crow",
+            WideRole::SwoopingOwl => "swooping-owl",
+            WideRole::ClimbingMonkey => "climbing-monkey",
+            WideRole::FlyingGoose => "flying-goose",
+            WideRole::FlyingCock => "flying-cock",
+            WideRole::BlindDog => "blind-dog",
+            WideRole::ViolentStag => "violent-stag",
+            WideRole::ViolentWolf => "violent-wolf",
+            WideRole::SwallowsWings => "swallows-wings",
+            WideRole::RunningRabbit => "running-rabbit",
+            WideRole::FlyingFalcon => "flying-falcon",
+            WideRole::TreacherousFox => "treacherous-fox",
+            WideRole::CloudEagle => "cloud-eagle",
+            WideRole::GoldenBird => "golden-bird",
+            WideRole::PloddingOx => "plodding-ox",
+            WideRole::HeavenlyHorse => "heavenly-horse",
+            WideRole::PromotedStruttingCrow => "promoted-strutting-crow",
+            WideRole::PromotedSwoopingOwl => "promoted-swooping-owl",
+            WideRole::PromotedFlyingGoose => "promoted-flying-goose",
+            WideRole::PromotedClimbingMonkey => "promoted-climbing-monkey",
+            WideRole::RaidingFalcon => "raiding-falcon",
+            WideRole::PromotedBlindDog => "promoted-blind-dog",
+            WideRole::RoamingBoar => "roaming-boar",
+            WideRole::BearsEyes => "bears-eyes",
+            WideRole::GlidingSwallow => "gliding-swallow",
+            WideRole::PromotedRunningRabbit => "promoted-running-rabbit",
+            WideRole::TenaciousFalcon => "tenacious-falcon",
         })
     }
 }
@@ -1833,8 +2173,13 @@ mod tests {
             WideRole::overflow3_from_base('u'),
             Some(WideRole::PromotedCannon)
         );
-        // A character that names no third-tier overflow role yields `None`.
+        // A character that names no third-tier overflow role yields `None`. The Wa
+        // Shogi promoted forms fill the rest of the `=` tier, so every letter `a..=z`
+        // now names one (e.g. `z` is the Tenacious Falcon); only a non-letter is free.
         assert_eq!(WideRole::overflow3_from_base('?'), None);
-        assert_eq!(WideRole::overflow3_from_base('z'), None);
+        assert_eq!(
+            WideRole::overflow3_from_base('z'),
+            Some(WideRole::TenaciousFalcon)
+        );
     }
 }

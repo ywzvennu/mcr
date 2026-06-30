@@ -83,8 +83,8 @@ pub use variants::{
     OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
     ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
     ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Xiangfu, XiangfuRules, Xiangqi,
-    XiangqiRules,
+    SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Washogi, WashogiRules, Xiangfu,
+    XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -498,6 +498,22 @@ geometry!(
     u256,
     12,
     12
+);
+
+geometry!(
+    /// The Wa Shogi board: eleven files by eleven ranks (121 squares), backed by
+    /// `u128`.
+    ///
+    /// An odd non-power-of-two width `11` on a `u128` backing: `11 * 11 = 121 <=
+    /// 128`, so it fits the single-limb `u128` (no [`U256`] needed). A square index
+    /// reaches `120`, and edge-masked east/west shifts must not wrap past the
+    /// eleventh file. Files run a..k, ranks 1..11. It hosts Wa Shogi, the
+    /// animal-themed large shogi, whose captured pieces enter a persistent hand and
+    /// are dropped back onto the board.
+    Washogi11x11,
+    u128,
+    11,
+    11
 );
 
 #[cfg(test)]

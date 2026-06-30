@@ -53,6 +53,7 @@ pub mod sittuyin;
 pub mod spartan;
 pub mod synochess;
 pub mod tori;
+pub mod washogi;
 pub mod xiangfu;
 pub mod xiangqi;
 
@@ -101,5 +102,6 @@ pub use sittuyin::{Sittuyin, SittuyinRules};
 pub use spartan::{Spartan, SpartanRules};
 pub use synochess::{Synochess, SynochessRules};
 pub use tori::{Tori, ToriRules};
+pub use washogi::{Washogi, WashogiRules};
 pub use xiangfu::{Xiangfu, XiangfuRules};
 pub use xiangqi::{Xiangqi, XiangqiRules};
