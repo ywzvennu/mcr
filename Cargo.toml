@@ -7,21 +7,37 @@
 
 [package]
 name = "mce"
-description = "Modular Chess Engine — a permissively licensed chess move-generation and rules library covering standard chess and variants."
-version = "0.0.0"
-# In active development — not yet released. `publish = false` guards against an
-# accidental `cargo publish` while the API is still in flux.
+description = "Clean-room, permissively licensed (MIT OR Apache-2.0) chess move-generation and rules library covering standard chess, Chess960, and 47+ fairy variants (Shogi, Xiangqi, Makruk, Capablanca, and more) validated against Fairy-Stockfish. Rules and move generation only — no search or evaluation."
+version = "0.3.0"
+# Release-readiness is staged, but the actual crates.io upload is user-gated:
+# `publish = false` still guards against an accidental `cargo publish`. Flip to
+# `true` (and make the repository public) only at the explicit release step.
+# `cargo publish --dry-run` has been verified to pass with this flipped locally.
 publish = false
 edition = "2021"
 rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ywzvennu/mce"
 homepage = "https://github.com/ywzvennu/mce"
+documentation = "https://docs.rs/mce"
 readme = "README.md"
-keywords = ["chess", "chess960", "move-generation", "variants", "bitboard"]
-categories = ["games", "game-development"]
+keywords = ["chess", "shogi", "xiangqi", "variants", "perft"]
+categories = ["game-development", "games", "no-std"]
 authors = ["MCE contributors"]
-exclude = ["/fuzz", "/.github"]
+# The published package is the library crate only: src/, README, LICENSEs,
+# CHANGELOG, and the architecture docs. The GPL-fenced and non-published sibling
+# crates each live behind their own Cargo.toml, so Cargo already drops them from
+# the package; they are also named here so the boundary is explicit and survives
+# any future restructuring. Never ship: compare-fairy / compare (link or drive
+# GPL engines), fuzz, the bindings/cli crates, CI config, or LLM scratch files.
+exclude = [
+    "/.github",
+    "/compare",
+    "/compare-fairy",
+    "/fuzz",
+    "/cli",
+    "/bindings",
+]
 
 [lints.rust]
 unsafe_code = "deny"

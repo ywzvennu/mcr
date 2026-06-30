@@ -516,7 +516,7 @@ impl<G: Geometry, V: WideVariant<G>> core::fmt::Debug for GenericPosition<G, V> 
 /// [`undo`]: GenericPosition::undo
 const MAX_UNDO_ROLES: usize = 8;
 
-/// The minimal record needed to reverse a single [`apply`](GenericPosition::apply)
+/// The minimal record needed to reverse a single `apply`
 /// **in place** — the unmake half of the geometry layer's make/unmake, returned by
 /// [`apply_with_undo`](GenericPosition::apply_with_undo) and consumed by
 /// [`undo`](GenericPosition::undo).
@@ -529,7 +529,7 @@ const MAX_UNDO_ROLES: usize = 8;
 /// * the **board** is restored by **direct mask assignment**: a move only ever
 ///   edits the two color masks and the role masks of a bounded set of roles (the
 ///   mover, a capture victim, a promotion, a castled rook, a Kyoto flip / Jieqi
-///   reveal, a gated piece — at most [`MAX_UNDO_ROLES`]). Snapshotting those masks
+///   reveal, a gated piece — at most `MAX_UNDO_ROLES`). Snapshotting those masks
 ///   by index before the move and assigning them straight back restores the board
 ///   byte-for-byte **without any per-square [`role_at`](super::Board) scan** — that
 ///   scan (a linear walk of all [`WideRole::COUNT`] masks) is what makes a
@@ -4237,7 +4237,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     ///
     /// This is the generic analogue of
     /// [`Position::zobrist`](crate::Position::zobrist): the XOR of one random
-    /// constant per hashed feature (see [`zobrist`](super::zobrist)). The value here
+    /// constant per hashed feature (see the `zobrist` module). The value here
     /// is **computed from scratch**; [`GenericGame`](super::game::GenericGame)
     /// maintains the identical value **incrementally** across moves (XOR-ing
     /// features in and out) for variants that
