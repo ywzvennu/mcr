@@ -53,6 +53,28 @@ jobs:
       - name: Benches (compile only)
         run: cargo bench --all-features --no-run
 
+  # Rustdoc warning gate (light; on every push/PR). After #307 made
+  # `cargo doc --no-deps` warning-free, this turns rustdoc warnings (broken
+  # intra-doc links, invalid doc-comment markup, etc.) into hard errors so the
+  # documentation debt cannot silently re-accumulate. Cheap — it is a doc build,
+  # not a test run — so it stays on the fast PR path rather than the gated set.
+  doc-gate:
+    name: doc (rustdoc -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Doc (deny warnings)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features
+
   # no_std gate: prove the crate still compiles with the default `std` feature
   # off, both on the host and on bare-metal / wasm targets that have no standard
   # library at all. This is the regression guard for issue #113 — the core
@@ -238,3 +260,78 @@ jobs:
       # `cargo test` skips for speed. Run here against published reference counts.
       - name: Deep perft sweep (ignored tests)
         run: cargo test --release --all-features -- --include-ignored
+
+  # Public-API breakage gate. cargo-semver-checks diffs the crate's public API
+  # against a baseline and flags accidental SemVer-incompatible changes (removed
+  # items, signature changes, etc.). Gated to pull_request / manual so it is
+  # PR-oriented and does not burn schedule minutes.
+  #
+  # IMPORTANT — currently INFORMATIONAL ONLY. `mce` is `version = "0.3.0"` but
+  # `publish = false` and is not yet on crates.io (see #250), and the repo has no
+  # release tags, so there is no baseline to diff against. cargo-semver-checks
+  # auto-detects the crates.io baseline and will report "no baseline" here; we
+  # run it with `|| true` so the report is surfaced without failing the PR. Once
+  # 0.3.0 is published (or a `v*` tag exists), drop the `|| true` to make this a
+  # true blocking gate — the manifest's `publish = false` is the only thing
+  # standing between this and a hard check.
+  semver-checks:
+    name: semver-checks (informational until published)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so a future tag-based baseline (`--baseline-rev`) works.
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@cargo-semver-checks
+
+      # No crates.io baseline exists yet (publish = false, no release tags), so
+      # this is non-blocking. It still type-checks the crate's public surface and
+      # becomes a meaningful diff the moment a baseline is available.
+      - name: cargo-semver-checks (informational)
+        run: cargo semver-checks --all-features || true
+
+  # Code-coverage report (report-only — NO hard gate / threshold initially).
+  # cargo-llvm-cov is heavier (instrumented build + full test run), so it is
+  # gated to push-to-main / schedule / manual rather than every PR, per the
+  # repo's CI-minutes posture. The lcov.info artifact is uploaded for inspection;
+  # a coverage threshold can be added later once a baseline is understood.
+  coverage:
+    name: coverage (llvm-cov, report-only)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Human-readable summary in the job log plus an lcov.info artifact. No
+      # `--fail-under-*` flag, so this is purely informational for now.
+      - name: Coverage (summary + lcov)
+        run: |
+          cargo llvm-cov --all-features --workspace --summary-only
+          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-coverage
+          path: lcov.info
+          if-no-files-found: error
