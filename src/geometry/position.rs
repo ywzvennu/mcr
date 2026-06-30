@@ -30,6 +30,7 @@ use super::attacks::{
 };
 use super::role::WideRole;
 use super::variant::{RoyalSlider, WideEndReason, WideVariant};
+use super::zobrist;
 use super::{
     Bitboard, Board, GateRole, GateSquare, Geometry, Square, WideMove, WideMoveKind, WidePiece,
 };
@@ -4227,47 +4228,138 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     // -- Repetition / draw helpers -----------------------------------------
 
-    /// A 64-bit key identifying this position for **repetition** purposes: the
-    /// board placement, side to move, en-passant target, castling / gating rights,
-    /// hands in pocket, the Duck and Alice planes, and the promoted mask — but
-    /// **not** the move clocks (which differ on every ply and must not break a
-    /// repetition). Two positions share a key iff they are "the same position" for
-    /// the repetition rules.
+    /// A stable 64-bit **Zobrist** key identifying this position: the board
+    /// placement, side to move, en-passant target, castling / gating rights, hands
+    /// in pocket, the Duck and Alice planes, and the promoted mask — but **not** the
+    /// move clocks nor the Janggi pass counter (which differ on most plies and must
+    /// not break a repetition). Two positions share a key iff they are "the same
+    /// position" for the repetition rules and for opening-book / deduplication use.
     ///
-    /// This is the generic analogue of [`Position::zobrist`](crate::Position::zobrist):
-    /// rather than an incrementally folded Zobrist value (the concrete engine's
-    /// approach), it is recomputed from the position with a deterministic FNV-1a
-    /// fold. It is consulted **only** by [`GenericGame`](super::game::GenericGame)
-    /// when [`WideVariant::tracks_repetition`] is on, so the history-free
-    /// [`GenericPosition`] (and therefore perft) never computes it and stays
-    /// byte-identical.
+    /// This is the generic analogue of
+    /// [`Position::zobrist`](crate::Position::zobrist): the XOR of one random
+    /// constant per hashed feature (see [`zobrist`](super::zobrist)). The value here
+    /// is **computed from scratch**; [`GenericGame`](super::game::GenericGame)
+    /// maintains the identical value **incrementally** across moves (XOR-ing
+    /// features in and out) for variants that
+    /// [track repetition](WideVariant::tracks_repetition), and
+    /// [`GenericGame::position_key`](super::game::GenericGame::position_key) exposes
+    /// it. The history-free [`GenericPosition`] (and therefore perft) never computes
+    /// or maintains it, so the bare make/unmake path stays byte-identical.
     #[must_use]
+    pub fn zobrist(&self) -> u64 {
+        self.zobrist_board_part() ^ self.zobrist_state_part()
+    }
+
+    /// The previous name for [`zobrist`](Self::zobrist), kept for the repetition
+    /// callers. Returns the same value.
+    #[must_use]
+    #[inline]
     pub fn repetition_key(&self) -> u64 {
-        use core::hash::{Hash, Hasher};
-        let mut h = Fnv1a::new();
-        self.state.turn.hash(&mut h);
-        self.state.castling.hash(&mut h);
-        self.state.ep_square.map(|s| s.index()).hash(&mut h);
-        self.state.gating.hash(&mut h);
-        self.state.placement.hash(&mut h);
-        self.state.duck.map(|s| s.index()).hash(&mut h);
-        for sq in self.state.board_b {
-            (0xB_u8, sq.index()).hash(&mut h);
-        }
-        for sq in self.promoted {
-            (0xC_u8, sq.index()).hash(&mut h);
-        }
+        self.zobrist()
+    }
+
+    /// The board half of [`zobrist`](Self::zobrist): the XOR of every colored
+    /// piece's square key.
+    fn zobrist_board_part(&self) -> u64 {
+        let mut hash = 0u64;
         for color in Color::ALL {
             for role in WideRole::ALL {
-                let pieces = self.board.pieces(color, role);
-                for sq in pieces {
-                    // Tag each square with its (color, role) so the same square in
-                    // two different piece groups folds to a distinct contribution.
-                    (color, role, sq.index()).hash(&mut h);
+                for sq in self.board.pieces(color, role) {
+                    hash ^= zobrist::piece_key(color, role, sq.index());
                 }
             }
         }
-        h.finish()
+        hash
+    }
+
+    /// The non-board half of [`zobrist`](Self::zobrist): side to move, castling /
+    /// gating rights, en passant, the gating reserves, hands in pocket, Duck, Alice
+    /// plane, and promoted mask. Recomputed from scratch (it is cheap — the state is
+    /// tiny next to the board), so [`GenericGame`](super::game::GenericGame) can XOR
+    /// the old part out and the new part in around a move.
+    pub(crate) fn zobrist_state_part(&self) -> u64 {
+        let s = &self.state;
+        let mut hash = zobrist::side_key(s.turn);
+
+        for color in Color::ALL {
+            for side in [KINGSIDE, QUEENSIDE] {
+                if let Some(file) = s.castling.rook_file(color, side) {
+                    hash ^= zobrist::castling_key(color, side, file);
+                }
+            }
+        }
+
+        if let Some(sq) = s.ep_square {
+            hash ^= zobrist::ep_key(sq.index());
+        }
+
+        for sq in s.gating.eligible() {
+            hash ^= zobrist::gating_eligible_key(sq.index());
+        }
+        for color in Color::ALL {
+            for gate in [GateRole::Hawk, GateRole::Elephant] {
+                if s.gating.has_reserve(color, gate) {
+                    hash ^= zobrist::gating_reserve_key(color, gate);
+                }
+            }
+        }
+
+        for color in Color::ALL {
+            for role in WideRole::ALL {
+                let count = s.placement.count(color, role);
+                if count > 0 {
+                    hash ^= zobrist::hand_key(color, role, count);
+                }
+            }
+        }
+
+        if let Some(sq) = s.duck {
+            hash ^= zobrist::duck_key(sq.index());
+        }
+        for sq in s.board_b {
+            hash ^= zobrist::alice_key(sq.index());
+        }
+        for sq in self.promoted {
+            hash ^= zobrist::promoted_key(sq.index());
+        }
+
+        hash
+    }
+
+    /// The XOR delta to apply to a maintained [`zobrist`](Self::zobrist) key for the
+    /// board edits a just-applied move made, given the [`Undo`] it produced.
+    ///
+    /// `self` is the position **after** the move; `undo` carries the pre-move color
+    /// masks and the pre-move masks of every role the move touched. For each touched
+    /// role and color, the squares whose membership flipped (the symmetric
+    /// difference of the old and new piece sets) are exactly the piece-square keys
+    /// to toggle — so XOR-ing this delta into the key reproduces a from-scratch
+    /// [`zobrist_board_part`](Self::zobrist_board_part) without rescanning the whole
+    /// board. The state half is handled separately by
+    /// [`zobrist_state_part`](Self::zobrist_state_part).
+    pub(crate) fn zobrist_board_delta(&self, undo: &Undo<G>) -> u64 {
+        let mut delta = 0u64;
+        // A role may be recorded more than once (the Undo tolerates duplicates); a
+        // role's whole contribution must be folded exactly once, so skip repeats —
+        // each stored mask is the same pre-move value, taken before any edit.
+        let mut seen: u128 = 0;
+        for &(idx, old_role_mask) in &undo.roles[..undo.role_count] {
+            let bit = 1u128 << idx;
+            if seen & bit != 0 {
+                continue;
+            }
+            seen |= bit;
+            let role = WideRole::ALL[idx];
+            let new_role_mask = self.board.by_role(role);
+            for (ci, color) in Color::ALL.into_iter().enumerate() {
+                let old_set = undo.by_color[ci] & old_role_mask;
+                let new_set = self.board.by_color(color) & new_role_mask;
+                for sq in old_set ^ new_set {
+                    delta ^= zobrist::piece_key(color, role, sq.index());
+                }
+            }
+        }
+        delta
     }
 
     /// Returns `true` if the two royal generals (kings) **face each other** down an
@@ -4491,38 +4583,6 @@ pub enum WideOutcome {
     },
     /// The game is drawn.
     Draw,
-}
-
-/// A tiny deterministic FNV-1a [`Hasher`](core::hash::Hasher) used to fold a
-/// position into its [`repetition_key`](GenericPosition::repetition_key). It is
-/// not a cryptographic hash; it only needs to be stable and well-distributed
-/// enough that distinct positions almost never collide, which is exactly what
-/// repetition detection wants. Defined here (rather than reusing a `std` hasher)
-/// so the key is identical in `no_std` builds and across platforms.
-struct Fnv1a(u64);
-
-impl Fnv1a {
-    /// The 64-bit FNV offset basis.
-    const fn new() -> Self {
-        Fnv1a(0xcbf2_9ce4_8422_2325)
-    }
-}
-
-impl core::hash::Hasher for Fnv1a {
-    #[inline]
-    fn finish(&self) -> u64 {
-        self.0
-    }
-
-    #[inline]
-    fn write(&mut self, bytes: &[u8]) {
-        let mut h = self.0;
-        for &b in bytes {
-            h ^= u64::from(b);
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-        self.0 = h;
-    }
 }
 
 // -- Move sink (materialise vs bulk-count) ----------------------------------
@@ -5824,5 +5884,108 @@ mod tests {
         let fen = "r3k2r/8/8/8/8/8/8/R3K2R w Kq - 0 1";
         let pos = Pos::from_fen(fen).expect("valid");
         assert_eq!(pos.to_fen(), fen);
+    }
+
+    // -- Zobrist position key ---------------------------------------------
+
+    #[test]
+    fn zobrist_is_deterministic_and_splits_into_parts() {
+        let pos = Pos::startpos();
+        // Stable across repeated computation.
+        assert_eq!(pos.zobrist(), pos.zobrist());
+        assert_eq!(pos.repetition_key(), pos.zobrist());
+        // The board and state halves XOR to the whole key.
+        assert_eq!(
+            pos.zobrist(),
+            pos.zobrist_board_part() ^ pos.zobrist_state_part()
+        );
+        // Two FENs for the same position hash equal.
+        let same = Pos::from_fen(STARTPOS).expect("valid");
+        assert_eq!(same.zobrist(), pos.zobrist());
+    }
+
+    #[test]
+    fn zobrist_distinguishes_one_ply() {
+        let start = Pos::startpos();
+        let mv = start
+            .legal_moves()
+            .into_iter()
+            .find(|m| m.to_uci::<Chess8x8>() == "e2e4")
+            .expect("e2e4 legal");
+        let after = start.play(&mv);
+        assert_ne!(after.zobrist(), start.zobrist());
+    }
+
+    /// Walks the legal-move tree to `depth`, asserting at every node that the
+    /// **incremental** Zobrist update — the old state half XORed out, the board
+    /// delta from the [`Undo`] XORed in, the new state half XORed in — reproduces a
+    /// from-scratch [`zobrist`](GenericPosition::zobrist) recompute exactly, and that
+    /// `undo` then restores the parent key. This exercises the same machinery
+    /// [`GenericGame`](super::super::game::GenericGame) uses to maintain the key.
+    fn walk_incremental_zobrist<G: Geometry, V: WideVariant<G>>(
+        pos: &mut GenericPosition<G, V>,
+        depth: u32,
+    ) {
+        let before = pos.zobrist();
+        if depth == 0 {
+            return;
+        }
+        for mv in pos.legal_moves() {
+            let old_state = pos.zobrist_state_part();
+            let undo = pos.apply_with_undo(&mv);
+            let incremental =
+                before ^ pos.zobrist_board_delta(&undo) ^ old_state ^ pos.zobrist_state_part();
+            assert_eq!(
+                incremental,
+                pos.zobrist(),
+                "incremental key diverged from recompute after {}",
+                mv.to_uci::<G>(),
+            );
+            walk_incremental_zobrist(pos, depth - 1);
+            pos.undo(undo);
+            assert_eq!(pos.zobrist(), before, "undo did not restore the key");
+        }
+    }
+
+    #[test]
+    fn incremental_zobrist_matches_recompute_standard() {
+        walk_incremental_zobrist(&mut Pos::startpos(), 3);
+        // "Kiwipete": captures, castling, and en passant are all on offer right
+        // away, exercising the board delta for every standard move kind at shallow
+        // depth.
+        let mut kiwipete =
+            Pos::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("valid");
+        walk_incremental_zobrist(&mut kiwipete, 3);
+    }
+
+    #[test]
+    fn incremental_zobrist_matches_recompute_fairy_variants() {
+        use crate::geometry::variants::{
+            Alice, Bughouse, Capahouse, Duck, Janggi, Makruk, Minishogi, Minixiangqi, Seirawan,
+            Shouse, Sittuyin, Xiangqi,
+        };
+
+        // One walk per variant, exercising hands (crazyhouse / S-House), gating
+        // (Seirawan / S-House), Alice planes, the Duck, the placement pocket
+        // (Sittuyin), the promoted mask (Capahouse), and the wide boards. Depth is
+        // kept shallow on the heavy generic boards (drops and gating fan the tree
+        // out fast) so the test stays quick; the deep board-delta coverage comes
+        // from the depth-4 standard-chess walk above, and the small boards walk a
+        // little deeper here. Hand / promoted-mask hashing is additionally covered
+        // by the crazyhouse `pockets_affect_zobrist` / `promoted_mask_affects_zobrist`
+        // unit tests.
+        walk_incremental_zobrist(&mut Bughouse::startpos(), 2);
+        walk_incremental_zobrist(&mut Capahouse::startpos(), 2);
+        walk_incremental_zobrist(&mut Seirawan::startpos(), 2);
+        walk_incremental_zobrist(&mut Shouse::startpos(), 2);
+        walk_incremental_zobrist(&mut Alice::startpos(), 2);
+        walk_incremental_zobrist(&mut Duck::startpos(), 2);
+        walk_incremental_zobrist(&mut Sittuyin::startpos(), 2);
+        walk_incremental_zobrist(&mut Makruk::startpos(), 2);
+        walk_incremental_zobrist(&mut Minishogi::startpos(), 3);
+        walk_incremental_zobrist(&mut Xiangqi::startpos(), 2);
+        walk_incremental_zobrist(&mut Minixiangqi::startpos(), 3);
+        walk_incremental_zobrist(&mut Janggi::startpos(), 2);
     }
 }

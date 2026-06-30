@@ -45,6 +45,7 @@ mod square;
 pub mod variant;
 pub mod variants;
 mod wide_move;
+mod zobrist;
 
 pub use any::{AnyWideVariant, UnknownWideVariant, WideVariantId};
 pub use backing::BitboardBacking;
