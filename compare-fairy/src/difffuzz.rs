@@ -22,9 +22,11 @@
 //! (`--games` / `--plies` / other `--seed`s) turns it into an investigative tool
 //! that reaches rarer states and may surface further candidates to triage; that is
 //! the fuzzer working as intended, the same way Minixiangqi's random games first
-//! exposed the latent Xiangqi bugs. Two real movegen bugs it has already surfaced
-//! and fixed: the Shinobi start array (Archer/Lancer for Shogi Knight/Commoner) and
-//! the Tori Pheasant drop-interposition (a jumped check wrongly blockable).
+//! exposed the latent Xiangqi bugs. Real movegen bugs it has already surfaced and
+//! fixed: the Shinobi start array (Archer/Lancer for Shogi Knight/Commoner), the
+//! Tori Pheasant drop-interposition (a jumped check wrongly blockable), and the
+//! Spartan White-pawn promotion set (promoting to the Spartan army plus an illegal
+//! King — issue #336).
 //!
 //! GPL FENCE unchanged: FSF is driven purely as a UCI subprocess (see `uci.rs`); no
 //! GPL code is linked, and the INI it reads is a plain data file.
@@ -387,28 +389,34 @@ const SPECS: &[Spec] = &[
 /// games surface a divergence that is **not yet resolved** — so they are held back
 /// from the default all-variants sweep to keep it a trustworthy zero-divergence
 /// gate. Each is still reachable explicitly with `--difffuzz --variant <name>` for
-/// investigation, and each is a documented follow-up distinct from the Shinobi /
-/// Tori movegen bugs this fuzzer already found and fixed:
+/// investigation.
 ///
-/// * **Seirawan / Shouse** — the S-Chess **gating rights** share the castling field
-///   under an engine-specific encoding (mce writes a rook-file gate as `H`/`h`,
-///   which FSF reads as h-rook *castling*). A harness FEN-interchange gap, not an
-///   mce movegen bug: gating movegen matches FSF on every pinned corpus position.
-/// * **Shako** — FSF forbids castling the king across a square a **cannon** attacks
-///   over a screen; mce's castling king-walk danger map is not cannon-aware on the
-///   transit square, so it rarely allows such a castle. A real, separate movegen bug.
-/// * **Spartan** — the two-kings side's check/legality adjudication diverges from
-///   FSF one ply deep on some positions (perft(1) agrees, perft(2) differs); needs a
-///   dedicated dual-king investigation.
+/// The #239 deeper-sweep candidates were triaged in #336; three were resolved
+/// there and no longer need holding back:
+///
+/// * **Spartan** — a real mce bug (a White Persian pawn promoted to the *Spartan*
+///   army set plus an illegal King); fixed in `SpartanRules::promotion_targets`.
+/// * **Seirawan / Shouse** — the only residual is an FSF artifact, not an mce bug:
+///   S-Chess shares one FEN field for castling rights and gating-eligible squares,
+///   so once a king has moved (losing castling) while a corner rook stays
+///   gating-eligible, mce serializes that surviving gate as a bare corner-file
+///   letter `A`/`H`/`a`/`h`; FSF has no encoding for "corner rook still gates but
+///   the king has moved" and reads it as a *castling right*, emitting an illegal
+///   castle of the already-moved king. That exact node is skipped (see
+///   [`is_schess_corner_castle_artifact`]); every other S-Chess node is checked.
+///
+/// What stays held back:
+///
+/// * **Shako** — a confirmed real mce movegen bug: FSF forbids castling the king
+///   across a square a **cannon** attacks over a screen, but mce's castling
+///   king-walk danger map is not cannon-aware on the transit square, so it allows
+///   the castle (repro: `c1q1ck4/vrn6v/2pp2p1r1/4p1n2p/pp3p1ppb/1Q2PP4/PN1P3P2/
+///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mce's `f2d2` is
+///   illegal because the e2 transit square is hit by the e5 cannon over the e3
+///   screen). A focused cannon-aware castling fix, tracked separately.
 /// * **Synochess** — a deeper-sweep perft divergence still under triage (dialect
-///   target vs movegen) at the time of writing.
-const HELD_BACK: &[WideVariantId] = &[
-    WideVariantId::Seirawan,
-    WideVariantId::Shouse,
-    WideVariantId::Shako,
-    WideVariantId::Spartan,
-    WideVariantId::Synochess,
-];
+///   target vs movegen); tracked as issue #337.
+const HELD_BACK: &[WideVariantId] = &[WideVariantId::Shako, WideVariantId::Synochess];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
@@ -448,6 +456,9 @@ struct Divergence {
 /// Per-variant fuzz outcome.
 struct VariantStat {
     nodes_checked: u64,
+    /// Nodes the cross-check deliberately skipped as a documented FSF artifact
+    /// (see [`is_schess_corner_castle_artifact`]).
+    nodes_skipped: u64,
     games: u32,
     divergences: usize,
     skipped: bool,
@@ -465,6 +476,36 @@ fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
     }
     let sibling = PathBuf::from(fsf_bin).parent()?.join("variants.ini");
     sibling.is_file().then_some(sibling)
+}
+
+/// Whether an S-Chess (Seirawan / S-House) node is an FSF castle-rights artifact
+/// that cannot be faithfully cross-checked, so the fuzzer skips it.
+///
+/// S-Chess folds castling rights and gating-eligible back-rank squares into one FEN
+/// field. Gating is per-piece — a back-rank piece may introduce a Hawk/Elephant on
+/// its **first** move (pychess/chessvariants) — so once a king has moved (losing
+/// castling) a corner rook that has *not* moved is still gating-eligible. mce
+/// serializes that surviving corner gate as a bare corner-file letter (`A`/`H` for
+/// White, `a`/`h` for Black) in the field. FSF has no encoding for "corner rook
+/// still gates but the king has moved": it reads the corner letter as a *castling
+/// right* and emits a castle of the already-moved king (verified — FSF plays e.g.
+/// `f8h8`, landing the king on g8: an illegal castle). The two FENs are therefore
+/// not mutually representable at this node, so it is skipped — the same targeted
+/// approach the neutral Duck (#189) uses. Every other S-Chess node is still checked.
+///
+/// The signal is exact: a corner-file letter appears in the field **only** in this
+/// state. While castling is available the corners ride on `K`/`Q`/`k`/`q`, and the
+/// non-corner gating files are `b`..`g` only, so a standalone `A`/`H`/`a`/`h`
+/// implies the king has moved while its corner rook stays gating-eligible. Limited
+/// to Seirawan / S-House, whose FEN field carries this dual meaning.
+fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
+    if spec.id != WideVariantId::Seirawan && spec.id != WideVariantId::Shouse {
+        return false;
+    }
+    // The castling/gating field is the 3rd space-separated field.
+    fen.split(' ')
+        .nth(2)
+        .is_some_and(|castling| castling.contains(['A', 'H', 'a', 'h']))
 }
 
 /// Cross-check one node: mce `perft(1)`/`perft(2)` + divide vs FSF's.
@@ -601,15 +642,17 @@ fn fmt_divide(divide: &[(String, u64)]) -> String {
 }
 
 /// Play one seeded random legal game, cross-checking every node. Returns
-/// `(nodes_checked, divergences, fsf_error)`; an FSF protocol error ends the game.
+/// `(nodes_checked, nodes_skipped, divergences, fsf_error)`; an FSF protocol error
+/// ends the game.
 fn fuzz_game(
     engine: &mut Engine,
     spec: &Spec,
     mut rng: Rng,
     plies: u32,
-) -> (u64, usize, Option<String>) {
+) -> (u64, u64, usize, Option<String>) {
     let mut pos = AnyWideVariant::startpos(spec.id);
     let mut nodes = 0u64;
+    let mut skipped = 0u64;
     let mut divergences = 0usize;
 
     for _ in 0..plies {
@@ -621,26 +664,33 @@ fn fuzz_game(
             break;
         }
 
-        match check_node(engine, spec, &pos) {
-            Ok(Ok(())) => {}
-            Ok(Err(d)) => {
-                divergences += 1;
-                report_divergence(spec.id, spec.fsf, &d);
+        // A documented FSF artifact (not an mce bug) is not cross-checkable; skip
+        // the node but play on so the random walk still explores past it.
+        if is_schess_corner_castle_artifact(spec, &pos.to_fen()) {
+            skipped += 1;
+        } else {
+            match check_node(engine, spec, &pos) {
+                Ok(Ok(())) => {}
+                Ok(Err(d)) => {
+                    divergences += 1;
+                    report_divergence(spec.id, spec.fsf, &d);
+                }
+                Err(e) => return (nodes, skipped, divergences, Some(e)),
             }
-            Err(e) => return (nodes, divergences, Some(e)),
+            nodes += 1;
         }
-        nodes += 1;
 
         let idx = rng.below(moves.len());
         pos = pos.play(&moves[idx]);
     }
-    (nodes, divergences, None)
+    (nodes, skipped, divergences, None)
 }
 
 /// Fuzz one variant for `cfg.games` seeded games of up to `cfg.plies` plies.
 fn fuzz_variant(engine: &mut Engine, spec: &Spec, variant_idx: usize, cfg: &Config) -> VariantStat {
     let mut stat = VariantStat {
         nodes_checked: 0,
+        nodes_skipped: 0,
         games: 0,
         divergences: 0,
         skipped: false,
@@ -658,8 +708,9 @@ fn fuzz_variant(engine: &mut Engine, spec: &Spec, variant_idx: usize, cfg: &Conf
 
     for game in 0..cfg.games {
         let rng = Rng::new(derive_seed(cfg.seed, variant_idx, game));
-        let (nodes, divergences, err) = fuzz_game(engine, spec, rng, cfg.plies);
+        let (nodes, skipped, divergences, err) = fuzz_game(engine, spec, rng, cfg.plies);
         stat.nodes_checked += nodes;
+        stat.nodes_skipped += skipped;
         stat.divergences += divergences;
         stat.games += 1;
         if let Some(e) = err {
@@ -670,8 +721,13 @@ fn fuzz_variant(engine: &mut Engine, spec: &Spec, variant_idx: usize, cfg: &Conf
         }
     }
 
+    let skip_note = if stat.nodes_skipped > 0 {
+        format!("  ({} FSF-artifact node(s) skipped)", stat.nodes_skipped)
+    } else {
+        String::new()
+    };
     println!(
-        "  {:<14} games {:>2}  nodes {:>6}  {}",
+        "  {:<14} games {:>2}  nodes {:>6}  {}{}",
         spec.id.as_str(),
         stat.games,
         stat.nodes_checked,
@@ -680,6 +736,7 @@ fn fuzz_variant(engine: &mut Engine, spec: &Spec, variant_idx: usize, cfg: &Conf
         } else {
             format!("{} DIVERGENCE(S)", stat.divergences)
         },
+        skip_note,
     );
     stat
 }
@@ -923,5 +980,52 @@ mod tests {
         }
         // The default sweep still covers the clear majority of variants.
         assert!(SPECS.len() - HELD_BACK.len() >= 39);
+    }
+
+    /// The S-Chess corner-castle artifact detector fires exactly on a standalone
+    /// corner-file letter in the castling field of a Seirawan / S-House FEN, and
+    /// never for a castling-available field or a non-S-Chess variant.
+    #[test]
+    fn schess_corner_castle_artifact_is_precise() {
+        let spec = SPECS
+            .iter()
+            .find(|s| s.id == WideVariantId::Seirawan)
+            .expect("seirawan spec");
+        let shouse = SPECS
+            .iter()
+            .find(|s| s.id == WideVariantId::Shouse)
+            .expect("shouse spec");
+        let other = SPECS
+            .iter()
+            .find(|s| s.id == WideVariantId::Capablanca)
+            .expect("capablanca spec");
+
+        // King has moved (no K/Q/k/q) but a corner rook stays gating-eligible: the
+        // field carries a bare `h` (Black) / `A` (White) — the artifact.
+        assert!(is_schess_corner_castle_artifact(
+            spec,
+            "1rbq1k1r/1pbp2a1/4pppn/2e2P2/1A1NP2p/6PN/P1PP3P/R1BQKERB[] b QCDcdh - 4 20",
+        ));
+        assert!(is_schess_corner_castle_artifact(
+            spec,
+            "r4bnr/3kqp1p/3pNn2/8/8/8/1P1BBPP1/R2K1ENR[] w AGHafgh - 2 21",
+        ));
+        // The same dual-meaning field applies to S-House.
+        assert!(is_schess_corner_castle_artifact(
+            shouse,
+            "1rbq1k1r/1pbp2a1/8/8/8/8/P1PP3P/R1BQKERB[] b QCDcdh - 4 20",
+        ));
+        // A castling-available start field uses K/Q for the corners and only b..g
+        // file letters — no artifact.
+        assert!(!is_schess_corner_castle_artifact(
+            spec,
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[HEhe] w KQBCDFGkqbcdfg - 0 1",
+        ));
+        // Restricted to S-Chess: another variant whose castling field legitimately
+        // carries file letters must not be touched.
+        assert!(!is_schess_corner_castle_artifact(
+            other,
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w ah - 0 1",
+        ));
     }
 }
