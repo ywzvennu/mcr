@@ -93,6 +93,21 @@ const PROMO_ONE_KING: &str = "k7/8/8/8/8/8/4h3/4K3 b - - 0 1";
 /// legal promotion target (only Lieutenant/General/Captain/Warlord).
 const PROMO_TWO_KINGS: &str = "k6k/8/8/8/8/8/4h3/4K3 b - - 0 1";
 
+/// A **White** (Persian) pawn one step from promotion. White is the standard
+/// army, so it promotes to exactly `N/B/R/Q` — never to a Spartan piece and never
+/// to a King. Regression guard for issue #336: the generic engine routes White's
+/// promotion through Spartan's `promotion_targets` too, so a colour-blind target
+/// set would (wrongly) hand White the four Spartan promotions plus an illegal King
+/// (perft(1) here would read 11, not 9). FSF `spartan` confirms the counts below.
+const WHITE_PROMO: &str = "k7/4P3/8/8/8/8/8/4K3 w - - 0 1";
+
+/// The exact midgame the #239 differential fuzzer surfaced the White-promotion bug
+/// on: a White pawn on e7 with both sides developed. FSF `spartan` `go perft` pins
+/// 39 / 1262 / 49801; the pre-fix engine over-counted (perft(1) 41) by giving the
+/// White pawn the Spartan promotion set (Warlord/General/Captain/Lieutenant/King).
+const WHITE_PROMO_MIDGAME: &str =
+    "t1k2kt1/h1h1Pi2/5hh1/1h3hh1/d1P2PP1/3hP1QN/2P1BK1P/R1B3R1 w - - 1 23";
+
 /// Asserts the generic Spartan perft equals each pinned `(depth, nodes)` count.
 /// Every number here also matched FSF spartan `go perft` on the same FEN.
 fn check(fen: &str, cases: &[(u32, u64)]) {
@@ -195,6 +210,23 @@ fn hoplite_promo_one_king() {
 fn hoplite_promo_two_kings() {
     // With two kings, King is not a promotion target.
     check(PROMO_TWO_KINGS, &[(2, 54), (3, 694), (4, 3632)]);
+}
+
+// -- White (Persian) promotion = standard N/B/R/Q only (issue #336) ----------
+
+#[test]
+fn white_pawn_promotes_to_standard_set_only() {
+    // White promotes only to N/B/R/Q (four targets, no Spartan piece, no King):
+    // perft(1) = 8 pawn promotions + 1 king step. A colour-blind target set would
+    // give 10 pawn moves (the four Spartan pieces + an illegal King) plus the king
+    // step, i.e. 11.
+    check(WHITE_PROMO, &[(1, 9), (2, 25), (3, 311), (4, 1577)]);
+}
+
+#[test]
+fn white_promotion_midgame_matches_fsf() {
+    // The #239 fuzzer repro, pinned to FSF `spartan` go perft.
+    check(WHITE_PROMO_MIDGAME, &[(1, 39), (2, 1262), (3, 49801)]);
 }
 
 // -- The starting FEN round-trips through mce's FEN I/O ----------------------
