@@ -21,7 +21,7 @@
 //! # Move layout ([`WideMove`])
 //!
 //! `WideMove` is a packed `u64` (origin / destination square indices, kind, role,
-//! and the Seirawan / S-House / Duck addenda — see [`super::wide_move`]). The wire
+//! and the Seirawan / S-House / Duck addenda — see the `wide_move` module). The wire
 //! form is that word, little-endian with trailing zero bytes trimmed: a length
 //! byte `0..=8` followed by that many value bytes. An ordinary move needs 2–4
 //! bytes; only the rare fairy addenda reach the high bytes. The standalone
@@ -33,7 +33,7 @@
 //! game records):
 //!
 //! 1. a **`u16` flags** word (little-endian) marking which optional sections
-//!    follow ([`F_EP`] … [`F_CLOCKS`]) plus the side to move ([`F_TURN_BLACK`]);
+//!    follow (`F_EP` … `F_CLOCKS`) plus the side to move (`F_TURN_BLACK`);
 //! 2. the **board**: an occupancy bitset of `ceil(SQUARES / 8)` bytes, then one
 //!    byte per occupied square in ascending order — `color << 7 | role` (the role
 //!    index is `0..76`, so it fits the low 7 bits);
@@ -46,7 +46,7 @@
 //!
 //! The geometry and variant are fixed by the concrete `GenericPosition<G, V>`
 //! type, so they are not stored; [`AnyWideVariant`] prepends a 1-byte
-//! [`WideVariantId`] selector for a self-describing form.
+//! [`WideVariantId`](crate::geometry::WideVariantId) selector for a self-describing form.
 
 use alloc::vec::Vec;
 
@@ -92,7 +92,7 @@ pub enum WireError {
     /// The leading tag byte is not the one this decoder expects (the wrapped
     /// byte is what was found).
     BadTag(u8),
-    /// The variant selector byte names no [`WideVariantId`].
+    /// The variant selector byte names no [`WideVariantId`](crate::geometry::WideVariantId).
     UnknownVariant(u8),
     /// A square-index byte is out of range for the board geometry.
     BadSquare(u8),
@@ -578,7 +578,7 @@ fn read_square<G: Geometry>(cur: &mut Cursor<'_>) -> Result<Square<G>, WireError
 /// Encodes a **game record**: a start [`AnyWideVariant`] position and the move
 /// list played from it. The layout is [`TAG_GAME`], the byte length of the
 /// embedded position, the position ([`AnyWideVariant::to_bytes`]), the move count,
-/// then each move ([`encode_move_body`]). The inverse is [`decode_game`].
+/// then each move (`encode_move_body`). The inverse is [`decode_game`].
 #[must_use]
 pub fn encode_game(start: &AnyWideVariant, moves: &[WideMove]) -> Vec<u8> {
     let position = start.to_bytes();
