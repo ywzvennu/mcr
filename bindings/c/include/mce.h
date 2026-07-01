@@ -54,6 +54,52 @@ typedef int32_t MceOutcome;
 #endif // __cplusplus
 
 /**
+ * Consolidated game-status codes returned by [`mce_position_status`] /
+ * [`mce_fairy_position_status`].
+ *
+ * This mirrors the engine's `GameStatus` (issue #372): it folds *why* a game
+ * ended together with the shape of the ending into one label, so a caller can
+ * distinguish a checkmate from a stalemate from a variant-specific win/draw
+ * without a second query. The winning side (for a decisive status) is read
+ * from [`mce_position_outcome`].
+ */
+enum MceStatus
+#if defined(__cplusplus) || __STDC_VERSION__ >= 202311L
+  : int32_t
+#endif // defined(__cplusplus) || __STDC_VERSION__ >= 202311L
+ {
+    /**
+     * The game is still in progress (no terminal rule applies).
+     */
+    MCE_STATUS_ONGOING = 0,
+    /**
+     * The side to move is checkmated (in check with no legal move).
+     */
+    MCE_STATUS_CHECKMATE = 1,
+    /**
+     * The side to move has no legal move and is not in check, scored as a draw.
+     */
+    MCE_STATUS_STALEMATE = 2,
+    /**
+     * A variant-specific decisive ending (a flag / temple / baring win, a
+     * perpetual-check or -chase loss, or a stalemate scored as a loss).
+     */
+    MCE_STATUS_VARIANT_WIN = 3,
+    /**
+     * A drawing rule other than stalemate (insufficient material, repetition,
+     * sennichite, bikjang, counting, the move-count rule, a variant draw).
+     */
+    MCE_STATUS_DRAW = 4,
+};
+#ifndef __cplusplus
+#if __STDC_VERSION__ >= 202311L
+typedef enum MceStatus MceStatus;
+#else
+typedef int32_t MceStatus;
+#endif // __STDC_VERSION__ >= 202311L
+#endif // __cplusplus
+
+/**
  * Opaque handle to a fairy-variant chess position chosen at runtime.
  *
  * C code only ever holds a `MceFairyPosition*`; the layout is private. Create
@@ -158,6 +204,52 @@ MceOutcome mce_position_outcome(const McePosition *pos);
 uint64_t mce_perft(const McePosition *pos, uint32_t depth);
 
 /**
+ * Returns the consolidated game status as an [`MceStatus`] code (an `int`),
+ * distinguishing checkmate / stalemate / a variant-specific win / a draw. See
+ * [`MceStatus`]. Returns `ONGOING` if `pos` is NULL or the call panics.
+ */
+MceStatus mce_position_status(const McePosition *pos);
+
+/**
+ * Returns `1` if `square` is attacked by any piece of `side`, `0` if not, and
+ * `-1` if `pos` is NULL, either string is NULL / not valid UTF-8, `square` is
+ * not a valid algebraic square, or `side` is not `"white"`/`"black"`.
+ */
+int mce_position_is_attacked(const McePosition *pos, const char *square, const char *side);
+
+/**
+ * Writes the squares of `side` pieces that attack `square` into `buf` as a
+ * single **space-separated** algebraic list (e.g. `"d1 f1"`), and returns the
+ * length needed including the NUL terminator (two-call buffer contract). An
+ * empty set yields the empty string (`needed == 1`). Returns `0` on error
+ * (NULL handle/string, bad UTF-8, bad square, or bad colour).
+ */
+uintptr_t mce_position_attackers(const McePosition *pos,
+                                 const char *square,
+                                 const char *side,
+                                 char *buf,
+                                 uintptr_t buflen);
+
+/**
+ * Writes the squares attacked (threatened) by the piece standing on `square`
+ * into `buf` as a space-separated algebraic list, and returns the length needed
+ * including the NUL terminator (two-call buffer contract). An empty square
+ * yields the empty string (`needed == 1`). Returns `0` on error (NULL
+ * handle/string, bad UTF-8, or a bad square).
+ */
+uintptr_t mce_position_attacks_from(const McePosition *pos,
+                                    const char *square,
+                                    char *buf,
+                                    uintptr_t buflen);
+
+/**
+ * Returns the mobility of the piece on `square`: the number of squares it
+ * attacks (`0` for an empty square). Returns `-1` if `pos` or `square` is NULL
+ * / not valid UTF-8, or `square` is not a valid algebraic square.
+ */
+int mce_position_mobility(const McePosition *pos, const char *square);
+
+/**
  * Creates a fairy position from a FEN under the named `variant`.
  *
  * `variant` accepts the canonical names and aliases of
@@ -234,6 +326,13 @@ MceOutcome mce_fairy_position_outcome(const MceFairyPosition *pos);
  * `depth == 0` legitimately returns `1`.
  */
 uint64_t mce_fairy_perft(const MceFairyPosition *pos, uint32_t depth);
+
+/**
+ * Returns the consolidated fairy game status as an [`MceStatus`] code, with the
+ * same encoding as [`mce_position_status`]. Returns `ONGOING` if `pos` is NULL
+ * or the call panics.
+ */
+MceStatus mce_fairy_position_status(const MceFairyPosition *pos);
 
 #ifdef __cplusplus
 }  // extern "C"

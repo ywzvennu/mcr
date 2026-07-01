@@ -109,6 +109,34 @@ int main(void) {
     CHECK(mce_position_is_check(pos) == 0, "startpos is not check");
     CHECK(mce_position_outcome(pos) == MCE_OUTCOME_ONGOING,
           "startpos outcome is ongoing");
+    CHECK(mce_position_status(pos) == MCE_STATUS_ONGOING,
+          "startpos status is ongoing");
+
+    /* --- Analysis queries (issue #373) ------------------------------------ */
+    CHECK(mce_position_is_attacked(pos, "f3", "white") == 1,
+          "White attacks f3 in the start position");
+    CHECK(mce_position_is_attacked(pos, "e4", "white") == 0,
+          "White does not attack e4 in the start position");
+    CHECK(mce_position_mobility(pos, "g1") == 3,
+          "the g1 knight has mobility 3 (e2, f3, h3)");
+    CHECK(mce_position_mobility(pos, "e4") == 0,
+          "an empty square has zero mobility");
+    CHECK(mce_position_is_attacked(pos, "z9", "white") == -1,
+          "a bad square yields the -1 error code");
+
+    {
+        size_t need = mce_position_attackers(pos, "f3", "white", NULL, 0);
+        char *buf = (char *)malloc(need);
+        if (buf != NULL &&
+            mce_position_attackers(pos, "f3", "white", buf, need) == need) {
+            printf("  attackers of f3 (white): %s\n", buf);
+            CHECK(count_words(buf) == 3, "f3 has 3 white attackers (g1,e2,g2)");
+            free(buf);
+        } else {
+            CHECK(0, "attackers query succeeds");
+            free(buf);
+        }
+    }
 
     mce_position_free(pos);
 
@@ -125,6 +153,8 @@ int main(void) {
     CHECK(mce_position_is_check(game) == 1, "position is check after Qh4#");
     CHECK(mce_position_outcome(game) == MCE_OUTCOME_BLACK_WINS,
           "outcome is BLACK_WINS after Fool's mate");
+    CHECK(mce_position_status(game) == MCE_STATUS_CHECKMATE,
+          "status is CHECKMATE after Fool's mate");
 
     /* Illegal move is rejected and leaves the position unchanged. */
     CHECK(mce_position_play_uci(game, "e2e4") == 2,
@@ -168,6 +198,8 @@ int main(void) {
         CHECK(mce_fairy_perft(xq, 1) == 44ULL, "xiangqi perft(1) == 44");
         CHECK(mce_fairy_perft(xq, 2) == 1920ULL, "xiangqi perft(2) == 1920");
         CHECK(mce_fairy_perft(xq, 3) == 79666ULL, "xiangqi perft(3) == 79666");
+        CHECK(mce_fairy_position_status(xq) == MCE_STATUS_ONGOING,
+              "xiangqi startpos status is ongoing");
         mce_fairy_position_free(xq);
     }
 

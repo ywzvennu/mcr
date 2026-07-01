@@ -60,8 +60,8 @@ use std::ffi::{c_char, c_int, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{AnyVariant, Color, Outcome, VariantId};
+use mce::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
+use mce::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
 
 /// Opaque handle to a chess position of a runtime-chosen variant.
 ///
@@ -87,6 +87,86 @@ pub enum MceOutcome {
     WhiteWins = 2,
     /// Black has won.
     BlackWins = 3,
+}
+
+/// Consolidated game-status codes returned by [`mce_position_status`] /
+/// [`mce_fairy_position_status`].
+///
+/// This mirrors the engine's `GameStatus` (issue #372): it folds *why* a game
+/// ended together with the shape of the ending into one label, so a caller can
+/// distinguish a checkmate from a stalemate from a variant-specific win/draw
+/// without a second query. The winning side (for a decisive status) is read
+/// from [`mce_position_outcome`].
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MceStatus {
+    /// The game is still in progress (no terminal rule applies).
+    Ongoing = 0,
+    /// The side to move is checkmated (in check with no legal move).
+    Checkmate = 1,
+    /// The side to move has no legal move and is not in check, scored as a draw.
+    Stalemate = 2,
+    /// A variant-specific decisive ending (a flag / temple / baring win, a
+    /// perpetual-check or -chase loss, or a stalemate scored as a loss).
+    VariantWin = 3,
+    /// A drawing rule other than stalemate (insufficient material, repetition,
+    /// sennichite, bikjang, counting, the move-count rule, a variant draw).
+    Draw = 4,
+}
+
+/// Folds a standard `(end_reason, outcome)` pair into an [`MceStatus`], matching
+/// the engine's `GameStatus::from_parts` shape on the 8x8 surface.
+fn standard_status(reason: Option<EndReason>, outcome: Option<Outcome>) -> MceStatus {
+    match (reason, outcome) {
+        (Some(EndReason::Checkmate), Some(Outcome::Decisive { .. })) => MceStatus::Checkmate,
+        (Some(EndReason::Stalemate), Some(Outcome::Draw)) => MceStatus::Stalemate,
+        (Some(_), Some(Outcome::Decisive { .. })) => MceStatus::VariantWin,
+        (Some(_), Some(Outcome::Draw)) => MceStatus::Draw,
+        _ => MceStatus::Ongoing,
+    }
+}
+
+/// Folds a fairy `(end_reason, outcome)` pair into an [`MceStatus`], the
+/// geometry-layer analogue of [`standard_status`].
+fn fairy_status(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) -> MceStatus {
+    match (reason, outcome) {
+        (Some(WideEndReason::Checkmate), Some(WideOutcome::Decisive { .. })) => {
+            MceStatus::Checkmate
+        }
+        (Some(WideEndReason::Stalemate), Some(WideOutcome::Draw)) => MceStatus::Stalemate,
+        (Some(_), Some(WideOutcome::Decisive { .. })) => MceStatus::VariantWin,
+        (Some(_), Some(WideOutcome::Draw)) => MceStatus::Draw,
+        _ => MceStatus::Ongoing,
+    }
+}
+
+/// Reaches the standard-chess core [`mce::Position`] inside an [`AnyVariant`].
+///
+/// Every `AnyVariant` arm wraps a `VariantPosition<V>` whose `.core()` exposes
+/// the underlying 8x8 [`Position`], where the attack-query primitives live. This
+/// is a plain, safe match over the public enum arms.
+fn core(av: &AnyVariant) -> &Position {
+    match av {
+        AnyVariant::Chess(p) => p.core(),
+        AnyVariant::Chess960(p) => p.core(),
+        AnyVariant::KingOfTheHill(p) => p.core(),
+        AnyVariant::ThreeCheck(p) => p.core(),
+        AnyVariant::RacingKings(p) => p.core(),
+        AnyVariant::Horde(p) => p.core(),
+        AnyVariant::Atomic(p) => p.core(),
+        AnyVariant::Antichess(p) => p.core(),
+        AnyVariant::Crazyhouse(p) => p.core(),
+    }
+}
+
+/// Parses a colour name (`"white"` / `"black"`, case-insensitive) into a
+/// [`Color`], or `None` if it is neither.
+fn parse_color(name: &str) -> Option<Color> {
+    match name.to_ascii_lowercase().as_str() {
+        "white" | "w" => Some(Color::White),
+        "black" | "b" => Some(Color::Black),
+        _ => None,
+    }
 }
 
 /// Resolve a borrowed `*const McePosition` to a shared reference, or return
@@ -304,6 +384,132 @@ pub extern "C" fn mce_perft(pos: *const McePosition, depth: u32) -> u64 {
     catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
 }
 
+/// Returns the consolidated game status as an [`MceStatus`] code (an `int`),
+/// distinguishing checkmate / stalemate / a variant-specific win / a draw. See
+/// [`MceStatus`]. Returns `ONGOING` if `pos` is NULL or the call panics.
+#[no_mangle]
+pub extern "C" fn mce_position_status(pos: *const McePosition) -> MceStatus {
+    let pos = pos_ref!(pos, MceStatus::Ongoing);
+    match catch_unwind(AssertUnwindSafe(|| {
+        standard_status(pos.inner.end_reason(), pos.inner.outcome())
+    })) {
+        Ok(s) => s,
+        Err(_) => MceStatus::Ongoing,
+    }
+}
+
+// -- Analysis queries (standard 8x8 surface) ---------------------------------
+//
+// Pure, rules-only attack queries (issue #373) over the standard 8x8 board
+// reached through the variant's core `Position`. `square` is algebraic
+// (`"e4"`), `side` is `"white"` / `"black"` (case-insensitive). They apply to
+// the 8x8 variants only; the fairy geometry has no analogous public accessor.
+
+/// Returns `1` if `square` is attacked by any piece of `side`, `0` if not, and
+/// `-1` if `pos` is NULL, either string is NULL / not valid UTF-8, `square` is
+/// not a valid algebraic square, or `side` is not `"white"`/`"black"`.
+#[no_mangle]
+pub extern "C" fn mce_position_is_attacked(
+    pos: *const McePosition,
+    square: *const c_char,
+    side: *const c_char,
+) -> c_int {
+    let pos = pos_ref!(pos, -1);
+    let square = cstr!(square, -1);
+    let side = cstr!(side, -1);
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let sq: Square = square.parse().ok()?;
+        let color = parse_color(side)?;
+        Some(core(&pos.inner).is_attacked(sq, color))
+    }));
+    match result {
+        Ok(Some(true)) => 1,
+        Ok(Some(false)) => 0,
+        _ => -1,
+    }
+}
+
+/// Writes the squares of `side` pieces that attack `square` into `buf` as a
+/// single **space-separated** algebraic list (e.g. `"d1 f1"`), and returns the
+/// length needed including the NUL terminator (two-call buffer contract). An
+/// empty set yields the empty string (`needed == 1`). Returns `0` on error
+/// (NULL handle/string, bad UTF-8, bad square, or bad colour).
+#[no_mangle]
+pub extern "C" fn mce_position_attackers(
+    pos: *const McePosition,
+    square: *const c_char,
+    side: *const c_char,
+    buf: *mut c_char,
+    buflen: usize,
+) -> usize {
+    let pos = pos_ref!(pos, 0);
+    let square = cstr!(square, 0);
+    let side = cstr!(side, 0);
+    let joined = catch_unwind(AssertUnwindSafe(|| {
+        let sq: Square = square.parse().ok()?;
+        let color = parse_color(side)?;
+        let p = core(&pos.inner);
+        let bb = p.attackers_to(sq, color, p.board().occupied());
+        Some(
+            bb.into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
+    }));
+    match joined {
+        Ok(Some(s)) => write_c_string(&s, buf, buflen),
+        _ => 0,
+    }
+}
+
+/// Writes the squares attacked (threatened) by the piece standing on `square`
+/// into `buf` as a space-separated algebraic list, and returns the length needed
+/// including the NUL terminator (two-call buffer contract). An empty square
+/// yields the empty string (`needed == 1`). Returns `0` on error (NULL
+/// handle/string, bad UTF-8, or a bad square).
+#[no_mangle]
+pub extern "C" fn mce_position_attacks_from(
+    pos: *const McePosition,
+    square: *const c_char,
+    buf: *mut c_char,
+    buflen: usize,
+) -> usize {
+    let pos = pos_ref!(pos, 0);
+    let square = cstr!(square, 0);
+    let joined = catch_unwind(AssertUnwindSafe(|| {
+        let sq: Square = square.parse().ok()?;
+        let bb = core(&pos.inner).attacks_from(sq);
+        Some(
+            bb.into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
+    }));
+    match joined {
+        Ok(Some(s)) => write_c_string(&s, buf, buflen),
+        _ => 0,
+    }
+}
+
+/// Returns the mobility of the piece on `square`: the number of squares it
+/// attacks (`0` for an empty square). Returns `-1` if `pos` or `square` is NULL
+/// / not valid UTF-8, or `square` is not a valid algebraic square.
+#[no_mangle]
+pub extern "C" fn mce_position_mobility(pos: *const McePosition, square: *const c_char) -> c_int {
+    let pos = pos_ref!(pos, -1);
+    let square = cstr!(square, -1);
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let sq: Square = square.parse().ok()?;
+        Some(core(&pos.inner).attacks_from(sq).count())
+    }));
+    match result {
+        Ok(Some(n)) => n as c_int,
+        _ => -1,
+    }
+}
+
 // -- Fairy (geometry-layer) variants ----------------------------------------
 //
 // The same opaque-handle surface as above, over `AnyWideVariant` rather than the
@@ -502,6 +708,20 @@ pub extern "C" fn mce_fairy_perft(pos: *const MceFairyPosition, depth: u32) -> u
     catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
 }
 
+/// Returns the consolidated fairy game status as an [`MceStatus`] code, with the
+/// same encoding as [`mce_position_status`]. Returns `ONGOING` if `pos` is NULL
+/// or the call panics.
+#[no_mangle]
+pub extern "C" fn mce_fairy_position_status(pos: *const MceFairyPosition) -> MceStatus {
+    let pos = pos_ref!(pos, MceStatus::Ongoing);
+    match catch_unwind(AssertUnwindSafe(|| {
+        fairy_status(pos.inner.end_reason(), pos.inner.outcome())
+    })) {
+        Ok(s) => s,
+        Err(_) => MceStatus::Ongoing,
+    }
+}
+
 /// Writes `s` (plus a NUL) into `buf`/`buflen` per the crate buffer contract and
 /// returns `s.len() + 1` (the bytes needed including the terminator).
 ///
@@ -640,6 +860,101 @@ mod tests {
         mce_position_free(pos);
     }
 
+    fn read_str(f: impl Fn(*mut c_char, usize) -> usize) -> String {
+        let need = f(ptr::null_mut(), 0);
+        let mut buf = vec![0u8; need];
+        let got = f(buf.as_mut_ptr().cast(), buf.len());
+        assert_eq!(got, need);
+        CStr::from_bytes_until_nul(&buf)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    #[test]
+    fn status_reports_checkmate_stalemate_and_ongoing() {
+        let v = cs("chess");
+        let start = mce_position_startpos(v.as_ptr());
+        assert_eq!(mce_position_status(start), MceStatus::Ongoing);
+        mce_position_free(start);
+
+        // Fool's mate -> checkmate, Black wins.
+        let mate_fen = cs("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
+        let mate = mce_position_new_from_fen(mate_fen.as_ptr(), v.as_ptr());
+        assert_eq!(mce_position_status(mate), MceStatus::Checkmate);
+        assert_eq!(mce_position_outcome(mate), MceOutcome::BlackWins);
+        mce_position_free(mate);
+
+        // Classic stalemate -> draw.
+        let stale_fen = cs("k7/2K5/1Q6/8/8/8/8/8 b - - 0 1");
+        let stale = mce_position_new_from_fen(stale_fen.as_ptr(), v.as_ptr());
+        assert_eq!(mce_position_status(stale), MceStatus::Stalemate);
+        mce_position_free(stale);
+
+        assert_eq!(mce_position_status(ptr::null()), MceStatus::Ongoing);
+    }
+
+    #[test]
+    fn analysis_is_attacked_attackers_and_mobility() {
+        let v = cs("chess");
+        let pos = mce_position_startpos(v.as_ptr());
+        let white = cs("white");
+        let black = cs("black");
+
+        // In the start position White attacks f3 (pawn/knight) but not e4.
+        let f3 = cs("f3");
+        let e4 = cs("e4");
+        assert_eq!(
+            mce_position_is_attacked(pos, f3.as_ptr(), white.as_ptr()),
+            1
+        );
+        assert_eq!(
+            mce_position_is_attacked(pos, e4.as_ptr(), white.as_ptr()),
+            0
+        );
+
+        // Attackers of f3 by White: the g1 knight and the e2/g2 pawns.
+        let attackers =
+            read_str(|b, n| mce_position_attackers(pos, f3.as_ptr(), white.as_ptr(), b, n));
+        let set: std::collections::HashSet<&str> = attackers.split_whitespace().collect();
+        assert_eq!(set, ["g1", "e2", "g2"].into_iter().collect());
+
+        // The g1 knight attacks e2, f3 and h3 (e2 is a friendly pawn it
+        // defends; the attack set counts it) from the start position.
+        let g1 = cs("g1");
+        let from = read_str(|b, n| mce_position_attacks_from(pos, g1.as_ptr(), b, n));
+        let fromset: std::collections::HashSet<&str> = from.split_whitespace().collect();
+        assert_eq!(fromset, ["e2", "f3", "h3"].into_iter().collect());
+        assert_eq!(mce_position_mobility(pos, g1.as_ptr()), 3);
+
+        // An empty square has no attacks and zero mobility.
+        assert_eq!(mce_position_mobility(pos, e4.as_ptr()), 0);
+
+        // Error paths: bad square / colour / NULL handle.
+        let bad = cs("z9");
+        assert_eq!(
+            mce_position_is_attacked(pos, bad.as_ptr(), white.as_ptr()),
+            -1
+        );
+        let badcolor = cs("purple");
+        assert_eq!(
+            mce_position_is_attacked(pos, f3.as_ptr(), badcolor.as_ptr()),
+            -1
+        );
+        assert_eq!(
+            mce_position_is_attacked(ptr::null(), f3.as_ptr(), white.as_ptr()),
+            -1
+        );
+        assert_eq!(mce_position_mobility(ptr::null(), g1.as_ptr()), -1);
+        assert_eq!(
+            mce_position_attackers(ptr::null(), f3.as_ptr(), black.as_ptr(), ptr::null_mut(), 0),
+            0
+        );
+
+        mce_position_free(pos);
+    }
+
     #[test]
     fn fairy_startpos_legal_moves_and_perft() {
         // Construct a fairy variant by name and run perft — the acceptance gate.
@@ -661,6 +976,8 @@ mod tests {
         assert_eq!(mce_fairy_perft(pos, 3), 79666);
         assert_eq!(mce_fairy_position_is_check(pos), 0);
         assert_eq!(mce_fairy_position_outcome(pos), MceOutcome::Ongoing);
+        assert_eq!(mce_fairy_position_status(pos), MceStatus::Ongoing);
+        assert_eq!(mce_fairy_position_status(ptr::null()), MceStatus::Ongoing);
 
         mce_fairy_position_free(pos);
 
