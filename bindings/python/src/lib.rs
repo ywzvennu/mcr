@@ -17,7 +17,7 @@ use pyo3::types::PyType;
 
 use ::mce::geometry::{AnyWideVariant, WideEndReason, WideMove, WideOutcome, WideVariantId};
 use ::mce::{
-    AnyVariant, Board, Color, EndReason, Move, Outcome, Position as CorePosition, VariantId,
+    AnyVariant, Board, Color, EndReason, Move, Outcome, Position as CorePosition, Square, VariantId,
 };
 
 /// Reaches the standard-chess core [`mce::Position`] inside an [`AnyVariant`].
@@ -46,6 +46,38 @@ fn core(av: &AnyVariant) -> &CorePosition {
 fn parse_variant(name: &str) -> PyResult<VariantId> {
     name.parse::<VariantId>()
         .map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+/// Parses an algebraic square (`"e4"`) into a [`Square`], raising `ValueError`
+/// on a malformed square.
+fn parse_square(s: &str) -> PyResult<Square> {
+    s.parse::<Square>()
+        .map_err(|e| PyValueError::new_err(format!("invalid square {s:?}: {e}")))
+}
+
+/// Parses a colour name (`"white"` / `"black"`, case-insensitive) into a
+/// [`Color`], raising `ValueError` otherwise.
+fn parse_color_name(s: &str) -> PyResult<Color> {
+    match s.to_ascii_lowercase().as_str() {
+        "white" | "w" => Ok(Color::White),
+        "black" | "b" => Ok(Color::Black),
+        _ => Err(PyValueError::new_err(format!(
+            "invalid colour {s:?}: expected \"white\" or \"black\""
+        ))),
+    }
+}
+
+/// The consolidated `GameStatus` label (issue #372) for a standard position,
+/// folding `(end_reason, outcome)` into one of `"ongoing"`, `"checkmate"`,
+/// `"stalemate"`, `"variant_win"`, or `"draw"`.
+fn status_str(reason: Option<EndReason>, outcome: Option<Outcome>) -> &'static str {
+    match (reason, outcome) {
+        (Some(EndReason::Checkmate), Some(Outcome::Decisive { .. })) => "checkmate",
+        (Some(EndReason::Stalemate), Some(Outcome::Draw)) => "stalemate",
+        (Some(_), Some(Outcome::Decisive { .. })) => "variant_win",
+        (Some(_), Some(Outcome::Draw)) => "draw",
+        _ => "ongoing",
+    }
 }
 
 /// A textual label for an outcome, mirroring python-chess result strings.
@@ -198,6 +230,53 @@ impl Position {
         self.inner.end_reason().map(end_reason_str)
     }
 
+    /// The consolidated game status (issue #372): one of `"ongoing"`,
+    /// `"checkmate"`, `"stalemate"`, `"variant_win"`, or `"draw"`. Folds the
+    /// end-reason and outcome into a single label; the winner (for a decisive
+    /// status) is available from `outcome()`.
+    fn status(&self) -> &'static str {
+        status_str(self.inner.end_reason(), self.inner.outcome())
+    }
+
+    /// Whether `square` (algebraic, e.g. `"e4"`) is attacked by any piece of
+    /// `color` (`"white"` / `"black"`). Raises `ValueError` on a bad square or
+    /// colour. A rules-only analysis query (issue #373).
+    fn is_attacked(&self, square: &str, color: &str) -> PyResult<bool> {
+        let sq = parse_square(square)?;
+        let c = parse_color_name(color)?;
+        Ok(core(&self.inner).is_attacked(sq, c))
+    }
+
+    /// The squares (algebraic) of `color` pieces that attack `square`, as a
+    /// list. Raises `ValueError` on a bad square or colour.
+    fn attackers(&self, square: &str, color: &str) -> PyResult<Vec<String>> {
+        let sq = parse_square(square)?;
+        let c = parse_color_name(color)?;
+        let p = core(&self.inner);
+        Ok(p.attackers_to(sq, c, p.board().occupied())
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
+    }
+
+    /// The squares (algebraic) attacked by the piece standing on `square`, as a
+    /// list (empty if the square is empty). Raises `ValueError` on a bad square.
+    fn attacks_from(&self, square: &str) -> PyResult<Vec<String>> {
+        let sq = parse_square(square)?;
+        Ok(core(&self.inner)
+            .attacks_from(sq)
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
+    }
+
+    /// The mobility of the piece on `square`: the number of squares it attacks
+    /// (`0` if empty). Raises `ValueError` on a bad square.
+    fn mobility(&self, square: &str) -> PyResult<u32> {
+        let sq = parse_square(square)?;
+        Ok(core(&self.inner).attacks_from(sq).count())
+    }
+
     /// The SAN for a move given in UCI. Raises `ValueError` if the UCI move is
     /// malformed or illegal in this position.
     fn san(&self, uci: &str) -> PyResult<String> {
@@ -306,6 +385,18 @@ fn wide_end_reason_str(reason: WideEndReason) -> &'static str {
         WideEndReason::Bikjang => "bikjang",
         WideEndReason::CountingDraw => "counting_draw",
         WideEndReason::MoveRule => "move_rule",
+    }
+}
+
+/// The consolidated `GameStatus` label (issue #372) for a fairy position — the
+/// geometry-layer analogue of [`status_str`].
+fn wide_status_str(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) -> &'static str {
+    match (reason, outcome) {
+        (Some(WideEndReason::Checkmate), Some(WideOutcome::Decisive { .. })) => "checkmate",
+        (Some(WideEndReason::Stalemate), Some(WideOutcome::Draw)) => "stalemate",
+        (Some(_), Some(WideOutcome::Decisive { .. })) => "variant_win",
+        (Some(_), Some(WideOutcome::Draw)) => "draw",
+        _ => "ongoing",
     }
 }
 
@@ -457,6 +548,12 @@ impl FairyPosition {
     /// if it is ongoing.
     fn end_reason(&self) -> Option<&'static str> {
         self.inner.end_reason().map(wide_end_reason_str)
+    }
+
+    /// The consolidated game status (issue #372): one of `"ongoing"`,
+    /// `"checkmate"`, `"stalemate"`, `"variant_win"`, or `"draw"`.
+    fn status(&self) -> &'static str {
+        wide_status_str(self.inner.end_reason(), self.inner.outcome())
     }
 
     fn __repr__(&self) -> String {
