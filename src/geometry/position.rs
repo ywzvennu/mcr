@@ -1206,6 +1206,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if num_checkers >= 2 {
             // Double check: only king moves are legal.
             self.append_drops(out);
+            // A king that flees a double check off a gating-eligible square may
+            // still gate a reserve onto the square it vacates: the gate rides the
+            // (already-legal) king escape and can neither expose nor shield our
+            // king, exactly as on the single-check / quiet tail below. Without
+            // this the gated double-check escape is dropped (issue #363: S-House
+            // discovered double checks under-counted the king's `+gate` reply).
+            // Gated behind `supports_gating()` (default-off), so every non-gating
+            // variant is byte-identical (its eligible set is empty regardless).
+            if V::supports_gating() {
+                self.append_gating_moves(out, us);
+            }
             return;
         }
 
