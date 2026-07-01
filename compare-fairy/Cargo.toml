@@ -35,6 +35,15 @@ mce = { path = "..", default-features = false, features = ["std"] }
 #   cargo run --release --features magic
 magic = ["mce/magic"]
 
+# Enables the mce side of the HaChu large-shogi perft comparison (issue #379's
+# `--hachu` mode). OFF by default: mce does not yet implement a Chu-Shogi
+# variant/move generator (only the 12x12 board geometry), so there is nothing to
+# cross-check against the HaChu oracle. Issue #380 adds Chu-Shogi rules and will
+# flip this on (and, at that point, wire it to the mce feature that gates the
+# variant, e.g. `large-shogi = ["mce/chu"]`). Until then it is a harness-local
+# switch that only selects the perft-comparison code path in `hachu.rs`.
+large-shogi = []
+
 [[bin]]
 name = "compare-fairy"
 path = "src/main.rs"
