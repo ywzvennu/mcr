@@ -284,15 +284,22 @@ jobs:
       # Where the corpus differential above pins a fixed basket of positions, this
       # plays seeded random *legal* games from each variant's start and cross-checks
       # mce's perft(1)/perft(2)+divide against FSF node-by-node, so a regression on a
-      # reachable-but-un-pinned position surfaces here. Fixed seed + bounded
-      # games/plies make it fully deterministic and cheap (~10s, all 44 fuzzable
-      # variants); the budget is anchored at the documented zero-divergence gate
-      # depth (3 games × 30 plies — driving it harder is investigative tooling, not a
-      # gate). MCE_FSF_BIN/MCE_FSF_VARIANTS_INI are already exported above, so the
-      # harness runs (rather than skipping) and `main` exits non-zero on any
-      # divergence — the `run` does not swallow that, so a divergence fails the job.
+      # reachable-but-un-pinned position surfaces here. Fixed seeds + bounded
+      # games/plies keep it fully deterministic. This job is GATED (schedule /
+      # workflow_dispatch only), so it does not spend per-PR CI minutes and can afford
+      # a deeper budget than a per-push gate would: the previous 3 games × 30 plies
+      # gate depth missed the Empire under-generation later caught at greater depth
+      # (issue #359), so the gate now sweeps 3 seeds × 8 games × 60 plies across all
+      # fuzzable variants (~2–3 min). MCE_FSF_BIN/MCE_FSF_VARIANTS_INI are already
+      # exported above, so the harness runs (rather than skipping); `main` exits
+      # non-zero on any divergence and the default `bash -e` shell propagates that out
+      # of the loop, so a divergence on ANY seed fails the job.
       - name: compare-fairy differential fuzzer vs FSF (seeded)
-        run: cargo run --release --manifest-path compare-fairy/Cargo.toml -- --difffuzz --seed 1 --games 3 --plies 30
+        run: |
+          for seed in 1 2 3; do
+            cargo run --release --manifest-path compare-fairy/Cargo.toml -- \
+              --difffuzz --seed "$seed" --games 8 --plies 60
+          done
 
       # Deep geometry-layer perft sweep: the expensive `#[ignore]`d layers that
       # `cargo test` skips for speed. Run here against published reference counts.
