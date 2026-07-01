@@ -24,7 +24,7 @@ use core::str::FromStr;
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
     Chak, Chennis, Dobutsu, Dragon, Duck, Embassy, Empire, FogOfWar, GenericPosition, Geometry,
-    Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate,
+    Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate,
     Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror,
     Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse,
     Sittuyin, Spartan, Synochess, Tori, WideEndReason, WideFenError, WideMove, WideOutcome,
@@ -411,6 +411,7 @@ wide_variants! {
     Grandhouse, Grandhouse, "grandhouse";
     HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
     Janggi, Janggi, "janggi", "korean";
+    Janus, Janus, "janus", "januschess";
     Jieqi, Jieqi, "jieqi";
     Khans, Khans, "khans";
     Knightmate, Knightmate, "knightmate";
@@ -480,7 +481,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 51, "all 51 fairy variants are covered");
+        assert_eq!(count, 52, "all 52 fairy variants are covered");
     }
 
     #[test]
@@ -674,6 +675,7 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Janggi, Janggi, AnyWideVariant::Janggi, 2);
+        agrees_with_typed!(WideVariantId::Janus, Janus, AnyWideVariant::Janus, 2);
         agrees_with_typed!(WideVariantId::Jieqi, Jieqi, AnyWideVariant::Jieqi, 2);
         agrees_with_typed!(WideVariantId::Khans, Khans, AnyWideVariant::Khans, 2);
         agrees_with_typed!(

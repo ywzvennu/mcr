@@ -135,6 +135,24 @@ fn amazon_to_fsf(fen: &str) -> String {
     }
 }
 
+/// Janus Chess dialect: mce spells the Janus (Bishop + Knight) as its Hawk `a`/`A`;
+/// FSF spells it `j`/`J`. Rewrite that letter in the placement field; every other
+/// letter and field is identical.
+fn janus_to_fsf(fen: &str) -> String {
+    let map = |c: char| match c {
+        'a' => 'j',
+        'A' => 'J',
+        other => other,
+    };
+    match fen.split_once(' ') {
+        Some((placement, rest)) => {
+            let mapped: String = placement.chars().map(map).collect();
+            format!("{mapped} {rest}")
+        }
+        None => fen.chars().map(map).collect(),
+    }
+}
+
 /// Every variant the fuzzer cross-checks against FSF, each reusing its pinned-corpus
 /// module's dialect rewrite.
 ///
@@ -280,6 +298,13 @@ const SPECS: &[Spec] = &[
         fsf: "janggi",
         needs_ini: false,
         dialect: crate::janggi::fen_to_fsf,
+    },
+    Spec {
+        // Janus: mce spells the Janus (Bishop + Knight) `a`; FSF spells it `j`.
+        id: WideVariantId::Janus,
+        fsf: "janus",
+        needs_ini: false,
+        dialect: janus_to_fsf,
     },
     Spec {
         id: WideVariantId::Khans,
