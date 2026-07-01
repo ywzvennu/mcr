@@ -77,18 +77,19 @@ pub use variant::{
 pub use variants::{
     Alice, AliceRules, Almost, AlmostRules, Amazon, AmazonRules, Asean, AseanRules, Bughouse,
     BughouseRules, Cambodian, CambodianRules, CannonShogi, CannonShogiRules, Capablanca,
-    CapablancaRules, Capahouse, CapahouseRules, Chak, ChakRules, Chennis, ChennisRules, Chigorin,
-    ChigorinRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy,
-    EmbassyRules, Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
-    GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
-    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Khans, KhansRules, Knightmate,
-    KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules,
-    Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules, Minixiangqi,
-    MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
-    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
-    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
-    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori,
-    ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    CapablancaRules, Capahouse, CapahouseRules, Chak, ChakRules, Chancellor, ChancellorRules,
+    Chennis, ChennisRules, Chigorin, ChigorinRules, Dobutsu, DobutsuRules, Dragon, DragonRules,
+    Duck, DuckRules, Embassy, EmbassyRules, Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro,
+    GorogoroRules, Gothic, GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
+    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules,
+    Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong,
+    MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi,
+    MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
+    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
+    Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
+    Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    Synochess, SynochessRules, Tori, ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules,
+    Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -397,6 +398,23 @@ geometry!(
     /// past the ninth file. Files run a..i, ranks 1..9. It hosts Shogi, whose
     /// captured pieces enter a persistent hand and are dropped back onto the board.
     Shogi9x9,
+    u128,
+    9,
+    9
+);
+
+geometry!(
+    /// A nine-files by nine-ranks chess board (81 squares), backed by `u128`.
+    ///
+    /// The board of Chancellor chess — standard chess widened to nine files and
+    /// nine ranks, with a Rook + Knight Chancellor added to each side's back rank.
+    /// It shares the 9x9 shape and `u128` backing with [`Shogi9x9`] but is a
+    /// **distinct** geometry, so the western-chess variant never shares its file /
+    /// rank / edge masks with the shogi family (mirroring how [`Tori7x7`],
+    /// [`Minixiangqi7x7`] and [`Chennis7x7`] keep separate 7x7 geometries). A square
+    /// index reaches `80`, and edge-masked east/west shifts must not wrap past the
+    /// ninth file. Files run a..i, ranks 1..9.
+    Chess9x9,
     u128,
     9,
     9

@@ -23,12 +23,12 @@ use core::str::FromStr;
 
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Chak, Chennis, Chigorin, Dobutsu, Dragon, Duck, Embassy, Empire, FogOfWar, GenericPosition,
-    Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans,
-    Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Orda,
-    Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
-    Shouse, Sittuyin, Spartan, Synochess, Tori, WideEndReason, WideFenError, WideMove, WideOutcome,
-    WideVariant, Xiangfu, Xiangqi,
+    Chak, Chancellor, Chennis, Chigorin, Dobutsu, Dragon, Duck, Embassy, Empire, FogOfWar,
+    GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus,
+    Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi,
+    Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
+    Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori, WideEndReason, WideFenError,
+    WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -398,6 +398,7 @@ wide_variants! {
     Capablanca, Capablanca, "capablanca", "capa";
     Capahouse, Capahouse, "capahouse";
     Chak, Chak, "chak";
+    Chancellor, Chancellor, "chancellor";
     Chennis, Chennis, "chennis";
     Chigorin, Chigorin, "chigorin";
     Dobutsu, Dobutsu, "dobutsu";
@@ -482,7 +483,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 53, "all 53 fairy variants are covered");
+        assert_eq!(count, 54, "all 54 fairy variants are covered");
     }
 
     #[test]
@@ -643,6 +644,12 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Chak, Chak, AnyWideVariant::Chak, 2);
+        agrees_with_typed!(
+            WideVariantId::Chancellor,
+            Chancellor,
+            AnyWideVariant::Chancellor,
+            2
+        );
         agrees_with_typed!(WideVariantId::Chennis, Chennis, AnyWideVariant::Chennis, 2);
         agrees_with_typed!(
             WideVariantId::Chigorin,
