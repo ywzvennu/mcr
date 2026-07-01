@@ -47,6 +47,18 @@ const DROPS_AND_GATES: &str =
 /// promoted-revert banking. Pinned against FSF.
 const PROMOTED_REVERT: &str = "Q~r1k4/8/8/8/8/8/8/4K3[] b - - 0 1";
 
+/// Discovered **double-check** gating (issue #363). White's `b5` Knight sits on
+/// the `a4`-Bishop's `a4`-`e8` diagonal; moving it (`b5xc7` or `b5xd6`) delivers
+/// a *double* check — the Knight directly plus the unmasked Bishop. Black's only
+/// reply is the king flight `e8d8`, which may **still gate** the held Hawk onto
+/// the vacated `e8` (`e8d8h`). mce previously returned early on double check
+/// before the gating pass, dropping that gated escape and under-counting
+/// `perft(2)` by 2. Both positions are pinned against FSF (`UCI_Variant shouse`).
+const DOUBLE_CHECK_GATE_1: &str =
+    "rnq1kbnr/p1p1pp1p/1p1p3p/1N1P1p1E/B7/8/P2PPPPP/1RBQKBNR[AEa] w KkqCDFGbfg - 0 15";
+const DOUBLE_CHECK_GATE_2: &str =
+    "rnq1kbnr/2p1pp1p/pp1p3p/1N1P1p1E/B7/7E/P2PPPPP/1RBQKBNR[Aa] w KkqCDFGbfg - 0 16";
+
 /// `(depth, nodes)` rows confirmed identical between mce and FSF.
 struct Perft {
     fen: &'static str,
@@ -96,6 +108,23 @@ fn drops_and_gates_shallow_matches_fsf() {
 #[test]
 fn promoted_revert_shallow_matches_fsf() {
     check(&PROMOTED_REVERT_PERFT, 3);
+}
+
+/// Regression for issue #363: a king fleeing a **discovered double check** off
+/// its virgin gating square must still be able to gate a held piece onto the
+/// vacated square. Both FENs' `perft(2)` are the FSF-confirmed counts (the
+/// differing move is the gated king escape `e8d8h`, worth exactly one extra node
+/// per position, so each total was short by 2 before the fix).
+#[test]
+fn double_check_gating_matches_fsf() {
+    for (fen, want) in [(DOUBLE_CHECK_GATE_1, 5649), (DOUBLE_CHECK_GATE_2, 3813)] {
+        let pos = Shouse::from_fen(fen).expect("S-House FEN parses");
+        assert_eq!(
+            gperft::<Chess8x8, _>(&pos, 2),
+            want,
+            "S-House double-check gating perft(2) for FEN {fen}",
+        );
+    }
 }
 
 #[test]
