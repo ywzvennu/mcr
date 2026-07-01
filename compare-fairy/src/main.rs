@@ -41,6 +41,7 @@ mod fogofwar;
 mod gorogoro;
 mod grand;
 mod grandhouse;
+mod hachu;
 mod hoppelpoppel;
 mod janggi;
 mod jieqi;
@@ -48,6 +49,7 @@ mod khans;
 mod knightmate;
 mod kyotoshogi;
 mod locate;
+mod locate_hachu;
 mod makpong;
 mod makruk;
 mod manchu;
@@ -72,6 +74,7 @@ mod synochess;
 mod tori;
 mod uci;
 mod variants;
+mod xboard;
 mod xiangfu;
 mod xiangqi;
 
@@ -92,6 +95,11 @@ struct Opts {
     difffuzz: bool,
     /// Differential-fuzzer tunables (only meaningful when `difffuzz` is set).
     fuzz: difffuzz::Config,
+    /// Run the HaChu large-shogi differential-oracle mode (issue #379) instead of
+    /// the FSF comparison.
+    hachu: bool,
+    /// Allow cloning + building HaChu if no binary is found (HaChu mode only).
+    build_hachu: bool,
 }
 
 /// A single measured comparison row.
@@ -133,6 +141,19 @@ impl Row {
 
 fn main() {
     let opts = parse_args();
+
+    // ---- HaChu large-shogi differential-oracle mode (issue #379) ----------
+    // Independent of FSF: HaChu covers the large-shogi variants (Chu / Dai /
+    // Tenjiku) that FSF does not, so this mode locates/drives HaChu on its own
+    // and never touches the FSF path below.
+    if opts.hachu {
+        println!("mce vs HaChu — large-shogi differential oracle (issue #379)");
+        let mismatches = hachu::run(opts.build_hachu);
+        if mismatches > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
 
     println!("mce vs Fairy-Stockfish — perft comparison harness (issue #158)");
     #[cfg(feature = "magic")]
@@ -385,12 +406,19 @@ fn parse_args() -> Opts {
         full: false,
         difffuzz: false,
         fuzz: difffuzz::Config::default(),
+        hachu: false,
+        build_hachu: false,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--build" => o.build = true,
             "--full" => o.full = true,
+            "--hachu" => o.hachu = true,
+            "--build-hachu" => {
+                o.hachu = true;
+                o.build_hachu = true;
+            }
             "--difffuzz" | "--fuzz" => o.difffuzz = true,
             "--seed" => o.fuzz.seed = parse_value(&mut args, "--seed", parse_seed),
             "--games" => o.fuzz.games = parse_value(&mut args, "--games", |s| s.parse().ok()),
@@ -401,8 +429,16 @@ fn parse_args() -> Opts {
             "--help" | "-h" => {
                 println!("usage: compare-fairy [--build] [--full]");
                 println!("       compare-fairy --difffuzz [--seed N] [--games K] [--plies P] [--variant X]");
-                println!("  --build    : clone + build Fairy-Stockfish if no binary is found");
-                println!("  --full     : one ply deeper per position");
+                println!("       compare-fairy --hachu [--build-hachu]");
+                println!("  --build       : clone + build Fairy-Stockfish if no binary is found");
+                println!("  --full        : one ply deeper per position");
+                println!(
+                    "  --hachu       : run the HaChu large-shogi differential-oracle mode (issue #379)"
+                );
+                println!(
+                    "  --build-hachu : clone + build HaChu if no binary is found (implies --hachu)"
+                );
+                println!("  env MCE_HACHU_BIN=<path> selects an existing HaChu binary");
                 println!("  --difffuzz : seeded random-game perft(1..2)+divide fuzzer vs FSF (issue #239)");
                 println!("  --seed N   : fuzzer base seed (decimal or 0x-hex; default 0x239)");
                 println!("  --games K  : random games per variant (default 3)");
