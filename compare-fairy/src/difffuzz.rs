@@ -224,6 +224,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::dragon::fen_to_fsf,
     },
     Spec {
+        // Embassy shares Capablanca's `e -> c` chancellor rewrite (same 10x8
+        // Chancellor + Archbishop army, king on the e-file).
+        id: WideVariantId::Embassy,
+        fsf: "embassy",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Empire,
         fsf: "empire",
         needs_ini: true,

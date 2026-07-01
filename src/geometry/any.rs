@@ -23,12 +23,12 @@ use core::str::FromStr;
 
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Chak, Chennis, Dobutsu, Dragon, Duck, Empire, FogOfWar, GenericPosition, Geometry, Gorogoro,
-    Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong,
-    Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan,
-    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
-    Synochess, Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu,
-    Xiangqi,
+    Chak, Chennis, Dobutsu, Dragon, Duck, Embassy, Empire, FogOfWar, GenericPosition, Geometry,
+    Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate,
+    Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror,
+    Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse,
+    Sittuyin, Spartan, Synochess, Tori, WideEndReason, WideFenError, WideMove, WideOutcome,
+    WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -402,6 +402,7 @@ wide_variants! {
     Dobutsu, Dobutsu, "dobutsu";
     Dragon, Dragon, "dragon";
     Duck, Duck, "duck";
+    Embassy, Embassy, "embassy";
     Empire, Empire, "empire";
     FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
@@ -479,7 +480,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 50, "all 50 fairy variants are covered");
+        assert_eq!(count, 51, "all 51 fairy variants are covered");
     }
 
     #[test]
@@ -644,6 +645,7 @@ mod tests {
         agrees_with_typed!(WideVariantId::Dobutsu, Dobutsu, AnyWideVariant::Dobutsu, 2);
         agrees_with_typed!(WideVariantId::Dragon, Dragon, AnyWideVariant::Dragon, 2);
         agrees_with_typed!(WideVariantId::Duck, Duck, AnyWideVariant::Duck, 2);
+        agrees_with_typed!(WideVariantId::Embassy, Embassy, AnyWideVariant::Embassy, 2);
         agrees_with_typed!(WideVariantId::Empire, Empire, AnyWideVariant::Empire, 2);
         agrees_with_typed!(
             WideVariantId::FogOfWar,
