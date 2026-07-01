@@ -230,6 +230,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::chennis::to_fsf_dialect,
     },
     Spec {
+        // Chigorin shares Capablanca's `e -> c` chancellor rewrite (White's only
+        // non-standard piece is the Rook+Knight Chancellor).
+        id: WideVariantId::Chigorin,
+        fsf: "chigorin",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Dobutsu,
         fsf: "dobutsu",
         needs_ini: false,
