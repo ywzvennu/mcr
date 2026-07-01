@@ -13,6 +13,10 @@ API is still maturing toward 1.0.
 
 - Further engine milestones (M11–M13) are in progress and will land in later
   releases; this section collects changes since 0.3.0.
+- **Chancellor chess** (`chancellor`) — standard western chess on a 9×9 board
+  (a new `Chess9x9` geometry) with a Rook + Knight Chancellor added to each back
+  rank, promotion including the Chancellor. Move generation verified node-for-node
+  against Fairy-Stockfish (`UCI_Variant chancellor`).
 
 ## [0.3.0] — 2026-06-30
 

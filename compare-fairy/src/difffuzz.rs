@@ -224,6 +224,15 @@ const SPECS: &[Spec] = &[
         dialect: crate::chak::to_fsf_dialect,
     },
     Spec {
+        // Chancellor chess (9x9) shares Capablanca's `e -> c` chancellor rewrite
+        // (its only non-standard piece is the Rook+Knight Chancellor). A FSF
+        // built-in, so no `variants.ini` is required.
+        id: WideVariantId::Chancellor,
+        fsf: "chancellor",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Chennis,
         fsf: "chennis",
         needs_ini: true,

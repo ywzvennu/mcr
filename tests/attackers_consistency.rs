@@ -40,17 +40,17 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
-    CapahouseRules, ChakRules, ChennisRules, DobutsuRules, DragonRules, DuckRules, EmpireRules,
-    FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules,
-    HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules, KnightmateRules, KyotoshogiRules,
-    MakpongRules, MakrukRules, ManchuRules, MansindamRules, MinishogiRules, MinixiangqiRules,
-    OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules,
-    ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
+    CapahouseRules, ChakRules, ChancellorRules, ChennisRules, DobutsuRules, DragonRules, DuckRules,
+    EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules,
+    GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules, KnightmateRules,
+    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MansindamRules, MinishogiRules,
+    MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules,
+    ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
     SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WashogiRules,
     WideRole, WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
+    Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
     Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11, Xiangqi9x10,
 };
 use mce::Color;
@@ -443,6 +443,29 @@ variant_test!(
         "r4k3r/pppppppppp/10/10/10/10/PPPPPPPPPP/R4K3R w KQkq - 0 1",
         "1nabqkben1/p1ppppppp1/1r6r1/1p6p1/3PP5/2N4N2/PPP2PPPPP/R1ABQKBE1R w KQ - 0 5",
         "5k4/4P5/10/10/10/10/10/5K4 w - - 0 1",
+    ]
+);
+
+// -- Chancellor (9x9) -------------------------------------------------------
+//
+// Chancellor chess is standard western chess widened to 9x9 with a Rook + Knight
+// Chancellor (`e` / `WideRole::Elephant`, geometrically symmetric) added to each
+// back rank, so only the pawn is colour-directional, exactly as standard chess.
+// This guards that the compound `role_attacks` and the `attackers_to` reverse-
+// projection agree on the distinct [`Chess9x9`] geometry. The corpus (mce dialect,
+// chancellor `e`) pairs a castling position with a developed midgame and a
+// promotion position, reusing the FSF-confirmed FENs from
+// `tests/perft_chancellor.rs`.
+
+variant_test!(
+    chancellor,
+    Chess9x9,
+    ChancellorRules,
+    "chancellor",
+    [
+        "r3k3r/9/9/9/9/9/9/9/R3K3R w KQkq - 0 1",
+        "r1bqke1br/ppp2pppp/2n2n3/3pp4/9/3PP4/2N2N3/PPP2PPPP/R1BQKE1BR w KQkq - 0 5",
+        "4k4/P8/9/9/9/9/9/9/4K4 w - - 0 1",
     ]
 );
 
