@@ -541,6 +541,34 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// A **board-aware** override of a role's pure **threat** set — the squares it
+    /// attacks / checks / could capture on — as distinct from its full *move* set
+    /// ([`role_attacks_board`](WideVariant::role_attacks_board)). Returning `None`
+    /// falls back to the occupancy-only [`role_attacks`](WideVariant::role_attacks).
+    ///
+    /// Only consulted when [`uses_board_attacks`](WideVariant::uses_board_attacks)
+    /// is `true`, and only on the threat-detection paths
+    /// ([`attackers_to`](crate::geometry::position::GenericPosition::attackers_to)
+    /// and the king-safety verify), never during move generation.
+    ///
+    /// The default returns [`role_attacks_board`](WideVariant::role_attacks_board),
+    /// so Janggi — whose cannon's move set and threat set coincide — is
+    /// byte-identical. A variant whose **move set differs from its threat set** must
+    /// override this. Empire's "move like a Queen, capture short" pieces are the
+    /// case: their move set folds in quiet Queen slides onto empty squares, which are
+    /// *not* threats (a piece reachable only by the quiet Queen move is not under
+    /// attack), so projecting the full move set from an empty square (a castling
+    /// transit / destination) would invent a phantom attacker. Empire overrides this
+    /// to return just the short capture pattern — the squares it genuinely threatens.
+    fn role_threats_board(
+        role: WideRole,
+        color: Color,
+        sq: Square<G>,
+        board: &Board<G>,
+    ) -> Option<Bitboard<G>> {
+        Self::role_attacks_board(role, color, sq, board)
+    }
+
     /// A **board-aware** override of the
     /// [`quiet_only_targets`](WideVariant::quiet_only_targets) set for a `role` of
     /// `color` on `sq`, returning `None` to fall back to the occupancy-only hook.

@@ -235,6 +235,32 @@ impl WideVariant<Chess8x8> for EmpireRules {
         Some(quiet_queen | captures)
     }
 
+    fn role_threats_board(
+        role: WideRole,
+        color: Color,
+        sq: Square<Chess8x8>,
+        board: &Board<Chess8x8>,
+    ) -> Option<Bitboard<Chess8x8>> {
+        // The pure **threat** set of an Empire piece is just its short capture
+        // pattern — never its Queen move. `role_attacks_board` (the *move* set) folds
+        // in the quiet Queen slides onto empty squares, which are reachable but not
+        // attacked: a piece an Empire mover could only ever *step* to (not capture) is
+        // not under threat. The threat-detection paths (`attackers_to`, king-safety)
+        // must therefore project only the capture pattern, or an empty square on the
+        // Queen-move diagonal of, say, a Tower (which captures only like a Rook) would
+        // be flagged as attacked — wrongly forbidding a king from castling onto or
+        // through it (issue #359). The king-safety caller sits the king on an
+        // occupied square, where this agrees with the move set; only an empty query
+        // square (a castling transit / destination) exposed the divergence. Returns
+        // the bare capture pattern (not masked by enemy occupancy): a threat covers
+        // any square the piece could capture on, occupied or not.
+        if !Self::is_empire_piece(role) {
+            let _ = color;
+            return None;
+        }
+        Some(Self::capture_pattern(role, sq, board.occupied()))
+    }
+
     fn role_attack_is_leg_asymmetric(role: WideRole) -> bool {
         // The Empire pieces' threat set is their short capture pattern, which is not
         // the same as their (Queen) move pattern — so `attackers_to` /
