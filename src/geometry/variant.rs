@@ -778,6 +778,37 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Cannon-royal fast-accept diagonal cap (default OFF) ----------------
+
+    /// Returns `Some(radius)` if this cannon-royal variant has **no long-range
+    /// diagonal attacker on the king** — no piece slides to the king down a board
+    /// diagonal — so the cannon king-safety fast-accept may **truncate the king's
+    /// diagonals to `radius` squares** per direction. Returns `None` (the default)
+    /// for every variant with a diagonal slider (a bishop / queen), keeping the
+    /// full board-length diagonals.
+    ///
+    /// On the per-move verify path ([`has_cannons`](WideVariant::has_cannons) /
+    /// [`has_flying_general`](WideVariant::has_flying_general)) a move whose origin
+    /// and destination both lie off every line through the king is accepted
+    /// without a make/unmake re-test, because it can change no blocker, screen, or
+    /// open file bearing on the king. That set of "king lines" is the king's rank,
+    /// file, and two diagonals. When the variant has no diagonal slider, the only
+    /// diagonal squares whose occupancy can ever change the king's safety are the
+    /// few near ones: a hobbled leaper's leg and a palace screen, all within a
+    /// small fixed radius (the Horse's leg is the king's diagonal neighbour; the
+    /// Janggi Elephant's two legs lie within two diagonal steps; the cannon's
+    /// palace-diagonal screen and a palace-diagonal chariot blocker are one step
+    /// away). Capping the diagonals at that radius drops only far-diagonal squares
+    /// that provably cannot bear on the king, so it widens the fast-accept while
+    /// leaving the authoritative king-safety scan — and therefore the legal move
+    /// set — byte-identical.
+    ///
+    /// Janggi and Xiangqi (cannon, hobbled leapers, palace, no bishop) return
+    /// `Some(2)`; every other variant keeps the default `None`.
+    fn king_diag_attack_radius() -> Option<u8> {
+        None
+    }
+
     // --- Makpong king-may-not-flee-check (default OFF) --------------------
 
     /// Returns `true` if this variant forbids the king from **fleeing** a check:

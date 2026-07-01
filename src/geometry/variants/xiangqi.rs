@@ -344,6 +344,17 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         true
     }
 
+    fn king_diag_attack_radius() -> Option<u8> {
+        // Xiangqi has no diagonal slider: the only diagonal threats to the general
+        // are the Elephant's blocked two-step jump (its eye one diagonal step away)
+        // and the Horse's hobbled leg (the king's diagonal neighbour) — every
+        // diagonal square that can bear on the general lies within two diagonal
+        // steps. The flying-general attack travels the (full-length, uncapped) file.
+        // So capping the fast-accept king diagonals at two squares is exact — see
+        // [`WideVariant::king_diag_attack_radius`].
+        Some(2)
+    }
+
     fn extra_royal_attack(
         board: &Board<Xiangqi9x10>,
         sq: Square<Xiangqi9x10>,
