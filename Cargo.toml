@@ -112,6 +112,17 @@ proptest = "1"
 # Exercises the round-trips in the feature-gated serde tests.
 serde_json = "1"
 
+# A thin UCI-ish adapter that drives the library over stdin/stdout — the mirror
+# image of the `compare-fairy` harness (which speaks UCI *to* Fairy-Stockfish).
+# It is a pure CONSUMER of the public API and adds nothing to the library's
+# dependency graph or rules. `doc = false` keeps it out of the rustdoc surface;
+# its inline unit tests still run under `cargo test`.
+[[bin]]
+name = "mce-uci"
+path = "src/bin/mce-uci.rs"
+doc = false
+bench = false
+
 [[bench]]
 name = "movegen"
 harness = false
