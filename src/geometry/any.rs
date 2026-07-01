@@ -22,8 +22,8 @@ use alloc::{string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
-    perft, Alice, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse, Chak, Chennis,
-    Dobutsu, Dragon, Duck, Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Grand,
+    perft, Alice, Almost, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse, Chak,
+    Chennis, Dobutsu, Dragon, Duck, Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Grand,
     Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk,
     Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako,
     Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori,
@@ -388,6 +388,7 @@ macro_rules! wide_variants {
 
 wide_variants! {
     Alice, Alice, "alice";
+    Almost, Almost, "almost", "almostchess";
     Asean, Asean, "asean";
     Bughouse, Bughouse, "bughouse", "bug";
     Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
@@ -475,7 +476,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 47, "all 47 fairy variants are covered");
+        assert_eq!(count, 48, "all 48 fairy variants are covered");
     }
 
     #[test]
@@ -602,6 +603,7 @@ mod tests {
     #[test]
     fn enum_dispatch_matches_typed_path_for_every_variant() {
         agrees_with_typed!(WideVariantId::Alice, Alice, AnyWideVariant::Alice, 2);
+        agrees_with_typed!(WideVariantId::Almost, Almost, AnyWideVariant::Almost, 2);
         agrees_with_typed!(WideVariantId::Asean, Asean, AnyWideVariant::Asean, 2);
         agrees_with_typed!(
             WideVariantId::Bughouse,

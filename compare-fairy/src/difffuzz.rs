@@ -120,6 +120,14 @@ fn identity(fen: &str) -> String {
 ///   it cannot be driven from an arbitrary fuzzed FEN.
 const SPECS: &[Spec] = &[
     Spec {
+        // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
+        // non-standard piece is the Rook+Knight Chancellor).
+        id: WideVariantId::Almost,
+        fsf: "almost",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Asean,
         fsf: "asean",
         needs_ini: false,
@@ -967,7 +975,7 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // 47 shipped variants minus the 3 by-design exclusions (Alice / Duck /
+        // Every shipped variant minus the 3 by-design exclusions (Alice / Duck /
         // Jieqi); the deeper-sweep follow-ups stay in SPECS but are skipped via
         // `HELD_BACK` on the default run.
         assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 3);
