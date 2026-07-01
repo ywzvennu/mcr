@@ -68,7 +68,24 @@ canonical names and aliases of `mce`'s `VariantId` (`"chess"`, `"chess960"` /
 | `mce_position_play_uci(pos, uci)` | `int` | `0` ok; `1` bad pointer/UTF-8; `2` illegal/malformed. Mutates `pos` in place. |
 | `mce_position_is_check(pos)` | `int` | `1` if side to move is in check, else `0`. |
 | `mce_position_outcome(pos)` | `MceOutcome` | `ONGOING`/`DRAW`/`WHITE_WINS`/`BLACK_WINS`. |
+| `mce_position_status(pos)` | `MceStatus` | `ONGOING`/`CHECKMATE`/`STALEMATE`/`VARIANT_WIN`/`DRAW` — the consolidated `GameStatus` (issue #372). |
 | `mce_perft(pos, depth)` | `uint64_t` | Leaf-node count; `depth == 0` returns `1`. |
+| `mce_position_is_attacked(pos, square, side)` | `int` | `1`/`0` whether `side` attacks `square`; `-1` on a bad square/colour/handle. |
+| `mce_position_attackers(pos, square, side, buf, buflen)` | `size_t` | Space-separated squares of `side` pieces attacking `square` (two-call contract). |
+| `mce_position_attacks_from(pos, square, buf, buflen)` | `size_t` | Space-separated squares the piece on `square` attacks (two-call contract). |
+| `mce_position_mobility(pos, square)` | `int` | Count of squares the piece on `square` attacks; `-1` on error. |
+
+The fairy (geometry-layer) surface mirrors the same lifecycle and adds
+`mce_fairy_position_status`; the attack-query primitives are 8x8-only, so they
+have no fairy counterpart. `square` is algebraic (`"e4"`); `side` is `"white"` /
+`"black"` (case-insensitive).
+
+### End-to-end example
+
+`test.c` is a runnable end-to-end example: it loads the start position, lists
+legal moves, plays the Fool's-mate line to a checkmate, runs perft, reads the
+consolidated status, and exercises the analysis queries. Run it with
+`./build_test.sh`.
 
 ### Ownership
 

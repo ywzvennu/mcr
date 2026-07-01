@@ -64,6 +64,11 @@ zh = mce.Position.startpos("crazyhouse")
 | `is_stalemate()` | `bool` | |
 | `outcome()` | `str \| None` | `"1-0"`, `"0-1"`, `"1/2-1/2"` |
 | `end_reason()` | `str \| None` | e.g. `"checkmate"`, `"stalemate"` |
+| `status()` | `str` | consolidated `GameStatus`: `"ongoing"`/`"checkmate"`/`"stalemate"`/`"variant_win"`/`"draw"` |
+| `is_attacked(square, color)` | `bool` | whether `color` attacks `square` (analysis, issue #373) |
+| `attackers(square, color)` | `list[str]` | squares of `color` pieces attacking `square` |
+| `attacks_from(square)` | `list[str]` | squares the piece on `square` attacks |
+| `mobility(square)` | `int` | count of squares the piece on `square` attacks |
 | `san(uci)` | `str` | |
 | `parse_san(san)` | `str` | returns UCI |
 | `zobrist()` | `int` | 64-bit |
@@ -71,8 +76,28 @@ zh = mce.Position.startpos("crazyhouse")
 
 `mce.perft(position, depth) -> int`
 
-Invalid input (bad FEN, illegal/malformed UCI or SAN, unknown variant) raises
-`ValueError`; nothing panics across the boundary.
+`mce.FairyPosition(variant, fen=None)` mirrors `Position` for the geometry-layer
+fairy variants (xiangqi, shogi, janggi, …) and also exposes `status()`;
+`mce.variants()` lists the fairy names. The analysis queries are 8x8-only.
+Squares are algebraic (`"e4"`); colours are `"white"` / `"black"`.
+
+Invalid input (bad FEN, illegal/malformed UCI or SAN, unknown variant, a bad
+square or colour) raises `ValueError`; nothing panics across the boundary.
+
+## End-to-end example
+
+Load a FEN, list moves, play one, run perft, read the status — the full loop:
+
+```python
+import mce
+
+pos = mce.Position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+print(pos.legal_moves()[:5])          # ['a2a3', 'a2a4', 'b2b3', ...]
+print(pos.is_attacked("f3", "white")) # True (analysis query)
+pos.push("e2e4")
+print(mce.perft(pos, 2))              # node count after 1. e4
+print(pos.status())                   # 'ongoing'
+```
 
 ## Tests
 

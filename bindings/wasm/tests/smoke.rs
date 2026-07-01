@@ -57,10 +57,48 @@ fn play_advances_and_reaches_mate() {
 
     assert!(g.is_check());
     assert!(g.is_checkmate());
+    assert_eq!(g.status(), "checkmate");
     let out = g.outcome().expect("game over");
     assert_eq!(out.kind, "decisive");
     assert_eq!(out.winner.as_deref(), Some("black"));
     assert_eq!(out.reason.as_deref(), Some("checkmate"));
+}
+
+#[test]
+fn status_and_analysis_queries() {
+    let g = Game::startpos(None).expect("startpos");
+    assert_eq!(g.status(), "ongoing");
+
+    // Analysis (issue #373): White attacks f3 but not e4 in the start position.
+    assert!(g.is_attacked("f3", "white").expect("is_attacked f3"));
+    assert!(!g.is_attacked("e4", "white").expect("is_attacked e4"));
+
+    // Attackers of f3 by White: g1 knight + e2/g2 pawns.
+    let mut attackers = g.attackers("f3", "white").expect("attackers");
+    attackers.sort();
+    assert_eq!(attackers, vec!["e2", "g1", "g2"]);
+    assert!(g
+        .attackers("f3", "black")
+        .expect("black attackers")
+        .is_empty());
+
+    // The g1 knight attacks e2 (own pawn, defended), f3 and h3.
+    let mut from = g.attacks_from("g1").expect("attacks_from g1");
+    from.sort();
+    assert_eq!(from, vec!["e2", "f3", "h3"]);
+    assert_eq!(g.mobility("g1").expect("mobility g1"), 3);
+    assert_eq!(g.mobility("e4").expect("mobility e4"), 0);
+
+    // Analysis also works for other 8x8 variants via the core position.
+    let atomic = Game::startpos(Some("atomic".to_owned())).expect("atomic");
+    assert_eq!(atomic.status(), "ongoing");
+    assert!(atomic
+        .is_attacked("f3", "white")
+        .expect("atomic is_attacked"));
+
+    // Stalemate is reported as a draw status.
+    let stale = Game::from_fen("k7/2K5/1Q6/8/8/8/8/8 b - - 0 1", None).expect("stalemate fen");
+    assert_eq!(stale.status(), "stalemate");
 }
 
 #[test]
@@ -99,6 +137,7 @@ fn fairy_startpos_and_perft_match_known_counts() {
     assert_eq!(xq.perft(1), "44");
     assert_eq!(xq.perft(2), "1920");
     assert_eq!(xq.perft(3), "79666");
+    assert_eq!(xq.status(), "ongoing");
 
     // A second geometry (9x9 Shogi) via an alias-free name (tests/perft_shogi.rs).
     let shogi = FairyGame::startpos("shogi").expect("shogi startpos");

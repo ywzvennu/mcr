@@ -14,13 +14,74 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use mce::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
-use mce::{AnyVariant, Color, EndReason, Outcome, Position, VariantId};
+use mce::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
 use wasm_bindgen::prelude::*;
 
 /// Map a value that implements [`core::fmt::Display`] (every mce error type does)
 /// into a JS exception carrying its message.
 fn js_err(e: impl core::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
+}
+
+/// Parses an algebraic square (`"e4"`) into a [`Square`], throwing on a
+/// malformed square.
+fn parse_square(s: &str) -> Result<Square, JsError> {
+    s.parse::<Square>().map_err(js_err)
+}
+
+/// Parses a colour name (`"white"` / `"black"`, case-insensitive) into a
+/// [`Color`], throwing otherwise.
+fn parse_color_name(s: &str) -> Result<Color, JsError> {
+    match s.to_ascii_lowercase().as_str() {
+        "white" | "w" => Ok(Color::White),
+        "black" | "b" => Ok(Color::Black),
+        _ => Err(JsError::new(&format!(
+            "invalid colour {s:?}: expected \"white\" or \"black\""
+        ))),
+    }
+}
+
+/// Reaches the standard-chess core [`Position`] inside an [`AnyVariant`] — a safe
+/// match over the public enum arms, each of which wraps a `VariantPosition`
+/// whose `.core()` exposes the underlying 8x8 board (where the attack queries
+/// live).
+fn variant_core(av: &AnyVariant) -> &Position {
+    match av {
+        AnyVariant::Chess(p) => p.core(),
+        AnyVariant::Chess960(p) => p.core(),
+        AnyVariant::KingOfTheHill(p) => p.core(),
+        AnyVariant::ThreeCheck(p) => p.core(),
+        AnyVariant::RacingKings(p) => p.core(),
+        AnyVariant::Horde(p) => p.core(),
+        AnyVariant::Atomic(p) => p.core(),
+        AnyVariant::Antichess(p) => p.core(),
+        AnyVariant::Crazyhouse(p) => p.core(),
+    }
+}
+
+/// The consolidated `GameStatus` label (issue #372) for a standard position,
+/// folding `(end_reason, outcome)` into one of `"ongoing"`, `"checkmate"`,
+/// `"stalemate"`, `"variant_win"`, or `"draw"`.
+fn status_str(reason: Option<EndReason>, outcome: Option<Outcome>) -> &'static str {
+    match (reason, outcome) {
+        (Some(EndReason::Checkmate), Some(Outcome::Decisive { .. })) => "checkmate",
+        (Some(EndReason::Stalemate), Some(Outcome::Draw)) => "stalemate",
+        (Some(_), Some(Outcome::Decisive { .. })) => "variant_win",
+        (Some(_), Some(Outcome::Draw)) => "draw",
+        _ => "ongoing",
+    }
+}
+
+/// The consolidated `GameStatus` label for a fairy position — the geometry-layer
+/// analogue of [`status_str`].
+fn wide_status_str(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) -> &'static str {
+    match (reason, outcome) {
+        (Some(WideEndReason::Checkmate), Some(WideOutcome::Decisive { .. })) => "checkmate",
+        (Some(WideEndReason::Stalemate), Some(WideOutcome::Draw)) => "stalemate",
+        (Some(_), Some(WideOutcome::Decisive { .. })) => "variant_win",
+        (Some(_), Some(WideOutcome::Draw)) => "draw",
+        _ => "ongoing",
+    }
 }
 
 /// Stable lowercase string for a colour, matching mce's own `Display`.
@@ -226,6 +287,57 @@ impl Game {
     pub fn perft(&self, depth: u32) -> String {
         self.inner.perft(depth).to_string()
     }
+
+    /// The consolidated game status (issue #372): one of `"ongoing"`,
+    /// `"checkmate"`, `"stalemate"`, `"variant_win"`, `"draw"`. The winner for a
+    /// decisive status is available from [`Game::outcome`].
+    #[wasm_bindgen(js_name = status)]
+    pub fn status(&self) -> String {
+        status_str(self.inner.end_reason(), self.inner.outcome()).to_owned()
+    }
+
+    /// Whether `square` (algebraic, e.g. `"e4"`) is attacked by any piece of
+    /// `color` (`"white"`/`"black"`). A rules-only analysis query (issue #373).
+    /// Throws on a bad square or colour.
+    #[wasm_bindgen(js_name = isAttacked)]
+    pub fn is_attacked(&self, square: &str, color: &str) -> Result<bool, JsError> {
+        let sq = parse_square(square)?;
+        let c = parse_color_name(color)?;
+        Ok(variant_core(&self.inner).is_attacked(sq, c))
+    }
+
+    /// The squares (algebraic) of `color` pieces that attack `square`. Throws on
+    /// a bad square or colour.
+    #[wasm_bindgen(js_name = attackers)]
+    pub fn attackers(&self, square: &str, color: &str) -> Result<Vec<String>, JsError> {
+        let sq = parse_square(square)?;
+        let c = parse_color_name(color)?;
+        let p = variant_core(&self.inner);
+        Ok(p.attackers_to(sq, c, p.board().occupied())
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
+    }
+
+    /// The squares (algebraic) attacked by the piece standing on `square` (empty
+    /// if the square is empty). Throws on a bad square.
+    #[wasm_bindgen(js_name = attacksFrom)]
+    pub fn attacks_from(&self, square: &str) -> Result<Vec<String>, JsError> {
+        let sq = parse_square(square)?;
+        Ok(variant_core(&self.inner)
+            .attacks_from(sq)
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
+    }
+
+    /// The mobility of the piece on `square`: how many squares it attacks (`0`
+    /// if empty). Throws on a bad square.
+    #[wasm_bindgen(js_name = mobility)]
+    pub fn mobility(&self, square: &str) -> Result<u32, JsError> {
+        let sq = parse_square(square)?;
+        Ok(variant_core(&self.inner).attacks_from(sq).count())
+    }
 }
 
 impl Game {
@@ -402,5 +514,12 @@ impl FairyGame {
     #[wasm_bindgen(js_name = perft)]
     pub fn perft(&self, depth: u32) -> String {
         self.inner.perft(depth).to_string()
+    }
+
+    /// The consolidated game status (issue #372): one of `"ongoing"`,
+    /// `"checkmate"`, `"stalemate"`, `"variant_win"`, `"draw"`.
+    #[wasm_bindgen(js_name = status)]
+    pub fn status(&self) -> String {
+        wide_status_str(self.inner.end_reason(), self.inner.outcome()).to_owned()
     }
 }

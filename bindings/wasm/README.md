@@ -22,13 +22,36 @@ A single `Game` class (backed by mce's runtime `AnyVariant` dispatch):
 | `game.isCheck()` | `boolean` | |
 | `game.isCheckmate()` | `boolean` | Standard mate; variant wins surface via `outcome()`. |
 | `game.outcome()` | `GameOutcome \| null` | `{ kind: "decisive"\|"draw", winner: string\|null, reason: string\|null }`. |
+| `game.status()` | `string` | Consolidated `GameStatus` (issue #372): `"ongoing"`/`"checkmate"`/`"stalemate"`/`"variant_win"`/`"draw"`. |
+| `game.isAttacked(square, color)` | `boolean` | Whether `color` attacks `square` (analysis, issue #373). |
+| `game.attackers(square, color)` | `string[]` | Squares of `color` pieces attacking `square`. |
+| `game.attacksFrom(square)` | `string[]` | Squares the piece on `square` attacks. |
+| `game.mobility(square)` | `number` | Count of squares the piece on `square` attacks. |
 | `game.san(uci)` | `string` | UCI → SAN. Standard / Chess960 only. |
 | `game.parseSan(san)` | `string` | SAN → UCI. Standard / Chess960 only. |
 | `game.zobrist()` | `string` | 16-digit hex (string, since `u64` exceeds JS exact-int range). |
 | `game.perft(depth)` | `string` | Node count as a string (precision-safe). |
 
+A parallel `FairyGame` class covers the geometry-layer fairy variants (xiangqi,
+shogi, janggi, …) with the same lifecycle plus `status()`; `FairyGame.variants()`
+lists the names. The analysis queries are 8x8-only. Squares are algebraic
+(`"e4"`); colours are `"white"` / `"black"`.
+
 Every fallible method returns a `Result<_, JsError>` in Rust, i.e. it **throws a
 JS exception** on bad input — nothing panics across the boundary.
+
+### End-to-end example (Node or browser)
+
+```js
+import { Game } from "./pkg/mce_wasm.js";
+
+const g = Game.fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+console.log(g.legalMoves().slice(0, 3)); // ["a2a3", "a2a4", "b2b3"]
+console.log(g.isAttacked("f3", "white")); // true (analysis)
+g.push("e2e4");
+console.log(g.perft(2));                  // node count after 1. e4
+console.log(g.status());                  // "ongoing"
+```
 
 ## Build
 
