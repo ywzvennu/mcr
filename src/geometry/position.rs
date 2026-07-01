@@ -4772,7 +4772,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else if V::has_first_move_leaps() {
             V::write_first_move_rights(self.state.castling, &mut out);
         } else {
-            write_castling(self.state.castling, &mut out);
+            write_castling::<G, V>(self.state.castling, &mut out);
         }
         out.push(' ');
         match self.state.ep_square {
@@ -5488,8 +5488,43 @@ fn parse_castling<G: Geometry, V: WideVariant<G>>(
     Ok(rights)
 }
 
-/// Writes the castling field in `KQkq` order, or `-` if no rights remain.
-fn write_castling(castling: GenericCastling, out: &mut String) {
+/// Writes the castling field, or `-` if no rights remain.
+///
+/// The default is `KQkq` order. A [`shredder_castling_fen`](WideVariant::shredder_castling_fen)
+/// variant (Caparandom) instead writes explicit rook-**file** letters — uppercase
+/// for White, lowercase for Black, in the same king-side-then-queen-side per-colour
+/// order — so its arbitrary rook files round-trip and match Fairy-Stockfish (e.g.
+/// the Capablanca-random startpos renders `JAja`).
+fn write_castling<G: Geometry, V: WideVariant<G>>(castling: GenericCastling, out: &mut String) {
+    if !V::shredder_castling_fen() {
+        write_castling_kqkq(castling, out);
+        return;
+    }
+    let before = out.len();
+    for (color, side) in [
+        (Color::White, KINGSIDE),
+        (Color::White, QUEENSIDE),
+        (Color::Black, KINGSIDE),
+        (Color::Black, QUEENSIDE),
+    ] {
+        if let Some(file) = castling.rook_file(color, side) {
+            let letter = (b'a' + file) as char;
+            out.push(if color.is_white() {
+                letter.to_ascii_uppercase()
+            } else {
+                letter
+            });
+        }
+    }
+    if out.len() == before {
+        out.push('-');
+    }
+}
+
+/// Writes the castling field in the standard `KQkq` order, or `-` if no rights
+/// remain. The default form for every non-Shredder variant, and the castling part
+/// of a gating variant's combined field.
+fn write_castling_kqkq(castling: GenericCastling, out: &mut String) {
     let before = out.len();
     if castling.rook_file(Color::White, KINGSIDE).is_some() {
         out.push('K');
@@ -5750,8 +5785,8 @@ fn write_castling_and_gating<G: Geometry>(
     out: &mut String,
 ) {
     let before = out.len();
-    write_castling(castling, out);
-    // `write_castling` writes `-` for no rights; strip it so we can append gating
+    write_castling_kqkq(castling, out);
+    // `write_castling_kqkq` writes `-` for no rights; strip it so we can append gating
     // letters (and re-add `-` only if nothing at all is written below).
     if out.ends_with('-') {
         out.pop();

@@ -218,6 +218,15 @@ const SPECS: &[Spec] = &[
         dialect: crate::capahouse::fen_to_fsf,
     },
     Spec {
+        // Caparandom shares Capablanca's `e -> c` chancellor rewrite (same 10x8
+        // army); its file-letter (`JAja`) castling field carries no piece letters,
+        // so the placement-only rewrite leaves it untouched.
+        id: WideVariantId::Caparandom,
+        fsf: "caparandom",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Chak,
         fsf: "chak",
         needs_ini: true,

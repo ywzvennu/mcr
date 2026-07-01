@@ -4,7 +4,7 @@
 //! the make/unmake / attackers suites guard one property each, this suite asserts
 //! the *structural* invariants that must hold at **every** reachable position of
 //! **every** registered fairy variant — the whole [`WideVariantId::ALL`] table in
-//! `src/geometry/any.rs` (53 variants, from 3x4 Dobutsu to 11x11-backed boards,
+//! `src/geometry/any.rs` (54 variants, from 3x4 Dobutsu to 11x11-backed boards,
 //! spanning drops, gating, placement, the Duck, the Janggi pass, and Alice's two
 //! planes). It is additive: it drives only the public API and changes no
 //! generation path, so existing movegen stays byte-identical.
@@ -222,7 +222,7 @@ fn assert_make_unmake_node<G: Geometry, V: WideVariant<G>>(
 }
 
 /// Drives seeded random self-play from `start`, asserting every invariant at each
-/// visited node. Generic over the variant so one body serves all 53.
+/// visited node. Generic over the variant so one body serves all 54.
 fn drive<G: Geometry, V: WideVariant<G>>(
     start: GenericPosition<G, V>,
     variant: &str,
@@ -369,7 +369,7 @@ fn walk_inputs() -> impl Strategy<Value = (WideVariantId, u64, u32)> {
 
 proptest! {
     // Modest case count: each case walks many nodes, so this stays fast in CI
-    // while exercising the invariants broadly across all 53 variants.
+    // while exercising the invariants broadly across all 54 variants.
     #![proptest_config(ProptestConfig::with_cases(192))]
 
     /// FEN fixed point and path-independent hash across every variant, via the

@@ -297,6 +297,22 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         }
     }
 
+    /// Returns `true` if the castling FEN field is written in **Shredder** form —
+    /// explicit rook-**file** letters, uppercase for White and lowercase for Black
+    /// (e.g. `JAja`) — rather than the standard `KQkq`.
+    ///
+    /// A Chess960-style shuffled variant (Caparandom) whose king and rooks start on
+    /// arbitrary files sets this so its castling rights round-trip unambiguously and
+    /// its FEN matches Fairy-Stockfish's own file-letter output byte-for-byte. The
+    /// reader accepts both forms regardless (`KQkq` is read as the outermost rook on
+    /// each side of the king); only the *writer* is switched here.
+    ///
+    /// The default is `false`, so every standard-castling variant keeps the `KQkq`
+    /// field it always emitted and stays byte-identical.
+    fn shredder_castling_fen() -> bool {
+        false
+    }
+
     /// Returns the set of royal squares of `color` whose safety defines check.
     ///
     /// The default is every king of `color` (one in standard chess). Multi-king
