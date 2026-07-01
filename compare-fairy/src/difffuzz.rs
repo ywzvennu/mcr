@@ -242,6 +242,14 @@ const SPECS: &[Spec] = &[
         dialect: identity,
     },
     Spec {
+        // Gothic shares Capablanca's `e -> c` chancellor rewrite (same 10x8
+        // Chancellor + Archbishop army, different back-rank order).
+        id: WideVariantId::Gothic,
+        fsf: "gothic",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Grand,
         fsf: "grand",
         needs_ini: false,

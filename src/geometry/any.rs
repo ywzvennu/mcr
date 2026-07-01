@@ -24,10 +24,11 @@ use core::str::FromStr;
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
     Chak, Chennis, Dobutsu, Dragon, Duck, Empire, FogOfWar, GenericPosition, Geometry, Gorogoro,
-    Grand, Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk,
-    Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako,
-    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori,
-    WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong,
+    Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan,
+    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
+    Synochess, Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu,
+    Xiangqi,
 };
 use crate::Color;
 
@@ -404,6 +405,7 @@ wide_variants! {
     Empire, Empire, "empire";
     FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
+    Gothic, Gothic, "gothic";
     Grand, Grand, "grand";
     Grandhouse, Grandhouse, "grandhouse";
     HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
@@ -477,7 +479,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 49, "all 49 fairy variants are covered");
+        assert_eq!(count, 50, "all 50 fairy variants are covered");
     }
 
     #[test]
@@ -655,6 +657,7 @@ mod tests {
             AnyWideVariant::Gorogoro,
             2
         );
+        agrees_with_typed!(WideVariantId::Gothic, Gothic, AnyWideVariant::Gothic, 2);
         agrees_with_typed!(WideVariantId::Grand, Grand, AnyWideVariant::Grand, 2);
         agrees_with_typed!(
             WideVariantId::Grandhouse,
