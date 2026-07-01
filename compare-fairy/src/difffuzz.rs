@@ -106,6 +106,53 @@ fn identity(fen: &str) -> String {
     fen.to_string()
 }
 
+/// Amazon Chess dialect: mce spells the Amazon (Queen + Knight) with the
+/// second-bank overflow token `**a`/`**A`; FSF spells it `a`/`A`. Strip the `**`
+/// prefix from that token in the placement field; every other letter and field is
+/// identical.
+fn amazon_to_fsf(fen: &str) -> String {
+    let (placement, rest) = match fen.split_once(' ') {
+        Some((p, r)) => (p, Some(r)),
+        None => (fen, None),
+    };
+    let mut out = String::with_capacity(placement.len());
+    let mut chars = placement.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '*' && chars.peek() == Some(&'*') {
+            // A second-bank overflow token `**X`: consume the second `*`, then emit
+            // the base letter case-preserved (only `**a`/`**A`, the Amazon, occurs).
+            chars.next();
+            if let Some(base) = chars.next() {
+                out.push(base);
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    match rest {
+        Some(r) => format!("{out} {r}"),
+        None => out,
+    }
+}
+
+/// Janus Chess dialect: mce spells the Janus (Bishop + Knight) as its Hawk `a`/`A`;
+/// FSF spells it `j`/`J`. Rewrite that letter in the placement field; every other
+/// letter and field is identical.
+fn janus_to_fsf(fen: &str) -> String {
+    let map = |c: char| match c {
+        'a' => 'j',
+        'A' => 'J',
+        other => other,
+    };
+    match fen.split_once(' ') {
+        Some((placement, rest)) => {
+            let mapped: String = placement.chars().map(map).collect();
+            format!("{mapped} {rest}")
+        }
+        None => fen.chars().map(map).collect(),
+    }
+}
+
 /// Every variant the fuzzer cross-checks against FSF, each reusing its pinned-corpus
 /// module's dialect rewrite.
 ///
@@ -119,6 +166,21 @@ fn identity(fen: &str) -> String {
 ///   per-position identity reveal (see `jieqi.rs`), not a static dialect rewrite, so
 ///   it cannot be driven from an arbitrary fuzzed FEN.
 const SPECS: &[Spec] = &[
+    Spec {
+        // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
+        // non-standard piece is the Rook+Knight Chancellor).
+        id: WideVariantId::Almost,
+        fsf: "almost",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
+        // Amazon Chess: mce spells the Amazon `**a`; FSF spells it `a`.
+        id: WideVariantId::Amazon,
+        fsf: "amazon",
+        needs_ini: false,
+        dialect: amazon_to_fsf,
+    },
     Spec {
         id: WideVariantId::Asean,
         fsf: "asean",
@@ -168,6 +230,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::chennis::to_fsf_dialect,
     },
     Spec {
+        // Chigorin shares Capablanca's `e -> c` chancellor rewrite (White's only
+        // non-standard piece is the Rook+Knight Chancellor).
+        id: WideVariantId::Chigorin,
+        fsf: "chigorin",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Dobutsu,
         fsf: "dobutsu",
         needs_ini: false,
@@ -178,6 +248,14 @@ const SPECS: &[Spec] = &[
         fsf: "dragon",
         needs_ini: false,
         dialect: crate::dragon::fen_to_fsf,
+    },
+    Spec {
+        // Embassy shares Capablanca's `e -> c` chancellor rewrite (same 10x8
+        // Chancellor + Archbishop army, king on the e-file).
+        id: WideVariantId::Embassy,
+        fsf: "embassy",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
     },
     Spec {
         id: WideVariantId::Empire,
@@ -196,6 +274,14 @@ const SPECS: &[Spec] = &[
         fsf: "gorogoroplus",
         needs_ini: true,
         dialect: identity,
+    },
+    Spec {
+        // Gothic shares Capablanca's `e -> c` chancellor rewrite (same 10x8
+        // Chancellor + Archbishop army, different back-rank order).
+        id: WideVariantId::Gothic,
+        fsf: "gothic",
+        needs_ini: false,
+        dialect: crate::capablanca::fen_to_fsf,
     },
     Spec {
         id: WideVariantId::Grand,
@@ -220,6 +306,13 @@ const SPECS: &[Spec] = &[
         fsf: "janggi",
         needs_ini: false,
         dialect: crate::janggi::fen_to_fsf,
+    },
+    Spec {
+        // Janus: mce spells the Janus (Bishop + Knight) `a`; FSF spells it `j`.
+        id: WideVariantId::Janus,
+        fsf: "janus",
+        needs_ini: false,
+        dialect: janus_to_fsf,
     },
     Spec {
         id: WideVariantId::Khans,
@@ -967,7 +1060,7 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // 47 shipped variants minus the 3 by-design exclusions (Alice / Duck /
+        // Every shipped variant minus the 3 by-design exclusions (Alice / Duck /
         // Jieqi); the deeper-sweep follow-ups stay in SPECS but are skipped via
         // `HELD_BACK` on the default run.
         assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 3);
