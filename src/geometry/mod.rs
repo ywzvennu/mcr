@@ -46,6 +46,7 @@ mod notation;
 pub mod position;
 mod role;
 mod square;
+pub mod status;
 pub mod variant;
 pub mod variants;
 mod wide_move;
@@ -67,6 +68,7 @@ pub use position::{
 };
 pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use square::Square;
+pub use status::GameStatus;
 pub use variant::{
     PromotionConfig, RoyalSlider, StandardChess, WideCountingRule, WideEndReason, WideRegion,
     WideVariant,
