@@ -106,6 +106,35 @@ fn identity(fen: &str) -> String {
     fen.to_string()
 }
 
+/// Amazon Chess dialect: mce spells the Amazon (Queen + Knight) with the
+/// second-bank overflow token `**a`/`**A`; FSF spells it `a`/`A`. Strip the `**`
+/// prefix from that token in the placement field; every other letter and field is
+/// identical.
+fn amazon_to_fsf(fen: &str) -> String {
+    let (placement, rest) = match fen.split_once(' ') {
+        Some((p, r)) => (p, Some(r)),
+        None => (fen, None),
+    };
+    let mut out = String::with_capacity(placement.len());
+    let mut chars = placement.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '*' && chars.peek() == Some(&'*') {
+            // A second-bank overflow token `**X`: consume the second `*`, then emit
+            // the base letter case-preserved (only `**a`/`**A`, the Amazon, occurs).
+            chars.next();
+            if let Some(base) = chars.next() {
+                out.push(base);
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    match rest {
+        Some(r) => format!("{out} {r}"),
+        None => out,
+    }
+}
+
 /// Every variant the fuzzer cross-checks against FSF, each reusing its pinned-corpus
 /// module's dialect rewrite.
 ///
@@ -126,6 +155,13 @@ const SPECS: &[Spec] = &[
         fsf: "almost",
         needs_ini: false,
         dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
+        // Amazon Chess: mce spells the Amazon `**a`; FSF spells it `a`.
+        id: WideVariantId::Amazon,
+        fsf: "amazon",
+        needs_ini: false,
+        dialect: amazon_to_fsf,
     },
     Spec {
         id: WideVariantId::Asean,
