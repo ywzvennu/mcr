@@ -32,6 +32,7 @@ mod capahouse;
 mod chak;
 mod chennis;
 mod corpus;
+mod courier;
 mod difffuzz;
 mod dobutsu;
 mod dragon;
@@ -281,6 +282,10 @@ fn main() {
     // Shatranj is a FSF built-in (no variants.ini needed), like makruk; its mce
     // dialect (`*x`/`m`) is rewritten to FSF's `b`/`q` inside shatranj::run.
     let shatranj_mismatches = shatranj::run(&mut engine, opts.full);
+    // Courier is a FSF built-in (needs a `largeboards=yes` build for the 12-wide
+    // board); its mce dialect (`*x`/`*u`/`*j`/`m`) is rewritten to FSF's
+    // `e`/`m`/`w`/`f` inside courier::run.
+    let courier_mismatches = courier::run(&mut engine, opts.full);
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
     // Shogun is an INI variant (like Shinobi): shogun::run loads FSF's
     // variants.ini (resolved from `$MCE_FSF_VARIANTS_INI`) before driving
@@ -365,6 +370,7 @@ fn main() {
         + shako_mismatches
         + shatar_mismatches
         + shatranj_mismatches
+        + courier_mismatches
         + shinobi_mismatches
         + shogun_mismatches
         + knightmate_mismatches

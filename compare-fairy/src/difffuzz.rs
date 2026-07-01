@@ -494,6 +494,21 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::xiangqi::fen_to_fsf,
     },
+    // Courier is appended **last**, out of alphabetical order, on purpose: the
+    // per-variant fuzz seed is keyed on each spec's *positional index* in this
+    // list (`derive_seed(base, idx, game)`), so inserting a new variant mid-list
+    // would shift every later variant's index and silently re-roll its random
+    // games. Appending here keeps every pre-existing variant's index — and thus
+    // its exact game stream and its clean sweep — byte-identical.
+    Spec {
+        // Courier chess (12x8) — its short-range Alfil / Man / Wazir / Ferz take
+        // mce's `*x`/`*u`/`*j`/`m` tokens, rewritten to FSF's `e`/`m`/`w`/`f` by a
+        // single-pass scan. A FSF built-in (needs a `largeboards=yes` build).
+        id: WideVariantId::Courier,
+        fsf: "courier",
+        needs_ini: false,
+        dialect: crate::courier::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

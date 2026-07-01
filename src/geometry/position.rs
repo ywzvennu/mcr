@@ -950,7 +950,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 if blockers.count() == 1 {
                     let pinned = blockers.lsb().expect("one blocker");
                     if our_pieces.contains(pinned) {
-                        pins.add(pinned, l);
+                        // By default, confine the pinned piece to the full
+                        // king–slider `line` (byte-identical to every existing
+                        // variant). Variants that opt in via
+                        // `confine_pins_to_segment` instead restrict it to the
+                        // segment between the king and the pinner (inclusive of
+                        // the pinner's square). The two are equivalent for a
+                        // slider — the king blocks the far side and the pinner
+                        // blocks beyond — but differ for a *leaper* (e.g. the
+                        // Courier Alfil) that can jump over its own king onto a
+                        // collinear square past it, which the full line would
+                        // wrongly permit.
+                        let mask = if V::confine_pins_to_segment() {
+                            between(king_sq, slider) | Bitboard::from_square(slider)
+                        } else {
+                            l
+                        };
+                        pins.add(pinned, mask);
                     }
                 }
             }

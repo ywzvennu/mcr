@@ -78,18 +78,18 @@ pub use variants::{
     Alice, AliceRules, Almost, AlmostRules, Amazon, AmazonRules, Asean, AseanRules, Bughouse,
     BughouseRules, Cambodian, CambodianRules, CannonShogi, CannonShogiRules, Capablanca,
     CapablancaRules, Capahouse, CapahouseRules, Caparandom, CaparandomRules, Chak, ChakRules,
-    Chancellor, ChancellorRules, Chennis, ChennisRules, Chigorin, ChigorinRules, Dobutsu,
-    DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules, Empire, EmpireRules,
-    FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic, GothicRules, Grand, GrandRules,
-    Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus,
-    JanusRules, Jieqi, JieqiRules, Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi,
-    KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam,
-    MansindamRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Orda, OrdaRules,
-    Ordamirror, OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako,
-    ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi,
-    ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin,
-    SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori, ToriRules, Washogi,
-    WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Chancellor, ChancellorRules, Chennis, ChennisRules, Chigorin, ChigorinRules, Courier,
+    CourierRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy,
+    EmbassyRules, Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
+    GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
+    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Khans, KhansRules, Knightmate,
+    KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules,
+    Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules, Minixiangqi,
+    MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
+    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
+    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
+    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori,
+    ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -421,6 +421,23 @@ geometry!(
 );
 
 geometry!(
+    /// The Courier chess board: twelve files by eight ranks (96 squares), backed
+    /// by `u128`.
+    ///
+    /// A **fourth** `u128` geometry and the widest single-limb board: twelve files
+    /// (the non-power-of-two width `12`) by eight ranks fill `12 * 8 = 96 <= 128`
+    /// bits, so it stays within a single `u128` (no [`U256`] needed). A square
+    /// index reaches `95`, and edge-masked east/west shifts must not wrap past the
+    /// twelfth file. Files run a..l, ranks 1..8. It hosts Courier chess — the
+    /// medieval widening of chess with the short-range Alfil, Ferz, Wazir, and
+    /// (non-royal) Man alongside the modern Rook, Knight, and Bishop.
+    Courier12x8,
+    u128,
+    12,
+    8
+);
+
+geometry!(
     /// The Minishogi board: five files by five ranks (25 squares), backed by
     /// `u64`.
     ///
@@ -540,7 +557,9 @@ geometry!(
 
 #[cfg(test)]
 mod tests {
-    use super::{Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Geometry, Square};
+    use super::{
+        Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Courier12x8, Geometry, Square,
+    };
     use crate::{Bitboard as CBitboard, Square as CSquare};
     use alloc::vec::Vec;
 
@@ -568,6 +587,45 @@ mod tests {
         // BOARD_MASK is exactly the 80 low bits.
         assert_eq!(Cap10x8::BOARD_MASK.count_ones(), 80);
         assert_eq!(Bitboard::<Cap10x8>::FULL.count(), 80);
+    }
+
+    #[test]
+    fn courier12x8_constants() {
+        assert_eq!(Courier12x8::WIDTH, 12);
+        assert_eq!(Courier12x8::HEIGHT, 8);
+        assert_eq!(Courier12x8::SQUARES, 96);
+        // One bit per rank on the first/last file.
+        assert_eq!(Courier12x8::FILE_A_MASK.count_ones(), 8);
+        assert_eq!(Courier12x8::LAST_FILE_MASK.count_ones(), 8);
+        // BOARD_MASK is exactly the 96 low bits.
+        assert_eq!(Courier12x8::BOARD_MASK.count_ones(), 96);
+        assert_eq!(Bitboard::<Courier12x8>::FULL.count(), 96);
+    }
+
+    #[test]
+    fn courier12x8_east_does_not_leak_off_twelfth_file() {
+        // East off the last (twelfth) file must vanish, not wrap to the next rank.
+        assert_eq!(
+            Bitboard::<Courier12x8>::LAST_FILE.east(),
+            Bitboard::<Courier12x8>::EMPTY
+        );
+        assert_eq!(
+            Bitboard::<Courier12x8>::FILE_A.west(),
+            Bitboard::<Courier12x8>::EMPTY
+        );
+        // Interior east: file 10 (index 10, rank 0) -> file 11 (index 11).
+        let f10 = Square::<Courier12x8>::from_file_rank(10, 0).unwrap();
+        assert_eq!(
+            Bitboard::<Courier12x8>::from_square(f10).east(),
+            Bitboard::<Courier12x8>::from_square(Square::from_file_rank(11, 0).unwrap())
+        );
+        // Last square index is 95 (file 11, rank 7); north off the top vanishes.
+        let top = Square::<Courier12x8>::new(95);
+        assert_eq!((top.file(), top.rank()), (11, 7));
+        assert_eq!(
+            Bitboard::<Courier12x8>::from_square(top).north(),
+            Bitboard::<Courier12x8>::EMPTY
+        );
     }
 
     // ----- 8x8 equivalence with the concrete path -----------------------------
