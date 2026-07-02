@@ -804,17 +804,24 @@ impl WideMove {
     /// ```
     #[must_use]
     pub fn to_uci<G: Geometry>(self) -> String {
-        // A Chu Lion move renders as `<from><to>`, with the intermediate square
-        // appended as `*<mid>` when the move captures on it (an igui or the first
-        // leg of a double capture). This disambiguates a two-leg Lion capture from
-        // an ordinary move to the same destination, and a `from == to` string
-        // (with no `*`) is the jitto pass.
+        // A Chu Lion move renders as `<from><to>` plus its intermediate square:
+        // `*<mid>` when the move captures on that square (an igui or the first leg
+        // of a double capture), `-<mid>` when it only steps through. Spelling the
+        // mid on **every** Lion move (not just capturing ones) makes the rendering
+        // injective — the `(from, to, mid)` triple uniquely identifies a Lion move,
+        // so two area paths to the same destination stay distinct (e.g. a
+        // distance-two capture reached through either of two elbow squares). The
+        // sole exception is the *jitto* pass (`from == to`, no capture on either
+        // leg), which renders as the bare `<sq><sq>`.
         if self.kind_tag() == KIND_LION {
-            let mut s = String::with_capacity(9);
+            let mut s = String::with_capacity(12);
             Self::render_square::<G>(&mut s, self.from_index());
             Self::render_square::<G>(&mut s, self.to_index());
-            if self.lion_captures_mid() {
-                s.push('*');
+            let is_pass = self.from_index() == self.to_index()
+                && !self.lion_captures_mid()
+                && !self.lion_captures_dest();
+            if !is_pass {
+                s.push(if self.lion_captures_mid() { '*' } else { '-' });
                 if let Some(mid) = self.lion_mid_index() {
                     Self::render_square::<G>(&mut s, mid);
                 }
