@@ -26,9 +26,9 @@ use super::{
     Caparandom, Chak, Chancellor, Chennis, Chigorin, Courier, Dobutsu, Dragon, Duck, Embassy,
     Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
     Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam,
-    Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj,
-    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori, WideEndReason,
-    WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar,
+    Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tencubed,
+    Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -426,6 +426,7 @@ wide_variants! {
     Mansindam, Mansindam, "mansindam";
     Minishogi, Minishogi, "minishogi";
     Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
+    Opulent, Opulent, "opulent";
     Orda, Orda, "orda";
     Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
     Placement, Placement, "placement";
@@ -441,6 +442,7 @@ wide_variants! {
     Sittuyin, Sittuyin, "sittuyin", "burmese";
     Spartan, Spartan, "spartan";
     Synochess, Synochess, "synochess";
+    Tencubed, Tencubed, "tencubed";
     Tori, Tori, "tori", "torishogi";
     Xiangfu, Xiangfu, "xiangfu";
     Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
@@ -485,7 +487,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 56, "all 56 fairy variants are covered");
+        assert_eq!(count, 58, "all 58 fairy variants are covered");
     }
 
     #[test]

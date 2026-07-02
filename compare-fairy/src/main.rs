@@ -57,6 +57,7 @@ mod manchu;
 mod mansindam;
 mod minishogi;
 mod minixiangqi;
+mod opulent;
 mod orda;
 mod ordamirror;
 mod placement;
@@ -72,6 +73,7 @@ mod shouse;
 mod sittuyin;
 mod spartan;
 mod synochess;
+mod tencubed;
 mod tori;
 mod uci;
 mod variants;
@@ -259,6 +261,12 @@ fn main() {
     let shouse_mismatches = shouse::run(&mut engine, opts.full);
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
+    // Ten-Cubed and Opulent are FSF built-ins (no variants.ini needed) on the same
+    // 10x10 Grand geometry; their mce dialects (`**w`/`**x` and `**w`/`**y`/`**z`
+    // second-bank leaper tokens, plus Elephant `e`) are rewritten to FSF's letters
+    // inside each module's run (issue #375).
+    let tencubed_mismatches = tencubed::run(&mut engine, opts.full);
+    let opulent_mismatches = opulent::run(&mut engine, opts.full);
     let duck_mismatches = duck::run(&mut engine, opts.full);
     // Dragon is a FSF built-in (no variants.ini needed): standard chess plus a
     // Bishop+Knight Dragon in each fixed pocket, droppable onto the back rank. Its
@@ -360,6 +368,8 @@ fn main() {
         + shouse_mismatches
         + grand_mismatches
         + grandhouse_mismatches
+        + tencubed_mismatches
+        + opulent_mismatches
         + duck_mismatches
         + dragon_mismatches
         + fogofwar_mismatches

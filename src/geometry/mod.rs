@@ -85,11 +85,12 @@ pub use variants::{
     Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Khans, KhansRules, Knightmate,
     KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules,
     Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules, Minixiangqi,
-    MinixiangqiRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
-    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
-    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
-    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules, Tori,
-    ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    MinixiangqiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
+    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
+    Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
+    Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    Synochess, SynochessRules, Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules,
+    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

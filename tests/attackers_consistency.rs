@@ -44,10 +44,10 @@ use mce::geometry::{
     DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules,
     GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules,
     KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MansindamRules,
-    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules,
-    ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
-    ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
-    WashogiRules, WideRole, WideVariant, XiangfuRules, XiangqiRules,
+    MinishogiRules, MinixiangqiRules, OpulentRules, OrdaRules, OrdamirrorRules, PlacementRules,
+    SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules,
+    ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules,
+    TencubedRules, ToriRules, WashogiRules, WideRole, WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Courier12x8, Dobutsu3x4, Gorogoro5x6, Grand10x10,
@@ -555,6 +555,49 @@ variant_test!(
     [
         "r8r/2bqkeab2/pppp1ppppp/2n4n2/3Np5/3P6/7N2/PPP1PPPPPP/2BQKEAB2/R8R[QPqp] w - - 1 4",
         "4k5/8P1/10/10/4Q~5/10/10/10/10/RNBQK1EAN1[Nn] w - - 0 1",
+    ]
+);
+
+// -- Ten-Cubed (10x10) ------------------------------------------------------
+//
+// Ten-Cubed adds two new pure leapers to the Grand army: the Wizard (`**w` /
+// `WideRole::Wizard`, Camel + Ferz) and the Champion (`**x` /
+// `WideRole::TencubedChampion`, Wazir + Alfil + Dabbaba). Both attack sets are
+// geometrically symmetric, so `attackers_to` reverse-projects them with no
+// override; this guards that the two new leapers' `role_attacks` and the
+// reverse-projection agree (alongside the reused symmetric Marshal `e` / Cardinal
+// `a` compounds). Corpus in the mce dialect (`**w`, `**x`).
+
+variant_test!(
+    tencubed,
+    Grand10x10,
+    TencubedRules,
+    "tencubed",
+    [
+        "k9/10/10/4**x5/10/3**W6/10/10/2ae6/9K w - - 0 1",
+        "2**x**wae**w**x2/1rnbqkbnr1/10/pppppppppp/10/10/PPPPPPPPPP/10/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1",
+    ]
+);
+
+// -- Opulent (10x10) --------------------------------------------------------
+//
+// Opulent adds three new leapers to the Grand-style army: the Wizard (`**w` /
+// `WideRole::Wizard`, Camel + Ferz), the Lion (`**y` / `WideRole::OpulentLion`,
+// Ferz + Dabbaba + Threeleaper) and the augmented Knight (`**z` /
+// `WideRole::OpulentKnight`, Knight + Wazir). Every one is geometrically
+// symmetric, so `attackers_to` reverse-projects them with no override; this guards
+// that all three new leapers' `role_attacks` and the reverse-projection agree
+// (alongside the reused symmetric Chancellor `e` / Archbishop `a` compounds).
+// Corpus in the mce dialect (`**w`, `**y`, `**z`).
+
+variant_test!(
+    opulent,
+    Grand10x10,
+    OpulentRules,
+    "opulent",
+    [
+        "k9/10/4**y5/10/2**z4**w2/10/10/10/2ea6/9K w - - 0 1",
+        "r**w6**wr/e**yb**zqk**zb**ya/10/pppppppppp/10/10/PPPPPPPPPP/10/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1",
     ]
 );
 

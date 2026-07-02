@@ -387,6 +387,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::minixiangqi::fen_to_fsf,
     },
     Spec {
+        // Opulent (10x10, Grand geometry): mce spells the Wizard `**w`, Lion `**y`,
+        // augmented Knight `**z`, and Chancellor `e`; FSF spells them `w`/`l`/`n`/`c`.
+        id: WideVariantId::Opulent,
+        fsf: "opulent",
+        needs_ini: false,
+        dialect: crate::opulent::fen_to_fsf,
+    },
+    Spec {
         id: WideVariantId::Orda,
         fsf: "orda",
         needs_ini: true,
@@ -475,6 +483,14 @@ const SPECS: &[Spec] = &[
         fsf: "synochess",
         needs_ini: true,
         dialect: crate::synochess::to_fsf_dialect,
+    },
+    Spec {
+        // Ten-Cubed (10x10, Grand geometry): mce spells the Wizard `**w`, Champion
+        // `**x`, and Marshal `e`; FSF spells them `w`/`c`/`m`.
+        id: WideVariantId::Tencubed,
+        fsf: "tencubed",
+        needs_ini: false,
+        dialect: crate::tencubed::fen_to_fsf,
     },
     Spec {
         id: WideVariantId::Tori,
