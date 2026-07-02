@@ -2869,11 +2869,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                             can_pass = true;
                         }
                         // The second King-step, from s1 to any non-friendly square
-                        // (other than the origin — that is the igui above). HaChu
-                        // enumerates one such move **per intermediate path**, so a
-                        // distance-two capture reachable through two empty
-                        // intermediates is two distinct area moves (plus the leaper's
-                        // direct jump).
+                        // (other than the origin — that is the igui above).
+                        //
+                        // * When the first step **captured** (`s1` enemy), the lion
+                        //   may continue to any square, at distance one or two — the
+                        //   capture makes the whole two-step move distinct from a
+                        //   plain move to `s2`.
+                        // * When the first step was onto an **empty** square, the
+                        //   two-step move is only distinct if it captures on the
+                        //   second step **and** lands at distance two: reaching an
+                        //   adjacent (distance-one) square through an empty
+                        //   intermediate is the same move as the plain step to it, so
+                        //   it is not re-emitted. HaChu enumerates one such move per
+                        //   intermediate path, matching this (a distance-two capture
+                        //   through two elbow squares is two distinct area moves, plus
+                        //   the leaper's direct jump).
                         for &d2 in &DIRS8 {
                             let Some(s2) = s1.offset(d2.0, d2.1) else {
                                 continue;
@@ -2882,7 +2892,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                                 continue;
                             }
                             let s2_enemy = their_pieces.contains(s2);
-                            if s1_enemy || s2_enemy {
+                            let emit = if s1_enemy {
+                                true
+                            } else {
+                                s2_enemy && chebyshev::<G>(from, s2) == 2
+                            };
+                            if emit {
                                 out.push(WideMove::lion(from, s2, s1, s1_enemy, s2_enemy));
                             }
                         }
@@ -2899,21 +2914,26 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         let Some(s1) = from.offset(df, dr) else {
                             continue;
                         };
-                        if their_pieces.contains(s1) {
+                        if our_pieces.contains(s1) {
+                            // Cannot step onto a friendly first square (only the
+                            // leaper's jump over it, already covered).
+                            continue;
+                        }
+                        let s1_enemy = their_pieces.contains(s1);
+                        if s1_enemy {
+                            // igui: capture the enemy on the line and return home.
                             out.push(WideMove::lion(from, from, s1, true, false));
-                            if let Some(s2) = s1.offset(df, dr) {
-                                if !our_pieces.contains(s2) {
-                                    out.push(WideMove::lion(
-                                        from,
-                                        s2,
-                                        s1,
-                                        true,
-                                        their_pieces.contains(s2),
-                                    ));
-                                }
-                            }
-                        } else if !our_pieces.contains(s1) {
+                        } else {
                             can_pass = true;
+                        }
+                        // The straight second step (no turning). Emit the two-step
+                        // move only when it captures on a leg — a non-capturing
+                        // straight double-step coincides with the leaper's jump.
+                        if let Some(s2) = s1.offset(df, dr) {
+                            let s2_enemy = their_pieces.contains(s2);
+                            if !our_pieces.contains(s2) && (s1_enemy || s2_enemy) {
+                                out.push(WideMove::lion(from, s2, s1, s1_enemy, s2_enemy));
+                            }
                         }
                     }
                 }
@@ -5470,6 +5490,16 @@ fn multi_royal_move_off_lines<G: Geometry>(
     }
     let to = mv.to::<G>();
     !royal_lines.contains(from) && !royal_lines.contains(to)
+}
+
+/// The Chebyshev (king-move) distance between two squares — `max(|Δfile|,
+/// |Δrank|)`. Used by the Chu Lion generator to tell a genuine distance-two area
+/// move from a redundant two-step to an adjacent square.
+#[inline]
+fn chebyshev<G: Geometry>(a: Square<G>, b: Square<G>) -> u8 {
+    let df = (a.file() as i16 - b.file() as i16).unsigned_abs();
+    let dr = (a.rank() as i16 - b.rank() as i16).unsigned_abs();
+    df.max(dr) as u8
 }
 
 /// The back rank (0-based) of `color`: rank `0` for white, the top rank for
