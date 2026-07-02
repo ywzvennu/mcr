@@ -458,6 +458,90 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// Whether `color`'s king(s) are in check right now, regardless of
+            /// whose turn it is — the type-erased forward of
+            /// [`GenericPosition::is_in_check`](super::GenericPosition::is_in_check).
+            /// `is_in_check(turn)` equals [`is_check`](Self::is_check).
+            #[must_use]
+            pub fn is_in_check(&self, color: Color) -> bool {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.is_in_check(color), )+
+                }
+            }
+
+            /// The royal (king) squares of `color`, as bare square indices
+            /// (ascending) — the type-erased forward of
+            /// [`GenericPosition::royal_squares`](super::GenericPosition::royal_squares).
+            /// Empty for a side whose king is non-royal (Duck, Dobutsu).
+            #[must_use]
+            pub fn royal_squares(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.royal_squares(color)), )+
+                }
+            }
+
+            /// The enemy pieces that attack a royal square of `color`, as bare
+            /// square indices (ascending) — the type-erased forward of
+            /// [`GenericPosition::checkers_of`](super::GenericPosition::checkers_of).
+            /// Excludes the royal-only flying-general confrontation; see
+            /// [`is_in_check`](Self::is_in_check) for the full verdict.
+            #[must_use]
+            pub fn checkers_of(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.checkers_of(color)), )+
+                }
+            }
+
+            /// The checkers of the side to move, as bare square indices
+            /// (ascending) — [`checkers_of`](Self::checkers_of) for
+            /// [`turn`](Self::turn), the type-erased forward of
+            /// [`GenericPosition::checkers`](super::GenericPosition::checkers).
+            #[must_use]
+            pub fn checkers(&self) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.checkers()), )+
+                }
+            }
+
+            /// The absolutely pinned pieces of `color`, as bare square indices
+            /// (ascending) — the type-erased forward of
+            /// [`GenericPosition::pinned_pieces`](super::GenericPosition::pinned_pieces).
+            #[must_use]
+            pub fn pinned_pieces(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.pinned_pieces(color)), )+
+                }
+            }
+
+            /// The line a pinned piece of `color` on `square` is confined to, as
+            /// bare square indices (ascending), or `None` if `square` holds no
+            /// absolutely pinned piece of `color` (or is off the board) — the
+            /// type-erased forward of
+            /// [`GenericPosition::pin_ray_of`](super::GenericPosition::pin_ray_of).
+            #[must_use]
+            pub fn pin_ray_of(&self, color: Color, square: u8) -> Option<Vec<u8>> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        p.pin_ray_of(color, square_of(p, square)?).map(square_indices)
+                    } )+
+                }
+            }
+
+            /// The legal moves of the side to move whose origin is `square` — the
+            /// type-erased forward of
+            /// [`GenericPosition::legal_moves_from`](super::GenericPosition::legal_moves_from).
+            /// An off-board index yields an empty list. A drop is grouped under the
+            /// square it drops onto (its packed origin equals its target).
+            #[must_use]
+            pub fn legal_moves_from(&self, square: u8) -> Vec<WideMove> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => match square_of(p, square) {
+                        Some(sq) => p.legal_moves_from(sq),
+                        None => Vec::new(),
+                    }, )+
+                }
+            }
+
             /// Serializes this position to FEN.
             #[must_use]
             pub fn to_fen(&self) -> String {
@@ -1115,5 +1199,89 @@ mod tests {
         aggregates_agree!(WideVariantId::Capablanca, Capablanca);
         aggregates_agree!(WideVariantId::Courier, Courier);
         aggregates_agree!(WideVariantId::Dobutsu, Dobutsu);
+    }
+
+    // --- Issue #411: type-erased check / pin / per-piece-move forwards -----
+
+    /// The check / pin / per-piece-move forwards agree with the typed
+    /// [`GenericPosition`](super::GenericPosition) path, square for square, across
+    /// a spread of geometries and a crafted check + pin position.
+    #[test]
+    fn check_pin_forwards_agree_with_typed_path() {
+        macro_rules! check_pin_agree {
+            ($any:expr, $typed:expr) => {{
+                let any = &$any;
+                let typed = &$typed;
+                let (w, h) = any.dimensions();
+                let squares = w * h;
+                for color in [Color::White, Color::Black] {
+                    assert_eq!(
+                        any.is_in_check(color),
+                        typed.is_in_check(color),
+                        "is_in_check"
+                    );
+                    let typed_royals: Vec<u8> = square_indices(typed.royal_squares(color));
+                    assert_eq!(any.royal_squares(color), typed_royals, "royal_squares");
+                    let typed_checkers: Vec<u8> = square_indices(typed.checkers_of(color));
+                    assert_eq!(any.checkers_of(color), typed_checkers, "checkers_of");
+                    let typed_pinned: Vec<u8> = square_indices(typed.pinned_pieces(color));
+                    assert_eq!(any.pinned_pieces(color), typed_pinned, "pinned_pieces");
+                    for i in 0..squares {
+                        let sq = Square::new(i);
+                        let typed_ray: Option<Vec<u8>> =
+                            typed.pin_ray_of(color, sq).map(square_indices);
+                        assert_eq!(any.pin_ray_of(color, i), typed_ray, "pin_ray {i}");
+                    }
+                }
+                let typed_checkers: Vec<u8> = square_indices(typed.checkers());
+                assert_eq!(any.checkers(), typed_checkers, "checkers");
+                for i in 0..squares {
+                    let sq = Square::new(i);
+                    assert_eq!(
+                        any.legal_moves_from(i),
+                        typed.legal_moves_from(sq),
+                        "legal_moves_from {i}",
+                    );
+                }
+                // Off-board indices are handled gracefully.
+                assert!(any.legal_moves_from(250).is_empty(), "off-board moves");
+                assert_eq!(any.pin_ray_of(Color::White, 250), None, "off-board pin ray");
+            }};
+        }
+
+        // A crafted 8x8 position: the white bishop on e2 is pinned to its king on
+        // e1 by the black rook on e8 along the e-file (so the king is screened, not
+        // itself in check) — exercising royal_squares, pinned_pieces, and pin_ray.
+        let fen = "4r3/8/8/8/8/8/4B3/4K3 w - - 0 1";
+        check_pin_agree!(
+            AnyWideVariant::from_fen(WideVariantId::Almost, fen).expect("almost fen"),
+            Almost::from_fen(fen).expect("almost fen")
+        );
+
+        // Start positions spanning several geometries and royalty rules.
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Xiangqi),
+            Xiangqi::startpos()
+        );
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Shogi),
+            Shogi::startpos()
+        );
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Spartan),
+            Spartan::startpos()
+        );
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Duck),
+            Duck::startpos()
+        );
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Dobutsu),
+            Dobutsu::startpos()
+        );
+        check_pin_agree!(
+            AnyWideVariant::startpos(WideVariantId::Courier),
+            Courier::startpos()
+        );
     }
 }

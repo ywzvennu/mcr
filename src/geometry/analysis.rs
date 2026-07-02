@@ -42,10 +42,13 @@
 //! [`WideVariant::role_attacks`]: crate::geometry::WideVariant::role_attacks
 //! [`WideVariant::role_threats_board`]: crate::geometry::WideVariant::role_threats_board
 
+use alloc::vec::Vec;
+
 use super::bitboard::Bitboard;
 use super::role::WideRole;
 use super::square::Square;
 use super::variant::WideVariant;
+use super::wide_move::WideMove;
 use super::GenericPosition;
 use super::Geometry;
 use crate::Color;
@@ -170,5 +173,72 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[inline]
     pub fn attack_count(&self, side: Color) -> u32 {
         self.attack_map(side).count()
+    }
+
+    /// The **royal (king) squares** of `color` — the squares whose occupant is
+    /// royal, i.e. whose safety the check / checkmate rules protect.
+    ///
+    /// A thin, board-aware view of [`WideVariant::royal_squares`]: one square in
+    /// standard chess and the single-king variants, possibly several for a
+    /// multi-king variant (Spartan), and **empty** for a variant whose king is
+    /// non-royal (Duck, Dobutsu's captured-king extinction rule). This is the
+    /// anchor the other check queries project from — [`checkers_of`](Self::checkers_of)
+    /// reports who attacks these squares and [`is_in_check`](Self::is_in_check)
+    /// folds the variant's royal-attack discipline over them.
+    #[must_use]
+    #[inline]
+    pub fn royal_squares(&self, color: Color) -> Bitboard<G> {
+        V::royal_squares(self.board(), color)
+    }
+
+    /// The **checkers of `color`**: the enemy pieces that attack one of `color`'s
+    /// royal squares under the live occupancy.
+    ///
+    /// The union, over every royal square of `color`, of
+    /// [`attackers_of`](Self::attackers_of) by the opposing side — so the
+    /// directional Pawns/Soldiers, the leg-asymmetric Xiangqi Horse, and the
+    /// screen cannons are all handled by the validated reverse projection. Every
+    /// square it reports holds an enemy piece whose threat set covers a royal.
+    ///
+    /// This is the *piece* relation: it does **not** include the royal-only Xiangqi
+    /// flying-general confrontation (an open file between the two generals, which
+    /// is not a piece attack); use [`is_in_check`](Self::is_in_check) for the full
+    /// variant-correct in-check verdict. For a single-royal side a non-empty
+    /// checker set means the side is in check; under multi-king duple-check
+    /// (Spartan) a side is in check only when *every* king is attacked, so a
+    /// non-empty set alone need not be a check there.
+    #[must_use]
+    pub fn checkers_of(&self, color: Color) -> Bitboard<G> {
+        let them = color.opposite();
+        let mut acc = Bitboard::EMPTY;
+        for royal in self.royal_squares(color) {
+            acc |= self.attackers_of(royal, them);
+        }
+        acc
+    }
+
+    /// The **checkers of the side to move** — [`checkers_of`](Self::checkers_of)
+    /// for [`turn`](Self::turn). The pieces the mover must answer.
+    #[must_use]
+    #[inline]
+    pub fn checkers(&self) -> Bitboard<G> {
+        self.checkers_of(self.turn())
+    }
+
+    /// The legal moves of the side to move whose **origin is `square`** — the
+    /// per-piece slice of [`legal_moves`](Self::legal_moves).
+    ///
+    /// A filter over the validated legal-move list, so it never invents a move the
+    /// generator would not: every legality rule (pins, check evasion, multi-royal,
+    /// cannon screens, gating) is already applied. Because each legal move has
+    /// exactly one origin, the lists returned for the distinct board squares
+    /// partition [`legal_moves`](Self::legal_moves). A **drop** is packed with its
+    /// origin equal to its target, so it is grouped under the square it drops onto.
+    #[must_use]
+    pub fn legal_moves_from(&self, square: Square<G>) -> Vec<WideMove> {
+        self.legal_moves()
+            .into_iter()
+            .filter(|mv| mv.from::<G>() == square)
+            .collect()
     }
 }

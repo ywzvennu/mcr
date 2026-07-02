@@ -19,11 +19,28 @@
 //! * `position startpos [moves …]` / `position fen <FEN> [moves …]` — sets the
 //!   position from the variant's start array or an mce-dialect FEN, then applies
 //!   the trailing UCI moves.
-//! * `d` — prints the board grid and `Fen: <fen>`.
+//! * `d` — prints the board grid, then `Fen:`, `Key:` (the Zobrist position key),
+//!   `Side to move:`, `Checkers:`, and `Status:` — the completeness superset of
+//!   the old grid-plus-Fen output.
+//! * `status` — prints one parseable `Status:` line (ongoing / checkmate /
+//!   stalemate / a variant win / a draw, with winner and reason), from the
+//!   consolidated `GameStatus` fold (fairy) or the `Outcome` / `EndReason` pair
+//!   (concrete engine).
+//! * `checkers` — prints `Checkers: <squares>`: the pieces giving check to the
+//!   side to move (fairy variants; the concrete engine reports check state only).
+//! * `pins` — prints `Pinned: <squares>`: the absolutely pinned pieces of the
+//!   side to move (fairy variants).
+//! * `attacked <white|black> <square>` — prints `Attacked: yes|no by <squares>`:
+//!   whether `square` is attacked by that side, and by which pieces (fairy
+//!   variants).
 //! * `go perft <N>` — prints the per-root-move divide (`<uci>: <nodes>`), a
 //!   blank line, then `Nodes searched: <total>` (the Fairy-Stockfish shape, so
 //!   the same parsers read it).
 //! * `quit` — exits.
+//!
+//! The `status` / `d` status line and the `checkers` / `pins` / `attacked`
+//! analysis queries are rules-only reads of the library's validated analysis
+//! surface (issues #373 / #392 / #411); there is still **no `go` search**.
 //!
 //! The adapter spans both variant families the library ships: the concrete
 //! 8x8-engine variants reached through [`mce::AnyVariant`] / [`mce::VariantId`]
@@ -35,8 +52,8 @@
 
 use std::io::{self, BufRead, Write};
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{AnyVariant, VariantId};
+use mce::geometry::{AnyWideVariant, GameStatus, WideVariantId};
+use mce::{AnyVariant, Color, Outcome, VariantId};
 
 /// The concrete-engine variants, paired with the `UCI_Variant` name the combo
 /// advertises. Each name round-trips through `VariantId::from_str`, and none
@@ -139,6 +156,156 @@ impl GamePos {
             GamePos::Wide(p) => p.perft(depth),
         }
     }
+
+    /// The side to move.
+    fn turn(&self) -> Color {
+        match self {
+            GamePos::Classic(p) => p.turn(),
+            GamePos::Wide(p) => p.turn(),
+        }
+    }
+
+    /// Whether the side to move is in check.
+    fn is_check(&self) -> bool {
+        match self {
+            GamePos::Classic(p) => p.is_check(),
+            GamePos::Wide(p) => p.is_check(),
+        }
+    }
+
+    /// The stable 64-bit position key (Zobrist), for the `d` / `status` dumps.
+    fn key(&self) -> u64 {
+        match self {
+            GamePos::Classic(p) => p.zobrist().get(),
+            GamePos::Wide(p) => p.position_key(),
+        }
+    }
+
+    /// The board dimensions `(width, height)`; the concrete engine is always 8x8.
+    fn dimensions(&self) -> (u8, u8) {
+        match self {
+            GamePos::Classic(_) => (8, 8),
+            GamePos::Wide(p) => p.dimensions(),
+        }
+    }
+
+    /// The geometry-layer position, if this is a fairy variant — the arm over
+    /// which the analysis debug commands (`checkers`, `attacked`, `pins`) query.
+    /// The concrete 8x8 engine does not expose those internals, so it yields
+    /// `None` and the commands report it.
+    fn as_wide(&self) -> Option<&AnyWideVariant> {
+        match self {
+            GamePos::Wide(p) => Some(p),
+            GamePos::Classic(_) => None,
+        }
+    }
+
+    /// A single-line, parseable rendering of the consolidated game status: the
+    /// [`GameStatus`] fold for a fairy variant, and the [`Outcome`] / [`EndReason`]
+    /// pair for the concrete engine, in the same shape.
+    fn status_line(&self) -> String {
+        let checked = |ongoing: &str| {
+            if self.is_check() {
+                format!("{ongoing} (check)")
+            } else {
+                ongoing.to_string()
+            }
+        };
+        match self {
+            GamePos::Wide(p) => match p.status() {
+                GameStatus::Ongoing => checked("ongoing"),
+                GameStatus::Checkmate { winner } => {
+                    format!("checkmate winner={}", color_name(winner))
+                }
+                GameStatus::Stalemate => "draw (stalemate)".to_string(),
+                GameStatus::VariantWin { winner, reason } => {
+                    format!(
+                        "variant_win winner={} reason={reason:?}",
+                        color_name(winner)
+                    )
+                }
+                GameStatus::Draw { reason } => format!("draw ({reason:?})"),
+            },
+            GamePos::Classic(p) => match p.outcome() {
+                None => checked("ongoing"),
+                Some(Outcome::Decisive { winner }) => match p.end_reason() {
+                    Some(reason) => {
+                        format!("decisive winner={} reason={reason:?}", color_name(winner))
+                    }
+                    None => format!("decisive winner={}", color_name(winner)),
+                },
+                Some(Outcome::Draw) => match p.end_reason() {
+                    Some(reason) => format!("draw ({reason:?})"),
+                    None => "draw".to_string(),
+                },
+            },
+        }
+    }
+}
+
+/// The lowercase name of a color, for the status / analysis dumps.
+fn color_name(color: Color) -> &'static str {
+    match color {
+        Color::White => "white",
+        Color::Black => "black",
+    }
+}
+
+/// Parses a color token (`white` / `w` / `black` / `b`, case-insensitive) for the
+/// `attacked` command, or `None` if it names neither side.
+fn parse_color(token: &str) -> Option<Color> {
+    match token.to_ascii_lowercase().as_str() {
+        "white" | "w" => Some(Color::White),
+        "black" | "b" => Some(Color::Black),
+        _ => None,
+    }
+}
+
+/// Renders a bare square `index` as a coordinate (`file` letter + 1-based `rank`)
+/// for a board `width` files wide, matching the `rank * width + file`
+/// little-endian numbering the UCI move strings use (so `checkers` / `attacked`
+/// square lists read in the same coordinates as the divide moves). Multi-rank
+/// boards (Xiangqi's rank 10) render the rank as a plain number.
+fn square_name(width: u8, index: u8) -> String {
+    let file = index % width;
+    let rank = index / width;
+    format!("{}{}", (b'a' + file) as char, u16::from(rank) + 1)
+}
+
+/// Parses a coordinate token (`file` letter + 1-based `rank`, e.g. `e4`, `i10`)
+/// against a `width` x `height` board, returning its bare square index, or `None`
+/// if the token is malformed or names no square on that board. The inverse of
+/// [`square_name`].
+fn parse_square(width: u8, height: u8, token: &str) -> Option<u8> {
+    let bytes = token.as_bytes();
+    let file_ch = *bytes.first()?;
+    if !file_ch.is_ascii_lowercase() {
+        return None;
+    }
+    let file = file_ch - b'a';
+    let rank_num: u16 = token.get(1..)?.parse().ok()?;
+    if rank_num == 0 {
+        return None;
+    }
+    let rank = rank_num - 1;
+    if file >= width || rank >= u16::from(height) {
+        return None;
+    }
+    Some(rank as u8 * width + file)
+}
+
+/// Renders a list of bare square indices as space-separated coordinates, or
+/// `(none)` when empty — the shared shape of the `checkers` / `attacked` / `pins`
+/// output.
+fn squares_text(width: u8, indices: &[u8]) -> String {
+    if indices.is_empty() {
+        return "(none)".to_string();
+    }
+    indices
+        .iter()
+        .map(|&i| square_name(width, i))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Resolves a `UCI_Variant` value to a [`VariantKind`], trying the concrete
@@ -331,6 +498,79 @@ impl Adapter {
         Ok(())
     }
 
+    /// Prints the `d` dump: the board grid, then `Fen:` / `Key:` / `Side to move:`
+    /// / `Checkers:` / `Status:` — a completeness superset of the old grid-plus-Fen
+    /// output, in the Fairy-Stockfish `d` shape so the same parsers still read it.
+    fn print_display<W: Write>(&self, out: &mut W) -> io::Result<()> {
+        let fen = self.pos.to_fen();
+        print_board(out, &fen)?;
+        writeln!(out, "Key: {:016X}", self.pos.key())?;
+        writeln!(out, "Side to move: {}", color_name(self.pos.turn()))?;
+        let (width, _) = self.pos.dimensions();
+        match self.pos.as_wide() {
+            Some(p) => writeln!(out, "Checkers: {}", squares_text(width, &p.checkers()))?,
+            None => writeln!(
+                out,
+                "Checkers: {}",
+                if self.pos.is_check() {
+                    "(in check)"
+                } else {
+                    "(none)"
+                }
+            )?,
+        }
+        writeln!(out, "Status: {}", self.pos.status_line())
+    }
+
+    /// Handles the geometry-layer analysis debug commands (`checkers`,
+    /// `attacked <color> <square>`, `pins`). They read the fairy-variant analysis
+    /// surface; for the concrete 8x8 engine, which does not expose those internals,
+    /// they report `info string` and print nothing on stdout.
+    fn analysis_command<W: Write, E: Write>(
+        &self,
+        tokens: &[&str],
+        out: &mut W,
+        err: &mut E,
+    ) -> io::Result<()> {
+        let (width, height) = self.pos.dimensions();
+        let Some(p) = self.pos.as_wide() else {
+            writeln!(
+                err,
+                "info string analysis queries are available for fairy variants only"
+            )?;
+            return Ok(());
+        };
+        match tokens[0] {
+            "checkers" => {
+                writeln!(out, "Checkers: {}", squares_text(width, &p.checkers()))?;
+            }
+            "pins" => {
+                let side = p.turn();
+                let pinned = p.pinned_pieces(side);
+                writeln!(out, "Pinned: {}", squares_text(width, &pinned))?;
+            }
+            "attacked" => {
+                // attacked <color> <square>
+                let color = tokens.get(1).and_then(|t| parse_color(t));
+                let square = tokens.get(2).and_then(|t| parse_square(width, height, t));
+                match (color, square) {
+                    (Some(color), Some(square)) => {
+                        let attackers = p.attackers_of(square, color);
+                        let yes = if attackers.is_empty() { "no" } else { "yes" };
+                        writeln!(
+                            out,
+                            "Attacked: {yes} by {}",
+                            squares_text(width, &attackers)
+                        )?;
+                    }
+                    _ => writeln!(err, "info string usage: attacked <white|black> <square>")?,
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     /// Dispatches one protocol line. Returns `false` on `quit`.
     fn handle_line<W: Write, E: Write>(
         &mut self,
@@ -353,7 +593,9 @@ impl Adapter {
             "ucinewgame" => {}
             "setoption" => self.set_option(&tokens, err)?,
             "position" => self.set_position(&tokens, err)?,
-            "d" => print_board(out, &self.pos.to_fen())?,
+            "d" => self.print_display(out)?,
+            "status" => writeln!(out, "Status: {}", self.pos.status_line())?,
+            "checkers" | "pins" | "attacked" => self.analysis_command(&tokens, out, err)?,
             "go" => {
                 // Rules/movegen only: the sole supported `go` is `go perft <N>`.
                 match (
@@ -492,5 +734,58 @@ mod tests {
         let text = String::from_utf8(out).unwrap();
         assert!(text.contains("e2e4: 1"));
         assert!(text.trim_end().ends_with("Nodes searched: 20"));
+    }
+
+    #[test]
+    fn square_name_and_parse_round_trip() {
+        // 8x8: a1 is index 0, e4 is index 28, h8 is 63.
+        assert_eq!(square_name(8, 0), "a1");
+        assert_eq!(square_name(8, 28), "e4");
+        assert_eq!(square_name(8, 63), "h8");
+        for i in 0u8..64 {
+            let name = square_name(8, i);
+            assert_eq!(parse_square(8, 8, &name), Some(i), "round trip {i}");
+        }
+        // Xiangqi's 9x10 board reaches a two-digit rank (i10 is the last square).
+        assert_eq!(square_name(9, 89), "i10");
+        assert_eq!(parse_square(9, 10, "i10"), Some(89));
+        // Off-board and malformed tokens are rejected, not panicked on.
+        assert_eq!(parse_square(8, 8, "i1"), None); // file past an 8-wide board
+        assert_eq!(parse_square(8, 8, "a9"), None); // rank past an 8-tall board
+        assert_eq!(parse_square(8, 8, "a0"), None); // ranks are 1-based
+        assert_eq!(parse_square(8, 8, ""), None);
+        assert_eq!(parse_square(8, 8, "4"), None); // no file letter
+    }
+
+    #[test]
+    fn parse_color_accepts_names_and_letters() {
+        assert_eq!(parse_color("white"), Some(Color::White));
+        assert_eq!(parse_color("W"), Some(Color::White));
+        assert_eq!(parse_color("black"), Some(Color::Black));
+        assert_eq!(parse_color("b"), Some(Color::Black));
+        assert_eq!(parse_color("red"), None);
+    }
+
+    #[test]
+    fn squares_text_renders_or_reports_empty() {
+        assert_eq!(squares_text(8, &[]), "(none)");
+        assert_eq!(squares_text(8, &[0, 28, 63]), "a1 e4 h8");
+    }
+
+    #[test]
+    fn status_line_folds_both_families() {
+        // Ongoing, then a checkmate, for the concrete engine.
+        let start = GamePos::startpos(VariantKind::Classic(VariantId::Standard));
+        assert_eq!(start.status_line(), "ongoing");
+        let mate = GamePos::from_fen(
+            VariantKind::Classic(VariantId::Standard),
+            "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
+        )
+        .expect("valid mate fen");
+        assert_eq!(mate.status_line(), "decisive winner=black reason=Checkmate");
+
+        // A fairy variant folds through GameStatus; a fresh Shogi game is ongoing.
+        let shogi = GamePos::startpos(VariantKind::Wide(WideVariantId::Shogi));
+        assert_eq!(shogi.status_line(), "ongoing");
     }
 }

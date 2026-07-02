@@ -88,3 +88,100 @@ fn go_without_perft_is_not_a_search() {
     let out = run("position startpos\ngo\nquit\n");
     assert!(!out.contains("bestmove"));
 }
+
+/// The last line with the given `prefix`, trimmed of the prefix and whitespace.
+fn last_field<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    text.lines()
+        .filter_map(|l| l.strip_prefix(prefix))
+        .next_back()
+        .map(str::trim)
+}
+
+#[test]
+fn d_output_is_complete() {
+    // The enriched `d` dump carries the grid, the FEN, the Zobrist key, the side
+    // to move, the checker line, and the consolidated status.
+    let out = run("position startpos\nd\nquit\n");
+    assert!(out.lines().any(|l| l.starts_with("Fen: ")));
+    assert!(out.lines().any(|l| l.starts_with("Key: ")));
+    assert_eq!(last_field(&out, "Side to move:"), Some("white"));
+    assert!(out.lines().any(|l| l.starts_with("Checkers:")));
+    assert_eq!(last_field(&out, "Status:"), Some("ongoing"));
+}
+
+#[test]
+fn status_command_reports_ongoing_and_checkmate() {
+    let start = run("position startpos\nstatus\nquit\n");
+    assert_eq!(last_field(&start, "Status:"), Some("ongoing"));
+
+    // Fool's mate: Black mates; the status line names the winner and the reason.
+    let mate = run("position startpos moves f2f3 e7e5 g2g4 d8h4\nstatus\nquit\n");
+    assert_eq!(
+        last_field(&mate, "Status:"),
+        Some("decisive winner=black reason=Checkmate")
+    );
+}
+
+#[test]
+fn fairy_checkers_and_status_report_check() {
+    // Almost Chess: Black king on e8 checked by a white rook on e1.
+    let out = run("setoption name UCI_Variant value almost\n\
+         position fen 4k3/8/8/8/8/8/8/4R1K1 b - - 0 1\n\
+         checkers\nstatus\nquit\n");
+    assert_eq!(last_field(&out, "Checkers:"), Some("e1"));
+    assert_eq!(last_field(&out, "Status:"), Some("ongoing (check)"));
+}
+
+#[test]
+fn fairy_pins_and_attacked_queries() {
+    // A white bishop on e2 pinned to its king on e1 by a black rook on e8.
+    let out = run("setoption name UCI_Variant value almost\n\
+         position fen 4r3/8/8/8/8/8/4B3/4K3 w - - 0 1\n\
+         pins\nattacked white e2\nattacked black e2\nquit\n");
+    assert_eq!(last_field(&out, "Pinned:"), Some("e2"));
+    // e2 is defended by the white king on e1, and also attacked by the black rook
+    // on e8 (e2 is the rook's first blocker — the pinned bishop it could capture).
+    let attacked: Vec<&str> = out.lines().filter(|l| l.starts_with("Attacked:")).collect();
+    assert_eq!(attacked, ["Attacked: yes by e1", "Attacked: yes by e8"]);
+}
+
+#[test]
+fn analysis_on_concrete_engine_degrades_gracefully() {
+    // The concrete 8x8 engine does not expose the fairy analysis internals, so the
+    // debug queries report on stderr and print nothing on stdout — without
+    // crashing. (`stderr` is nulled by `run`, so stdout simply lacks the lines.)
+    let out = run("position startpos\ncheckers\npins\nattacked white e4\nquit\n");
+    assert!(!out.lines().any(|l| l.starts_with("Checkers:")));
+    assert!(!out.lines().any(|l| l.starts_with("Pinned:")));
+    assert!(!out.lines().any(|l| l.starts_with("Attacked:")));
+}
+
+#[test]
+fn position_fen_edge_cases_do_not_crash() {
+    // A bare `position fen` (no FEN), a malformed FEN, a bare `position`, an
+    // illegal trailing move, and a bad `attacked` argument are all handled without
+    // aborting the process; the following `status` still answers.
+    let out = run("position fen\n\
+         position fen not a real fen\n\
+         position\n\
+         setoption name UCI_Variant value xiangqi\n\
+         position startpos moves e2e4\n\
+         attacked purple z9\n\
+         position startpos\n\
+         status\nquit\n");
+    // The process survived every malformed line and answered the final status.
+    assert_eq!(last_field(&out, "Status:"), Some("ongoing"));
+}
+
+#[test]
+fn checkers_square_names_match_divide_coordinates() {
+    // The `checkers` / `attacked` coordinates use the same numbering as the
+    // `go perft` divide moves: a rook checking down the e-file is reported as `e1`,
+    // and a divide from that position lists moves in the same coordinate system.
+    let out = run("setoption name UCI_Variant value almost\n\
+         position fen 4k3/8/8/8/8/8/8/4R1K1 b - - 0 1\n\
+         checkers\ngo perft 1\nquit\n");
+    assert_eq!(last_field(&out, "Checkers:"), Some("e1"));
+    // Every divide move origin is a coordinate the same parser reads (e.g. e8…).
+    assert!(out.lines().any(|l| l.starts_with("e8")));
+}

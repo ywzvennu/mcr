@@ -169,7 +169,135 @@ fn assert_move_gen<G: Geometry, V: WideVariant<G>>(
     }
 }
 
-/// Asserts both properties on one position.
+/// Cross-checks the check / pin / per-piece-move query helpers against the
+/// validated primitives and forward move generation.
+fn assert_queries<G: Geometry, V: WideVariant<G>>(
+    pos: &GenericPosition<G, V>,
+    variant: &str,
+    fen: &str,
+) {
+    let board = pos.board();
+    let us = pos.turn();
+
+    // is_in_check(turn) is exactly the proven is_check; and a legal position never
+    // leaves the side that just moved (turn.opposite()) in check.
+    assert_eq!(
+        pos.is_in_check(us),
+        pos.is_check(),
+        "is_in_check(turn) != is_check in {variant}, FEN: {fen}",
+    );
+    assert!(
+        !pos.is_in_check(us.opposite()),
+        "the side that just moved is in check in {variant}, FEN: {fen}",
+    );
+
+    for c in Color::ALL {
+        let royals = pos.royal_squares(c);
+        let checkers = pos.checkers_of(c);
+        // Every checker is an enemy piece whose threat set actually covers a royal
+        // of c — reverse (attackers) and forward (piece_attacks) agree per piece.
+        for chk in checkers {
+            assert!(
+                board.color_at(chk) == Some(c.opposite()),
+                "checker {i} of {c:?} is not an enemy piece in {variant}, FEN: {fen}",
+                i = chk.index(),
+            );
+            let threats = pos
+                .piece_attacks(chk)
+                .expect("a checker occupies its square");
+            assert!(
+                !(threats & royals).is_empty(),
+                "checker {i} of {c:?} does not attack a royal in {variant}, FEN: {fen}",
+                i = chk.index(),
+            );
+        }
+        // A single-royal side is in check iff it has a piece checker (the
+        // flying-general term aside, which only adds check); so a non-empty checker
+        // set on a single royal always means in check.
+        if royals.count() == 1 && !checkers.is_empty() {
+            assert!(
+                pos.is_in_check(c),
+                "checkers present but not in check in {variant}, color {c:?}, FEN: {fen}",
+            );
+        }
+
+        // Pins are friendly, non-royal, and each has a ray through a king that the
+        // pin query reports; unpinned friendly pieces report no ray.
+        let pinned = pos.pinned_pieces(c);
+        assert!(
+            (pinned & !board.by_color(c)).is_empty(),
+            "pinned_pieces({c:?}) includes a non-{c:?} piece in {variant}, FEN: {fen}",
+        );
+        assert!(
+            (pinned & royals).is_empty(),
+            "a royal is reported pinned in {variant}, color {c:?}, FEN: {fen}",
+        );
+        for index in 0..G::SQUARES {
+            let sq = Square::<G>::new(index);
+            let ray = pos.pin_ray_of(c, sq);
+            if pinned.contains(sq) {
+                let ray = ray.expect("a pinned piece has a pin ray");
+                assert!(
+                    ray.contains(sq),
+                    "pin ray of {index} excludes the pinned piece in {variant}, FEN: {fen}",
+                );
+            } else {
+                assert!(
+                    ray.is_none(),
+                    "unpinned square {index} reports a pin ray in {variant}, color {c:?}, FEN: {fen}",
+                );
+            }
+        }
+    }
+
+    // checkers() is checkers_of(turn).
+    assert!(
+        pos.checkers() == pos.checkers_of(us),
+        "checkers() != checkers_of(turn) in {variant}, FEN: {fen}",
+    );
+
+    // legal_moves_from partitions legal_moves by origin, and every pinned piece of
+    // the side to move keeps its legal moves on its pin ray.
+    let all = pos.legal_moves();
+    let mut counted = 0usize;
+    let pinned_us = pos.pinned_pieces(us);
+    // A geometric pin to one royal confines movement only under single-royal
+    // legality; a multi-king side (Spartan) may legally expose one king (it is in
+    // check only under *duple* attack), so that tie is asserted only when the side
+    // to move has exactly one royal.
+    let confines = pos.royal_squares(us).count() == 1;
+    for index in 0..G::SQUARES {
+        let sq = Square::<G>::new(index);
+        let from_here = pos.legal_moves_from(sq);
+        for mv in &from_here {
+            assert_eq!(
+                mv.from::<G>(),
+                sq,
+                "legal_moves_from({index}) returned a foreign-origin move in {variant}, FEN: {fen}",
+            );
+        }
+        counted += from_here.len();
+        if confines && pinned_us.contains(sq) {
+            let ray = pos
+                .pin_ray_of(us, sq)
+                .expect("a pinned piece of the mover has a ray");
+            for mv in &from_here {
+                assert!(
+                    ray.contains(mv.to::<G>()),
+                    "pinned piece at {index} moves off its pin ray in {variant}\n  \
+                     move={mv:?}\n  FEN: {fen}",
+                );
+            }
+        }
+    }
+    assert_eq!(
+        counted,
+        all.len(),
+        "legal_moves_from does not partition legal_moves in {variant}, FEN: {fen}",
+    );
+}
+
+/// Asserts every property on one position.
 fn assert_all<G: Geometry, V: WideVariant<G>>(
     pos: &GenericPosition<G, V>,
     variant: &str,
@@ -177,6 +305,7 @@ fn assert_all<G: Geometry, V: WideVariant<G>>(
 ) {
     assert_primitives(pos, variant, fen);
     assert_move_gen(pos, variant, fen);
+    assert_queries(pos, variant, fen);
 }
 
 /// Runs the properties over the start position and `SEEDS`-driven playouts.
