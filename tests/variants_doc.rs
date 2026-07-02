@@ -292,8 +292,8 @@ fn wide_meta(id: WideVariantId) -> Meta {
         WideVariantId::Chu => Meta {
             display: "Chu Shogi (12x12)",
             pieces: "The 21-type Chu Shogi army: King, Free King, Lion, Dragon King/Horse, Kirin, Phoenix, Side/Vertical Mover, Copper/Silver/Gold/Ferocious Leopard/Blind Tiger/Drunk Elephant, Lance, Reverse Chariot, Go-Between, Pawn, and their promoted forms.",
-            rules: "No hand or drops; per-piece promotion on entering the far four ranks; two royals (King and the promoted Prince). The Lion and lion-power promoted pieces are modeled as jumping leapers (igui / double-capture / lion-trading not yet modeled).",
-            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 is a byte-identical move-set match and perft(2)=1296 matches exactly; perft(3) mce=47955 vs HaChu=47952 (a 3-node over-generation, pinned as a regression value).",
+            rules: "No hand or drops; mandatory promotion on entering the far four ranks (HaChu's promote-on-entry); two royals (King and the promoted Prince). The Lion and lion-power promoted pieces (Horned Falcon, Soaring Eagle) have their full move set: igui, double capture, two-step area move, and jitto pass. Lion-trading restrictions are not enforced (HaChu does not enforce them either).",
+            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 (byte-identical move set) and perft(2)=1296 match node-for-node; perft(3) mce=48319 vs HaChu=48317, agreeing at every node but one where HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mce is correct).",
         },
         WideVariantId::Courier => Meta {
             display: "Courier chess (12x8)",
