@@ -40,18 +40,18 @@
 
 use mce::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
-    CapahouseRules, ChakRules, ChancellorRules, ChennisRules, DobutsuRules, DragonRules, DuckRules,
-    EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules, GrandRules,
-    GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules, KnightmateRules,
-    KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MansindamRules, MinishogiRules,
-    MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules,
-    ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules,
-    SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules, WashogiRules,
-    WideRole, WideVariant, XiangfuRules, XiangqiRules,
+    CapahouseRules, ChakRules, ChancellorRules, ChennisRules, CourierRules, DobutsuRules,
+    DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules,
+    GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, KhansRules,
+    KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules, MansindamRules,
+    MinishogiRules, MinixiangqiRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules,
+    ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
+    ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, ToriRules,
+    WashogiRules, WideRole, WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
-    Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Dobutsu3x4, Gorogoro5x6, Grand10x10, Minishogi5x5,
-    Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11, Xiangqi9x10,
+    Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Courier12x8, Dobutsu3x4, Gorogoro5x6, Grand10x10,
+    Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11, Xiangqi9x10,
 };
 use mce::Color;
 
@@ -466,6 +466,35 @@ variant_test!(
         "r3k3r/9/9/9/9/9/9/9/R3K3R w KQkq - 0 1",
         "r1bqke1br/ppp2pppp/2n2n3/3pp4/9/3PP4/2N2N3/PPP2PPPP/R1BQKE1BR w KQkq - 0 5",
         "4k4/P8/9/9/9/9/9/9/4K4 w - - 0 1",
+    ]
+);
+
+// -- Courier (12x8) ---------------------------------------------------------
+//
+// Courier chess is standard western Rook / Knight / Bishop / King plus the
+// short-range medieval leapers — the Courier (`*x` / [`WideRole::Alfil`], a
+// two-square diagonal jumper), the Ferz (`m` / [`WideRole::Met`], one diagonal
+// step), the Wazir (`*j` / [`WideRole::Wazir`], one orthogonal step), and the Man
+// (`*u` / [`WideRole::Commoner`], a non-royal king). Every one of those attack
+// sets is geometrically symmetric, so only the pawn is colour-directional, exactly
+// as standard chess. This guards that each leaper's `role_attacks` set and the
+// `attackers_to` reverse-projection agree on the distinct [`Courier12x8`] geometry
+// — in particular that an Alfil check (a two-diagonal jump from a square collinear
+// with the king) is detected on both the forward (king-danger) and reverse paths.
+// The corpus (mce dialect) pairs the FSF-confirmed developed midgame and promotion
+// positions from `tests/perft_courier.rs` with an Alfil-check position and a
+// Wazir/Man/Ferz endgame (both sides armed so no node is a baring leaf).
+
+variant_test!(
+    courier,
+    Courier12x8,
+    CourierRules,
+    "courier",
+    [
+        "r1*xb*uk1*jb*xnr/2ppp2pppp1/1pn2pm5/p5p4p/P5P4P/1P2*XPM5/2PPP2PPPP1/RN1B*UK1*JB*XNR w - - 0 4",
+        "3r7k/1P10/12/12/12/12/12/K11 w - - 0 1",
+        "6r4k/12/12/12/5*X6/12/12/K11 w - - 0 1",
+        "7r3k/12/12/12/4*J*U6/5m6/12/K11 w - - 0 1",
     ]
 );
 

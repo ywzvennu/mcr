@@ -23,12 +23,12 @@ use core::str::FromStr;
 
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Caparandom, Chak, Chancellor, Chennis, Chigorin, Dobutsu, Dragon, Duck, Embassy, Empire,
-    FogOfWar, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi,
-    Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi,
-    Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
-    Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori, WideEndReason, WideFenError,
-    WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Caparandom, Chak, Chancellor, Chennis, Chigorin, Courier, Dobutsu, Dragon, Duck, Embassy,
+    Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
+    Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam,
+    Minishogi, Minixiangqi, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj,
+    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tori, WideEndReason,
+    WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -402,6 +402,7 @@ wide_variants! {
     Chancellor, Chancellor, "chancellor";
     Chennis, Chennis, "chennis";
     Chigorin, Chigorin, "chigorin";
+    Courier, Courier, "courier";
     Dobutsu, Dobutsu, "dobutsu";
     Dragon, Dragon, "dragon";
     Duck, Duck, "duck";
@@ -484,7 +485,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 55, "all 55 fairy variants are covered");
+        assert_eq!(count, 56, "all 56 fairy variants are covered");
     }
 
     #[test]
@@ -664,6 +665,7 @@ mod tests {
             AnyWideVariant::Chigorin,
             2
         );
+        agrees_with_typed!(WideVariantId::Courier, Courier, AnyWideVariant::Courier, 2);
         agrees_with_typed!(WideVariantId::Dobutsu, Dobutsu, AnyWideVariant::Dobutsu, 2);
         agrees_with_typed!(WideVariantId::Dragon, Dragon, AnyWideVariant::Dragon, 2);
         agrees_with_typed!(WideVariantId::Duck, Duck, AnyWideVariant::Duck, 2);
