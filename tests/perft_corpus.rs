@@ -35,6 +35,17 @@
 //!   the per-variant `tests/perft_*.rs` suites, which were validated
 //!   node-for-node against FSF when each variant landed. **This test never
 //!   invokes FSF** — it only checks mce against the pinned constants.
+//! - **Generic-geometry Capablanca-family & long-tail variants** (almost, amazon,
+//!   chigorin, gothic, embassy, janus, caparandom, chancellor, courier, tencubed,
+//!   opulent) — like the wide/fairy set, no published perft table exists, so each
+//!   startpos count was produced with the FSF oracle (`UCI_Variant <name>`, `go
+//!   perft`) and pinned here. Every depth below was **re-confirmed against FSF on
+//!   2026-07-02** and also matches the per-variant `tests/perft_<name>.rs` suites.
+//! - **Chu Shogi** (12x12) — the reference oracle is **HaChu** (no FSF perft). The
+//!   depth-1/2 counts are byte-identical/node-for-node HaChu matches; depth-3 pins
+//!   mce's *correct* 48319 (HaChu 0.23 yields 48317 via a documented
+//!   anti-diagonal-Lion bug that misses two legal captures — mce is right); depth-4
+//!   is an mce regression pin. See `tests/perft_chu.rs` for the full write-up.
 //!
 //! # Layering
 //!
@@ -45,7 +56,11 @@
 //! cargo test --release --test perft_corpus -- --include-ignored
 //! ```
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mce::geometry::{
+    perft as gperft, Almost, Amazon, AnyWideVariant, Cap10x8, Caparandom, Chancellor, Chess8x8,
+    Chess9x9, Chigorin, Chu, Chu12x12, Courier, Courier12x8, Embassy, Gothic, Grand10x10, Janus,
+    Opulent, Tencubed, WideVariantId,
+};
 use mce::{perft, perft_variant, AnyVariant, Chess960, Position, VariantId};
 
 /// One reference position: a label, its FEN, and the pinned `(depth, nodes)`
@@ -408,18 +423,34 @@ const WIDE: &[WideStartCase] = &[
         nodes: &[(1, 44), (2, 1920), (3, 79666), (4, 3290240), (5, 133312995)],
         cheap_max: 3,
     },
-    // FSF shogi startpos perft: 30 / 900 / 25470 / 719731 / 19861490, confirmed 2026-07-01.
+    // FSF shogi startpos perft: 30 / 900 / 25470 / 719731 / 19861490 / 547581517,
+    // depths 1-5 confirmed 2026-07-01; depth 6 confirmed 2026-07-02.
     WideStartCase {
         id: WideVariantId::Shogi,
         label: "shogi",
-        nodes: &[(1, 30), (2, 900), (3, 25470), (4, 719731), (5, 19861490)],
+        nodes: &[
+            (1, 30),
+            (2, 900),
+            (3, 25470),
+            (4, 719731),
+            (5, 19861490),
+            (6, 547581517),
+        ],
         cheap_max: 3,
     },
-    // FSF minishogi startpos perft: 14 / 181 / 2512 / 35401 / 533203, confirmed 2026-07-01.
+    // FSF minishogi startpos perft: 14 / 181 / 2512 / 35401 / 533203 / 8276188,
+    // depths 1-5 confirmed 2026-07-01; depth 6 confirmed 2026-07-02.
     WideStartCase {
         id: WideVariantId::Minishogi,
         label: "minishogi",
-        nodes: &[(1, 14), (2, 181), (3, 2512), (4, 35401), (5, 533203)],
+        nodes: &[
+            (1, 14),
+            (2, 181),
+            (3, 2512),
+            (4, 35401),
+            (5, 533203),
+            (6, 8276188),
+        ],
         cheap_max: 4,
     },
     // FSF makruk startpos perft: 23 / 529 / 12012 / 273026 / 6223994 / 142078049, confirmed 2026-07-01.
@@ -472,11 +503,18 @@ const WIDE: &[WideStartCase] = &[
         ],
         cheap_max: 4,
     },
-    // FSF grand startpos perft: 65 / 4225 / 259514 / 15921643, confirmed 2026-07-01.
+    // FSF grand startpos perft: 65 / 4225 / 259514 / 15921643 / 959883584,
+    // depths 1-4 confirmed 2026-07-01; depth 5 confirmed 2026-07-02.
     WideStartCase {
         id: WideVariantId::Grand,
         label: "grand",
-        nodes: &[(1, 65), (2, 4225), (3, 259514), (4, 15921643)],
+        nodes: &[
+            (1, 65),
+            (2, 4225),
+            (3, 259514),
+            (4, 15921643),
+            (5, 959883584),
+        ],
         cheap_max: 3,
     },
     // FSF shako startpos perft: 58 / 3364 / 185938 / 10273158 / 559582321, confirmed 2026-07-01.
@@ -492,11 +530,19 @@ const WIDE: &[WideStartCase] = &[
         ],
         cheap_max: 3,
     },
-    // FSF minixiangqi startpos perft: 19 / 331 / 6664 / 127164 / 2666905, confirmed 2026-07-01.
+    // FSF minixiangqi startpos perft: 19 / 331 / 6664 / 127164 / 2666905 / 54612676,
+    // depths 1-5 confirmed 2026-07-01; depth 6 confirmed 2026-07-02.
     WideStartCase {
         id: WideVariantId::Minixiangqi,
         label: "minixiangqi",
-        nodes: &[(1, 19), (2, 331), (3, 6664), (4, 127164), (5, 2666905)],
+        nodes: &[
+            (1, 19),
+            (2, 331),
+            (3, 6664),
+            (4, 127164),
+            (5, 2666905),
+            (6, 54612676),
+        ],
         cheap_max: 4,
     },
 ];
@@ -528,4 +574,267 @@ fn wide_variants_deep() {
             |d| pos.perft(d),
         );
     }
+}
+
+// ===========================================================================
+// Generic-geometry Capablanca-family & long-tail variants — FSF-confirmed
+// startpos perft, pinned as constants. Each was produced with `UCI_Variant
+// <name>` / `go perft` on the FSF oracle (`largeboards=yes` for the wide
+// boards) and **re-confirmed against FSF on 2026-07-02**. The same numbers
+// appear in the per-variant `tests/perft_<name>.rs` suites. FENs are the mce
+// dialect (compound pieces spelled with mce's overflow tokens); FSF spells the
+// compounds with its own single letters (see each `tests/perft_<name>.rs`).
+// This test never invokes FSF — it only checks mce against the pinned counts.
+// ===========================================================================
+
+/// A generic-geometry reference: a label, its mce-dialect FEN, the pinned
+/// `(depth, nodes)` pairs, and the cheap-layer cutoff. Checked through the typed
+/// [`mce::geometry::perft`] for the geometry named by the enclosing group.
+struct GeomCase {
+    /// A short human label (the variant name).
+    label: &'static str,
+    /// The startpos in the mce FEN dialect.
+    fen: &'static str,
+    /// The pinned `(depth, node-count)` reference pairs.
+    nodes: &'static [(u32, u64)],
+    /// The deepest depth that runs in the cheap (non-`#[ignore]`) layer.
+    cheap_max: u32,
+}
+
+/// Emits a `<cheap>` / `<deep>` `#[test]` pair that runs every [`GeomCase`] in
+/// `$cases` through `gperft::<$geom, _>`, the cheap test keeping depths
+/// `<= cheap_max` and the `#[ignore]`d deep test the rest. `$ty` is the variant
+/// position type (its `from_fen` parses the mce-dialect FEN).
+macro_rules! geom_group {
+    ($cheap:ident, $deep:ident, $ty:ty, $geom:ty, $cases:expr) => {
+        #[test]
+        fn $cheap() {
+            for c in $cases {
+                let pos = <$ty>::from_fen(c.fen).expect("valid variant FEN");
+                run(
+                    c.label,
+                    c.fen,
+                    c.nodes,
+                    |d| d <= c.cheap_max,
+                    |d| gperft::<$geom, _>(&pos, d),
+                );
+            }
+        }
+
+        #[test]
+        #[ignore = "deep perft; run with --release --test perft_corpus -- --ignored"]
+        fn $deep() {
+            for c in $cases {
+                let pos = <$ty>::from_fen(c.fen).expect("valid variant FEN");
+                run(
+                    c.label,
+                    c.fen,
+                    c.nodes,
+                    |d| d > c.cheap_max,
+                    |d| gperft::<$geom, _>(&pos, d),
+                );
+            }
+        }
+    };
+}
+
+// -- 8x8 Capablanca-family (Queen swapped / asymmetric armies) --------------
+// FSF `almost` / `amazon` / `chigorin`, confirmed 2026-07-02. Each is its own
+// rules type on the shared `Chess8x8` geometry, so it gets its own group.
+const ALMOST: &[GeomCase] = &[GeomCase {
+    // almost: Queen -> Chancellor (Rook+Knight). FSF almost startpos.
+    label: "almost",
+    fen: "rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1",
+    nodes: &[(1, 22), (2, 484), (3, 11895), (4, 290522), (5, 7812388)],
+    cheap_max: 4,
+}];
+geom_group!(
+    geom_almost_cheap,
+    geom_almost_deep,
+    Almost,
+    Chess8x8,
+    ALMOST
+);
+
+const AMAZON: &[GeomCase] = &[GeomCase {
+    // amazon: Queen -> Amazon (Queen+Knight). FSF amazon startpos.
+    label: "amazon",
+    fen: "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1",
+    nodes: &[(1, 22), (2, 484), (3, 12483), (4, 318185), (5, 9319911)],
+    cheap_max: 4,
+}];
+geom_group!(
+    geom_amazon_cheap,
+    geom_amazon_deep,
+    Amazon,
+    Chess8x8,
+    AMAZON
+);
+
+const CHIGORIN: &[GeomCase] = &[GeomCase {
+    // chigorin: White knight army + Chancellor vs Black bishop army + Queen.
+    // FSF chigorin startpos.
+    label: "chigorin",
+    fen: "rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1",
+    nodes: &[(1, 26), (2, 416), (3, 11408), (4, 229973), (5, 6624527)],
+    cheap_max: 4,
+}];
+geom_group!(
+    geom_chigorin_cheap,
+    geom_chigorin_deep,
+    Chigorin,
+    Chess8x8,
+    CHIGORIN
+);
+
+// -- 10x8 Capablanca board (Chancellor + Archbishop army) -------------------
+// FSF `gothic` / `embassy` / `janus` / `caparandom` (largeboards), confirmed
+// 2026-07-02. All share the `Cap10x8` geometry but each is its own rules type,
+// so each gets its own group.
+const GOTHIC: &[GeomCase] = &[GeomCase {
+    // gothic: Capablanca board, Gothic back-rank order. FSF gothic startpos.
+    label: "gothic",
+    fen: "rnbqekabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQEKABNR w KQkq - 0 1",
+    nodes: &[(1, 28), (2, 784), (3, 25283), (4, 808984), (5, 28946187)],
+    cheap_max: 3,
+}];
+geom_group!(geom_gothic_cheap, geom_gothic_deep, Gothic, Cap10x8, GOTHIC);
+
+const EMBASSY: &[GeomCase] = &[GeomCase {
+    // embassy: Capablanca board, king on e-file. FSF embassy startpos.
+    label: "embassy",
+    fen: "rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1",
+    nodes: &[(1, 28), (2, 784), (3, 25281), (4, 809539), (5, 28937546)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_embassy_cheap,
+    geom_embassy_deep,
+    Embassy,
+    Cap10x8,
+    EMBASSY
+);
+
+const JANUS: &[GeomCase] = &[GeomCase {
+    // janus: Capablanca board, two Januses (Bishop+Knight), no Chancellor. FSF
+    // janus startpos.
+    label: "janus",
+    fen: "ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1",
+    nodes: &[(1, 28), (2, 782), (3, 24747), (4, 772074), (5, 26869186)],
+    cheap_max: 3,
+}];
+geom_group!(geom_janus_cheap, geom_janus_deep, Janus, Cap10x8, JANUS);
+
+const CAPARANDOM: &[GeomCase] = &[GeomCase {
+    // caparandom: Capablanca army shuffled, Chess960-style castling (file-letter
+    // `JAja` rights). FSF caparandom startpos (canonical Capablanca array).
+    label: "caparandom",
+    fen: "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1",
+    nodes: &[(1, 28), (2, 784), (3, 25228), (4, 805128)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_caparandom_cheap,
+    geom_caparandom_deep,
+    Caparandom,
+    Cap10x8,
+    CAPARANDOM
+);
+
+// -- 9x9 Chancellor chess --------------------------------------------------
+// FSF `chancellor` (largeboards), confirmed 2026-07-02.
+const CHANCELLOR: &[GeomCase] = &[GeomCase {
+    // chancellor: standard army widened to 9x9 with a Chancellor. FSF startpos.
+    label: "chancellor",
+    fen: "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1",
+    nodes: &[(1, 24), (2, 576), (3, 15896), (4, 436656), (5, 13466196)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_chancellor_cheap,
+    geom_chancellor_deep,
+    Chancellor,
+    Chess9x9,
+    CHANCELLOR
+);
+
+// -- 12x8 Courier chess ----------------------------------------------------
+// FSF `courier` (largeboards), confirmed 2026-07-02. Non-standard start array
+// (advanced a/g/l pawns, Ferz on g3/g6); short-range Alfil/Ferz/Wazir/Man army.
+const COURIER: &[GeomCase] = &[GeomCase {
+    label: "courier",
+    fen:
+        "rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1",
+    nodes: &[(1, 26), (2, 678), (3, 18406), (4, 500337), (5, 14144849)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_courier_cheap,
+    geom_courier_deep,
+    Courier,
+    Courier12x8,
+    COURIER
+);
+
+// -- 10x10 Omega-family (Grand board + extra leapers) ----------------------
+// FSF `tencubed` / `opulent` (largeboards), confirmed 2026-07-02.
+const TENCUBED: &[GeomCase] = &[GeomCase {
+    // tencubed: Grand army + Wizard (Camel+Ferz) + Champion (Wazir+Alfil+Dabbaba).
+    label: "tencubed",
+    fen: "2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1",
+    nodes: &[(1, 40), (2, 1600), (3, 68230), (4, 2906895), (5, 131575398)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_tencubed_cheap,
+    geom_tencubed_deep,
+    Tencubed,
+    Grand10x10,
+    TENCUBED
+);
+
+const OPULENT: &[GeomCase] = &[GeomCase {
+    // opulent: Grand army + Wizard + Lion (Ferz+Dabbaba+Threeleaper) + augmented
+    // Knight (Knight+Wazir).
+    label: "opulent",
+    fen: "r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1",
+    nodes: &[(1, 50), (2, 2500), (3, 133829), (4, 7147971), (5, 402780823)],
+    cheap_max: 3,
+}];
+geom_group!(
+    geom_opulent_cheap,
+    geom_opulent_deep,
+    Opulent,
+    Grand10x10,
+    OPULENT
+);
+
+// ===========================================================================
+// Chu Shogi (12x12) — HaChu-referenced, pinned as constants.
+//
+// The reference oracle is HaChu (H. G. Muller); FSF has no Chu perft. Depth 1
+// (36) is a byte-identical move-set match; depth 2 (1296) matches HaChu
+// node-for-node. Depth 3 pins mce's **correct** 48319: HaChu 0.23 yields 48317
+// because of a documented anti-diagonal-Lion bug (it misses two legal captures
+// after `1. f3f5 d8d7`) — mce is right, and every other node matches. Depth 4
+// (1802285) is an mce-only regression pin (a node-by-node HaChu cross-check at
+// ~1.8M nodes is intractable). See `tests/perft_chu.rs` for the full write-up.
+// ===========================================================================
+
+/// Chu start-position perft, cheap layer (depths 1-3). Depth 3's 48319 is mce's
+/// correct value (HaChu 0.23's buggy 48317 is *not* pinned; see the module head).
+#[test]
+fn chu_cheap() {
+    let pos = Chu::startpos();
+    assert_eq!(gperft::<Chu12x12, _>(&pos, 1), 36);
+    assert_eq!(gperft::<Chu12x12, _>(&pos, 2), 1296);
+    assert_eq!(gperft::<Chu12x12, _>(&pos, 3), 48319);
+}
+
+/// Chu start-position perft, deep layer (depth 4): an mce regression pin.
+#[test]
+#[ignore = "deep perft; run with --release --test perft_corpus -- --ignored"]
+fn chu_deep() {
+    let pos = Chu::startpos();
+    assert_eq!(gperft::<Chu12x12, _>(&pos, 4), 1802285);
 }
