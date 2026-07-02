@@ -1215,15 +1215,16 @@ mod tests {
                 let (w, h) = any.dimensions();
                 let squares = w * h;
                 for color in [Color::White, Color::Black] {
-                    assert_eq!(any.is_in_check(color), typed.is_in_check(color), "is_in_check");
-                    let typed_royals: Vec<u8> =
-                        square_indices(typed.royal_squares(color));
+                    assert_eq!(
+                        any.is_in_check(color),
+                        typed.is_in_check(color),
+                        "is_in_check"
+                    );
+                    let typed_royals: Vec<u8> = square_indices(typed.royal_squares(color));
                     assert_eq!(any.royal_squares(color), typed_royals, "royal_squares");
-                    let typed_checkers: Vec<u8> =
-                        square_indices(typed.checkers_of(color));
+                    let typed_checkers: Vec<u8> = square_indices(typed.checkers_of(color));
                     assert_eq!(any.checkers_of(color), typed_checkers, "checkers_of");
-                    let typed_pinned: Vec<u8> =
-                        square_indices(typed.pinned_pieces(color));
+                    let typed_pinned: Vec<u8> = square_indices(typed.pinned_pieces(color));
                     assert_eq!(any.pinned_pieces(color), typed_pinned, "pinned_pieces");
                     for i in 0..squares {
                         let sq = Square::new(i);

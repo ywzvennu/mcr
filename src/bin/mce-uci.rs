@@ -219,14 +219,19 @@ impl GamePos {
                 }
                 GameStatus::Stalemate => "draw (stalemate)".to_string(),
                 GameStatus::VariantWin { winner, reason } => {
-                    format!("variant_win winner={} reason={reason:?}", color_name(winner))
+                    format!(
+                        "variant_win winner={} reason={reason:?}",
+                        color_name(winner)
+                    )
                 }
                 GameStatus::Draw { reason } => format!("draw ({reason:?})"),
             },
             GamePos::Classic(p) => match p.outcome() {
                 None => checked("ongoing"),
                 Some(Outcome::Decisive { winner }) => match p.end_reason() {
-                    Some(reason) => format!("decisive winner={} reason={reason:?}", color_name(winner)),
+                    Some(reason) => {
+                        format!("decisive winner={} reason={reason:?}", color_name(winner))
+                    }
                     None => format!("decisive winner={}", color_name(winner)),
                 },
                 Some(Outcome::Draw) => match p.end_reason() {
@@ -507,7 +512,11 @@ impl Adapter {
             None => writeln!(
                 out,
                 "Checkers: {}",
-                if self.pos.is_check() { "(in check)" } else { "(none)" }
+                if self.pos.is_check() {
+                    "(in check)"
+                } else {
+                    "(none)"
+                }
             )?,
         }
         writeln!(out, "Status: {}", self.pos.status_line())
@@ -543,9 +552,7 @@ impl Adapter {
             "attacked" => {
                 // attacked <color> <square>
                 let color = tokens.get(1).and_then(|t| parse_color(t));
-                let square = tokens
-                    .get(2)
-                    .and_then(|t| parse_square(width, height, t));
+                let square = tokens.get(2).and_then(|t| parse_square(width, height, t));
                 match (color, square) {
                     (Some(color), Some(square)) => {
                         let attackers = p.attackers_of(square, color);
@@ -556,10 +563,7 @@ impl Adapter {
                             squares_text(width, &attackers)
                         )?;
                     }
-                    _ => writeln!(
-                        err,
-                        "info string usage: attacked <white|black> <square>"
-                    )?,
+                    _ => writeln!(err, "info string usage: attacked <white|black> <square>")?,
                 }
             }
             _ => {}

@@ -125,11 +125,9 @@ fn status_command_reports_ongoing_and_checkmate() {
 #[test]
 fn fairy_checkers_and_status_report_check() {
     // Almost Chess: Black king on e8 checked by a white rook on e1.
-    let out = run(
-        "setoption name UCI_Variant value almost\n\
+    let out = run("setoption name UCI_Variant value almost\n\
          position fen 4k3/8/8/8/8/8/8/4R1K1 b - - 0 1\n\
-         checkers\nstatus\nquit\n",
-    );
+         checkers\nstatus\nquit\n");
     assert_eq!(last_field(&out, "Checkers:"), Some("e1"));
     assert_eq!(last_field(&out, "Status:"), Some("ongoing (check)"));
 }
@@ -137,18 +135,13 @@ fn fairy_checkers_and_status_report_check() {
 #[test]
 fn fairy_pins_and_attacked_queries() {
     // A white bishop on e2 pinned to its king on e1 by a black rook on e8.
-    let out = run(
-        "setoption name UCI_Variant value almost\n\
+    let out = run("setoption name UCI_Variant value almost\n\
          position fen 4r3/8/8/8/8/8/4B3/4K3 w - - 0 1\n\
-         pins\nattacked white e2\nattacked black e2\nquit\n",
-    );
+         pins\nattacked white e2\nattacked black e2\nquit\n");
     assert_eq!(last_field(&out, "Pinned:"), Some("e2"));
     // e2 is defended by the white king on e1, and also attacked by the black rook
     // on e8 (e2 is the rook's first blocker — the pinned bishop it could capture).
-    let attacked: Vec<&str> = out
-        .lines()
-        .filter(|l| l.starts_with("Attacked:"))
-        .collect();
+    let attacked: Vec<&str> = out.lines().filter(|l| l.starts_with("Attacked:")).collect();
     assert_eq!(attacked, ["Attacked: yes by e1", "Attacked: yes by e8"]);
 }
 
@@ -168,16 +161,14 @@ fn position_fen_edge_cases_do_not_crash() {
     // A bare `position fen` (no FEN), a malformed FEN, a bare `position`, an
     // illegal trailing move, and a bad `attacked` argument are all handled without
     // aborting the process; the following `status` still answers.
-    let out = run(
-        "position fen\n\
+    let out = run("position fen\n\
          position fen not a real fen\n\
          position\n\
          setoption name UCI_Variant value xiangqi\n\
          position startpos moves e2e4\n\
          attacked purple z9\n\
          position startpos\n\
-         status\nquit\n",
-    );
+         status\nquit\n");
     // The process survived every malformed line and answered the final status.
     assert_eq!(last_field(&out, "Status:"), Some("ongoing"));
 }
@@ -187,11 +178,9 @@ fn checkers_square_names_match_divide_coordinates() {
     // The `checkers` / `attacked` coordinates use the same numbering as the
     // `go perft` divide moves: a rook checking down the e-file is reported as `e1`,
     // and a divide from that position lists moves in the same coordinate system.
-    let out = run(
-        "setoption name UCI_Variant value almost\n\
+    let out = run("setoption name UCI_Variant value almost\n\
          position fen 4k3/8/8/8/8/8/8/4R1K1 b - - 0 1\n\
-         checkers\ngo perft 1\nquit\n",
-    );
+         checkers\ngo perft 1\nquit\n");
     assert_eq!(last_field(&out, "Checkers:"), Some("e1"));
     // Every divide move origin is a coordinate the same parser reads (e.g. e8…).
     assert!(out.lines().any(|l| l.starts_with("e8")));
