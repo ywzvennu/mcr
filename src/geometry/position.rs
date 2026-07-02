@@ -3869,6 +3869,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     u.touch(captured, &self.board);
                 }
             }
+            // A Lion double capture / igui also removes a piece on its
+            // intermediate square; record that victim's role so undo restores it.
+            if mv.lion_captures_mid() {
+                if let Some(mid) = mv.lion_mid::<G>() {
+                    if let Some(captured) = self.board.role_at(mid) {
+                        u.touch(captured, &self.board);
+                    }
+                }
+            }
             if let Some(promo) = mv.kind().promotion() {
                 u.touch(promo, &self.board);
             }
@@ -4003,6 +4012,30 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // Drops are fully handled by the early return above (a drop has no
                 // origin piece, so it cannot share the board-move path).
                 unreachable!("drops are handled before the board-move match");
+            }
+            WideMoveKind::LionMove {
+                first_capture,
+                second_capture,
+            } => {
+                // A Chu Lion multi-step move: lift the Lion, remove up to two
+                // victims (the intermediate square and the destination), then land
+                // the Lion on `to`. For an igui / jitto pass `from == to`, so the
+                // Lion returns to its own square (a net-zero board move plus, for
+                // igui, the removed adjacent victim).
+                reset_clock = first_capture || second_capture;
+                self.board.remove_known(from, moving);
+                if first_capture {
+                    if let Some(mid) = mv.lion_mid::<G>() {
+                        if let Some(victim) = self.board.piece_at(mid) {
+                            self.board.remove_known(mid, victim);
+                        }
+                    }
+                }
+                // `set_piece` clears any occupant of `to` first, covering the
+                // destination capture (`second_capture`); for a pass / igui,
+                // `to == from` is empty after the lift, so this simply lands the
+                // Lion back home.
+                self.board.set_piece(to, moving);
             }
         }
 
@@ -4176,7 +4209,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             | WideMoveKind::DoublePawnPush
             | WideMoveKind::EnPassant
             | WideMoveKind::CastleKingside
-            | WideMoveKind::CastleQueenside => {
+            | WideMoveKind::CastleQueenside
+            // A Lion move carries the (never-promoted) Lion's bit from `from` to
+            // `to` like any board move; the intermediate victim, if any, is cleared
+            // with the destination bit. Chu Shogi has no crazyhouse promoted mask,
+            // so this arm is inert there — it exists only for match exhaustiveness.
+            | WideMoveKind::LionMove { .. } => {
                 if self.promoted.contains(from) {
                     self.promoted.clear(from);
                     self.promoted.set(to);
