@@ -7,13 +7,14 @@ carries no copyleft obligation — making it safe to use in permissive,
 proprietary, or any other projects alike.
 
 The library covers standard chess and eight classic variants on its frozen
-`u64` 8x8 engine, plus **47 fairy / pychess-class variants** (Xiangqi, Shogi,
-Makruk, Capablanca, Grand, and many more) on a parallel generic geometry layer,
-plus the standalone Ataxx game. Move generation for every variant is verified
-against published perft node counts and, where an oracle exists, node-for-node
-against [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish).
-It is rules-and-move-generation only: there is no search, evaluation, GUI, or
-network play.
+`u64` 8x8 engine, plus **60+ fairy / pychess-class variants** (Xiangqi, Shogi,
+Makruk, Capablanca, Grand, Chu Shogi, and many more) on a parallel generic
+geometry layer, plus the standalone Ataxx game. Move generation for every
+variant is verified against published perft node counts and, where an oracle
+exists, node-for-node against
+[Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish) (and HaChu
+for the large shogis). It is rules-and-move-generation only: there is no search,
+evaluation, GUI, or network play.
 
 For how the engine is built — the frozen 8x8 `u64` core and the parallel generic
 geometry layer the fairy variants ride — see [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -21,7 +22,7 @@ geometry layer the fairy variants ride — see [ARCHITECTURE.md](ARCHITECTURE.md
 ## Features
 
 - Perft-correct move generation for standard chess, eight classic variants, and
-  47 fairy variants spanning board sizes from 3x4 up to 10x10
+  60+ fairy variants spanning board sizes from 3x4 up to 12x12
 - FEN, UCI, and SAN (standard algebraic notation) parsing and serialization,
   including SAN/UCI/PGN for the fairy geometry layer
 - Incremental Zobrist hashing
@@ -57,13 +58,19 @@ suite under [`tests/`](tests).
 > board size, start FEN, notable pieces, special rules, and validation oracle —
 > see **[docs/variants.md](docs/variants.md)**. That table is generated straight
 > from the registries and drift-checked in CI, so it never falls behind the code.
+> For per-variant perft/node-rate figures, see
+> **[docs/perf-variants.md](docs/perf-variants.md)**.
 
-The 47 variants below ride the parallel **generic geometry layer**
+The variants below ride the parallel **generic geometry layer**
 ([`mce::geometry`]): `GenericPosition<G, V>` over a compile-time
 [`Geometry`]-parametrised `Bitboard<G>` / `Square<G>`,
 with a per-variant [`WideVariant`] rule layer. They
 are selectable at runtime through `AnyWideVariant` / `WideVariantId`. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for the layer's design.
+
+The tables here are a **representative selection** grouped by board geometry;
+the complete, drift-checked list of all 60+ variants is in
+[docs/variants.md](docs/variants.md).
 
 The **Validation** column records how each variant's move generation is pinned.
 "perft vs FSF" means mce's perft node counts were checked **node-for-node**
@@ -210,7 +217,7 @@ cargo run --release --manifest-path compare-fairy/Cargo.toml -- --build
 
 ```toml
 [dependencies]
-mce = "0.1"
+mce = "0.3"
 ```
 
 Parse a FEN, generate legal moves, play one, and read the outcome:
@@ -247,6 +254,28 @@ let e4 = pos.parse_uci("e2e4").unwrap();
 let after = pos.play(&e4);
 assert!(after.outcome().is_none());
 ```
+
+Drive a fairy variant on a non-8x8 board through the parallel `AnyWideVariant`
+surface (same shape, under `mce::geometry`):
+
+```rust
+use mce::geometry::{AnyWideVariant, WideVariantId};
+
+let id: WideVariantId = "shogi".parse().unwrap();
+let pos = AnyWideVariant::startpos(id);
+assert_eq!(pos.variant_id(), WideVariantId::Shogi);
+assert_eq!(pos.dimensions(), (9, 9)); // Shogi is a 9x9 board
+assert!(!pos.legal_moves().is_empty());
+```
+
+The two runtime-dispatch families (`AnyVariant` / `VariantId` for the concrete
+8x8 games; `AnyWideVariant` / `WideVariantId` for the fairy geometry layer)
+expose parallel method sets — `startpos` / `from_fen`, `variant_id`, `turn`,
+`legal_moves` / `legal_moves_from`, `play`, `outcome`, `end_reason`, `is_check`,
+`to_fen`, `perft`, and so on — so code written against one reads the same against
+the other. (The fairy family also carries a richer analysis surface — per-color
+`is_in_check`, `attackers_of`, `attack_map`, pins — some of which is mirrored on
+the concrete *core* `Position`; see [ARCHITECTURE.md](ARCHITECTURE.md).)
 
 ## Building and testing
 

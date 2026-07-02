@@ -7,7 +7,7 @@
 
 [package]
 name = "mce"
-description = "Clean-room, permissively licensed (MIT OR Apache-2.0) chess move-generation and rules library covering standard chess, Chess960, and 47+ fairy variants (Shogi, Xiangqi, Makruk, Capablanca, and more) validated against Fairy-Stockfish. Rules and move generation only — no search or evaluation."
+description = "Clean-room, permissively licensed (MIT OR Apache-2.0) chess move-generation and rules library covering standard chess, Chess960, and 60+ fairy variants (Shogi, Xiangqi, Makruk, Capablanca, Chu Shogi, and more) validated against Fairy-Stockfish. Rules and move generation only — no search or evaluation."
 version = "0.3.0"
 # Release-readiness is staged, but the actual crates.io upload is user-gated:
 # `publish = false` still guards against an accidental `cargo publish`. Flip to
