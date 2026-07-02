@@ -245,7 +245,10 @@ fn chu_lion_moves_round_trip_through_san_and_uci() {
     }
 
     assert!(lion_moves > 0, "the Chu walk must exercise Lion moves");
-    assert!(saw_igui, "expected to observe an igui (stationary capture) Lion move");
+    assert!(
+        saw_igui,
+        "expected to observe an igui (stationary capture) Lion move"
+    );
     assert!(saw_double, "expected to observe a double-capture Lion move");
     assert!(
         saw_two_step_capture,
@@ -295,7 +298,9 @@ fn kyoto_two_form_drops_are_uci_ambiguous_but_san_distinct() {
                 // The documented limit: >1 distinct legal drop share this UCI, and
                 // parse_uci can only return one of them.
                 found_collision = true;
-                let resolved = pos.parse_uci(uci).expect("a shared UCI still resolves to one move");
+                let resolved = pos
+                    .parse_uci(uci)
+                    .expect("a shared UCI still resolves to one move");
                 assert!(
                     group.contains(&resolved),
                     "parse_uci({uci:?}) must return one of the colliding drops",
