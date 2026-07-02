@@ -33,7 +33,7 @@ fn startpos_round_trips() {
     let pos = Chu::startpos();
     assert_eq!(
         pos.to_fen(),
-        "l***l***csgk**egs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSG**EKGS***C***LL w - - 0 1"
+        "l***l***csg**ekgs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSGK**EGS***C***LL w - - 0 1"
     );
 }
 

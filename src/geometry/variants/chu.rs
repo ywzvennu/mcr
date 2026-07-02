@@ -77,17 +77,19 @@ use super::super::Chu12x12;
 pub struct ChuRules;
 
 /// The confirmed Chu Shogi starting placement (mce dialect), matching the HaChu
-/// oracle's `variant chu` board — the chirality is cross-checked against HaChu
-/// (whose start-position legal-move set mce reproduces exactly; see `perft_chu`).
-/// White (uppercase) holds ranks 1–5; Black is the 180° rotation on ranks 8–12.
-/// Reading White's back rank a..l: Lance, Ferocious Leopard, Copper, Silver, Gold,
-/// Drunk Elephant, King, Gold, Silver, Copper, Ferocious Leopard, Lance — the Drunk
-/// Elephant on the f-file, the King on g. The three central files line up by
-/// promotion: f holds Elephant (r1) / Kirin (r2) / Lion (r3), and g holds King (r1)
-/// / Phoenix (r2) / Free King (r3), so each Kirin sits behind its Lion and each
-/// Phoenix behind its Free King. Dragon Kings render as `+R`, Dragon Horses as `+B`.
+/// oracle's `variant chu` board. The chirality is cross-checked against HaChu: its
+/// King sits on **f1** (verified — the piece there is the one that may step straight
+/// back, which only the King may) and its Lion on **f3**, and mce reproduces HaChu's
+/// start-position legal-move set exactly (see `perft_chu`). White (uppercase) holds
+/// ranks 1–5; Black is the 180° rotation on ranks 8–12. Reading White's back rank
+/// a..l: Lance, Ferocious Leopard, Copper, Silver, Gold, King, Drunk Elephant, Gold,
+/// Silver, Copper, Ferocious Leopard, Lance — the King on the f-file, the Drunk
+/// Elephant on g. The three central files line up by promotion: f holds King (r1) /
+/// Kirin (r2) / Lion (r3), and g holds Elephant (r1) / Phoenix (r2) / Free King
+/// (r3), so each Kirin sits behind its Lion and each Phoenix behind its Free King.
+/// Dragon Kings render as `+R`, Dragon Horses as `+B`.
 const CHU_PLACEMENT: &str = concat!(
-    "l***l***csgk**egs***c***ll/", // rank 12 (Black back: King f, Elephant g)
+    "l***l***csg**ekgs***c***ll/", // rank 12 (Black back: Elephant f, King g)
     "***r1b1***t***p***k***t1b1***r/", // rank 11 (Black: Phoenix f, Kirin g)
     "***i***vr+b+rq***n+r+br***v***i/", // rank 10 (Black: Free King f, Lion g)
     "pppppppppppp/",               // rank 9  (Black pawns)
@@ -97,7 +99,7 @@ const CHU_PLACEMENT: &str = concat!(
     "PPPPPPPPPPPP/",               // rank 4  (White pawns)
     "***I***VR+B+R***NQ+R+BR***V***I/", // rank 3  (White: Lion f, Free King g)
     "***R1B1***T***K***P***T1B1***R/", // rank 2  (White: Kirin f, Phoenix g)
-    "L***L***CSG**EKGS***C***LL"   // rank 1  (White back: Elephant f, King g)
+    "L***L***CSGK**EGS***C***LL"   // rank 1  (White back: King f, Elephant g)
 );
 
 impl ChuRules {
@@ -558,7 +560,7 @@ mod tests {
         let pos = Chu::startpos();
         assert_eq!(
             pos.to_fen(),
-            "l***l***csgk**egs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSG**EKGS***C***LL w - - 0 1"
+            "l***l***csg**ekgs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSGK**EGS***C***LL w - - 0 1"
         );
     }
 
