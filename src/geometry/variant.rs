@@ -820,13 +820,15 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// `false`, which keeps the original full-line pin mask so **every existing
     /// variant is byte-identical** by construction.
     ///
-    /// The two masks differ only for a **leaper** that can jump *past* its own
-    /// king: on the full line such a leaper would be wrongly permitted to land
-    /// on a collinear square beyond the king. Courier (whose Alfil leaps two
-    /// squares diagonally) is the only variant that overrides this to `true`.
-    /// For sliders the two masks are always equivalent (the king blocks the far
-    /// side and the pinner blocks beyond), so enabling it never changes a
-    /// slider's legal moves.
+    /// The two masks differ only for a **leaper** that can jump *past* the
+    /// pinning slider (or *past* its own king): on the full line such a leaper
+    /// would be wrongly permitted to land on a collinear square beyond the pinner
+    /// or the king, off the shielding segment. Variants with such leapers override
+    /// this to `true` — Courier (whose Alfil leaps two squares diagonally), the
+    /// Opulent and Ten-Cubed compounds, and Tori Shogi (whose Pheasant/Goose leap
+    /// straight past a pinner, issue #416). For sliders the two masks are always
+    /// equivalent (the king blocks the far side and the pinner blocks beyond), so
+    /// enabling it never changes a slider's legal moves.
     fn confine_pins_to_segment() -> bool {
         false
     }

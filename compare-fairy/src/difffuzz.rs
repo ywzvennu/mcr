@@ -600,19 +600,24 @@ const SPECS: &[Spec] = &[
 ///
 /// Currently held back (deeper-sweep candidate awaiting a fix):
 ///
-/// * **Tori** (Tori Shogi) — a latent **mce** bug surfaced by the deeper sweep
-///   (`--difffuzz --variant tori --seed 1 --games 8 --plies 60`, issue #394):
-///   a Pheasant pinned to its own king along a file is wrongly allowed to make
-///   its two-square forward *jump*, vacating the shielding square and leaving the
-///   king in check (FSF then has a king-capture in the child). mce generates the
-///   illegal `f5f3`; the correct `perft(1)` is 34, not 35. This is a sibling of
-///   the already-fixed "Tori Pheasant drop-interposition": the jump geometry
-///   needs the same post-move king-safety re-check. Tracked in mce issue #416;
-///   held back rather than fixed here (this crate is GPL-fenced and never touches
-///   the mce library). Repro FEN (Black to move):
-///   `*G*z1*y1*y*v/3*a1k1/*k*K*y2*z*Y/1*y*y*y*k*R*Y/1*Y1*Y*Y2/*V2*YK*Y*R/1*Z1*A*K*Z1[*Y*y] b - - 2 28`.
+/// * *(none — every surfaced candidate has been fixed and released below.)*
 ///
 /// Resolved and released back into the default sweep:
+///
+/// * **Tori** (Tori Shogi, issue #416) — a latent **mce** bug surfaced by the
+///   deeper sweep (`--difffuzz --variant tori --seed 1 --games 8 --plies 60`,
+///   issue #394): a Pheasant pinned to its own king along a file was wrongly
+///   allowed to make its two-square forward *jump*, vacating the shielding square
+///   and leaving the king in check (FSF then has a king-capture in the child). mce
+///   generated the illegal `f5f3`; the correct `perft(1)` is 34, not 35. A sibling
+///   of the already-fixed "Tori Pheasant drop-interposition" — a *jumping* leaper
+///   can leap past the pinning slider (or its own king) off the king-to-pinner
+///   segment. Fixed in mce by confining a pinned Tori piece to that segment
+///   (`ToriRules::confine_pins_to_segment`, the same hook Courier uses), which is
+///   byte-identical for Tori's sliders and every other variant. Repro FEN (Black
+///   to move):
+///   `*G*z1*y1*y*v/3*a1k1/*k*K*y2*z*Y/1*y*y*y*k*R*Y/1*Y1*Y*Y2/*V2*YK*Y*R/1*Z1*A*K*Z1[*Y*y] b - - 2 28`.
+///   Clean over seeds 1-3 (8 games × 80 plies, 0 divergences).
 ///
 /// * **Shako** (issue #335) — FSF forbids castling the king across a square a
 ///   **cannon** attacks over a screen, but mce's castling king-walk danger map
@@ -631,7 +636,7 @@ const SPECS: &[Spec] = &[
 ///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
 ///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
 ///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
-const HELD_BACK: &[WideVariantId] = &[WideVariantId::Tori];
+const HELD_BACK: &[WideVariantId] = &[];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {

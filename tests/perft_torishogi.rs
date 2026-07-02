@@ -92,3 +92,22 @@ fn pheasant_check_cannot_be_blocked_by_a_drop() {
 w - - 0 15";
     check(CHECK_BY_PHEASANT, &[(1, 3), (2, 134), (3, 4743)]);
 }
+
+/// Regression for the pinned-Pheasant jump bug (issue #416): a Pheasant pinned to
+/// its own king along a file may **not** take its two-square forward *jump*, which
+/// would vacate the shielding square and expose the king to the pinning slider.
+///
+/// Here the Black King is on f6, the Black Pheasant on f5, and the White Right
+/// Quail on f4; the Quail slides forward up the file (f4 -> f5 -> f6), so the
+/// Pheasant is the only shield. mce previously allowed the Pheasant's `f5f3` jump
+/// (over the Quail, off the king-to-pinner segment), leaving the king in check —
+/// perft(1) was 35 with the illegal `f5f3`. Confining a pinned piece to the
+/// king-to-pinner segment drops it; the correct count is 34. FSF (`torishogi`,
+/// same position) confirms 34 / 1048 / 30652.
+#[test]
+fn pinned_pheasant_cannot_take_its_forward_jump() {
+    const PINNED_PHEASANT: &str =
+        "*G*z1*y1*y*v/3*a1k1/*k*K*y2*z*Y/1*y*y*y*k*R*Y/1*Y1*Y*Y2/*V2*YK*Y*R/1*Z1*A*K*Z1[*Y*y] \
+b - - 2 28";
+    check(PINNED_PHEASANT, &[(1, 34), (2, 1048), (3, 30652)]);
+}
