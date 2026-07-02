@@ -226,6 +226,17 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// The wrapped variant's board dimensions `(width, height)` in
+            /// `(files, ranks)`, read from its [`Geometry`] — e.g. `(8, 8)` for
+            /// the 8x8 fairy variants, `(9, 10)` for Xiangqi, `(12, 8)` for
+            /// Courier. Fixed by the variant, independent of the position.
+            #[must_use]
+            pub fn dimensions(&self) -> (u8, u8) {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.dimensions(), )+
+                }
+            }
+
             /// The side to move.
             #[must_use]
             pub fn turn(&self) -> Color {

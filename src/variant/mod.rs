@@ -166,6 +166,22 @@ pub enum VariantId {
 }
 
 impl VariantId {
+    /// Every concrete 8x8 variant identifier, in declaration order. The
+    /// counterpart of [`WideVariantId::ALL`](crate::geometry::WideVariantId::ALL)
+    /// for the fairy layer; lets callers enumerate the whole concrete registry
+    /// (e.g. to build a reference table) without hard-coding the list.
+    pub const ALL: &'static [VariantId] = &[
+        VariantId::Standard,
+        VariantId::Chess960,
+        VariantId::Atomic,
+        VariantId::Antichess,
+        VariantId::Crazyhouse,
+        VariantId::KingOfTheHill,
+        VariantId::ThreeCheck,
+        VariantId::RacingKings,
+        VariantId::Horde,
+    ];
+
     /// The lowercase identifier used in textual contexts.
     #[must_use]
     pub const fn as_str(self) -> &'static str {

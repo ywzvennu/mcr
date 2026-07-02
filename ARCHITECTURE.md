@@ -132,6 +132,14 @@ is the type-erased enum wrapper that does this, selected by a `WideVariantId`.
 Dynamic dispatch lives **only** at this outer enum; the inner hot loops stay
 monomorphised and dispatch-free.
 
+For a complete, always-current reference of every registered variant — board
+size, start FEN, notable pieces, special rules, and validation oracle — see
+[`docs/variants.md`](docs/variants.md). It is generated from the registries
+(`VariantId` / `WideVariantId`, `AnyWideVariant::dimensions`, and each start
+position's `to_fen()`) by `tests/variants_doc.rs`, which also drift-checks the
+committed copy against a fresh render, so the reference cannot fall behind the
+code.
+
 ### Geometry families
 
 The shipped geometries, by backing integer:
