@@ -23,7 +23,7 @@ use core::str::FromStr;
 
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Caparandom, Chak, Chancellor, Chennis, Chigorin, Courier, Dobutsu, Dragon, Duck, Embassy,
+    Caparandom, Chak, Chancellor, Chennis, Chigorin, Chu, Courier, Dobutsu, Dragon, Duck, Embassy,
     Empire, FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
     HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu,
     Mansindam, Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako,
@@ -566,6 +566,7 @@ wide_variants! {
     Chancellor, Chancellor, "chancellor";
     Chennis, Chennis, "chennis";
     Chigorin, Chigorin, "chigorin";
+    Chu, Chu, "chu", "chushogi", "chu-shogi";
     Courier, Courier, "courier";
     Dobutsu, Dobutsu, "dobutsu";
     Dragon, Dragon, "dragon";
@@ -651,7 +652,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 58, "all 58 fairy variants are covered");
+        assert_eq!(count, 59, "all 59 fairy variants are covered");
     }
 
     #[test]
