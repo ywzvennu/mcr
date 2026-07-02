@@ -1,13 +1,16 @@
 //! Checkshogi (Check Shogi, 9x9) on the generic engine — **standard 9x9 Shogi**
-//! ([`shogi`](super::shogi)) with a single terminal twist: **giving check wins the
-//! game**. Validated against Fairy-Stockfish `UCI_Variant checkshogi`.
+//! ([`shogi`]) with a single terminal twist: **giving check wins the game**.
+//! Validated against Fairy-Stockfish `UCI_Variant checkshogi`.
 //!
 //! Every piece, the persistent capture-fed **hand**, **drops**, the far-three-rank
 //! **promotion zone**, and all drop / promotion legality are exactly Shogi's — this
-//! rule layer **delegates every move-generation hook to
-//! [`ShogiRules`](super::shogi::ShogiRules)** and overrides only the terminal rule.
-//! It reuses the same [`Shogi9x9`](super::super::Shogi9x9) geometry and army; the
-//! FEN placement, piece letters, and hand bracket are identical to Shogi.
+//! rule layer **delegates every move-generation hook to [`ShogiRules`]** and
+//! overrides only the terminal rule. It reuses the same [`Shogi9x9`] geometry and
+//! army; the FEN placement, piece letters, and hand bracket are identical to Shogi.
+//!
+//! [`shogi`]: super::shogi
+//! [`ShogiRules`]: super::shogi::ShogiRules
+//! [`Shogi9x9`]: super::super::Shogi9x9
 //!
 //! ## The check-win rule
 //!
