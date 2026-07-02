@@ -77,8 +77,8 @@ pub use variant::{
 pub use variants::{
     Alice, AliceRules, Almost, AlmostRules, Amazon, AmazonRules, Asean, AseanRules, Bughouse,
     BughouseRules, Cambodian, CambodianRules, CannonShogi, CannonShogiRules, Capablanca,
-    CapablancaRules, Capahouse, CapahouseRules, Caparandom, CaparandomRules, Chak, ChakRules,
-    Chancellor, ChancellorRules, Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules,
+    CapablancaRules, Capahouse, CapahouseRules, Caparandom, CaparandomRules, Centaur, CentaurRules,
+    Chak, ChakRules, Chancellor, ChancellorRules, Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules,
     Courier, CourierRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy,
     EmbassyRules, Empire, EmpireRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
     GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
