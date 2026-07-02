@@ -5484,7 +5484,10 @@ fn multi_royal_move_off_lines<G: Geometry>(
     // routed to the full make/unmake verify. (Gated behind `has_lion_moves`, so no
     // other variant ever produces one and this is inert for them.)
     if kings.contains(from)
-        || matches!(mv.kind(), WideMoveKind::EnPassant | WideMoveKind::LionMove { .. })
+        || matches!(
+            mv.kind(),
+            WideMoveKind::EnPassant | WideMoveKind::LionMove { .. }
+        )
     {
         return false;
     }

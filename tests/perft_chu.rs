@@ -84,7 +84,10 @@ fn ucis_from(fen: &str, from_sq: &str) -> Vec<String> {
 #[test]
 fn lion_jitto_pass() {
     let ucis = ucis_from("k11/12/12/12/12/12/5***N6/12/12/12/12/K11 w - - 0 1", "f6");
-    assert!(ucis.contains(&"f6f6".to_string()), "lion should have a pass: {ucis:?}");
+    assert!(
+        ucis.contains(&"f6f6".to_string()),
+        "lion should have a pass: {ucis:?}"
+    );
 }
 
 /// The Lion's **igui**: it captures an adjacent enemy (here on g6) and stays on its
@@ -92,7 +95,10 @@ fn lion_jitto_pass() {
 #[test]
 fn lion_igui_stationary_capture() {
     let ucis = ucis_from("k11/12/12/12/12/12/5***Np5/12/12/12/12/K11 w - - 0 1", "f6");
-    assert!(ucis.contains(&"f6f6*g6".to_string()), "lion should have an igui on g6: {ucis:?}");
+    assert!(
+        ucis.contains(&"f6f6*g6".to_string()),
+        "lion should have an igui on g6: {ucis:?}"
+    );
     // The ordinary step-capture onto g6 is also available (a distinct move).
     assert!(ucis.contains(&"f6g6".to_string()));
 }
@@ -101,8 +107,14 @@ fn lion_igui_stationary_capture() {
 /// in one turn, the intermediate g6 riding in the move's addendum.
 #[test]
 fn lion_double_capture() {
-    let ucis = ucis_from("k11/12/12/12/12/12/5***Npp4/12/12/12/12/K11 w - - 0 1", "f6");
-    assert!(ucis.contains(&"f6h6*g6".to_string()), "lion should double-capture g6+h6: {ucis:?}");
+    let ucis = ucis_from(
+        "k11/12/12/12/12/12/5***Npp4/12/12/12/12/K11 w - - 0 1",
+        "f6",
+    );
+    assert!(
+        ucis.contains(&"f6h6*g6".to_string()),
+        "lion should double-capture g6+h6: {ucis:?}"
+    );
     // A redundant elbow path to the *adjacent* g6 is NOT generated (matches HaChu):
     // exactly one plain move lands on g6.
     assert_eq!(ucis.iter().filter(|m| m.as_str() == "f6g6").count(), 1);
@@ -133,12 +145,21 @@ fn chu_promotion_forced_on_entry_only() {
     // Rook on f7 (outside the rank-9..12 zone) sliding up: every move that *enters*
     // the zone promotes, with no plain alternative.
     let enter = ucis_from("k11/12/12/12/12/5R6/12/12/12/12/12/K11 w - - 0 1", "f7");
-    assert!(enter.iter().any(|m| m == "f7f9r"), "entry must promote: {enter:?}");
-    assert!(!enter.contains(&"f7f9".to_string()), "no non-promoting entry: {enter:?}");
+    assert!(
+        enter.iter().any(|m| m == "f7f9r"),
+        "entry must promote: {enter:?}"
+    );
+    assert!(
+        !enter.contains(&"f7f9".to_string()),
+        "no non-promoting entry: {enter:?}"
+    );
     // Rook already inside the zone (f10) moving within it does not promote.
     let within = ucis_from("k11/12/5R6/12/12/12/12/12/12/12/12/K11 w - - 0 1", "f10");
     assert!(within.contains(&"f10f11".to_string()));
-    assert!(!within.contains(&"f10f11r".to_string()), "no promotion within zone: {within:?}");
+    assert!(
+        !within.contains(&"f10f11r".to_string()),
+        "no promotion within zone: {within:?}"
+    );
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {

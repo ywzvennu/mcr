@@ -301,20 +301,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 return "--".to_string();
             }
             push_role_token(&mut s, role);
-            // Always name the intermediate square: it is what distinguishes a
-            // two-step area move from the leaper's direct jump to the same square
-            // (and one area path from another), so the SAN stays unique.
+            // Always render **both legs**, naming the intermediate square: the mid
+            // is what distinguishes a two-step area move from the leaper's direct
+            // jump to the same square (and one area path from another), and spelling
+            // out the second leg keeps an igui (`***Nxi5-f6`: capture i5, return to
+            // f6) distinct from the ordinary step-capture (`***Nxi5`).
             let mid = mv.lion_mid_index().unwrap_or(to);
-            if from == to {
-                // igui: capture the adjacent enemy on `mid` and return home.
-                s.push('x');
-                push_square::<G>(&mut s, mid);
-            } else {
-                s.push(if first_capture { 'x' } else { '-' });
-                push_square::<G>(&mut s, mid);
-                s.push(if second_capture { 'x' } else { '-' });
-                push_square::<G>(&mut s, to);
-            }
+            s.push(if first_capture { 'x' } else { '-' });
+            push_square::<G>(&mut s, mid);
+            s.push(if second_capture { 'x' } else { '-' });
+            push_square::<G>(&mut s, to);
         } else if from == to && !mv.is_drop() {
             // A Janggi pass: a legal null move. It carries no gate / promotion /
             // check decoration, so it renders as the bare token.
@@ -546,9 +542,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // A bare `--` pass is a non-capturing null move (a Janggi pass or the
             // Chu Lion's jitto pass); an igui also has `from == to` but captures, so
             // it is excluded here and resolved by its own SAN.
-            SanShape::Pass => {
-                mv.from_index() == mv.to_index() && !mv.is_drop() && !mv.is_capture()
-            }
+            SanShape::Pass => mv.from_index() == mv.to_index() && !mv.is_drop() && !mv.is_capture(),
             SanShape::CastleKingside => matches!(mv.kind(), WideMoveKind::CastleKingside),
             SanShape::CastleQueenside => matches!(mv.kind(), WideMoveKind::CastleQueenside),
             SanShape::Drop { role, to } => mv.drop_role() == Some(role) && mv.to_index() == to,

@@ -377,8 +377,7 @@ impl WideMove {
                 second_capture,
             } => {
                 let base = WideMove::pack(from, to, 0, KIND_LION);
-                let mut high =
-                    LION_PRESENT | ((from as u64 & LION_MID_MASK) << LION_MID_SHIFT);
+                let mut high = LION_PRESENT | ((from as u64 & LION_MID_MASK) << LION_MID_SHIFT);
                 if first_capture {
                     high |= LION_CAP1;
                 }
