@@ -1,25 +1,55 @@
 //! # mce — Modular Chess Engine
 //!
-//! A permissively licensed (MIT OR Apache-2.0) chess move-generation and rules
+//! A permissively licensed (MIT OR Apache-2.0) chess **move-generation and rules**
 //! library. It is an original, clean-room implementation built from public
-//! algorithms and specifications, so it carries no copyleft obligation and is
-//! safe to use in permissive and proprietary projects alike.
+//! algorithms and specifications — it does not derive from any copyleft engine —
+//! so it carries no copyleft obligation and is safe to use in permissive and
+//! proprietary projects alike.
 //!
-//! The library is rules-and-move-generation only — there is no search or
-//! evaluation, no GUI, and no network play.
+//! ## What mce is (and is not)
 //!
-//! ## Coverage
+//! mce answers the *rules* questions about a position: what are the legal moves,
+//! what does a move lead to, is the side to move in check, is the game over and
+//! why, how many nodes does the tree hold ([`perft`]). It covers **standard
+//! chess, Chess960, and 60+ fairy variants** (Shogi, Xiangqi, Makruk, Capablanca,
+//! Chu Shogi, and more), each perft-verified against the reference engines
+//! Fairy-Stockfish and HaChu.
 //!
-//! Standard chess and eight variants, each perft-verified:
+//! mce is emphatically **not** an engine that *plays* chess:
 //!
-//! - **Chess960** (Fischer Random) — arbitrary back-rank shuffles and X-FEN castling.
-//! - **King of the Hill** — win by marching a king to a central square.
-//! - **Three-check** — win by delivering the third check.
-//! - **Racing Kings** — win by racing a king to the eighth rank.
-//! - **Atomic** — captures detonate, taking the adjacent non-pawns with them.
-//! - **Antichess** (Giveaway) — captures are forced and shedding all pieces wins.
-//! - **Horde** — White's pawn army against a full Black side.
-//! - **Crazyhouse** — captured pieces flip sides and can be dropped back in.
+//! - **No search** — no alpha-beta, MCTS, or any tree search.
+//! - **No evaluation** — no heuristics, piece-square tables, or scoring. The
+//!   analysis helpers ([`Position::attackers_to`], mobility on the fairy side)
+//!   are pure geometric *queries*, never value judgements.
+//! - **No GUI and no network play.**
+//!
+//! It is the rules-and-movegen foundation such an engine (or a server, a trainer,
+//! a puzzle generator, or a UCI adapter) would be built *on top of*.
+//!
+//! ## The two variant families
+//!
+//! Variants come in two parallel families that share the same feel — parse a FEN,
+//! list legal moves, play, count perft — but differ in board geometry:
+//!
+//! 1. **Concrete 8×8** — standard chess and the eight classic 8×8 variants, on the
+//!    frozen, proven `u64` [`Bitboard`] / [`Square`] path. One type per variant
+//!    ([`Chess`], [`Chess960`], [`KingOfTheHill`], [`ThreeCheck`], [`RacingKings`],
+//!    [`Horde`], [`Atomic`], [`Antichess`], [`Crazyhouse`]) over the generic
+//!    [`VariantPosition`], plus the runtime-dispatch [`AnyVariant`] enum and its
+//!    string-addressable [`VariantId`] selector.
+//!
+//! 2. **Generic-geometry fairy** — the 60+ wider or differently-shaped variants
+//!    (Shogi 9×9, Xiangqi 9×10, Chu Shogi 12×12, Capablanca 10×8, tiny Dobutsu
+//!    3×4, …), which need boards beyond 8×8. They live under the [`geometry`](mod@geometry)
+//!    module on a *separate*, compile-time-parameterized `Bitboard<G>` /
+//!    `Square<G>` hierarchy, with the runtime-dispatch [`AnyWideVariant`](geometry::AnyWideVariant)
+//!    enum and its [`WideVariantId`](geometry::WideVariantId) selector.
+//!
+//! The concrete 8×8 path is frozen and never re-parametrised, so the wide layer
+//! costs the standard game nothing; see the module docs on [`geometry`](mod@geometry) for the
+//! design. A per-variant reference (boards, pieces, rules, sources) lives in
+//! [`docs/variants.md`], and per-variant perft/node-rate figures in
+//! [`docs/perf-variants.md`].
 //!
 //! ## Public surface
 //!
@@ -35,11 +65,12 @@
 //! - **Outcomes and draws** — [`Outcome`], the precise [`EndReason`] labels,
 //!   repetition tracking ([`count_repetitions`], [`is_repetition`]), and the
 //!   move-validating [`Game`] driver.
-//! - **Variants** — a generic [`VariantPosition`] over the [`Variant`] trait with
-//!   one type per variant ([`Chess`], [`Chess960`], [`KingOfTheHill`],
-//!   [`ThreeCheck`], [`RacingKings`], [`Horde`], [`Atomic`], [`Antichess`],
-//!   [`Crazyhouse`]), plus the [`AnyVariant`] runtime dispatch enum and its
-//!   [`VariantId`] selector for choosing a variant from a string or value.
+//! - **Concrete variants** — the [`VariantPosition`] / [`Variant`] family and the
+//!   [`AnyVariant`] / [`VariantId`] runtime dispatch described above.
+//! - **Fairy variants** — the whole generic-geometry layer under [`geometry`](mod@geometry):
+//!   the [`Geometry`](geometry::Geometry) trait, `GenericPosition`, the per-variant
+//!   types, and [`AnyWideVariant`](geometry::AnyWideVariant) /
+//!   [`WideVariantId`](geometry::WideVariantId).
 //! - **Ataxx** — the [`ataxx`] module is a self-contained 7×7 stones game
 //!   (clone / jump / flip), **not** a chess variant: it shares none of the
 //!   chess engine's geometry, pieces, or move generator and stands entirely
@@ -50,7 +81,7 @@
 //! Parse a FEN, generate legal moves, play one, and read the outcome:
 //!
 //! ```
-//! use mce::{Color, Outcome, Position};
+//! use mce::{perft, Color, Outcome, Position};
 //!
 //! // Fool's mate, one move from the end: Black plays Qh4#.
 //! let pos = Position::from_fen(
@@ -62,11 +93,14 @@
 //! let mate = pos.parse_uci("d8h4").unwrap();
 //! assert_eq!(pos.san(&mate), "Qh4#");
 //!
+//! // Node counting (perft) over the legal-move tree.
+//! assert_eq!(perft(&Position::startpos(), 4), 197_281);
+//!
 //! let after = pos.play(&mate);
 //! assert_eq!(after.outcome(), Some(Outcome::Decisive { winner: Color::Black }));
 //! ```
 //!
-//! Drive a variant chosen at runtime through [`AnyVariant`]:
+//! Drive a concrete 8×8 variant chosen at runtime through [`AnyVariant`]:
 //!
 //! ```
 //! use mce::{AnyVariant, VariantId};
@@ -81,6 +115,37 @@
 //! let after = pos.play(&e4);
 //! assert!(after.outcome().is_none());
 //! ```
+//!
+//! Drive a fairy variant on a non-8×8 board through the parallel
+//! [`AnyWideVariant`](geometry::AnyWideVariant) surface:
+//!
+//! ```
+//! use mce::geometry::{AnyWideVariant, WideVariantId};
+//!
+//! // Shogi is a 9×9 board; the surface mirrors `AnyVariant`.
+//! let id: WideVariantId = "shogi".parse().unwrap();
+//! let pos = AnyWideVariant::startpos(id);
+//! assert_eq!(pos.variant_id(), WideVariantId::Shogi);
+//! assert_eq!(pos.dimensions(), (9, 9));
+//! assert!(!pos.legal_moves().is_empty());
+//! ```
+//!
+//! ## Cargo features
+//!
+//! - **`std`** *(default)* — opts back into the standard library. With it off
+//!   (`--no-default-features`) the crate is `#![no_std]` (see below).
+//! - **`magic`** *(implies `std`)* — use magic-bitboard sliders instead of the
+//!   default lean hyperbola-quintessence tables; faster on slider-heavy
+//!   positions, at the cost of a runtime-built ~841 KiB table. The public API is
+//!   unchanged either way.
+//! - **`book`** *(implies `std`)* — the filesystem [`Book::open`] Polyglot loader;
+//!   the in-memory [`Book::from_bytes`] reader needs no feature.
+//! - **`parallel`** *(implies `std`)* — the [`perft_parallel`] /
+//!   `perft_variant_parallel` node counters (rayon), byte-identical to the serial
+//!   counters. With the feature off, rayon is absent from the dependency graph.
+//! - **`serde`** — `Serialize` / `Deserialize` on the public value types
+//!   (positions and boards serialize as their FEN strings). With the feature off,
+//!   serde is absent from the dependency graph.
 //!
 //! ## `no_std`
 //!
@@ -98,6 +163,9 @@
 //! `Book::open` loader (the in-memory [`Book::from_bytes`] reader is
 //! `no_std`), and the runtime-built `magic` slider table. Accordingly the
 //! `magic`, `book`, and `parallel` features imply `std`.
+//!
+//! [`docs/variants.md`]: https://github.com/ywzvennu/mce/blob/main/docs/variants.md
+//! [`docs/perf-variants.md`]: https://github.com/ywzvennu/mce/blob/main/docs/perf-variants.md
 #![doc(html_root_url = "https://docs.rs/mce")]
 // The crate is `no_std` by default; the on-by-default `std` feature opts back
 // into the standard library (for `std::error::Error`, `std::fs` book loading,
@@ -105,6 +173,7 @@
 // generation compile without `std`, drawing `Vec`/`String`/`format!` from
 // `alloc`.
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(missing_docs)]
 
 extern crate alloc;
 
