@@ -24,11 +24,12 @@ use core::str::FromStr;
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
     Caparandom, Chak, Chancellor, Chennis, Chigorin, Courier, Dobutsu, Dragon, Duck, Embassy,
-    Empire, FogOfWar, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
-    Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam,
-    Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar,
-    Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Synochess, Tencubed,
-    Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Empire, FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
+    HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu,
+    Mansindam, Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako,
+    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
+    Synochess, Tencubed, Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant,
+    Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -75,6 +76,29 @@ fn find_uci<G: Geometry, V: WideVariant<G>>(
     pos.legal_moves()
         .into_iter()
         .find(|m| m.to_uci::<G>() == uci)
+}
+
+/// Resolves a geometry-agnostic square index against the geometry of `pos`,
+/// yielding `None` when `index` names no square on that board.
+///
+/// The type-erased [`AnyWideVariant`] analysis queries take a bare `u8` index
+/// (`0..G::SQUARES`, the little-endian `rank * width + file` numbering) rather
+/// than a geometry-parameterized [`Square<G>`](super::Square); this helper
+/// recovers `G` from the position type — as [`move_to_uci`] does — and validates
+/// the index against that board so an out-of-range value is handled instead of
+/// panicking.
+fn square_of<G: Geometry, V: WideVariant<G>>(
+    _pos: &GenericPosition<G, V>,
+    index: u8,
+) -> Option<Square<G>> {
+    Square::try_new(index)
+}
+
+/// Collects the set squares of a [`Bitboard<G>`](super::Bitboard) as their bare
+/// `u8` indices, ascending — the type-erased form the [`AnyWideVariant`] analysis
+/// queries return in place of a geometry-parameterized bitboard.
+fn square_indices<G: Geometry>(squares: impl IntoIterator<Item = Square<G>>) -> Vec<u8> {
+    squares.into_iter().map(|sq| sq.index()).collect()
 }
 
 /// Generates the [`WideVariantId`] selector and the [`AnyWideVariant`] runtime
@@ -291,6 +315,135 @@ macro_rules! wide_variants {
             pub fn is_check(&self) -> bool {
                 match self {
                     $( AnyWideVariant::$variant(p) => p.is_check(), )+
+                }
+            }
+
+            /// The consolidated [`GameStatus`] of this position — the
+            /// single-`match` forward of
+            /// [`GenericPosition::status`](super::GenericPosition::status), which
+            /// folds the wrapped variant's `end_reason` / `outcome` into one total
+            /// enum (ongoing, checkmate, stalemate, a variant win, or a draw).
+            ///
+            /// This covers the single-position rules; the history-dependent rules
+            /// (repetition, sennichite, perpetual check / chase, bikjang, counting)
+            /// need a game wrapper and are out of scope for a bare position.
+            #[must_use]
+            pub fn status(&self) -> GameStatus {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.status(), )+
+                }
+            }
+
+            /// Whether `square` is attacked by a piece of `by_color`, under the
+            /// live board occupancy — the type-erased forward of
+            /// [`GenericPosition::is_attacked`](super::GenericPosition::is_attacked).
+            ///
+            /// `square` is a bare index (`0..width * height`, the little-endian
+            /// `rank * width + file` numbering); an index off the wrapped variant's
+            /// board yields `false`.
+            #[must_use]
+            pub fn is_attacked(&self, square: u8, by_color: Color) -> bool {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        square_of(p, square).is_some_and(|sq| p.is_attacked(sq, by_color))
+                    } )+
+                }
+            }
+
+            /// The `side` pieces that attack `square`, as their bare square indices
+            /// (ascending) — the type-erased forward of
+            /// [`GenericPosition::attackers_of`](super::GenericPosition::attackers_of).
+            ///
+            /// `square` is a bare index (see [`is_attacked`](Self::is_attacked));
+            /// an off-board index yields an empty list. Because a geometry-
+            /// parameterized [`Bitboard<G>`](super::Bitboard) cannot be named at the
+            /// type-erased level, the attacker *set* is returned as an index list;
+            /// [`attacker_count`](Self::attacker_count) gives just its size.
+            #[must_use]
+            pub fn attackers_of(&self, square: u8, side: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => match square_of(p, square) {
+                        Some(sq) => square_indices(p.attackers_of(sq, side)),
+                        None => Vec::new(),
+                    }, )+
+                }
+            }
+
+            /// The number of `side` pieces that attack `square` — the population
+            /// count of [`attackers_of`](Self::attackers_of), forwarding
+            /// [`GenericPosition::attackers_of`](super::GenericPosition::attackers_of)
+            /// without materializing the index list. An off-board index yields `0`.
+            #[must_use]
+            pub fn attacker_count(&self, square: u8, side: Color) -> u32 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        square_of(p, square).map_or(0, |sq| p.attackers_of(sq, side).count())
+                    } )+
+                }
+            }
+
+            /// The attack (threat) set of the piece standing on `square`, as its
+            /// bare square indices (ascending), or `None` if `square` is empty or
+            /// off the board — the type-erased forward of
+            /// [`GenericPosition::piece_attacks`](super::GenericPosition::piece_attacks).
+            ///
+            /// The geometry-parameterized bitboard is erased to an index list, as
+            /// for [`attackers_of`](Self::attackers_of);
+            /// [`piece_mobility`](Self::piece_mobility) gives just its size.
+            #[must_use]
+            pub fn piece_attacks(&self, square: u8) -> Option<Vec<u8>> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        p.piece_attacks(square_of(p, square)?).map(square_indices)
+                    } )+
+                }
+            }
+
+            /// The number of squares the piece on `square` attacks (its mobility),
+            /// or `0` if `square` is empty or off the board — the type-erased
+            /// forward of
+            /// [`GenericPosition::piece_mobility`](super::GenericPosition::piece_mobility).
+            #[must_use]
+            pub fn piece_mobility(&self, square: u8) -> u32 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        square_of(p, square).map_or(0, |sq| p.piece_mobility(sq))
+                    } )+
+                }
+            }
+
+            /// Every square attacked by at least one piece of `side`, as bare
+            /// square indices (ascending) — the type-erased forward of
+            /// [`GenericPosition::attack_map`](super::GenericPosition::attack_map).
+            ///
+            /// The geometry-parameterized bitboard is erased to an index list;
+            /// [`attack_count`](Self::attack_count) gives just its size.
+            #[must_use]
+            pub fn attack_map(&self, side: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.attack_map(side)), )+
+                }
+            }
+
+            /// The squares of `side`'s own pieces that `side` also attacks (its
+            /// defended pieces), as bare square indices (ascending) — the
+            /// type-erased forward of
+            /// [`GenericPosition::defense_map`](super::GenericPosition::defense_map).
+            #[must_use]
+            pub fn defense_map(&self, side: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.defense_map(side)), )+
+                }
+            }
+
+            /// The number of distinct squares `side` attacks — the type-erased
+            /// forward of
+            /// [`GenericPosition::attack_count`](super::GenericPosition::attack_count),
+            /// equal to the length of [`attack_map`](Self::attack_map).
+            #[must_use]
+            pub fn attack_count(&self, side: Color) -> u32 {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.attack_count(side), )+
                 }
             }
 
@@ -789,5 +942,165 @@ mod tests {
         agrees_with_typed!(WideVariantId::Tori, Tori, AnyWideVariant::Tori, 2);
         agrees_with_typed!(WideVariantId::Xiangfu, Xiangfu, AnyWideVariant::Xiangfu, 2);
         agrees_with_typed!(WideVariantId::Xiangqi, Xiangqi, AnyWideVariant::Xiangqi, 2);
+    }
+
+    // --- Issue #392: type-erased status / analysis forwards ---------------
+
+    /// The consolidated [`GameStatus`] forward reports the right terminal state
+    /// for a variant win, a draw, and an ongoing game — through the runtime
+    /// [`AnyWideVariant`] enum, without naming any variant's geometry.
+    #[test]
+    fn status_forward_reports_terminal_state() {
+        // Synochess campmate: a Black king reaching its goal rank is a variant win.
+        let win =
+            AnyWideVariant::from_fen(WideVariantId::Synochess, "8/8/8/8/8/8/4K3/3k4 w - - 0 1")
+                .expect("valid synochess fen");
+        assert_eq!(
+            win.status(),
+            GameStatus::VariantWin {
+                winner: Color::Black,
+                reason: WideEndReason::VariantWin,
+            }
+        );
+        assert!(win.status().is_decisive());
+
+        // Capablanca king vs. king: an insufficient-material draw.
+        let draw = AnyWideVariant::from_fen(
+            WideVariantId::Capablanca,
+            "5k4/10/10/10/10/10/10/5K4 w - - 0 1",
+        )
+        .expect("valid capablanca fen");
+        assert_eq!(
+            draw.status(),
+            GameStatus::Draw {
+                reason: WideEndReason::InsufficientMaterial,
+            }
+        );
+        assert!(draw.status().is_draw());
+
+        // A start position is ongoing, and the folded status agrees with the
+        // already-forwarded outcome.
+        let start = AnyWideVariant::startpos(WideVariantId::Shogi);
+        assert_eq!(start.status(), GameStatus::Ongoing);
+        assert_eq!(start.status().outcome(), start.outcome());
+    }
+
+    /// The per-square analysis forwards are geometry-correct and semantically
+    /// right: on an 8x8 board a lone rook attacks its own rank and file, and every
+    /// query agrees square-for-square with the typed [`GenericPosition`] path.
+    #[test]
+    fn analysis_forwards_agree_with_typed_path() {
+        let fen = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+        let any = AnyWideVariant::from_fen(WideVariantId::Almost, fen).expect("valid almost fen");
+        let typed = Almost::from_fen(fen).expect("valid almost fen");
+
+        // Semantic anchors: the a1 rook (index 0) attacks along rank 1 and file a.
+        assert!(
+            any.is_attacked(1, Color::White),
+            "b1 attacked by the a1 rook"
+        );
+        assert!(
+            any.is_attacked(8, Color::White),
+            "a2 attacked by the a1 rook"
+        );
+        assert!(!any.is_attacked(9, Color::White), "b2 is not attacked");
+        assert_eq!(
+            any.attackers_of(1, Color::White),
+            alloc::vec![0u8],
+            "only the a1 rook attacks b1"
+        );
+        assert_eq!(any.attacker_count(1, Color::White), 1);
+
+        // Full square-for-square agreement with the typed path over the board.
+        for i in 0u8..64 {
+            let sq = Square::new(i);
+            for side in [Color::White, Color::Black] {
+                assert_eq!(
+                    any.is_attacked(i, side),
+                    typed.is_attacked(sq, side),
+                    "is_attacked {i} {side:?}"
+                );
+                let typed_attackers: Vec<u8> = typed
+                    .attackers_of(sq, side)
+                    .into_iter()
+                    .map(|s| s.index())
+                    .collect();
+                assert_eq!(
+                    any.attackers_of(i, side),
+                    typed_attackers,
+                    "attackers_of {i} {side:?}"
+                );
+                assert_eq!(
+                    any.attacker_count(i, side) as usize,
+                    typed_attackers.len(),
+                    "attacker_count {i} {side:?}"
+                );
+            }
+            let typed_piece: Option<Vec<u8>> = typed
+                .piece_attacks(sq)
+                .map(|bb| bb.into_iter().map(|s| s.index()).collect());
+            assert_eq!(any.piece_attacks(i), typed_piece, "piece_attacks {i}");
+            assert_eq!(
+                any.piece_mobility(i),
+                typed.piece_mobility(sq),
+                "piece_mobility {i}"
+            );
+        }
+
+        // Off-board indices are handled gracefully rather than panicking.
+        assert!(!any.is_attacked(200, Color::White));
+        assert!(any.attackers_of(200, Color::White).is_empty());
+        assert_eq!(any.attacker_count(200, Color::White), 0);
+        assert_eq!(any.piece_attacks(200), None);
+        assert_eq!(any.piece_mobility(200), 0);
+    }
+
+    /// The per-side aggregate forwards (status, attack / defense map, attack
+    /// count) agree with the typed path across a spread of geometries — 8x8,
+    /// 9x10 Xiangqi, 9x9 Shogi, 10x8 Capablanca, the 12x8 `u128`-backed Courier,
+    /// and the tiny 3x4 Dobutsu board.
+    #[test]
+    fn analysis_aggregates_agree_with_typed_path() {
+        macro_rules! aggregates_agree {
+            ($id:expr, $alias:ty) => {{
+                let typed = <$alias>::startpos();
+                let any = AnyWideVariant::startpos($id);
+                assert_eq!(any.status(), typed.status(), "{} status", $id);
+                for side in [Color::White, Color::Black] {
+                    assert_eq!(
+                        any.attack_count(side),
+                        typed.attack_count(side),
+                        "{} attack_count",
+                        $id
+                    );
+                    let typed_attacks: Vec<u8> = typed
+                        .attack_map(side)
+                        .into_iter()
+                        .map(|s| s.index())
+                        .collect();
+                    assert_eq!(any.attack_map(side), typed_attacks, "{} attack_map", $id);
+                    let typed_defense: Vec<u8> = typed
+                        .defense_map(side)
+                        .into_iter()
+                        .map(|s| s.index())
+                        .collect();
+                    assert_eq!(any.defense_map(side), typed_defense, "{} defense_map", $id);
+                    // The count and the erased index list stay consistent.
+                    assert_eq!(
+                        any.attack_count(side) as usize,
+                        any.attack_map(side).len(),
+                        "{} count/len",
+                        $id
+                    );
+                }
+            }};
+        }
+
+        aggregates_agree!(WideVariantId::Almost, Almost);
+        aggregates_agree!(WideVariantId::Xiangqi, Xiangqi);
+        aggregates_agree!(WideVariantId::Shogi, Shogi);
+        aggregates_agree!(WideVariantId::Capablanca, Capablanca);
+        aggregates_agree!(WideVariantId::Courier, Courier);
+        aggregates_agree!(WideVariantId::Dobutsu, Dobutsu);
     }
 }
