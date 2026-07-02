@@ -153,6 +153,26 @@ fn janus_to_fsf(fen: &str) -> String {
     }
 }
 
+/// Centaur Chess dialect: mce spells the Centaur (King + Knight) with the Orda
+/// Kheshig letter `w`/`W`; FSF's INI `centaur` variant spells it `c`/`C`. Rewrite
+/// that letter in the placement field; the standard KQkq castling field carries no
+/// piece letters and the side-to-move `w` sits outside the placement field, so both
+/// are left untouched.
+fn centaur_to_fsf(fen: &str) -> String {
+    let map = |c: char| match c {
+        'w' => 'c',
+        'W' => 'C',
+        other => other,
+    };
+    match fen.split_once(' ') {
+        Some((placement, rest)) => {
+            let mapped: String = placement.chars().map(map).collect();
+            format!("{mapped} {rest}")
+        }
+        None => fen.chars().map(map).collect(),
+    }
+}
+
 /// Every variant the fuzzer cross-checks against FSF, each reusing its pinned-corpus
 /// module's dialect rewrite.
 ///
@@ -225,6 +245,16 @@ const SPECS: &[Spec] = &[
         fsf: "caparandom",
         needs_ini: false,
         dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
+        // Centaur Chess (10x8): the Capablanca board with the compounds replaced by
+        // two Centaurs (King + Knight). FSF has no built-in `centaur`; it is an INI
+        // variant (a `capablanca` descendant with `centaur = c`), so a variants.ini
+        // defining it must be loaded. mce spells the Centaur `w`, FSF `c`.
+        id: WideVariantId::Centaur,
+        fsf: "centaur",
+        needs_ini: true,
+        dialect: centaur_to_fsf,
     },
     Spec {
         id: WideVariantId::Chak,
