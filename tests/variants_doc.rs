@@ -289,6 +289,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess with standard castling; colour-restricted promotion — White to Chancellor/Rook/Knight, Black to Queen/Rook/Bishop. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant chigorin`).",
         },
+        WideVariantId::Chu => Meta {
+            display: "Chu Shogi (12x12)",
+            pieces: "The 21-type Chu Shogi army: King, Free King, Lion, Dragon King/Horse, Kirin, Phoenix, Side/Vertical Mover, Copper/Silver/Gold/Ferocious Leopard/Blind Tiger/Drunk Elephant, Lance, Reverse Chariot, Go-Between, Pawn, and their promoted forms.",
+            rules: "No hand or drops; per-piece promotion on entering the far four ranks; two royals (King and the promoted Prince). The Lion and lion-power promoted pieces are modeled as jumping leapers (igui / double-capture / lion-trading not yet modeled).",
+            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 is a byte-identical move-set match and perft(2)=1296 matches exactly; perft(3) mce=47955 vs HaChu=47952 (a 3-node over-generation, pinned as a regression value).",
+        },
         WideVariantId::Courier => Meta {
             display: "Courier chess (12x8)",
             pieces: "Rook, Knight, Bishop, King plus the medieval Courier (Alfil, two-square diagonal leap), Man (non-royal king-mover), Wazir, and Ferz.",

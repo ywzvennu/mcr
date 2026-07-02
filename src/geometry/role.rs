@@ -1086,6 +1086,84 @@ pub enum WideRole {
     /// [`WideRole::ViolentStag`]'s `**` base, so it takes the last free `**` base `z`,
     /// and the `compare-fairy` harness maps `**z → n` when driving Opulent.
     OpulentKnight = 109,
+
+    // --- Chu Shogi (12x12) army (§ Milestone 15, issue #380) ---
+    //
+    // The Chu-Shogi-specific pieces past the exhausted single-letter alphabet and
+    // the three full `*` / `**` / `=` overflow banks: they are **fourth-tier
+    // overflow** roles (`is_overflow4`) whose FEN token is the [`OVERFLOW_PREFIX`]
+    // **tripled** (`***`) plus a recycled base letter whose case carries the
+    // colour. The many Chu pieces whose movement matches an existing role reuse it
+    // (King, Gold, Silver, Rook, Bishop, Lance, Queen = Free King, DrunkElephant,
+    // CrownPrince = Prince, Dragon = Dragon King, DragonHorse); only the genuinely
+    // distinct movers get a new role here.
+    /// Copper General (銅将, Chu Shogi) — steps one square forward, to the two
+    /// forward diagonals, or straight back (four targets). Promotes to a Side
+    /// Mover. A fourth-tier overflow role: its FEN token is `***C` / `***c`.
+    CopperGeneral = 110,
+    /// Ferocious Leopard (猛豹, Chu Shogi) — steps one square to any of the six
+    /// forward/backward orthogonal-and-diagonal squares (every King step except
+    /// the two sideways ones). Promotes to a Bishop. FEN token `***L` / `***l`.
+    FerociousLeopard = 111,
+    /// Blind Tiger (盲虎, Chu Shogi) — steps one square in any direction except
+    /// straight forward (seven targets). Promotes to a Flying Stag. FEN token
+    /// `***T` / `***t`.
+    BlindTiger = 112,
+    /// Go-Between (仲人, Chu Shogi) — steps one square straight forward or straight
+    /// back only. Promotes to a Drunk Elephant. FEN token `***G` / `***g`.
+    GoBetween = 113,
+    /// Reverse Chariot (反車, Chu Shogi) — slides any distance straight forward or
+    /// straight back. Promotes to a Whale. FEN token `***R` / `***r`.
+    ReverseChariot = 114,
+    /// Side Mover (横行, Chu Shogi) — slides any distance sideways, or steps one
+    /// square straight forward or back. Promotes to a Free Boar. FEN token
+    /// `***I` / `***i`.
+    SideMover = 115,
+    /// Vertical Mover (竪行, Chu Shogi) — slides any distance straight forward or
+    /// back, or steps one square sideways. Promotes to a Flying Ox. FEN token
+    /// `***V` / `***v`.
+    VerticalMover = 116,
+    /// Kirin (麒麟, Chu Shogi) — jumps to the second square in each orthogonal
+    /// direction (four jumps) or steps one square diagonally (four steps).
+    /// Promotes to a Lion. FEN token `***K` / `***k`.
+    Kirin = 117,
+    /// Phoenix (鳳凰, Chu Shogi) — jumps to the second square in each diagonal
+    /// direction (four jumps) or steps one square orthogonally (four steps).
+    /// Promotes to a Free King (Queen). FEN token `***P` / `***p`.
+    Phoenix = 118,
+    /// Lion (獅子, Chu Shogi) — the double-King-move piece: it may take a King step
+    /// up to twice per turn (reaching any square within two King steps, jumping
+    /// intervening pieces), capture on both steps, make an *igui* stationary
+    /// capture, or pass. Does not promote. FEN token `***N` / `***n`.
+    ChuLion = 119,
+    /// White Horse (白駒, Chu Shogi) — the promoted Lance: slides any distance
+    /// straight forward/back or forward-diagonally. FEN token `***W` / `***w`.
+    WhiteHorse = 120,
+    /// Whale (鯨鯢, Chu Shogi) — the promoted Reverse Chariot: slides any distance
+    /// straight forward/back or backward-diagonally. FEN token `***A` / `***a`.
+    Whale = 121,
+    /// Flying Stag (飛鹿, Chu Shogi) — the promoted Blind Tiger: slides any distance
+    /// straight forward/back, or steps one square in any of the eight directions.
+    /// FEN token `***S` / `***s`.
+    FlyingStag = 122,
+    /// Flying Ox (飛牛, Chu Shogi) — the promoted Vertical Mover: slides any
+    /// distance straight forward/back or diagonally (a Bishop plus a vertical
+    /// Rook). FEN token `***O` / `***o`.
+    FlyingOx = 123,
+    /// Free Boar (奔猪, Chu Shogi) — the promoted Side Mover: slides any distance
+    /// sideways or diagonally (a Bishop plus a horizontal Rook). FEN token
+    /// `***B` / `***b`.
+    FreeBoar = 124,
+    /// Horned Falcon (角鷹, Chu Shogi) — the promoted Dragon Horse: slides freely
+    /// in every direction except straight forward, and has the Lion's two-step
+    /// power (step/jump up to two squares, igui, pass) along the straight-forward
+    /// line only. FEN token `***H` / `***h`.
+    HornedFalcon = 125,
+    /// Soaring Eagle (飛鷲, Chu Shogi) — the promoted Dragon King: slides freely in
+    /// every direction except the two forward diagonals, and has the Lion's
+    /// two-step power along each forward-diagonal line only. FEN token
+    /// `***E` / `***e`.
+    SoaringEagle = 126,
 }
 
 impl WideRole {
@@ -1093,7 +1171,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 110;
+    pub const COUNT: usize = 127;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1207,6 +1285,23 @@ impl WideRole {
         WideRole::TencubedChampion,
         WideRole::OpulentLion,
         WideRole::OpulentKnight,
+        WideRole::CopperGeneral,
+        WideRole::FerociousLeopard,
+        WideRole::BlindTiger,
+        WideRole::GoBetween,
+        WideRole::ReverseChariot,
+        WideRole::SideMover,
+        WideRole::VerticalMover,
+        WideRole::Kirin,
+        WideRole::Phoenix,
+        WideRole::ChuLion,
+        WideRole::WhiteHorse,
+        WideRole::Whale,
+        WideRole::FlyingStag,
+        WideRole::FlyingOx,
+        WideRole::FreeBoar,
+        WideRole::HornedFalcon,
+        WideRole::SoaringEagle,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1515,6 +1610,32 @@ impl WideRole {
             WideRole::TencubedChampion => 'x',
             WideRole::OpulentLion => 'y',
             WideRole::OpulentKnight => 'z',
+            // Chu Shogi army — **fourth-tier** overflow roles (`***`). Each FEN
+            // token is the tripled prefix plus a distinct recycled base letter
+            // (returned here), the board FEN I/O adding the prefix. The letters are
+            // mnemonic (copper `c`, leopard `l`, tiger `t`, go-between `g`, reverse
+            // chariot `r`, side mover `i`, vertical mover `v`, kirin `k`, phoenix
+            // `p`, lion `n`, white horse `w`, whale `a`, flying stag `s`, flying ox
+            // `o`, free boar `b`, horned falcon `h`, soaring eagle `e`) and are
+            // distinct within the `***` tier. The `compare-fairy` harness rewrites
+            // each `***<base>` to HaChu's Chu letter when driving Chu Shogi.
+            WideRole::CopperGeneral => 'c',
+            WideRole::FerociousLeopard => 'l',
+            WideRole::BlindTiger => 't',
+            WideRole::GoBetween => 'g',
+            WideRole::ReverseChariot => 'r',
+            WideRole::SideMover => 'i',
+            WideRole::VerticalMover => 'v',
+            WideRole::Kirin => 'k',
+            WideRole::Phoenix => 'p',
+            WideRole::ChuLion => 'n',
+            WideRole::WhiteHorse => 'w',
+            WideRole::Whale => 'a',
+            WideRole::FlyingStag => 's',
+            WideRole::FlyingOx => 'o',
+            WideRole::FreeBoar => 'b',
+            WideRole::HornedFalcon => 'h',
+            WideRole::SoaringEagle => 'e',
         }
     }
 
@@ -1870,6 +1991,70 @@ impl WideRole {
         }
     }
 
+    /// Returns `true` if this is a **fourth-tier overflow** role — a fairy role
+    /// added after the single-letter alphabet and *all three* of the `*` / `**` /
+    /// `=` overflow banks were exhausted (26 roles each). The Chu Shogi (12x12)
+    /// army is the first such tier. Like the lower tiers it has **no bare letter of
+    /// its own**: its FEN token is the [`OVERFLOW_PREFIX`] **tripled** (`***`)
+    /// followed by a recycled base letter (returned by [`char`](WideRole::char))
+    /// whose case carries the colour, and the board FEN parser / writer handle the
+    /// prefix (see [`overflow4_from_base`](WideRole::overflow4_from_base)).
+    #[must_use]
+    #[inline]
+    pub const fn is_overflow4(self) -> bool {
+        matches!(
+            self,
+            WideRole::CopperGeneral
+                | WideRole::FerociousLeopard
+                | WideRole::BlindTiger
+                | WideRole::GoBetween
+                | WideRole::ReverseChariot
+                | WideRole::SideMover
+                | WideRole::VerticalMover
+                | WideRole::Kirin
+                | WideRole::Phoenix
+                | WideRole::ChuLion
+                | WideRole::WhiteHorse
+                | WideRole::Whale
+                | WideRole::FlyingStag
+                | WideRole::FlyingOx
+                | WideRole::FreeBoar
+                | WideRole::HornedFalcon
+                | WideRole::SoaringEagle
+        )
+    }
+
+    /// Maps a recycled base letter (after a tripled [`OVERFLOW_PREFIX`], `***`)
+    /// back to its fourth-tier overflow role, returning `None` if the letter does
+    /// not name one. The inverse of [`char`](WideRole::char) for an
+    /// [`is_overflow4`](WideRole::is_overflow4) role; used by the board FEN parser
+    /// when it sees a `***`-prefixed token. Accepts either case (the case carries
+    /// colour, handled by the caller).
+    #[must_use]
+    #[inline]
+    pub const fn overflow4_from_base(ch: char) -> Option<WideRole> {
+        match ch.to_ascii_lowercase() {
+            'c' => Some(WideRole::CopperGeneral),
+            'l' => Some(WideRole::FerociousLeopard),
+            't' => Some(WideRole::BlindTiger),
+            'g' => Some(WideRole::GoBetween),
+            'r' => Some(WideRole::ReverseChariot),
+            'i' => Some(WideRole::SideMover),
+            'v' => Some(WideRole::VerticalMover),
+            'k' => Some(WideRole::Kirin),
+            'p' => Some(WideRole::Phoenix),
+            'n' => Some(WideRole::ChuLion),
+            'w' => Some(WideRole::WhiteHorse),
+            'a' => Some(WideRole::Whale),
+            's' => Some(WideRole::FlyingStag),
+            'o' => Some(WideRole::FlyingOx),
+            'b' => Some(WideRole::FreeBoar),
+            'h' => Some(WideRole::HornedFalcon),
+            'e' => Some(WideRole::SoaringEagle),
+            _ => None,
+        }
+    }
+
     /// Returns the uppercase FEN/SAN character for this role.
     #[must_use]
     #[inline]
@@ -2042,6 +2227,23 @@ impl fmt::Display for WideRole {
             WideRole::TencubedChampion => "tencubed-champion",
             WideRole::OpulentLion => "opulent-lion",
             WideRole::OpulentKnight => "opulent-knight",
+            WideRole::CopperGeneral => "copper-general",
+            WideRole::FerociousLeopard => "ferocious-leopard",
+            WideRole::BlindTiger => "blind-tiger",
+            WideRole::GoBetween => "go-between",
+            WideRole::ReverseChariot => "reverse-chariot",
+            WideRole::SideMover => "side-mover",
+            WideRole::VerticalMover => "vertical-mover",
+            WideRole::Kirin => "kirin",
+            WideRole::Phoenix => "phoenix",
+            WideRole::ChuLion => "chu-lion",
+            WideRole::WhiteHorse => "white-horse",
+            WideRole::Whale => "whale",
+            WideRole::FlyingStag => "flying-stag",
+            WideRole::FlyingOx => "flying-ox",
+            WideRole::FreeBoar => "free-boar",
+            WideRole::HornedFalcon => "horned-falcon",
+            WideRole::SoaringEagle => "soaring-eagle",
         })
     }
 }
@@ -2097,6 +2299,7 @@ mod tests {
                 || role.is_overflow()
                 || role.is_overflow2()
                 || role.is_overflow3()
+                || role.is_overflow4()
             {
                 continue;
             }
@@ -2150,7 +2353,11 @@ mod tests {
         let chars: Vec<char> = WideRole::ALL
             .into_iter()
             .filter(|r| {
-                !r.is_promoted() && !r.is_overflow() && !r.is_overflow2() && !r.is_overflow3()
+                !r.is_promoted()
+                    && !r.is_overflow()
+                    && !r.is_overflow2()
+                    && !r.is_overflow3()
+                    && !r.is_overflow4()
             })
             .map(WideRole::char)
             .filter(|&c| c != '?')
@@ -2276,5 +2483,36 @@ mod tests {
             WideRole::overflow3_from_base('z'),
             Some(WideRole::TenaciousFalcon)
         );
+    }
+
+    #[test]
+    fn overflow4_roles_round_trip_through_the_tripled_prefix() {
+        // A fourth-tier overflow role (the Chu Shogi army) has no bare letter: its
+        // `char()` is a recycled base letter, and `overflow4_from_base` maps that
+        // base letter back to the role (what the board FEN parser does after a
+        // `***` prefix). None of them is a `*` / `**` / `=` overflow role or a
+        // `+`-promoted role.
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow4()) {
+            assert!(!role.is_overflow());
+            assert!(!role.is_overflow2());
+            assert!(!role.is_overflow3());
+            assert!(!role.is_promoted());
+            let base = role.char();
+            assert_ne!(base, '?', "overflow-4 base letter is real");
+            assert_eq!(WideRole::overflow4_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow4_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+        }
+        // The Copper General recycles `c`, the Kirin `k`, the Lion `n`.
+        assert_eq!(WideRole::CopperGeneral.char(), 'c');
+        assert_eq!(
+            WideRole::overflow4_from_base('c'),
+            Some(WideRole::CopperGeneral)
+        );
+        assert_eq!(WideRole::overflow4_from_base('k'), Some(WideRole::Kirin));
+        assert_eq!(WideRole::overflow4_from_base('n'), Some(WideRole::ChuLion));
+        assert_eq!(WideRole::overflow4_from_base('?'), None);
     }
 }
