@@ -610,12 +610,18 @@ mod tests {
     }
 
     /// The Lion reaches every square within two King steps (24 targets), jumping
-    /// intervening pieces. From f6 (file 5, rank 5) on an otherwise near-empty board.
+    /// intervening pieces, plus its own square via the jitto pass (25 destinations).
+    /// From f6 (file 5, rank 5) on an otherwise near-empty board.
     #[test]
     fn lion_reaches_two_king_steps() {
         let got = targets_from("k11/12/12/12/12/12/5***N6/12/12/12/12/5K6 w - - 0 1", 5, 5);
-        let want = indices(&LION_OFFSETS.map(|(df, dr)| ((5 + df) as u8, (5 + dr) as u8)));
-        assert_eq!(got, want);
+        let mut want_coords: Vec<(u8, u8)> = LION_OFFSETS
+            .iter()
+            .map(|&(df, dr)| ((5 + df) as u8, (5 + dr) as u8))
+            .collect();
+        // The jitto pass returns the Lion to its own square (a `from == to` move).
+        want_coords.push((5, 5));
+        assert_eq!(got, indices(&want_coords));
     }
 
     /// A Kirin jumps to the second orthogonal square and steps one diagonally.
