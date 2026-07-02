@@ -2163,4 +2163,387 @@ mod tests {
         assert_eq!(between::<Cap10x8>(p, q), Bitboard::EMPTY);
         assert_eq!(line::<Cap10x8>(p, q), Bitboard::EMPTY);
     }
+
+    // ----- cargo-mutants triage (issue #370): survivor-killing coverage --------
+    //
+    // NOTES on equivalent mutants (documented rather than "killed"): several
+    // slider/king-line primitives are the union of provably **disjoint** bit sets —
+    // a rook's file ray and rank ray share only the origin square (excluded); a
+    // bishop's two diagonals likewise; a queen is the union of the (disjoint) rook
+    // and bishop reach; and `king_attack_lines` ORs four lines that pairwise meet
+    // only at the king (removed by `.without(king)`). For disjoint operands
+    // `a | b == a ^ b`, so a `|`->`^` mutation on any of these unions is a genuine
+    // no-op (equivalent) mutant that no test can distinguish. The `|`->`&`
+    // mutation, by contrast, collapses a disjoint union to the empty set, which the
+    // equivalence sweeps below do catch.
+
+    /// Builds a backing value bit-for-bit from a `u128` seed, generic over the
+    /// backing width, masked to the on-board squares. Shared by the sweeps below.
+    fn seed_occ<G: Geometry>(x: u128) -> Bitboard<G> {
+        let mut v = G::Bits::ZERO;
+        let mut bit = 0u32;
+        while bit < G::Bits::BITS && bit < 128 {
+            if (x >> bit) & 1 == 1 {
+                v = v | G::Bits::bit(bit);
+            }
+            bit += 1;
+        }
+        Bitboard::<G>(v) & Bitboard::<G>::FULL
+    }
+
+    /// A basket of occupancies for a geometry: empty, full, and randomised.
+    fn occ_basket<G: Geometry>(count: usize) -> Vec<Bitboard<G>> {
+        let mut next = rng();
+        let mut occs = Vec::new();
+        occs.push(Bitboard::EMPTY);
+        occs.push(Bitboard::<G>::FULL);
+        for _ in 0..count {
+            let lo = next() as u128;
+            let hi = (next() as u128) << 64;
+            occs.push(seed_occ::<G>(lo | hi));
+        }
+        occs
+    }
+
+    #[test]
+    fn masked_sliders_match_plain_primitives() {
+        // The KingLineMasks reuse variants (`*_attacks_masked`) only cache the four
+        // line masks; they must be bit-identical to the plain sliders that re-derive
+        // them each call. Sweep every square × a basket of occupancies on an 8x8
+        // (u64) and a 10x8 (u128) geometry, and check the cached square round-trips.
+        fn check<G>(squares: u8)
+        where
+            G: Geometry,
+            G::Bits: core::fmt::Debug,
+        {
+            let occs = occ_basket::<G>(24);
+            for index in 0..squares {
+                let sq = Square::<G>::new(index);
+                let masks = KingLineMasks::new(sq);
+                assert_eq!(masks.square(), sq, "square round-trip {index}");
+                for &occ in &occs {
+                    assert_eq!(
+                        rook_attacks_masked::<G>(masks, occ),
+                        rook_attacks::<G>(sq, occ),
+                        "rook masked {index}"
+                    );
+                    assert_eq!(
+                        bishop_attacks_masked::<G>(masks, occ),
+                        bishop_attacks::<G>(sq, occ),
+                        "bishop masked {index}"
+                    );
+                    assert_eq!(
+                        queen_attacks_masked::<G>(masks, occ),
+                        queen_attacks::<G>(sq, occ),
+                        "queen masked {index}"
+                    );
+                }
+            }
+        }
+        check::<Chess8x8>(64);
+        check::<Cap10x8>(80);
+    }
+
+    /// Independent reference for a Shogi lance: the blocker-aware forward file ray
+    /// (north for white, south for black), stopping at and including the first
+    /// occupant.
+    fn scan_lance<G: Geometry>(color: Color, sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let step: i8 = if color.is_white() { 1 } else { -1 };
+        let mut bb = Bitboard::EMPTY;
+        let mut cur = sq.offset(0, step);
+        while let Some(next) = cur {
+            bb.set(next);
+            if occ.contains(next) {
+                break;
+            }
+            cur = next.offset(0, step);
+        }
+        bb
+    }
+
+    #[test]
+    fn lance_matches_forward_file_ray() {
+        // Both colours, every square, a basket of occupancies: the lance equals the
+        // independent forward-ray scan. Pins the forward direction (white north /
+        // black south) and the `file_ray & forward` masking.
+        fn check<G>(squares: u8)
+        where
+            G: Geometry,
+            G::Bits: core::fmt::Debug,
+        {
+            let occs = occ_basket::<G>(24);
+            for index in 0..squares {
+                let sq = Square::<G>::new(index);
+                for &occ in &occs {
+                    for color in [Color::White, Color::Black] {
+                        assert_eq!(
+                            lance_attacks::<G>(color, sq, occ),
+                            scan_lance::<G>(color, sq, occ),
+                            "lance {color:?} sq {index}"
+                        );
+                    }
+                }
+            }
+        }
+        check::<Chess8x8>(64);
+        check::<Cap10x8>(80);
+        // Spot-check the direction split concretely: a white lance on a1 slides the
+        // whole a-file north; a black lance on a8 slides it south.
+        let white = lance_attacks::<Chess8x8>(Color::White, Square::new(0), Bitboard::EMPTY);
+        assert_eq!(
+            white,
+            rook_attacks::<Chess8x8>(Square::new(0), Bitboard::EMPTY)
+                & file_mask(Square::<Chess8x8>::new(0))
+        );
+        assert!(white.contains(Square::new(56)) && !white.contains(Square::new(1)));
+        let black = lance_attacks::<Chess8x8>(Color::Black, Square::new(56), Bitboard::EMPTY);
+        assert!(black.contains(Square::new(0)) && !black.contains(Square::new(57)));
+    }
+
+    /// Independent reference for the diagonal cannon / bishop-hopper: along each of
+    /// the four diagonals, the empty squares beyond the first screen (quiet jumps)
+    /// and the first piece past it (capture target).
+    fn scan_diag_cannon<G: Geometry>(
+        sq: Square<G>,
+        occ: Bitboard<G>,
+    ) -> (Bitboard<G>, Bitboard<G>) {
+        let mut quiet = Bitboard::EMPTY;
+        let mut caps = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 1), (-1, -1), (-1, 1), (1, -1)] {
+            let mut cur = sq.offset(df, dr);
+            let screen = loop {
+                match cur {
+                    None => break None,
+                    Some(n) if occ.contains(n) => break Some(n),
+                    Some(n) => cur = n.offset(df, dr),
+                }
+            };
+            let Some(screen) = screen else { continue };
+            let mut cur = screen.offset(df, dr);
+            while let Some(next) = cur {
+                if occ.contains(next) {
+                    caps.set(next);
+                    break;
+                }
+                quiet.set(next);
+                cur = next.offset(df, dr);
+            }
+        }
+        (quiet, caps)
+    }
+
+    #[test]
+    fn diag_cannon_matches_walk() {
+        // Sweep the diagonal-cannon quiet jumps and capture targets against the
+        // independent diagonal walk, on an 8x8 (u64) and 10x8 (u128) geometry. Pins
+        // the `diag_rays` half-ray split and the per-ray unions.
+        fn check<G>(squares: u8)
+        where
+            G: Geometry,
+            G::Bits: core::fmt::Debug,
+        {
+            let occs = occ_basket::<G>(24);
+            for index in 0..squares {
+                let sq = Square::<G>::new(index);
+                for &occ in &occs {
+                    let (quiet, caps) = scan_diag_cannon::<G>(sq, occ);
+                    assert_eq!(
+                        diag_cannon_quiet_jumps::<G>(sq, occ),
+                        quiet,
+                        "diag cannon quiet sq {index}"
+                    );
+                    assert_eq!(
+                        diag_cannon_capture_targets::<G>(sq, occ),
+                        caps,
+                        "diag cannon caps sq {index}"
+                    );
+                }
+            }
+        }
+        check::<Chess8x8>(64);
+        check::<Cap10x8>(80);
+    }
+
+    /// Independent reference for the Xiangqi elephant: four two-square diagonal
+    /// leaps, each blocked by its midpoint "eye". The eye is derived geometrically
+    /// as half the target offset — independent of the library's `ELEPHANT_EYES`.
+    fn scan_elephant<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(dx, dy) in &[(2, 2), (2, -2), (-2, 2), (-2, -2)] {
+            let Some(eye) = sq.offset(dx / 2, dy / 2) else {
+                continue;
+            };
+            if occ.contains(eye) {
+                continue;
+            }
+            if let Some(dest) = sq.offset(dx, dy) {
+                bb.set(dest);
+            }
+        }
+        bb
+    }
+
+    /// Independent reference for the Xiang-Fu Mahout: eight two-square leaps (four
+    /// Alfil diagonals + four Dabbaba orthogonals), each blocked by its midpoint.
+    fn scan_mahout<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(dx, dy) in &[
+            (2, 2),
+            (2, -2),
+            (-2, 2),
+            (-2, -2),
+            (2, 0),
+            (-2, 0),
+            (0, 2),
+            (0, -2),
+        ] {
+            let Some(leg) = sq.offset(dx / 2, dy / 2) else {
+                continue;
+            };
+            if occ.contains(leg) {
+                continue;
+            }
+            if let Some(dest) = sq.offset(dx, dy) {
+                bb.set(dest);
+            }
+        }
+        bb
+    }
+
+    /// Independent reference for the Janggi elephant: one orthogonal step then two
+    /// diagonal steps outward, blocked at each intervening square. Leg 1 is the
+    /// orthogonal step along the longer axis; leg 2 is one diagonal step past it.
+    fn scan_janggi_elephant<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        let dirs: [(i8, i8); 8] = [
+            (2, 3),
+            (-2, 3),
+            (2, -3),
+            (-2, -3),
+            (3, 2),
+            (3, -2),
+            (-3, 2),
+            (-3, -2),
+        ];
+        for &(dx, dy) in &dirs {
+            let sx = if dx > 0 { 1 } else { -1 };
+            let sy = if dy > 0 { 1 } else { -1 };
+            let (l1x, l1y) = if dy.abs() > dx.abs() {
+                (0, sy)
+            } else {
+                (sx, 0)
+            };
+            let Some(leg1) = sq.offset(l1x, l1y) else {
+                continue;
+            };
+            if occ.contains(leg1) {
+                continue;
+            }
+            let Some(leg2) = sq.offset(l1x + sx, l1y + sy) else {
+                continue;
+            };
+            if occ.contains(leg2) {
+                continue;
+            }
+            if let Some(dest) = sq.offset(dx, dy) {
+                bb.set(dest);
+            }
+        }
+        bb
+    }
+
+    #[test]
+    fn blockable_leapers_match_reference() {
+        // Sweep the Xiangqi elephant, the Mahout, and the Janggi elephant against
+        // independent references that derive each leap's blocking square(s) from the
+        // target offset — so a sign flip in the offset tables (ELEPHANT_EYES /
+        // MAHOUT_LEGS / JANGGI_ELEPHANT_LEGS) diverges on some square.
+        use crate::geometry::{Shogi9x9, Xiangqi9x10};
+        let occs = occ_basket::<Xiangqi9x10>(24);
+        for index in 0..90u8 {
+            let sq = Square::<Xiangqi9x10>::new(index);
+            for &occ in &occs {
+                assert_eq!(
+                    elephant_attacks_blockable::<Xiangqi9x10>(sq, occ),
+                    scan_elephant::<Xiangqi9x10>(sq, occ),
+                    "elephant sq {index}"
+                );
+                assert_eq!(
+                    janggi_elephant_attacks::<Xiangqi9x10>(sq, occ),
+                    scan_janggi_elephant::<Xiangqi9x10>(sq, occ),
+                    "janggi elephant sq {index}"
+                );
+            }
+        }
+        let occs = occ_basket::<Shogi9x9>(24);
+        for index in 0..81u8 {
+            let sq = Square::<Shogi9x9>::new(index);
+            for &occ in &occs {
+                assert_eq!(
+                    mahout_attacks_blockable::<Shogi9x9>(sq, occ),
+                    scan_mahout::<Shogi9x9>(sq, occ),
+                    "mahout sq {index}"
+                );
+            }
+        }
+    }
+
+    /// Independent reference for the diagonal-capped king lines: the full rank and
+    /// file rays (walked to the edge), plus the four diagonals truncated to
+    /// `radius` squares per direction.
+    fn scan_king_capped<G: Geometry>(king: Square<G>, radius: u8) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let mut cur = king.offset(df, dr);
+            while let Some(n) = cur {
+                bb.set(n);
+                cur = n.offset(df, dr);
+            }
+        }
+        for &(df, dr) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+            let mut cur = king.offset(df, dr);
+            let mut steps = 0u8;
+            while steps < radius {
+                let Some(n) = cur else { break };
+                bb.set(n);
+                cur = n.offset(df, dr);
+                steps += 1;
+            }
+        }
+        bb
+    }
+
+    #[test]
+    fn king_lines_diag_capped_matches_reference() {
+        // Several radii, every square, on an 8x8 and a 10x8 geometry: the capped
+        // king lines equal the independent rank/file walk plus radius-limited
+        // diagonals. A radius covering the whole board reproduces the uncapped
+        // `king_attack_lines`.
+        fn check<G>(squares: u8)
+        where
+            G: Geometry,
+            G::Bits: core::fmt::Debug,
+        {
+            for &radius in &[0u8, 1, 2, 3, 20] {
+                for index in 0..squares {
+                    let sq = Square::<G>::new(index);
+                    assert_eq!(
+                        king_attack_lines_diag_capped::<G>(sq, radius),
+                        scan_king_capped::<G>(sq, radius),
+                        "capped king radius {radius} sq {index}"
+                    );
+                }
+            }
+            for index in 0..squares {
+                let sq = Square::<G>::new(index);
+                assert_eq!(
+                    king_attack_lines_diag_capped::<G>(sq, 20),
+                    king_attack_lines::<G>(sq),
+                    "capped==uncapped sq {index}"
+                );
+            }
+        }
+        check::<Chess8x8>(64);
+        check::<Cap10x8>(80);
+    }
 }
