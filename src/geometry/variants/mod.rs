@@ -8,6 +8,7 @@
 //! [`WideVariant`]: super::WideVariant
 //! [`GenericPosition`]: super::GenericPosition
 
+pub mod aiwok;
 pub mod alice;
 pub mod almost;
 pub mod amazon;
@@ -41,6 +42,7 @@ pub mod hoppelpoppel;
 pub mod janggi;
 pub mod janus;
 pub mod jieqi;
+pub mod karouk;
 pub mod khans;
 pub mod knightmate;
 pub mod kyotoshogi;
@@ -72,6 +74,7 @@ pub mod washogi;
 pub mod xiangfu;
 pub mod xiangqi;
 
+pub use aiwok::{Aiwok, AiwokRules};
 pub use alice::{Alice, AliceRules};
 pub use almost::{Almost, AlmostRules};
 pub use amazon::{Amazon, AmazonRules};
@@ -105,6 +108,7 @@ pub use hoppelpoppel::{HoppelPoppel, HoppelPoppelRules};
 pub use janggi::{Janggi, JanggiRules};
 pub use janus::{Janus, JanusRules};
 pub use jieqi::{Jieqi, JieqiRules};
+pub use karouk::{Karouk, KaroukRules};
 pub use khans::{Khans, KhansRules};
 pub use knightmate::{Knightmate, KnightmateRules};
 pub use kyotoshogi::{Kyotoshogi, KyotoshogiRules};

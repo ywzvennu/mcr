@@ -205,6 +205,12 @@ fn concrete_meta(id: VariantId) -> Meta {
 /// a new `WideVariantId` will not compile until it is documented here.
 fn wide_meta(id: WideVariantId) -> Meta {
     match id {
+        WideVariantId::Aiwok => Meta {
+            display: "Ai-Wok",
+            pieces: "Makruk army with the Met replaced by an Ai-Wok (Rook + Knight + Ferz super-piece): Rook, Knight, Khon (silver), Ai-Wok, King, single-step promote-to-Ai-Wok pawns.",
+            rules: "Makruk with the Met upgraded to the Ai-Wok (rook slides, knight leaps, and one diagonal step); pawns promote to an Ai-Wok. No castling; counting endgame. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant ai-wok`).",
+        },
         WideVariantId::Alice => Meta {
             display: "Alice chess",
             pieces: "Standard chess army on two mirror 8x8 boards (A and B).",
@@ -402,6 +408,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             pieces: "Xiangqi army, but every piece except the two Generals starts face-down as a Dark piece, revealing its identity on its first move.",
             rules: "Standard Xiangqi geometry, palace, river, and flying-general; a dark piece moves as the Xiangqi piece native to its home square and reveals (from a hidden pool) the instant it moves.",
             oracle: "Rules-validated (not an FSF variant, hidden identities); the deterministic all-dark core perft-matches FSF `UCI_Variant xiangqi`.",
+        },
+        WideVariantId::Karouk => Meta {
+            display: "Ka Ouk (Kar Ouk)",
+            pieces: "Makruk army: Rook, Knight, Khon (silver), Met (ferz), King, single-step promote-to-Met pawns.",
+            rules: "Cambodian chess (Makruk plus the one-time King and Met first-move leaps and counting endgame) except that giving check wins the game outright (a checked side has no reply). Win by delivering check (or by checkmate).",
+            oracle: "Fairy-Stockfish (`UCI_Variant karouk`).",
         },
         WideVariantId::Khans => Meta {
             display: "Khan's Chess (8x8)",
