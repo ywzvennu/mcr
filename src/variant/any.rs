@@ -187,6 +187,16 @@ impl AnyVariant {
         dispatch!(self, p => p.legal_moves())
     }
 
+    /// The legal moves of the side to move whose origin is `from` — the parallel
+    /// of [`AnyWideVariant::legal_moves_from`](crate::geometry::AnyWideVariant::legal_moves_from)
+    /// on the concrete 8×8 family. A filter over
+    /// [`legal_moves`](AnyVariant::legal_moves); a drop is grouped under the square
+    /// it drops onto.
+    #[must_use]
+    pub fn legal_moves_from(&self, from: crate::Square) -> Vec<Move> {
+        dispatch!(self, p => p.legal_moves_from(from))
+    }
+
     /// The legal moves of the side to move in staged move-ordering order: an
     /// optional priority (TT/hash) move first, then captures ordered by victim
     /// value, then quiets.
@@ -333,6 +343,30 @@ mod tests {
         for junk in ["", "chess9600", "kingofthevalley", "xyzzy", "check"] {
             let err = junk.parse::<VariantId>().unwrap_err();
             assert_eq!(err.0, junk.trim().to_ascii_lowercase());
+        }
+    }
+
+    #[test]
+    fn legal_moves_from_partitions_and_matches_generic() {
+        use crate::Square;
+        for id in ALL_IDS {
+            let any = AnyVariant::startpos(id);
+            let mut total = 0usize;
+            for i in 0..64 {
+                let sq = Square::new(i);
+                let from_sq = any.legal_moves_from(sq);
+                // Each origin's slice is exactly the legal moves with that origin.
+                let expected: Vec<Move> = any
+                    .legal_moves()
+                    .into_iter()
+                    .filter(|m| m.from() == sq)
+                    .collect();
+                assert_eq!(from_sq, expected, "{id} from {sq:?}");
+                total += from_sq.len();
+            }
+            // Crazyhouse drops pack their origin as the drop target (0..64), so the
+            // per-square lists still partition the whole legal-move list.
+            assert_eq!(total, any.legal_moves().len(), "{id} partition");
         }
     }
 

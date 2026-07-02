@@ -593,6 +593,22 @@ impl Position {
         !self.attackers_to(sq, by, self.board.occupied()).is_empty()
     }
 
+    /// Returns the set of `side` pieces that attack `sq` under the current board
+    /// occupancy.
+    ///
+    /// A one-argument-lighter convenience over [`attackers_to`](Self::attackers_to)
+    /// that fills in the live occupancy for you. This mirrors the fairy layer's
+    /// [`GenericPosition::attackers_of`](crate::geometry::GenericPosition::attackers_of),
+    /// so the concrete and generic-geometry families expose the same query name.
+    /// To detect attackers *through* a would-be-moved king — so the king does not
+    /// shield itself — call [`attackers_to`](Self::attackers_to) directly with a
+    /// custom occupancy.
+    #[must_use]
+    #[inline]
+    pub fn attackers_of(&self, sq: Square, side: Color) -> Bitboard {
+        self.attackers_to(sq, side, self.board.occupied())
+    }
+
     /// Returns the pieces of the side *not* to move that currently give check
     /// (attack the side-to-move's king).
     #[must_use]
@@ -610,6 +626,21 @@ impl Position {
         !self.checkers().is_empty()
     }
 
+    /// Returns `true` if `color`'s king is in check right now, regardless of whose
+    /// turn it is; `is_in_check(self.turn())` equals [`is_check`](Self::is_check).
+    ///
+    /// A side with no king on the board is never in check. This mirrors the fairy
+    /// layer's
+    /// [`GenericPosition::is_in_check`](crate::geometry::GenericPosition::is_in_check),
+    /// so the concrete and generic-geometry families expose the same query name.
+    #[must_use]
+    #[inline]
+    pub fn is_in_check(&self, color: Color) -> bool {
+        self.board
+            .king_of(color)
+            .is_some_and(|king| self.is_attacked(king, color.opposite()))
+    }
+
     /// Returns the absolutely-pinned pieces of `color`: friendly pieces standing
     /// on a line between their own king and an enemy slider, with no other piece
     /// between, so that moving them off that line would expose the king to check.
@@ -621,7 +652,7 @@ impl Position {
     /// This is the standard *absolute* pin (pinned to the king); it does not
     /// report relative pins to other pieces.
     #[must_use]
-    pub fn pinned(&self, color: Color) -> Bitboard {
+    pub fn pinned_pieces(&self, color: Color) -> Bitboard {
         match self.board.king_of(color) {
             Some(king) => {
                 let occupied = self.board.occupied();
@@ -630,6 +661,19 @@ impl Position {
             }
             None => Bitboard::EMPTY,
         }
+    }
+
+    /// Deprecated alias for [`pinned_pieces`](Self::pinned_pieces).
+    ///
+    /// Renamed to `pinned_pieces` for parity with the fairy layer's
+    /// [`GenericPosition::pinned_pieces`](crate::geometry::GenericPosition::pinned_pieces).
+    #[must_use]
+    #[deprecated(
+        since = "0.3.1",
+        note = "renamed to `pinned_pieces` for parity with the fairy family"
+    )]
+    pub fn pinned(&self, color: Color) -> Bitboard {
+        self.pinned_pieces(color)
     }
 
     /// Returns the pseudo-attacks of the piece currently standing on `sq`, given
@@ -832,6 +876,23 @@ impl Position {
         let mut moves = MoveList::new();
         self.generate_into(&mut moves);
         moves.into_vec()
+    }
+
+    /// The legal moves of the side to move whose origin is `from`.
+    ///
+    /// A filter over [`legal_moves`](Self::legal_moves), so it never invents a move
+    /// the generator would not: every legality rule (pins, check evasion) is
+    /// already applied. Because each legal move has exactly one origin, the lists
+    /// returned for the distinct board squares partition [`legal_moves`](Self::legal_moves).
+    /// This mirrors the fairy layer's
+    /// [`GenericPosition::legal_moves_from`](crate::geometry::GenericPosition::legal_moves_from),
+    /// so the concrete and generic-geometry families expose the same query name.
+    #[must_use]
+    pub fn legal_moves_from(&self, from: Square) -> Vec<Move> {
+        self.legal_moves()
+            .into_iter()
+            .filter(|mv| mv.from() == from)
+            .collect()
     }
 
     /// Returns `true` if `mv` is among this position's legal moves.
@@ -3704,10 +3765,10 @@ mod tests {
         // White king e1, white knight e4, black rook e8: the knight is pinned to
         // the king down the e-file and may not move off it.
         let pos = Position::from_fen("4rk2/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
-        let pinned = pos.pinned(Color::White);
+        let pinned = pos.pinned_pieces(Color::White);
         assert_eq!(pinned, Bitboard::from(Square::E4));
         // The enemy has nothing pinned.
-        assert!(pos.pinned(Color::Black).is_empty());
+        assert!(pos.pinned_pieces(Color::Black).is_empty());
         // A pinned knight has no legal moves here (every knight jump leaves the
         // e-file).
         assert!(!pos.legal_moves().iter().any(|m| m.from() == Square::E4));
@@ -3717,7 +3778,62 @@ mod tests {
     fn pinned_is_empty_without_a_pinner() {
         // Same knight, but the rook is replaced by an empty file: nothing pins.
         let pos = Position::from_fen("6k1/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
-        assert!(pos.pinned(Color::White).is_empty());
+        assert!(pos.pinned_pieces(Color::White).is_empty());
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn deprecated_pinned_alias_matches_pinned_pieces() {
+        let pos = Position::from_fen("4rk2/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
+        for color in Color::ALL {
+            assert_eq!(pos.pinned(color), pos.pinned_pieces(color));
+        }
+    }
+
+    #[test]
+    fn is_in_check_is_color_indexed_and_agrees_with_is_check() {
+        // Black rook e8 checks the white king on e1; it is White (side to move)
+        // who is in check, not Black.
+        let pos = Position::from_fen("4rk2/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert!(pos.is_in_check(Color::White));
+        assert!(!pos.is_in_check(Color::Black));
+        // For the side to move, the color-indexed query equals `is_check`.
+        assert_eq!(pos.is_in_check(pos.turn()), pos.is_check());
+    }
+
+    #[test]
+    fn attackers_of_uses_live_occupancy_like_attackers_to() {
+        let pos = Position::from_fen("4k3/Q7/8/8/8/2P2N2/8/3RK3 w - - 0 1").unwrap();
+        let occ = pos.board().occupied();
+        for sq in (0..64).map(Square::new) {
+            for side in Color::ALL {
+                assert_eq!(
+                    pos.attackers_of(sq, side),
+                    pos.attackers_to(sq, side, occ),
+                    "attackers_of mismatch at {sq:?} for {side:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn legal_moves_from_partitions_legal_moves() {
+        let pos = Position::startpos();
+        // Each origin's slice is exactly the legal moves with that origin.
+        for sq in (0..64).map(Square::new) {
+            let from_sq = pos.legal_moves_from(sq);
+            let expected: Vec<Move> = pos
+                .legal_moves()
+                .into_iter()
+                .filter(|m| m.from() == sq)
+                .collect();
+            assert_eq!(from_sq, expected);
+        }
+        // The per-origin lists partition the whole legal-move list.
+        let total: usize = (0..64)
+            .map(|i| pos.legal_moves_from(Square::new(i)).len())
+            .sum();
+        assert_eq!(total, pos.legal_moves().len());
     }
 
     #[test]
