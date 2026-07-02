@@ -1027,6 +1027,65 @@ pub enum WideRole {
     /// **sideways**. Reverts to a Flying Falcon in hand when captured. (Wa Shogi.) A
     /// **third-tier overflow role**: its FEN token is `=Z` / `=z`.
     TenaciousFalcon = 105,
+
+    // --- Ten-Cubed / Opulent (10x10 Omega-family) leapers (§ Milestone 15) ----
+    //
+    // Ten-Cubed and Opulent chess are 10x10 variants on the [`Grand10x10`]
+    // geometry (confirmed square-for-square against Fairy-Stockfish `UCI_Variant
+    // tencubed` / `opulent`). Beyond the standard chess army and the Rook+Knight
+    // Marshal ([`WideRole::Elephant`]) / Bishop+Knight Archbishop
+    // ([`WideRole::Hawk`]) compounds they reuse, they add three genuinely-new
+    // **pure leapers** — the Wizard (both variants), the Champion (Ten-Cubed) and
+    // the Lion (Opulent). All three land **past** the single-letter alphabet, the
+    // single-`*` overflow bank and much of the doubled-`**` second bank, so each is
+    // a **second-bank overflow role** ([`is_overflow2`]) spelled with the doubled
+    // prefix [`OVERFLOW_PREFIX`] (`**`) plus a recycled base letter whose case
+    // carries the colour. The `compare-fairy` harness rewrites each token to FSF's
+    // spelling when driving the two variants.
+    //
+    // [`is_overflow2`]: WideRole::is_overflow2
+    /// Wizard (FSF `w`, Betza `CF` = Camel + Ferz) — a pure leaper to the eight
+    /// Camel `(±1,±3)` / `(±3,±1)` squares **and** the four Ferz `(±1,±1)`
+    /// diagonal one-steps (twelve targets), jumping over any intervening piece.
+    /// Its attack set is symmetric, so [`attackers_to`](super::position::GenericPosition::attackers_to)
+    /// reverse-projects it directly. (Ten-Cubed, Opulent.) A **second-bank overflow
+    /// role**: its FEN token is `**W` (white) / `**w` (black), recycling FSF's
+    /// wizard letter `w` (free within the `**` tier); the `compare-fairy` harness
+    /// maps `**w → w` when driving either variant.
+    Wizard = 106,
+    /// Ten-Cubed Champion (FSF `c`, Betza `WAD` = Wazir + Alfil + Dabbaba) — a pure
+    /// leaper to the four Wazir `(±1,0)` / `(0,±1)` orthogonal one-steps, the four
+    /// Dabbaba `(±2,0)` / `(0,±2)` two-orthogonal jumps, and the four Alfil
+    /// `(±2,±2)` two-diagonal jumps (twelve targets), leaping over any intervening
+    /// piece. Distinct from the Xiang Fu [`WideRole::Champion`] (a royal ring-confined
+    /// one-stepper), which already claims the `=k` token. (Ten-Cubed only — Opulent's
+    /// `C` is the Rook+Knight [`WideRole::Elephant`].) A **second-bank overflow
+    /// role**: its FEN token is `**X` (white) / `**x` (black); the FSF champion
+    /// letter `c` is already the [`WideRole::CrownPrince`]'s `**` base, so it takes
+    /// the free base `x`, and the `compare-fairy` harness maps `**x → c` when driving
+    /// Ten-Cubed.
+    TencubedChampion = 107,
+    /// Opulent Lion (FSF `l`, Betza `FDH` = Ferz + Dabbaba + Threeleaper) — a pure
+    /// leaper to the four Ferz `(±1,±1)` diagonal one-steps, the four Dabbaba
+    /// `(±2,0)` / `(0,±2)` two-orthogonal jumps, and the four Threeleaper `(±3,0)` /
+    /// `(0,±3)` three-orthogonal jumps (twelve targets), leaping over any intervening
+    /// piece — one square diagonally, or two or three squares straight, exactly as
+    /// Opulent chess documents its Lion. No FSF Chu-Shogi double-move here. (Opulent
+    /// only.) A **second-bank overflow role**: its FEN token is `**Y` (white) /
+    /// `**y` (black); the FSF lion letter `l` is already the [`WideRole::FlyingCock`]'s
+    /// `**` base, so it takes the free base `y`, and the `compare-fairy` harness maps
+    /// `**y → l` when driving Opulent.
+    OpulentLion = 108,
+    /// Opulent Knight (FSF `n`, Betza `NW` = Knight + Wazir) — Opulent chess's
+    /// **augmented knight**: it leaps to the eight ordinary knight `(±1,±2)`/`(±2,±1)`
+    /// squares **and** steps one square orthogonally (the four Wazir `(±1,0)`/`(0,±1)`
+    /// moves), twelve targets in all. Distinct from the plain [`WideRole::Knight`]
+    /// (Opulent's rook, bishop, and queen are all standard, but its knight is not), so
+    /// it is its own role. (Opulent only.) A **second-bank overflow role**: its FEN
+    /// token is `**Z` (white) / `**z` (black); the FSF knight letter `n` is already the
+    /// [`WideRole::ViolentStag`]'s `**` base, so it takes the last free `**` base `z`,
+    /// and the `compare-fairy` harness maps `**z → n` when driving Opulent.
+    OpulentKnight = 109,
 }
 
 impl WideRole {
@@ -1034,7 +1093,7 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
-    pub const COUNT: usize = 106;
+    pub const COUNT: usize = 110;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1144,6 +1203,10 @@ impl WideRole {
         WideRole::GlidingSwallow,
         WideRole::PromotedRunningRabbit,
         WideRole::TenaciousFalcon,
+        WideRole::Wizard,
+        WideRole::TencubedChampion,
+        WideRole::OpulentLion,
+        WideRole::OpulentKnight,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1442,6 +1505,16 @@ impl WideRole {
             WideRole::GlidingSwallow => 'x',
             WideRole::PromotedRunningRabbit => 'y',
             WideRole::TenaciousFalcon => 'z',
+            // Ten-Cubed / Opulent leapers — second-bank (`**`) overflow roles.
+            // The Wizard recycles FSF's letter `w`; the Ten-Cubed Champion and the
+            // Opulent Lion recycle the free `**` bases `x` / `y` (FSF's `c` / `l`
+            // being already the CrownPrince's / FlyingCock's `**` bases). The board
+            // FEN I/O adds the doubled `**` prefix; the `compare-fairy` harness maps
+            // `**w → w`, `**x → c`, `**y → l` when driving FSF.
+            WideRole::Wizard => 'w',
+            WideRole::TencubedChampion => 'x',
+            WideRole::OpulentLion => 'y',
+            WideRole::OpulentKnight => 'z',
         }
     }
 
@@ -1642,6 +1715,10 @@ impl WideRole {
                 | WideRole::FlyingFalcon
                 | WideRole::TreacherousFox
                 | WideRole::CloudEagle
+                | WideRole::Wizard
+                | WideRole::TencubedChampion
+                | WideRole::OpulentLion
+                | WideRole::OpulentKnight
         )
     }
 
@@ -1686,6 +1763,12 @@ impl WideRole {
             't' => Some(WideRole::FlyingFalcon),
             'u' => Some(WideRole::TreacherousFox),
             'v' => Some(WideRole::CloudEagle),
+            // Ten-Cubed / Opulent leapers — the Wizard recycles FSF's `w`; the
+            // Ten-Cubed Champion and Opulent Lion take the free `**` bases `x` / `y`.
+            'w' => Some(WideRole::Wizard),
+            'x' => Some(WideRole::TencubedChampion),
+            'y' => Some(WideRole::OpulentLion),
+            'z' => Some(WideRole::OpulentKnight),
             _ => None,
         }
     }
@@ -1955,6 +2038,10 @@ impl fmt::Display for WideRole {
             WideRole::GlidingSwallow => "gliding-swallow",
             WideRole::PromotedRunningRabbit => "promoted-running-rabbit",
             WideRole::TenaciousFalcon => "tenacious-falcon",
+            WideRole::Wizard => "wizard",
+            WideRole::TencubedChampion => "tencubed-champion",
+            WideRole::OpulentLion => "opulent-lion",
+            WideRole::OpulentKnight => "opulent-knight",
         })
     }
 }
@@ -2139,8 +2226,16 @@ mod tests {
             WideRole::overflow2_from_base('c'),
             Some(WideRole::CrownPrince)
         );
-        // A character that names no second-bank role yields `None`.
-        assert_eq!(WideRole::overflow2_from_base('z'), None);
+        // The Ten-Cubed / Opulent leapers fill the last free `**` bases: the Wizard
+        // `w`, the Ten-Cubed Champion `x`, the Opulent Lion `y`, and the Opulent
+        // Knight `z`. Every letter `a..=z` now names a second-bank role, so only a
+        // non-letter is free.
+        assert_eq!(WideRole::overflow2_from_base('w'), Some(WideRole::Wizard));
+        assert_eq!(
+            WideRole::overflow2_from_base('z'),
+            Some(WideRole::OpulentKnight)
+        );
+        assert_eq!(WideRole::overflow2_from_base('?'), None);
     }
 
     #[test]
