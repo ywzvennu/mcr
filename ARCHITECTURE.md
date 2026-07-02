@@ -19,8 +19,8 @@ records the *as-built* result and the terminology used in the code.
 
 2. **The parallel generic geometry layer** ([`src/geometry/`](src/geometry)).
    A second, independent hierarchy parametrised over a compile-time `Geometry`,
-   built for fairy / pychess-class variants that need wider boards (up to 100
-   squares) and new piece roles. The 47 fairy variants ride this layer. It is
+   built for fairy / pychess-class variants that need wider boards (up to 144
+   squares) and new piece roles. The 60+ fairy variants ride this layer. It is
    the subject of the rest of this document.
 
 A third, fully self-contained module, [`src/ataxx.rs`](src/ataxx.rs), implements
@@ -34,8 +34,9 @@ single `u64`.
 
 The decisive design bet (see the design doc, §0) was **not** to retrofit the
 8x8 path but to introduce a parallel, monomorphised generic layer with the
-backing integer chosen per board. The 8x8 `u64` path stays frozen; everything
-wider rides `u128`. All modules below live under [`src/geometry/`](src/geometry).
+backing integer chosen per board. The 8x8 `u64` path stays frozen; boards up to
+128 squares ride `u128`, and the largest (12x12 Chu Shogi = 144 squares) rides a
+two-limb `U256`. All modules below live under [`src/geometry/`](src/geometry).
 
 ### `Geometry`, `Bitboard<G>`, `Square<G>`, `Board<G>`
 
@@ -138,11 +139,13 @@ size, start FEN, notable pieces, special rules, and validation oracle — see
 (`VariantId` / `WideVariantId`, `AnyWideVariant::dimensions`, and each start
 position's `to_fen()`) by `tests/variants_doc.rs`, which also drift-checks the
 committed copy against a fresh render, so the reference cannot fall behind the
-code.
+code. Per-variant perft / node-rate figures live in
+[`docs/perf-variants.md`](docs/perf-variants.md).
 
 ### Geometry families
 
-The shipped geometries, by backing integer:
+The shipped geometries, by backing integer (representative hosts; the complete,
+drift-checked variant list is in [`docs/variants.md`](docs/variants.md)):
 
 | Geometry | Board | Bits | Hosts |
 | -------- | :---: | :--: | ----- |
@@ -151,18 +154,24 @@ The shipped geometries, by backing integer:
 | `Grand10x10` | 10x10 (100) | `u128` | Grand, Grandhouse, Shako |
 | `Xiangqi9x10` | 9x10 (90) | `u128` | Xiangqi, Janggi, Manchu, Jieqi |
 | `Shogi9x9` | 9x9 (81) | `u128` | Shogi, Sho Shogi, Cannon Shogi, Mansindam, Chak, Xiang Fu |
+| `Chess9x9` | 9x9 (81) | `u128` | Chancellor |
+| `Courier12x8` | 12x8 (96) | `u128` | Courier |
+| `Washogi11x11` | 11x11 (121) | `u128` | Wa Shogi |
 | `Minixiangqi7x7` | 7x7 (49) | `u128` | Minixiangqi |
 | `Tori7x7` | 7x7 (49) | `u128` | Tori Shogi |
 | `Chennis7x7` | 7x7 (49) | `u128` | Chennis |
 | `Gorogoro5x6` | 5x6 (30) | `u64` | Gorogoro Shogi Plus |
 | `Minishogi5x5` | 5x5 (25) | `u64` | Minishogi, Kyoto Shogi |
 | `Dobutsu3x4` | 3x4 (12) | `u64` | Dobutsu |
+| `Chu12x12` | 12x12 (144) | `U256` | Chu Shogi |
 
-A single `u128` covers every board larger than 64 squares (80, 81, 90, 100 are
-all `<= 128`), keeping the whole bitboard algebra in two registers and reusing
-the hyperbola-quintessence slider math unchanged. The three same-sized 7x7
-geometries are kept **distinct** so, e.g., the Tori bird army never shares masks
-with the Xiangqi-on-7x7 palace/river machinery.
+A single `u128` covers every board from 65 up to 128 squares (80, 81, 90, 96,
+100, 121 all fit), keeping the whole bitboard algebra in two registers and
+reusing the hyperbola-quintessence slider math unchanged; only the 144-square
+Chu Shogi board overflows into the two-limb `U256` backing. The same-sized 7x7
+and 9x9 geometries are kept **distinct** so, e.g., the Tori bird army never
+shares masks with the Xiangqi-on-7x7 palace/river machinery, and the
+western-chess Chancellor never shares masks with the Shogi family.
 
 ### The `attackers_to` consistency guard
 
@@ -192,6 +201,53 @@ systematic guard so the class cannot recur: for every variant it computes the
   driven through `AnyWideVariant` so a variant can be chosen by name at runtime.
 
 ---
+
+## Public API surface and naming conventions
+
+The crate ships **two variant families** that a consumer drives the same way —
+parse a FEN, list legal moves, play, count perft — but which differ in board
+geometry:
+
+- **Concrete 8x8** — `Position`, the `Variant` / `VariantPosition<V>` types, and
+  the runtime-dispatch `AnyVariant` / `VariantId`.
+- **Generic-geometry fairy** — `GenericPosition<G, V>` and the runtime-dispatch
+  `AnyWideVariant` / `WideVariantId`, under `mce::geometry`.
+
+A goal of the public surface is that the two families **read the same** where
+they overlap, so the naming was audited for consistency and standardized by
+**non-breaking** means only (add the canonical name; keep any prior name as a
+`#[deprecated]` alias — never a rename or removal).
+
+### Audit findings and decisions
+
+| Concept | Fairy family | Concrete family — before | Resolution |
+| ------- | ------------ | ------------------------ | ---------- |
+| "who attacks this square" (live occupancy) | `GenericPosition::attackers_of(sq, side)` | only the lower-level `Position::attackers_to(sq, side, occ)` | **added** `Position::attackers_of(sq, side)` as the live-occupancy convenience, matching the fairy name. Both `_to` (explicit occupancy) and `_of` (live occupancy) now exist on both families, with the same meaning. |
+| per-color check | `GenericPosition::is_in_check(color)` (plus `AnyWideVariant::is_in_check`) | only `Position::is_check()` (side to move) | **added** `Position::is_in_check(color)`; `is_in_check(turn) == is_check()`. |
+| moves from one square | `GenericPosition::legal_moves_from(sq)`, `AnyWideVariant::legal_moves_from` | only `legal_moves()` | **added** `legal_moves_from(from)` to `Position`, `VariantPosition`, and `AnyVariant`. |
+| absolutely-pinned pieces | `GenericPosition::pinned_pieces(color)` | `Position::pinned(color)` | **renamed** to `Position::pinned_pieces(color)`; `pinned` kept as a `#[deprecated]` alias. |
+
+`is_check()` (side to move) is spelled identically on both families and is
+retained; the color-indexed `is_in_check` is the *additional* query, never a
+rename of `is_check`. Likewise `startpos` / `from_fen` constructors and `to_fen`
+/ `legal_moves` / `play` / `perft` / `variant_id` / `turn` / `outcome` /
+`end_reason` were already spelled identically across the two families and needed
+no change.
+
+### Deliberately *not* mirrored (scoped out)
+
+- **`AnyVariant::is_in_check(color)`** and the wider fairy *analysis* surface
+  (`attack_map`, `defense_map`, `piece_attacks`, `checkers_of`, `pin_ray_of`, …)
+  are **not** forwarded onto the concrete `AnyVariant`. Per-color check on the
+  concrete *variant* wrapper is not merely a forward: variants such as Atomic
+  redefine king safety (adjacent kings cancel check) through the `Variant::is_check`
+  hook, which is *side-to-move only* and takes no color argument. A correct
+  color-indexed check for those variants needs a color-aware rule hook, which
+  would be a `Variant`-trait change — out of scope for a non-breaking docs +
+  polish pass. It is recorded here as a **proposal** for a future milestone. The
+  color-indexed `is_in_check` therefore lands only on the concrete *core*
+  `Position` (standard king safety, where it is unambiguous) and on the fairy
+  family (which already carries the color-aware machinery).
 
 ## Validation and the GPL fence
 

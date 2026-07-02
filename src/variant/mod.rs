@@ -829,6 +829,23 @@ impl<V: Variant> VariantPosition<V> {
         self.legal_move_list().into_vec()
     }
 
+    /// The legal moves of the side to move whose origin is `from`.
+    ///
+    /// A filter over [`legal_moves`](Self::legal_moves), so every variant rule
+    /// (forced captures, drops, king safety) is already applied. Because each
+    /// legal move has exactly one origin, the lists returned for the distinct
+    /// squares partition [`legal_moves`](Self::legal_moves); a drop is grouped
+    /// under the square it drops onto (its packed origin equals its target). This
+    /// mirrors the fairy layer's
+    /// [`GenericPosition::legal_moves_from`](crate::geometry::GenericPosition::legal_moves_from).
+    #[must_use]
+    pub fn legal_moves_from(&self, from: Square) -> Vec<Move> {
+        self.legal_moves()
+            .into_iter()
+            .filter(|mv| mv.from() == from)
+            .collect()
+    }
+
     /// Generates the legal moves into a stack-backed [`MoveList`], the
     /// allocation-free core of [`VariantPosition::legal_moves`].
     fn legal_move_list(&self) -> MoveList {
