@@ -53,6 +53,13 @@
 //!   every non-Duck move, so a variant without the duck mechanic produces words
 //!   whose value is identical to the old `u32` layout (zero-extended) — its base
 //!   logic, ordering, and equality are unchanged.
+//!
+//! The rest of the high word carries two further default-off addenda that are
+//! mutually exclusive with the Duck fields (no variant sets more than one): the
+//! S-House **hand-gate** (bits 41..49) and the Chu-Shogi **Lion** addendum (bits
+//! 49..60) — an 8-bit intermediate/second-capture square plus two capture flags
+//! and a presence bit, set only by a [`WideMoveKind::LionMove`]. Every other move
+//! leaves all of these `0`.
 
 use alloc::string::String;
 use core::fmt;
@@ -93,6 +100,27 @@ pub enum WideMoveKind {
         /// The role of the dropped piece.
         role: WideRole,
     },
+    /// A Chu-Shogi **Lion** multi-step move: the Lion (or a lion-power promoted
+    /// piece — Horned Falcon, Soaring Eagle) makes up to two King-steps in one
+    /// turn, optionally capturing a piece on an **intermediate** square it steps
+    /// through *and/or* on the destination. This is the only move kind that can
+    /// remove **two** enemy pieces at once, and the only one whose origin may
+    /// equal its destination (the *igui* stationary capture and the *jitto*
+    /// pass).
+    ///
+    /// The intermediate square rides in a high-word addendum (see
+    /// [`WideMove::lion`]); the two capture flags are carried here. Used only by
+    /// Chu Shogi (default-off), so every other variant's packed words are
+    /// byte-identical to before this kind existed.
+    LionMove {
+        /// Whether the move captures the piece on the intermediate square
+        /// (the *igui* victim, or the first of a double capture).
+        first_capture: bool,
+        /// Whether the move captures the piece on the destination square
+        /// (the second of a double capture, or a lone destination capture on a
+        /// two-step area move).
+        second_capture: bool,
+    },
 }
 
 impl WideMoveKind {
@@ -105,6 +133,14 @@ impl WideMoveKind {
             WideMoveKind::Capture
                 | WideMoveKind::EnPassant
                 | WideMoveKind::Promotion { capture: true, .. }
+                | WideMoveKind::LionMove {
+                    first_capture: true,
+                    ..
+                }
+                | WideMoveKind::LionMove {
+                    second_capture: true,
+                    ..
+                }
         )
     }
 
@@ -156,6 +192,10 @@ const KIND_CASTLE_Q: u32 = 5;
 const KIND_PROMOTION: u32 = 6;
 const KIND_PROMOTION_CAPTURE: u32 = 7;
 const KIND_DROP: u32 = 8;
+// The Chu-Shogi Lion multi-step move (default-off). Its intermediate square and
+// two capture flags live in a high-word addendum (bits 49..60), so every
+// non-Lion move — for which those bits are `0` — keeps a byte-identical word.
+const KIND_LION: u32 = 9;
 
 const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
@@ -198,6 +238,19 @@ const HAND_GATE_ROLE_SHIFT: u32 = 41; // bits 41..47: 6-bit WideRole index
 const HAND_GATE_ROLE_MASK: u64 = 0x3f;
 const HAND_GATE_PRESENT: u64 = 1 << 47;
 const HAND_GATE_ON_ROOK: u64 = 1 << 48;
+
+// Chu Lion addendum, in the free high-word bits above the hand-gate fields
+// (which end at bit 48). A Lion move (kind `KIND_LION`) carries the square it
+// steps through / captures on as an 8-bit index, plus the two capture flags.
+// Every non-Lion move leaves these bits `0`, so its word is bit-identical to the
+// pre-Lion layout (and the Duck / hand-gate addenda, which occupy the lower half
+// of the high word, are mutually exclusive with a Lion move — no variant fields
+// both).
+const LION_MID_SHIFT: u32 = 49; // bits 49..57: 8-bit intermediate square index
+const LION_MID_MASK: u64 = 0xff;
+const LION_CAP1: u64 = 1 << 57; // captured a piece on the intermediate square
+const LION_CAP2: u64 = 1 << 58; // captured a piece on the destination square
+const LION_PRESENT: u64 = 1 << 59; // this word carries a Lion addendum
 
 /// The Seirawan reserve piece a [`WideMove`] gates in as the second half of a
 /// back-rank piece's first move: a Hawk (Bishop + Knight) or an Elephant
@@ -322,7 +375,88 @@ impl WideMove {
             ),
             // A drop is `from == to == square`; the role rides in the role field.
             WideMoveKind::Drop { role } => WideMove::pack(to, to, role.index() as u32, KIND_DROP),
+            // A Lion move carries its intermediate square in the addendum; `new`
+            // has no square for it, so it packs the base move (with `mid == from`,
+            // an inert default) and the capture flags. Use [`WideMove::lion`] to
+            // set a real intermediate square.
+            WideMoveKind::LionMove {
+                first_capture,
+                second_capture,
+            } => {
+                let base = WideMove::pack(from, to, 0, KIND_LION);
+                let mut high = LION_PRESENT | ((from as u64 & LION_MID_MASK) << LION_MID_SHIFT);
+                if first_capture {
+                    high |= LION_CAP1;
+                }
+                if second_capture {
+                    high |= LION_CAP2;
+                }
+                WideMove(base.0 | high)
+            }
         }
+    }
+
+    /// Creates a Chu-Shogi **Lion** multi-step move: the Lion on `from` steps
+    /// through the intermediate square `mid` to the destination `to`, capturing on
+    /// `mid` when `first_capture` and on `to` when `second_capture`.
+    ///
+    /// `from == to` encodes the two net-zero Lion moves: an *igui* stationary
+    /// capture (`first_capture`, the victim on `mid`) or a *jitto* pass (neither
+    /// flag). The intermediate square and flags ride in the high-word addendum, so
+    /// the low 32 bits stay a plain `from`/`to` move; every non-Lion move leaves
+    /// the addendum `0` and is byte-identical.
+    #[must_use]
+    #[inline]
+    pub fn lion<G: Geometry>(
+        from: Square<G>,
+        to: Square<G>,
+        mid: Square<G>,
+        first_capture: bool,
+        second_capture: bool,
+    ) -> WideMove {
+        let base = WideMove::pack(from.index(), to.index(), 0, KIND_LION);
+        let mut high = LION_PRESENT | ((mid.index() as u64 & LION_MID_MASK) << LION_MID_SHIFT);
+        if first_capture {
+            high |= LION_CAP1;
+        }
+        if second_capture {
+            high |= LION_CAP2;
+        }
+        WideMove(base.0 | high)
+    }
+
+    /// The intermediate square index of a Lion move (the square it steps through /
+    /// captures on), or `None` if this is not a Lion move.
+    #[must_use]
+    #[inline]
+    pub const fn lion_mid_index(self) -> Option<u8> {
+        if self.0 & LION_PRESENT != 0 {
+            Some(((self.0 >> LION_MID_SHIFT) & LION_MID_MASK) as u8)
+        } else {
+            None
+        }
+    }
+
+    /// The intermediate square of a Lion move for a board of geometry `G`, or
+    /// `None` if this is not a Lion move.
+    #[must_use]
+    #[inline]
+    pub fn lion_mid<G: Geometry>(self) -> Option<Square<G>> {
+        self.lion_mid_index().map(Square::new)
+    }
+
+    /// Whether this Lion move captures on its intermediate square.
+    #[must_use]
+    #[inline]
+    pub const fn lion_captures_mid(self) -> bool {
+        self.0 & LION_PRESENT != 0 && self.0 & LION_CAP1 != 0
+    }
+
+    /// Whether this Lion move captures on its destination square.
+    #[must_use]
+    #[inline]
+    pub const fn lion_captures_dest(self) -> bool {
+        self.0 & LION_PRESENT != 0 && self.0 & LION_CAP2 != 0
     }
 
     /// Creates a drop move placing a piece of `role` on `square`.
@@ -431,8 +565,12 @@ impl WideMove {
                 role: self.role_or_pawn(),
                 capture: true,
             },
-            // Any code at or above KIND_DROP is a drop; codes are dense, so this
-            // only matches KIND_DROP for values this crate produces.
+            KIND_LION => WideMoveKind::LionMove {
+                first_capture: self.0 & LION_CAP1 != 0,
+                second_capture: self.0 & LION_CAP2 != 0,
+            },
+            // Any remaining code is a drop; codes are dense, so this only matches
+            // KIND_DROP for values this crate produces.
             _ => WideMoveKind::Drop {
                 role: self.role_or_pawn(),
             },
@@ -453,7 +591,7 @@ impl WideMove {
         matches!(
             self.kind_tag(),
             KIND_CAPTURE | KIND_EN_PASSANT | KIND_PROMOTION_CAPTURE
-        )
+        ) || (self.kind_tag() == KIND_LION && self.0 & (LION_CAP1 | LION_CAP2) != 0)
     }
 
     /// Returns `true` if this move is castling.
@@ -666,6 +804,23 @@ impl WideMove {
     /// ```
     #[must_use]
     pub fn to_uci<G: Geometry>(self) -> String {
+        // A Chu Lion move renders as `<from><to>`, with the intermediate square
+        // appended as `*<mid>` when the move captures on it (an igui or the first
+        // leg of a double capture). This disambiguates a two-leg Lion capture from
+        // an ordinary move to the same destination, and a `from == to` string
+        // (with no `*`) is the jitto pass.
+        if self.kind_tag() == KIND_LION {
+            let mut s = String::with_capacity(9);
+            Self::render_square::<G>(&mut s, self.from_index());
+            Self::render_square::<G>(&mut s, self.to_index());
+            if self.lion_captures_mid() {
+                s.push('*');
+                if let Some(mid) = self.lion_mid_index() {
+                    Self::render_square::<G>(&mut s, mid);
+                }
+            }
+            return s;
+        }
         if let Some(role) = self.drop_role() {
             let mut s = String::with_capacity(4);
             s.push(role.upper_char());
@@ -753,6 +908,10 @@ struct WideMoveData {
     /// The square the neutral Duck is placed on this ply (Duck chess), as an
     /// index.
     duck: Option<u8>,
+    /// The intermediate square of a Chu Lion move (the square it steps through /
+    /// captures on), as an index; `None` for every non-Lion move. The two Lion
+    /// capture flags already ride in [`kind`](WideMoveData::kind).
+    lion_mid: Option<u8>,
 }
 
 #[cfg(feature = "serde")]
@@ -766,6 +925,7 @@ impl WideMove {
             gate: self.gate().map(|g| (g, self.gate_square())),
             hand_gate: self.hand_gate().map(|r| (r, self.hand_gate_square())),
             duck: self.duck_to_index(),
+            lion_mid: self.lion_mid_index(),
         }
     }
 
@@ -781,6 +941,7 @@ impl WideMove {
             gate,
             hand_gate,
             duck,
+            lion_mid,
         } = data;
         let mut mv = match kind {
             WideMoveKind::Quiet => WideMove::pack(from, to, 0, KIND_QUIET),
@@ -801,7 +962,30 @@ impl WideMove {
             ),
             // A drop is `from == to == square`; the role rides in the role field.
             WideMoveKind::Drop { role } => WideMove::pack(to, to, role.index() as u32, KIND_DROP),
+            // A Lion move: its capture flags ride in the addendum; the
+            // intermediate square is reapplied from `lion_mid` below.
+            WideMoveKind::LionMove {
+                first_capture,
+                second_capture,
+            } => {
+                let base = WideMove::pack(from, to, 0, KIND_LION);
+                let mut high = LION_PRESENT;
+                if first_capture {
+                    high |= LION_CAP1;
+                }
+                if second_capture {
+                    high |= LION_CAP2;
+                }
+                WideMove(base.0 | high)
+            }
         };
+        if let Some(mid) = lion_mid {
+            mv = WideMove(
+                (mv.0 & !(LION_MID_MASK << LION_MID_SHIFT))
+                    | LION_PRESENT
+                    | ((mid as u64 & LION_MID_MASK) << LION_MID_SHIFT),
+            );
+        }
         if let Some((role, square)) = gate {
             mv = mv.with_gate(role, square);
         }
@@ -1029,6 +1213,50 @@ mod tests {
         let s = Square::<Grand10x10>::from_file_rank(0, 9).unwrap();
         let m = WideMove::new(s, Square::<Grand10x10>::new(0), WideMoveKind::Quiet);
         assert_eq!(m.to_uci::<Grand10x10>(), "a10a1");
+    }
+
+    #[test]
+    fn lion_move_round_trips_and_is_default_off() {
+        let from = Square::<Wide11x11>::new(50);
+        let to = Square::<Wide11x11>::new(72);
+        let mid = Square::<Wide11x11>::new(61);
+        // A double capture: captures the intermediate and the destination.
+        let d = WideMove::lion(from, to, mid, true, true);
+        assert_eq!(d.from_index(), 50);
+        assert_eq!(d.to_index(), 72);
+        assert_eq!(d.lion_mid_index(), Some(61));
+        assert!(d.lion_captures_mid());
+        assert!(d.lion_captures_dest());
+        assert!(d.is_capture());
+        assert_eq!(
+            d.kind(),
+            WideMoveKind::LionMove {
+                first_capture: true,
+                second_capture: true,
+            }
+        );
+        // An igui: from == to, captures only the adjacent (mid) square.
+        let igui = WideMove::lion(from, from, mid, true, false);
+        assert_eq!(igui.from_index(), igui.to_index());
+        assert!(igui.lion_captures_mid());
+        assert!(!igui.lion_captures_dest());
+        assert!(igui.is_capture());
+        // A jitto pass: from == to, no capture at all — but still a Lion move.
+        let pass = WideMove::lion(from, from, mid, false, false);
+        assert!(!pass.is_capture());
+        assert_eq!(pass.lion_mid_index(), Some(61));
+        assert_eq!(
+            pass.kind(),
+            WideMoveKind::LionMove {
+                first_capture: false,
+                second_capture: false,
+            }
+        );
+        // A non-Lion move carries no Lion addendum (default-off byte-identity):
+        // the whole high word is zero, exactly as before this kind existed.
+        let plain = WideMove::new(from, to, WideMoveKind::Capture);
+        assert_eq!(plain.lion_mid_index(), None);
+        assert_eq!(plain.0 & 0xffff_ffff_0000_0000, 0);
     }
 
     #[test]

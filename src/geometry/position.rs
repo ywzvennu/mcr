@@ -2779,6 +2779,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_berolina_pawns() {
             self.gen_berolina_moves(pseudo, us, occupied, their_pieces, full, &pins);
         }
+        // Chu-Shogi Lion powers (default-off): the two-step area move, igui
+        // stationary capture, double capture, and jitto pass — the moves the plain
+        // leaper `role_attacks` cannot express. Emitted only under `has_lion_moves`,
+        // so every other variant skips this and is byte-identical.
+        if V::has_lion_moves() {
+            self.gen_lion_moves(pseudo, us, their_pieces, our_pieces);
+        }
 
         // Castling: only the single-king side (white, in Spartan) ever has it, and
         // it must not be in check / pass through an attacked square. Compute the
@@ -2790,6 +2797,151 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 let king_danger = self.attacked_by(us.opposite(), occ_without_king);
                 if self.attackers_to(ksq, us.opposite(), occupied).is_empty() {
                     self.gen_castles(pseudo, us, occupied, king_danger, ksq);
+                }
+            }
+        }
+    }
+
+    /// Generates the side-to-move's **Chu-Shogi Lion** moves: the special
+    /// [`WideMoveKind::LionMove`] moves that a plain leaper cannot express — the
+    /// two-step area move (with an intermediate capture), the *igui* stationary
+    /// capture, the double capture, and the *jitto* pass. The ordinary single steps
+    /// and distance-two jumps are already produced by `role_attacks`
+    /// (`Quiet`/`Capture` moves), so this pass adds *only* the moves that touch an
+    /// intermediate square or return the piece to its origin.
+    ///
+    /// Runs only under [`WideVariant::has_lion_moves`]; a full lion
+    /// ([`WideVariant::role_is_full_lion`]) turns freely across its two King-steps,
+    /// while a line-lion ([`WideVariant::role_lion_lines`]: Horned Falcon, Soaring
+    /// Eagle) may only step straight along each lion-power line.
+    fn gen_lion_moves<S: WideSink>(
+        &self,
+        out: &mut S,
+        us: Color,
+        their_pieces: Bitboard<G>,
+        our_pieces: Bitboard<G>,
+    ) {
+        // The eight King directions, the two-step alphabet of a full lion.
+        const DIRS8: [(i8, i8); 8] = [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ];
+        let board = &self.board;
+        for role in WideRole::ALL {
+            let full = V::role_is_full_lion(role);
+            let lines = V::role_lion_lines(role);
+            if !full && lines.is_empty() {
+                continue;
+            }
+            for from in board.pieces(us, role) {
+                let mut can_pass = false;
+                if full {
+                    // A full lion: the first King-step lands on any non-friendly
+                    // adjacent square (empty or enemy), then it may stop, igui
+                    // (return home), or take a second King-step in any direction.
+                    // The plain single steps and distance-two jumps are already
+                    // produced by `role_attacks`, so this pass emits only the moves
+                    // that touch an intermediate square: the igui, and every
+                    // two-step path that **captures** on either leg (a non-capturing
+                    // two-step coincides with a jump and is not emitted again).
+                    for &d1 in &DIRS8 {
+                        let Some(s1) = from.offset(d1.0, d1.1) else {
+                            continue;
+                        };
+                        if our_pieces.contains(s1) {
+                            // Cannot step onto a friendly piece (only jump over it,
+                            // which the leaper already covers).
+                            continue;
+                        }
+                        let s1_enemy = their_pieces.contains(s1);
+                        if s1_enemy {
+                            // igui: capture the adjacent enemy and return home.
+                            out.push(WideMove::lion(from, from, s1, true, false));
+                        } else {
+                            // An empty adjacent square: the lion can step there and
+                            // back, so the jitto pass is available.
+                            can_pass = true;
+                        }
+                        // The second King-step, from s1 to any non-friendly square
+                        // (other than the origin — that is the igui above).
+                        //
+                        // * When the first step **captured** (`s1` enemy), the lion
+                        //   may continue to any square, at distance one or two — the
+                        //   capture makes the whole two-step move distinct from a
+                        //   plain move to `s2`.
+                        // * When the first step was onto an **empty** square, the
+                        //   two-step move is only distinct if it captures on the
+                        //   second step **and** lands at distance two: reaching an
+                        //   adjacent (distance-one) square through an empty
+                        //   intermediate is the same move as the plain step to it, so
+                        //   it is not re-emitted. HaChu enumerates one such move per
+                        //   intermediate path, matching this (a distance-two capture
+                        //   through two elbow squares is two distinct area moves, plus
+                        //   the leaper's direct jump).
+                        for &d2 in &DIRS8 {
+                            let Some(s2) = s1.offset(d2.0, d2.1) else {
+                                continue;
+                            };
+                            if s2 == from || our_pieces.contains(s2) {
+                                continue;
+                            }
+                            let s2_enemy = their_pieces.contains(s2);
+                            let emit = if s1_enemy {
+                                true
+                            } else {
+                                s2_enemy && chebyshev::<G>(from, s2) == 2
+                            };
+                            if emit {
+                                out.push(WideMove::lion(from, s2, s1, s1_enemy, s2_enemy));
+                            }
+                        }
+                    }
+                } else {
+                    // A line-lion (Horned Falcon / Soaring Eagle): lion power only
+                    // straight along each of its lion-power lines, no turning.
+                    for &line in lines {
+                        let (df, dr) = if us.is_white() {
+                            line
+                        } else {
+                            (line.0, -line.1)
+                        };
+                        let Some(s1) = from.offset(df, dr) else {
+                            continue;
+                        };
+                        if our_pieces.contains(s1) {
+                            // Cannot step onto a friendly first square (only the
+                            // leaper's jump over it, already covered).
+                            continue;
+                        }
+                        let s1_enemy = their_pieces.contains(s1);
+                        if s1_enemy {
+                            // igui: capture the enemy on the line and return home.
+                            out.push(WideMove::lion(from, from, s1, true, false));
+                        } else {
+                            can_pass = true;
+                        }
+                        // The straight second step (no turning). Emit the two-step
+                        // move only when it captures on a leg — a non-capturing
+                        // straight double-step coincides with the leaper's jump.
+                        if let Some(s2) = s1.offset(df, dr) {
+                            let s2_enemy = their_pieces.contains(s2);
+                            if !our_pieces.contains(s2) && (s1_enemy || s2_enemy) {
+                                out.push(WideMove::lion(from, s2, s1, s1_enemy, s2_enemy));
+                            }
+                        }
+                    }
+                }
+                if can_pass {
+                    // The jitto pass: step to an empty adjacent square and back, a
+                    // net-zero move that only passes the turn. One per piece, with
+                    // an inert mid square (no capture).
+                    out.push(WideMove::lion(from, from, from, false, false));
                 }
             }
         }
@@ -2969,7 +3121,28 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         for to in targets {
             let capture = their_pieces.contains(to);
             let to_rank = to.rank();
-            if from_in_zone || V::in_promotion_zone(us, to_rank) {
+            let to_in_zone = V::in_promotion_zone(us, to_rank);
+            let forced = V::role_promotion_forced(role, us, to_rank);
+            // Whether promotion is offered here, and whether it is compulsory.
+            let (promo_allowed, must_promote) = if V::lion_style_promotion() {
+                // The Chu-Shogi rule as HaChu applies it (its default
+                // "Promote on entry"): a piece promotes exactly when it **enters**
+                // the promotion zone from outside, and promotion is then
+                // **mandatory** — there is no non-promoting alternative. A move that
+                // stays within, leaves, or captures within the zone never promotes.
+                // A Pawn / Lance that would otherwise be immobile on the furthest
+                // rank (`forced`) also promotes, and must.
+                let entering = to_in_zone && !from_in_zone;
+                let may = entering || forced;
+                (may, may)
+            } else {
+                // The standard "starts or ends in the zone" rule. Compulsory when
+                // promotion is mandatory (Shinobi) or the piece would otherwise be
+                // immobile (Shogi's forced promotion).
+                let in_zone = from_in_zone || to_in_zone;
+                (in_zone, in_zone && (mandatory || forced))
+            };
+            if promo_allowed {
                 if !limited {
                     out.push(WideMove::new(
                         from,
@@ -2980,11 +3153,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         },
                     ));
                 }
-                // The non-promoting alternative, unless promotion is mandatory in
-                // the zone (Shinobi) or the piece would then have no further move
-                // (Shogi's forced promotion). When the promotion is suppressed by
-                // the limit the plain move is always available.
-                if limited || (!mandatory && !V::role_promotion_forced(role, us, to_rank)) {
+                // The non-promoting alternative, unless promotion is compulsory
+                // here. When the promotion is suppressed by the limit the plain
+                // move is always available.
+                if limited || !must_promote {
                     let kind = if capture {
                         WideMoveKind::Capture
                     } else {
@@ -3869,6 +4041,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     u.touch(captured, &self.board);
                 }
             }
+            // A Lion double capture / igui also removes a piece on its
+            // intermediate square; record that victim's role so undo restores it.
+            if mv.lion_captures_mid() {
+                if let Some(mid) = mv.lion_mid::<G>() {
+                    if let Some(captured) = self.board.role_at(mid) {
+                        u.touch(captured, &self.board);
+                    }
+                }
+            }
             if let Some(promo) = mv.kind().promotion() {
                 u.touch(promo, &self.board);
             }
@@ -4003,6 +4184,30 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // Drops are fully handled by the early return above (a drop has no
                 // origin piece, so it cannot share the board-move path).
                 unreachable!("drops are handled before the board-move match");
+            }
+            WideMoveKind::LionMove {
+                first_capture,
+                second_capture,
+            } => {
+                // A Chu Lion multi-step move: lift the Lion, remove up to two
+                // victims (the intermediate square and the destination), then land
+                // the Lion on `to`. For an igui / jitto pass `from == to`, so the
+                // Lion returns to its own square (a net-zero board move plus, for
+                // igui, the removed adjacent victim).
+                reset_clock = first_capture || second_capture;
+                self.board.remove_known(from, moving);
+                if first_capture {
+                    if let Some(mid) = mv.lion_mid::<G>() {
+                        if let Some(victim) = self.board.piece_at(mid) {
+                            self.board.remove_known(mid, victim);
+                        }
+                    }
+                }
+                // `set_piece` clears any occupant of `to` first, covering the
+                // destination capture (`second_capture`); for a pass / igui,
+                // `to == from` is empty after the lift, so this simply lands the
+                // Lion back home.
+                self.board.set_piece(to, moving);
             }
         }
 
@@ -4176,7 +4381,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             | WideMoveKind::DoublePawnPush
             | WideMoveKind::EnPassant
             | WideMoveKind::CastleKingside
-            | WideMoveKind::CastleQueenside => {
+            | WideMoveKind::CastleQueenside
+            // A Lion move carries the (never-promoted) Lion's bit from `from` to
+            // `to` like any board move; the intermediate victim, if any, is cleared
+            // with the destination bit. Chu Shogi has no crazyhouse promoted mask,
+            // so this arm is inert there — it exists only for match exhaustiveness.
+            | WideMoveKind::LionMove { .. } => {
                 if self.promoted.contains(from) {
                     self.promoted.clear(from);
                     self.promoted.set(to);
@@ -5267,11 +5477,32 @@ fn multi_royal_move_off_lines<G: Geometry>(
     royal_lines: Bitboard<G>,
 ) -> bool {
     let from = mv.from::<G>();
-    if kings.contains(from) || matches!(mv.kind(), WideMoveKind::EnPassant) {
+    // A Lion move can remove a piece on its *intermediate* square (an igui / double
+    // capture) — a third square, off the from/to pair, that may sit on a royal line
+    // and unblock a check. Its from == to for an igui / pass also defeats the
+    // origin/destination reasoning. So no Lion move is ever fast-accepted; each is
+    // routed to the full make/unmake verify. (Gated behind `has_lion_moves`, so no
+    // other variant ever produces one and this is inert for them.)
+    if kings.contains(from)
+        || matches!(
+            mv.kind(),
+            WideMoveKind::EnPassant | WideMoveKind::LionMove { .. }
+        )
+    {
         return false;
     }
     let to = mv.to::<G>();
     !royal_lines.contains(from) && !royal_lines.contains(to)
+}
+
+/// The Chebyshev (king-move) distance between two squares — `max(|Δfile|,
+/// |Δrank|)`. Used by the Chu Lion generator to tell a genuine distance-two area
+/// move from a redundant two-step to an adjacent square.
+#[inline]
+fn chebyshev<G: Geometry>(a: Square<G>, b: Square<G>) -> u8 {
+    let df = (a.file() as i16 - b.file() as i16).unsigned_abs();
+    let dr = (a.rank() as i16 - b.rank() as i16).unsigned_abs();
+    df.max(dr) as u8
 }
 
 /// The back rank (0-based) of `color`: rank `0` for white, the top rank for

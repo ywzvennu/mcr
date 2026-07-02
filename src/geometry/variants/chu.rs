@@ -11,43 +11,49 @@
 //! The reference engine for Chu Shogi is **HaChu** (H. G. Muller), driven as a
 //! GPL subprocess oracle by the `compare-fairy` harness (issue #379).
 //!
-//! **What is machine-validated against HaChu (and what is not):**
+//! **What is machine-validated against HaChu:**
 //!
 //! * HaChu has **no native perft**, but its move generation can be read externally:
 //!   the `ddugovic/hachu 0.23` build accepts `usermove` only after a `memory N` hash
 //!   allocation (otherwise it segfaults on the first move), and with `debug=1` it
 //!   prints its full generated move list for a position when handed an illegal
 //!   `usermove`. Driving it that way (a fresh subprocess per node, replaying the move
-//!   sequence, reading the move-list dump) gives an external HaChu perft.
-//! * Against that oracle, from the start position: **perft(1) = 36** matches HaChu
-//!   **byte-for-byte** (identical coordinate move set), and **perft(2) = 1296**
-//!   matches **exactly**. At **perft(3)** mce counts 47955 and HaChu 47952 — mce
-//!   over-generates **3** nodes (in the `f3f5` / `e4e5` / `h4h5` subtrees),
-//!   consistent with the Lion / promotion approximations below and **not yet
-//!   resolved**. So the start army's ordinary movement is HaChu-validated to depth 2
-//!   and the depth-3 gap is small and localized.
+//!   sequence, reading the move-list dump — deduping killer/hash prefixes and
+//!   suppressed entries) gives an external HaChu perft; `setboard` drives arbitrary
+//!   positions for isolated Lion / promotion checks.
+//! * From the start position: **perft(1) = 36** matches HaChu **byte-for-byte**, and
+//!   **perft(2) = 1296** matches **node-for-node**. At **perft(3)** mce counts 48319
+//!   and HaChu 48317; the trees agree at every node **except one** (after
+//!   `1. f3f5 d8d7`), where HaChu 0.23 fails to generate the two legal
+//!   *anti-diagonal* distance-two Lion captures of the Black Go-Between on d7 — a
+//!   **HaChu bug** (its Lion captures a distance-two enemy on the a1–l12 diagonal
+//!   but not the opposite one, shown in isolation via `setboard`). mce is correct.
 //!
-//! **What this module implements and what it does NOT (yet):**
+//! **What this module implements:**
 //!
 //! * Every non-Lion piece — the sliding generals/chariots/movers, the step
-//!   generals, the Kirin/Phoenix jumpers, and the promoted forms — is implemented
-//!   in full via [`role_attacks`](WideVariant::role_attacks).
+//!   generals, the Kirin/Phoenix jumpers, and the promoted forms — via
+//!   [`role_attacks`](WideVariant::role_attacks).
 //! * The **Lion** ([`WideRole::ChuLion`]) and the two lion-power promoted pieces
-//!   (**Horned Falcon**, **Soaring Eagle**) are implemented as **jumping leapers**
-//!   over their reachable squares (anything within two King steps for the Lion; the
-//!   two-square forward / forward-diagonal reach for the Falcon / Eagle). This is
-//!   **exact for ordinary moves and single captures**, but the **igui** (stationary
-//!   capture), the **double capture** (capturing two pieces in one turn via the
-//!   intermediate square), and the **lion-trading** restrictions are **not modeled**
-//!   — the [`WideMove`](crate::geometry::WideMove) type carries only a `from`/`to`
-//!   pair, with no room for the Lion's intermediate square.
-//! * The Chu **promotion condition** (promote on *entering* the zone from outside,
-//!   or on a *capture beginning within* the zone) is approximated by the generic
-//!   no-hand per-piece path, which promotes on any move **ending in the zone**. The
-//!   two differ only for moves made entirely within / out of the far four ranks.
+//!   (**Horned Falcon** forward, **Soaring Eagle** forward-diagonally) in full: the
+//!   single steps and distance-two jumps come from the leaper `role_attacks`, and
+//!   the moves a leaper cannot express — the **igui** (stationary capture), the
+//!   **double capture**, the two-step **area move** (one per capturing intermediate
+//!   path), and the **jitto pass** — come from the dedicated
+//!   [`gen_lion_moves`](crate::geometry::GenericPosition) pass via the new
+//!   [`WideMoveKind::LionMove`](crate::geometry::WideMoveKind) (an intermediate
+//!   square packed into the `WideMove` addendum, default-off for every other
+//!   variant). The Chu **lion-trading** restrictions are **not** modelled because
+//!   HaChu does not enforce them in its move generation either (its `setboard` dumps
+//!   let a Lion capture a *protected* enemy Lion), so matching the oracle means
+//!   leaving them off.
+//! * The Chu **promotion** rule as HaChu applies it (its default "promote on
+//!   entry"): promotion is **mandatory** on a move that *enters* the zone from
+//!   outside, and is never offered on a move that stays within, leaves, or captures
+//!   within it ([`WideVariant::lion_style_promotion`]).
 //!
 //! See `tests/perft_chu.rs` for the HaChu-cross-checked perft counts and the
-//! per-piece movement unit tests.
+//! Lion / promotion / per-piece movement unit tests.
 //!
 //! ## The army (White orientation; forward = up the board)
 //!
@@ -380,6 +386,45 @@ impl WideVariant<Chu12x12> for ChuRules {
         )
     }
 
+    // --- Lion powers (igui, double capture, jitto pass) -------------------
+
+    fn has_lion_moves() -> bool {
+        true
+    }
+
+    fn role_is_full_lion(role: WideRole) -> bool {
+        // The Lion has lion power in all eight directions.
+        matches!(role, WideRole::ChuLion)
+    }
+
+    fn role_lion_lines(role: WideRole) -> &'static [(i8, i8)] {
+        // The two lion-power promoted pieces carry a *partial* (straight-line) lion
+        // power: the Horned Falcon straight forward, the Soaring Eagle along each
+        // forward diagonal. (Their sliding/leaping moves in the other directions
+        // are the ordinary `role_attacks` set.)
+        match role {
+            WideRole::HornedFalcon => &[(0, 1)],
+            WideRole::SoaringEagle => &[(1, 1), (-1, 1)],
+            _ => &[],
+        }
+    }
+
+    fn lion_style_promotion() -> bool {
+        true
+    }
+
+    fn role_promotion_forced(role: WideRole, color: Color, to_rank: u8) -> bool {
+        // A Pawn or Lance reaching the furthest rank can no longer move (both only
+        // advance straight forward), so it must take its "second chance" to promote
+        // there even on a non-capturing move. Every other Chu piece can always move
+        // from the deepest rank, so promotion stays optional for it.
+        let furthest = match color {
+            Color::White => 11,
+            Color::Black => 0,
+        };
+        to_rank == furthest && matches!(role, WideRole::Pawn | WideRole::Lance)
+    }
+
     fn in_promotion_zone(color: Color, rank: u8) -> bool {
         // The furthest four ranks: ranks 9–12 (indices 8–11) for White, ranks 1–4
         // (indices 0–3) for Black.
@@ -565,12 +610,18 @@ mod tests {
     }
 
     /// The Lion reaches every square within two King steps (24 targets), jumping
-    /// intervening pieces. From f6 (file 5, rank 5) on an otherwise near-empty board.
+    /// intervening pieces, plus its own square via the jitto pass (25 destinations).
+    /// From f6 (file 5, rank 5) on an otherwise near-empty board.
     #[test]
     fn lion_reaches_two_king_steps() {
         let got = targets_from("k11/12/12/12/12/12/5***N6/12/12/12/12/5K6 w - - 0 1", 5, 5);
-        let want = indices(&LION_OFFSETS.map(|(df, dr)| ((5 + df) as u8, (5 + dr) as u8)));
-        assert_eq!(got, want);
+        let mut want_coords: Vec<(u8, u8)> = LION_OFFSETS
+            .iter()
+            .map(|&(df, dr)| ((5 + df) as u8, (5 + dr) as u8))
+            .collect();
+        // The jitto pass returns the Lion to its own square (a `from == to` move).
+        want_coords.push((5, 5));
+        assert_eq!(got, indices(&want_coords));
     }
 
     /// A Kirin jumps to the second orthogonal square and steps one diagonally.

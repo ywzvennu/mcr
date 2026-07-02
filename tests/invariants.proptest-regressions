@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 99fb9da866158ca4c535fdb0e87cb7bbd1cac1b97d07d2b6a387b9bf5a78e243 # shrinks to (id, seed, plies) = (Chu, 0, 0)
+cc 5a96b2b8dbedc8fb98a9cbd365e7ad913a788cb6d4c6a2b919086c23f0fb700c # shrinks to (id, seed, plies) = (Chu, 285528149264335120, 19)
+cc 1316b3b7ca6bce66c0a11517619ad7dab306adc2d7485459d7a6b7ac72f6d732 # shrinks to (id, seed, plies) = (Chu, 6349354930476959424, 27)

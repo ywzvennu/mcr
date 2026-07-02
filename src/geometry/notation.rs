@@ -283,6 +283,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             } else {
                 "O-O-O"
             });
+        } else if let WideMoveKind::LionMove {
+            first_capture,
+            second_capture,
+        } = mv.kind()
+        {
+            // A Chu Lion multi-step move. A pure net-zero non-capture is the jitto
+            // pass; otherwise the role token leads, an intermediate capture is shown
+            // as `x<mid>`, and the second leg (when the piece actually moves) as
+            // `-<to>` or `x<to>`. Examples: `Nxg6` (igui on g6), `Nxg6xh6` (double
+            // capture), `Nxg6-h5` (capture g6, land empty h5).
+            let role = self
+                .board()
+                .role_at(Square::<G>::new(from))
+                .unwrap_or(WideRole::Pawn);
+            if from == to && !first_capture {
+                return "--".to_string();
+            }
+            push_role_token(&mut s, role);
+            // Always render **both legs**, naming the intermediate square: the mid
+            // is what distinguishes a two-step area move from the leaper's direct
+            // jump to the same square (and one area path from another), and spelling
+            // out the second leg keeps an igui (`***Nxi5-f6`: capture i5, return to
+            // f6) distinct from the ordinary step-capture (`***Nxi5`).
+            let mid = mv.lion_mid_index().unwrap_or(to);
+            s.push(if first_capture { 'x' } else { '-' });
+            push_square::<G>(&mut s, mid);
+            s.push(if second_capture { 'x' } else { '-' });
+            push_square::<G>(&mut s, to);
         } else if from == to && !mv.is_drop() {
             // A Janggi pass: a legal null move. It carries no gate / promotion /
             // check decoration, so it renders as the bare token.
@@ -439,16 +467,48 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Returns [`WideSanError`] if the string is empty, malformed, names no legal
     /// move, or is ambiguous between several legal moves.
     pub fn parse_san(&self, s: &str) -> Result<WideMove, WideSanError> {
-        let parsed = parse_san_str::<G>(s)?;
+        // The structured parse handles every move shape *except* a Chu Lion
+        // multi-step move, whose two-square / igui / pass notation has no
+        // `ParsedSan` form. Try the structured path first (unchanged for every other
+        // variant); fall back to a direct canonical-SAN match, which resolves Lion
+        // moves (and is only reached when the structured path names nothing).
+        match parse_san_str::<G>(s) {
+            Ok(parsed) => {
+                let mut found: Option<WideMove> = None;
+                for mv in self.legal_moves() {
+                    if !self.san_matches(&mv, &parsed) {
+                        continue;
+                    }
+                    if found.is_some() {
+                        return Err(WideSanError::Ambiguous);
+                    }
+                    found = Some(mv);
+                }
+                if let Some(mv) = found {
+                    return Ok(mv);
+                }
+            }
+            Err(WideSanError::Ambiguous) => return Err(WideSanError::Ambiguous),
+            Err(_) => {}
+        }
+        self.direct_san_match(s)
+    }
+
+    /// Resolves `s` by comparing it against the canonical SAN of each legal move —
+    /// the fallback that resolves Chu Lion multi-step moves (which have no
+    /// structured `ParsedSan` shape). Trailing check / annotation glyphs are
+    /// ignored on both sides.
+    fn direct_san_match(&self, s: &str) -> Result<WideMove, WideSanError> {
+        let want = s.trim_end_matches(['+', '#', '!', '?']);
         let mut found: Option<WideMove> = None;
         for mv in self.legal_moves() {
-            if !self.san_matches(&mv, &parsed) {
-                continue;
+            let cand = self.san(&mv);
+            if cand.trim_end_matches(['+', '#', '!', '?']) == want {
+                if found.is_some() {
+                    return Err(WideSanError::Ambiguous);
+                }
+                found = Some(mv);
             }
-            if found.is_some() {
-                return Err(WideSanError::Ambiguous);
-            }
-            found = Some(mv);
         }
         found.ok_or(WideSanError::Illegal)
     }
@@ -479,7 +539,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
 
         match p.shape {
-            SanShape::Pass => mv.from_index() == mv.to_index() && !mv.is_drop(),
+            // A bare `--` pass is a non-capturing null move (a Janggi pass or the
+            // Chu Lion's jitto pass); an igui also has `from == to` but captures, so
+            // it is excluded here and resolved by its own SAN.
+            SanShape::Pass => mv.from_index() == mv.to_index() && !mv.is_drop() && !mv.is_capture(),
             SanShape::CastleKingside => matches!(mv.kind(), WideMoveKind::CastleKingside),
             SanShape::CastleQueenside => matches!(mv.kind(), WideMoveKind::CastleQueenside),
             SanShape::Drop { role, to } => mv.drop_role() == Some(role) && mv.to_index() == to,
@@ -491,6 +554,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 promotion,
             } => {
                 if mv.is_castle() || mv.is_drop() {
+                    return false;
+                }
+                // A Chu Lion multi-step move has its own SAN (`direct_san_match`);
+                // it must not be matched here, or a plain capture and a same-square
+                // Lion area capture would collide.
+                if matches!(mv.kind(), WideMoveKind::LionMove { .. }) {
                     return false;
                 }
                 if mv.from_index() == mv.to_index() {

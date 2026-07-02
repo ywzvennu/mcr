@@ -240,6 +240,49 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         true
     }
 
+    /// Returns `true` if this variant fields **Chu-Shogi Lion** pieces — pieces
+    /// whose move includes the two-step area move, the *igui* stationary capture,
+    /// the double capture, and the *jitto* pass. Default `false`; only Chu Shogi
+    /// overrides it. When `true`, the multi-royal generator runs an extra
+    /// `gen_lion_moves` pass that emits these
+    /// [`WideMoveKind::LionMove`](super::WideMoveKind::LionMove) moves for the
+    /// pieces [`role_is_full_lion`](WideVariant::role_is_full_lion) /
+    /// [`role_lion_lines`](WideVariant::role_lion_lines) identify. Every other
+    /// variant leaves it `false`, so the pass is never run and their move
+    /// generation is byte-identical.
+    fn has_lion_moves() -> bool {
+        false
+    }
+
+    /// Returns `true` if `role` is a **full Lion** — a piece with lion power in all
+    /// eight directions (Chu Shogi's Lion): its two King-steps may turn, so it
+    /// reaches, captures on, and igui-captures across every adjacent and
+    /// distance-two square. Default `false`. Consulted only under
+    /// [`has_lion_moves`](WideVariant::has_lion_moves).
+    fn role_is_full_lion(_role: WideRole) -> bool {
+        false
+    }
+
+    /// Returns the White-orientation **lion-power line directions** of `role` — the
+    /// straight lines along which a partial lion-power piece (Chu Shogi's Horned
+    /// Falcon: forward; Soaring Eagle: the two forward diagonals) may make its
+    /// two-step / igui / pass Lion move, without turning. Empty for every other
+    /// role. Consulted only under [`has_lion_moves`](WideVariant::has_lion_moves);
+    /// a role is either a full lion or a line-lion, never both.
+    fn role_lion_lines(_role: WideRole) -> &'static [(i8, i8)] {
+        &[]
+    }
+
+    /// Returns `true` if this variant promotes by the **Chu-Shogi rule**: a piece
+    /// may promote only when it *enters* the promotion zone from outside, or makes
+    /// a *capture* on a move that begins inside the zone — never on a non-capturing
+    /// move that stays within or leaves the zone. Default `false` (the standard
+    /// "starts-or-ends in the zone" rule). Only Chu Shogi overrides it, so every
+    /// other promotion variant is byte-identical.
+    fn lion_style_promotion() -> bool {
+        false
+    }
+
     /// Returns the rank (0-based) from which a pawn of `color` may make its
     /// initial double advance. The default is the standard second rank: rank `1`
     /// for white, `HEIGHT - 2` for black.
