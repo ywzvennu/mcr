@@ -1453,6 +1453,25 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    // --- Check-win (Checkshogi; default OFF) ------------------------------
+
+    /// Returns `true` if **giving check wins the game** — the side that delivers a
+    /// check has won immediately, so a position with the side to move **in check**
+    /// is terminal (Checkshogi; FSF's `checkCounting = true` with a one-check goal,
+    /// the `1+1` FEN field). The default is `false`.
+    ///
+    /// While it is `false` the engine never evaluates the rule, so every other
+    /// variant is byte-identical. When `true`, a position in which the side to move
+    /// is in check is **terminal**: the move generator short-circuits to *zero
+    /// moves* (the node is a perft leaf, exactly as Fairy-Stockfish truncates it),
+    /// and the win is reported as a [`WideEndReason::VariantWin`] credited to the
+    /// **checker** (the side *not* to move). Because a single check ends the game,
+    /// there is no cross-move counter to track — the terminal is a pure property of
+    /// the current position.
+    fn wins_on_check() -> bool {
+        false
+    }
+
     // --- Repetition / draw rules (default OFF) ----------------------------
     //
     // These hooks drive the history-dependent terminal rules, which a bare

@@ -1245,6 +1245,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
 
+        // Check-win (Checkshogi): if the side to move is in check, the opponent's
+        // last move gave check and immediately won — the node is terminal with no
+        // moves, a perft leaf exactly as Fairy-Stockfish truncates it. Gated behind
+        // `wins_on_check()` (default-off), so every other variant skips the check
+        // and is byte-identical. This is the single chokepoint both the
+        // materialising generator and the bulk-count leaf path funnel through.
+        if V::wins_on_check() && self.is_check() {
+            return;
+        }
+
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
@@ -4629,6 +4639,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         {
             return Some(WideEndReason::VariantWin);
         }
+        // Check-win (Checkshogi): the side to move being in check means the
+        // opponent's last move gave check and won the game outright. Gated behind
+        // `wins_on_check()` (default-off). Reported *before* the checkmate/stalemate
+        // test so a checking move is a variant win — not a (possibly non-mating)
+        // check or a spurious checkmate. `outcome` credits the checker (the side
+        // *not* to move).
+        if V::wins_on_check() && self.is_check() {
+            return Some(WideEndReason::VariantWin);
+        }
         // Bare-king "Robado" draw (Shatar): a side reduced to its lone king draws
         // the game immediately. Gated behind `has_bare_king_draw()` (default-off).
         // Reported before the checkmate/stalemate test so a bare-king node — which
@@ -4708,7 +4727,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 let winner = if (V::has_flag_win()
                     && self.flag_win_reached(self.state.turn.opposite()))
                     || (V::has_temple_win() && self.temple_win_reached(self.state.turn.opposite()))
+                    || (V::wins_on_check() && self.is_check())
                 {
+                    // Check-win (Checkshogi): the checked side to move has lost, so
+                    // the checker — the side *not* to move — wins.
                     self.state.turn.opposite()
                 } else if V::has_bare_king_loss() {
                     // Baring (Shatranj): the bared side has lost, so its opponent

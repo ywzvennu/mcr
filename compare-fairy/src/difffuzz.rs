@@ -557,6 +557,25 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::courier::to_fsf_dialect,
     },
+    // EuroShogi and Checkshogi are appended (out of alphabetical order) for the
+    // same seed-stability reason as Courier above: the per-variant fuzz seed is
+    // keyed on each spec's positional index, so a mid-list insert would re-roll
+    // every later variant's games. Both are FSF built-ins spelled identically to
+    // mce (EuroShogi's `k g n b r p` + `+`-promoted forms; Checkshogi is Shogi's
+    // letters), so each takes the `identity` dialect. FSF fills Checkshogi's absent
+    // `1+1` check-counter field with its default, so mce's counter-free FEN parses.
+    Spec {
+        id: WideVariantId::EuroShogi,
+        fsf: "euroshogi",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::CheckShogi,
+        fsf: "checkshogi",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
