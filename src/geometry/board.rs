@@ -424,16 +424,21 @@ impl<G: Geometry> Board<G> {
                         // `WideRole::overflow4_from_base`.
                         if base as char == crate::geometry::role::OVERFLOW_PREFIX {
                             i += 1;
-                            let base = bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
-                                crate::geometry::role::OVERFLOW_PREFIX,
-                            ))?;
+                            let base =
+                                bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
+                                    crate::geometry::role::OVERFLOW_PREFIX,
+                                ))?;
                             let role = WideRole::overflow4_from_base(base as char).ok_or(
-                                ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
+                                ParseBoardError::InvalidChar(
+                                    crate::geometry::role::OVERFLOW_PREFIX,
+                                ),
                             )?;
                             (role, base)
                         } else {
                             let role = WideRole::overflow2_from_base(base as char).ok_or(
-                                ParseBoardError::InvalidChar(crate::geometry::role::OVERFLOW_PREFIX),
+                                ParseBoardError::InvalidChar(
+                                    crate::geometry::role::OVERFLOW_PREFIX,
+                                ),
                             )?;
                             (role, base)
                         }

@@ -2,27 +2,30 @@
 //!
 //! ## Validation status (read `variants::chu` module docs for the full picture)
 //!
-//! The reference oracle for Chu Shogi is **HaChu** (driven by `compare-fairy`).
-//! Two things about that oracle constrain what can be machine-checked here:
+//! The reference oracle for Chu Shogi is **HaChu** (H. G. Muller, driven by
+//! `compare-fairy`). HaChu has **no native perft**, but its move generation can be
+//! read externally: the `ddugovic/hachu 0.23` build only accepts `usermove` after a
+//! `memory N` hash allocation (otherwise it segfaults on the first move), and with
+//! `debug=1` it prints its full generated move list for a position when handed an
+//! illegal `usermove`. Driving it that way (a fresh subprocess per node, replaying
+//! the move sequence, reading the move-list dump) yields an external HaChu perft.
 //!
-//! * HaChu has **no native perft**, and the `ddugovic/hachu` build's CECP
-//!   `usermove` handler **segfaults** on a cold move (it parses against a legal-move
-//!   list that only a prior search populates), so the intended external tree-walk
-//!   (play each mce move, read HaChu's legality verdict) is **not runnable** with
-//!   this build. Move **counts** below are therefore mce-derived regression values,
-//!   not HaChu-confirmed node counts.
-//! * HaChu's `w` / `b` debug commands print its **attack map**, which *is* usable
-//!   without `usermove`. The start-position White and Black attack maps produced by
-//!   mce match HaChu's **exactly** (both colours), and the isolated Horned Falcon /
-//!   Soaring Eagle attack maps match HaChu on every ordinary slide/step — differing
-//!   only on the lion-power two-step squares, which HaChu deliberately omits from
-//!   its static attack table. So the **movement geometry** of the start army is
-//!   HaChu-cross-checked; see `compare-fairy` and the module docs.
+//! Cross-check against that HaChu oracle, from the start position:
+//!
+//! * **perft(1) = 36** — mce's legal-move set is **byte-identical** to HaChu's
+//!   (all 36 coordinate moves match exactly).
+//! * **perft(2) = 1296** — **exact** match with HaChu.
+//! * **perft(3)**: mce = **47955**, HaChu = **47952**. mce over-generates **3**
+//!   nodes at depth 3, localized to the `f3f5` (Lion), `e4e5` and `h4h5` root-move
+//!   subtrees (each +1). This is consistent with the documented approximations (the
+//!   leaper Lion model and the promote-on-any-move-ending-in-zone rule); it is **not
+//!   yet resolved**, so perft(3) is pinned as an mce regression value, honestly
+//!   noted as 3 above the HaChu count.
 //!
 //! These tests pin the mce move generator against regressions and assert the
 //! documented per-piece movement.
 
-use mce::geometry::{perft, Chu, Chu12x12, GenericPosition, Square};
+use mce::geometry::{perft, Chu, Chu12x12, Square};
 
 /// The Chu start position round-trips through mce's FEN I/O in the `***`-dialect.
 #[test]
@@ -30,20 +33,20 @@ fn startpos_round_trips() {
     let pos = Chu::startpos();
     assert_eq!(
         pos.to_fen(),
-        "l***l***csg**ekgs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+r***nq+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+RQ***N+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSGK**EGS***C***LL w - - 0 1"
+        "l***l***csgk**egs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSG**EKGS***C***LL w - - 0 1"
     );
 }
 
-/// Start-position perft. **mce-derived regression values** (not HaChu-confirmed
-/// node counts — see the module docs for why the HaChu tree-walk is not runnable).
-/// The depth-1 attack geometry underlying these is cross-checked against HaChu's
-/// attack map; the counts guard against move-generator regressions.
+/// Start-position perft. Depths 1 and 2 are **HaChu-validated** (perft(1) = 36 is a
+/// byte-identical move-set match; perft(2) = 1296 matches exactly). perft(3) = 47955
+/// is mce's value; the external HaChu tree-walk gives 47952, so mce over-generates 3
+/// nodes at depth 3 (see the module docs) — pinned here as a regression guard.
 #[test]
 fn startpos_perft_regression() {
     let pos = Chu::startpos();
     assert_eq!(perft::<Chu12x12, _>(&pos, 1), 36);
     assert_eq!(perft::<Chu12x12, _>(&pos, 2), 1296);
-    assert_eq!(perft::<Chu12x12, _>(&pos, 3), 48387);
+    assert_eq!(perft::<Chu12x12, _>(&pos, 3), 47955);
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {

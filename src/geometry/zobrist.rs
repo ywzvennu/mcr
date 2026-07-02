@@ -46,9 +46,16 @@ use crate::Color;
 const COLORS: usize = 2;
 /// The number of [`WideRole`]s — the piece-key table's role dimension.
 const ROLES: usize = WideRole::COUNT;
-/// The largest square count of any wide geometry (the `u128`-backed boards reach at
-/// most 128 squares), so every square index is `< MAX_SQUARES`.
-const MAX_SQUARES: usize = 128;
+/// The largest square count of any wide geometry: the 144-square, U256-backed
+/// [`Chu12x12`](super::Chu12x12) board, so every square index is `< MAX_SQUARES`.
+const MAX_SQUARES: usize = 144;
+/// The historical square-table width — the largest square count of every
+/// `u128`-backed board (128 squares). Square-indexed tables draw their first
+/// `BASE_SQUARES` keys in the original stream order and defer the high squares
+/// `[BASE_SQUARES..MAX_SQUARES]` (reachable only by the 144-square Chu board) to a
+/// later extension pass, so every board with at most `BASE_SQUARES` squares keeps
+/// **byte-identical** keys.
+const BASE_SQUARES: usize = 128;
 /// The castling table's file dimension: an upper bound on any board width (the
 /// widest wide board is ten files), so every rook start file is `< MAX_FILES`.
 const MAX_FILES: usize = 16;
@@ -118,6 +125,20 @@ macro_rules! fill {
     }};
 }
 
+/// Fills the half-open index range `[$lo, $hi)` of a table with successive
+/// generator outputs. Used to draw a square-indexed table's historical
+/// `[0, BASE_SQUARES)` region in the original stream order, then its high-square
+/// `[BASE_SQUARES, MAX_SQUARES)` extension in a separate later pass.
+macro_rules! fill_range {
+    ($state:expr, $table:expr, $lo:expr, $hi:expr) => {{
+        let mut i = $lo;
+        while i < $hi {
+            $table[i] = splitmix64($state);
+            i += 1;
+        }
+    }};
+}
+
 impl Keys {
     /// Generates the constants by drawing successive [`splitmix64`] outputs in a
     /// fixed order. A `const fn`, so the tables are computed at compile time and are
@@ -130,7 +151,7 @@ impl Keys {
         while c < COLORS {
             let mut r = 0;
             while r < ROLES {
-                fill!(&mut state, pieces[c][r]);
+                fill_range!(&mut state, pieces[c][r], 0, BASE_SQUARES);
                 r += 1;
             }
             c += 1;
@@ -150,10 +171,10 @@ impl Keys {
         }
 
         let mut ep = [0u64; MAX_SQUARES];
-        fill!(&mut state, ep);
+        fill_range!(&mut state, ep, 0, BASE_SQUARES);
 
         let mut gating_eligible = [0u64; MAX_SQUARES];
-        fill!(&mut state, gating_eligible);
+        fill_range!(&mut state, gating_eligible, 0, BASE_SQUARES);
 
         let mut gating_reserve = [[0u64; GATES]; COLORS];
         let mut c = 0;
@@ -174,13 +195,32 @@ impl Keys {
         }
 
         let mut duck = [0u64; MAX_SQUARES];
-        fill!(&mut state, duck);
+        fill_range!(&mut state, duck, 0, BASE_SQUARES);
 
         let mut alice = [0u64; MAX_SQUARES];
-        fill!(&mut state, alice);
+        fill_range!(&mut state, alice, 0, BASE_SQUARES);
 
         let mut promoted = [0u64; MAX_SQUARES];
-        fill!(&mut state, promoted);
+        fill_range!(&mut state, promoted, 0, BASE_SQUARES);
+
+        // Extension pass: the high squares `[BASE_SQUARES, MAX_SQUARES)`, reachable
+        // only by the 144-square Chu board. Drawn last, after every historical draw
+        // above, so all boards with at most `BASE_SQUARES` squares keep their keys
+        // byte-for-byte identical to before Chu widened `MAX_SQUARES`.
+        let mut c = 0;
+        while c < COLORS {
+            let mut r = 0;
+            while r < ROLES {
+                fill_range!(&mut state, pieces[c][r], BASE_SQUARES, MAX_SQUARES);
+                r += 1;
+            }
+            c += 1;
+        }
+        fill_range!(&mut state, ep, BASE_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, gating_eligible, BASE_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, duck, BASE_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, alice, BASE_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, promoted, BASE_SQUARES, MAX_SQUARES);
 
         Keys {
             pieces,

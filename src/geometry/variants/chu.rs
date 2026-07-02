@@ -13,18 +13,19 @@
 //!
 //! **What is machine-validated against HaChu (and what is not):**
 //!
-//! * HaChu has **no native perft**, and the `ddugovic/hachu 0.23` build's CECP
-//!   `usermove` handler **segfaults** on a cold move (it parses against a legal-move
-//!   list only a prior search populates), so the intended external tree-walk is
-//!   **not runnable** with this build. Move **counts** are therefore mce-derived
-//!   regression values, not HaChu-confirmed node counts.
-//! * HaChu's `w` / `b` attack-map debug commands *do* work without `usermove`. The
-//!   start-position White **and** Black attack maps produced by mce match HaChu's
-//!   **exactly** (both colours) — a cross-check of the whole 20-type start army's
-//!   ordinary movement geometry. The isolated Horned Falcon / Soaring Eagle attack
-//!   maps also match HaChu on every ordinary slide/step, differing only on the
-//!   lion-power two-step squares HaChu deliberately omits from its static attack
-//!   table.
+//! * HaChu has **no native perft**, but its move generation can be read externally:
+//!   the `ddugovic/hachu 0.23` build accepts `usermove` only after a `memory N` hash
+//!   allocation (otherwise it segfaults on the first move), and with `debug=1` it
+//!   prints its full generated move list for a position when handed an illegal
+//!   `usermove`. Driving it that way (a fresh subprocess per node, replaying the move
+//!   sequence, reading the move-list dump) gives an external HaChu perft.
+//! * Against that oracle, from the start position: **perft(1) = 36** matches HaChu
+//!   **byte-for-byte** (identical coordinate move set), and **perft(2) = 1296**
+//!   matches **exactly**. At **perft(3)** mce counts 47955 and HaChu 47952 — mce
+//!   over-generates **3** nodes (in the `f3f5` / `e4e5` / `h4h5` subtrees),
+//!   consistent with the Lion / promotion approximations below and **not yet
+//!   resolved**. So the start army's ordinary movement is HaChu-validated to depth 2
+//!   and the depth-3 gap is small and localized.
 //!
 //! **What this module implements and what it does NOT (yet):**
 //!
@@ -45,9 +46,8 @@
 //!   no-hand per-piece path, which promotes on any move **ending in the zone**. The
 //!   two differ only for moves made entirely within / out of the far four ranks.
 //!
-//! See `tests/perft_chu.rs` for the mce regression perft counts and the per-piece
-//! movement unit tests, and the `compare-fairy` scratch drivers for the HaChu
-//! attack-map cross-check procedure.
+//! See `tests/perft_chu.rs` for the HaChu-cross-checked perft counts and the
+//! per-piece movement unit tests.
 //!
 //! ## The army (White orientation; forward = up the board)
 //!
@@ -76,24 +76,28 @@ use super::super::Chu12x12;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ChuRules;
 
-/// The confirmed Chu Shogi starting placement (mce dialect). White (uppercase)
-/// holds ranks 1–5; Black is the 180° rotation on ranks 8–12. Reading White's back
-/// rank a..l: Lance, Ferocious Leopard, Copper, Silver, Gold, King, Drunk Elephant,
-/// Gold, Silver, Copper, Ferocious Leopard, Lance. The King stands on the f-file and
-/// the Drunk Elephant on g; on rank 3 the Free King (Queen) is on f and the Lion on
-/// g. Dragon Kings render as `+R`, Dragon Horses as `+B`.
+/// The confirmed Chu Shogi starting placement (mce dialect), matching the HaChu
+/// oracle's `variant chu` board — the chirality is cross-checked against HaChu
+/// (whose start-position legal-move set mce reproduces exactly; see `perft_chu`).
+/// White (uppercase) holds ranks 1–5; Black is the 180° rotation on ranks 8–12.
+/// Reading White's back rank a..l: Lance, Ferocious Leopard, Copper, Silver, Gold,
+/// Drunk Elephant, King, Gold, Silver, Copper, Ferocious Leopard, Lance — the Drunk
+/// Elephant on the f-file, the King on g. The three central files line up by
+/// promotion: f holds Elephant (r1) / Kirin (r2) / Lion (r3), and g holds King (r1)
+/// / Phoenix (r2) / Free King (r3), so each Kirin sits behind its Lion and each
+/// Phoenix behind its Free King. Dragon Kings render as `+R`, Dragon Horses as `+B`.
 const CHU_PLACEMENT: &str = concat!(
-    "l***l***csg**ekgs***c***ll/",       // rank 12 (Black back)
-    "***r1b1***t***p***k***t1b1***r/",   // rank 11
-    "***i***vr+b+r***nq+r+br***v***i/",  // rank 10
-    "pppppppppppp/",                     // rank 9  (Black pawns)
-    "3***g4***g3/",                      // rank 8  (Black go-betweens)
-    "12/12/",                            // ranks 7,6 (empty)
-    "3***G4***G3/",                      // rank 5  (White go-betweens)
-    "PPPPPPPPPPPP/",                     // rank 4  (White pawns)
-    "***I***VR+B+RQ***N+R+BR***V***I/",  // rank 3
-    "***R1B1***T***K***P***T1B1***R/",   // rank 2
-    "L***L***CSGK**EGS***C***LL"         // rank 1  (White back)
+    "l***l***csgk**egs***c***ll/", // rank 12 (Black back: King f, Elephant g)
+    "***r1b1***t***p***k***t1b1***r/", // rank 11 (Black: Phoenix f, Kirin g)
+    "***i***vr+b+rq***n+r+br***v***i/", // rank 10 (Black: Free King f, Lion g)
+    "pppppppppppp/",               // rank 9  (Black pawns)
+    "3***g4***g3/",                // rank 8  (Black go-betweens)
+    "12/12/",                      // ranks 7,6 (empty)
+    "3***G4***G3/",                // rank 5  (White go-betweens)
+    "PPPPPPPPPPPP/",               // rank 4  (White pawns)
+    "***I***VR+B+R***NQ+R+BR***V***I/", // rank 3  (White: Lion f, Free King g)
+    "***R1B1***T***K***P***T1B1***R/", // rank 2  (White: Kirin f, Phoenix g)
+    "L***L***CSG**EKGS***C***LL"   // rank 1  (White back: Elephant f, King g)
 );
 
 impl ChuRules {
@@ -108,7 +112,11 @@ impl ChuRules {
     }
 
     /// The leaper attack set for `white_offsets`, oriented for `color`.
-    fn leaper(color: Color, sq: Square<Chu12x12>, white_offsets: &[(i8, i8)]) -> Bitboard<Chu12x12> {
+    fn leaper(
+        color: Color,
+        sq: Square<Chu12x12>,
+        white_offsets: &[(i8, i8)],
+    ) -> Bitboard<Chu12x12> {
         let mut bb = Bitboard::<Chu12x12>::EMPTY;
         for &off in white_offsets {
             let (df, dr) = Self::orient(off, color);
@@ -186,11 +194,11 @@ impl WideVariant<Chu12x12> for ChuRules {
                 &[(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1)],
             ),
             // Silver: straight forward + four diagonals (five).
-            WideRole::Silver => Self::leaper(color, sq, &[(0, 1), (1, 1), (-1, 1), (1, -1), (-1, -1)]),
-            // Copper: straight forward, two forward diagonals, straight back (four).
-            WideRole::CopperGeneral => {
-                Self::leaper(color, sq, &[(0, 1), (1, 1), (-1, 1), (0, -1)])
+            WideRole::Silver => {
+                Self::leaper(color, sq, &[(0, 1), (1, 1), (-1, 1), (1, -1), (-1, -1)])
             }
+            // Copper: straight forward, two forward diagonals, straight back (four).
+            WideRole::CopperGeneral => Self::leaper(color, sq, &[(0, 1), (1, 1), (-1, 1), (0, -1)]),
             // Ferocious Leopard: every King step except the two sideways ones (six).
             WideRole::FerociousLeopard => Self::leaper(
                 color,
@@ -219,13 +227,31 @@ impl WideVariant<Chu12x12> for ChuRules {
             WideRole::Kirin => Self::leaper(
                 color,
                 sq,
-                &[(0, 2), (0, -2), (2, 0), (-2, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)],
+                &[
+                    (0, 2),
+                    (0, -2),
+                    (2, 0),
+                    (-2, 0),
+                    (1, 1),
+                    (1, -1),
+                    (-1, 1),
+                    (-1, -1),
+                ],
             ),
             // Phoenix: two-square diagonal jumps + one-step orthogonals.
             WideRole::Phoenix => Self::leaper(
                 color,
                 sq,
-                &[(2, 2), (2, -2), (-2, 2), (-2, -2), (1, 0), (-1, 0), (0, 1), (0, -1)],
+                &[
+                    (2, 2),
+                    (2, -2),
+                    (-2, 2),
+                    (-2, -2),
+                    (1, 0),
+                    (-1, 0),
+                    (0, 1),
+                    (0, -1),
+                ],
             ),
 
             // --- full sliders -----------------------------------------------
@@ -266,7 +292,8 @@ impl WideVariant<Chu12x12> for ChuRules {
             WideRole::Whale => Self::ray(color, sq, occ, &[(0, 1), (0, -1), (1, -1), (-1, -1)]),
             // Flying Stag (promoted Blind Tiger): vertical slide + King step.
             WideRole::FlyingStag => {
-                Self::ray(color, sq, occ, &[(0, 1), (0, -1)]) | attacks::king_attacks::<Chu12x12>(sq)
+                Self::ray(color, sq, occ, &[(0, 1), (0, -1)])
+                    | attacks::king_attacks::<Chu12x12>(sq)
             }
             // Flying Ox (promoted Vertical Mover): vertical Rook + Bishop.
             WideRole::FlyingOx => {
@@ -458,14 +485,30 @@ impl WideVariant<Chu12x12> for ChuRules {
 /// The Lion's reachable squares on an empty board: every square within two King
 /// steps (Chebyshev distance 1 or 2), which it jumps to over any intervening piece.
 const LION_OFFSETS: [(i8, i8); 24] = [
-    (-1, -1), (0, -1), (1, -1),
-    (-1, 0), (1, 0),
-    (-1, 1), (0, 1), (1, 1),
-    (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2),
-    (-2, -1), (2, -1),
-    (-2, 0), (2, 0),
-    (-2, 1), (2, 1),
-    (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+    (-2, -2),
+    (-1, -2),
+    (0, -2),
+    (1, -2),
+    (2, -2),
+    (-2, -1),
+    (2, -1),
+    (-2, 0),
+    (2, 0),
+    (-2, 1),
+    (2, 1),
+    (-2, 2),
+    (-1, 2),
+    (0, 2),
+    (1, 2),
+    (2, 2),
 ];
 
 /// Chu Shogi (middle shogi, 12x12) as a [`GenericPosition`] over [`Chu12x12`].
@@ -499,7 +542,11 @@ mod tests {
     fn indices(coords: &[(u8, u8)]) -> Vec<u8> {
         let mut v: Vec<u8> = coords
             .iter()
-            .map(|&(f, r)| Sq::<Chu12x12>::from_file_rank(f, r).expect("on board").index())
+            .map(|&(f, r)| {
+                Sq::<Chu12x12>::from_file_rank(f, r)
+                    .expect("on board")
+                    .index()
+            })
             .collect();
         v.sort_unstable();
         v.dedup();
@@ -511,7 +558,7 @@ mod tests {
         let pos = Chu::startpos();
         assert_eq!(
             pos.to_fen(),
-            "l***l***csg**ekgs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+r***nq+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+RQ***N+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSGK**EGS***C***LL w - - 0 1"
+            "l***l***csgk**egs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSG**EKGS***C***LL w - - 0 1"
         );
     }
 
