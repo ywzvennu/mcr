@@ -243,8 +243,8 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// Returns `true` if this variant fields **Chu-Shogi Lion** pieces — pieces
     /// whose move includes the two-step area move, the *igui* stationary capture,
     /// the double capture, and the *jitto* pass. Default `false`; only Chu Shogi
-    /// overrides it. When `true`, the multi-royal generator runs an extra pass
-    /// ([`GenericPosition::gen_lion_moves`]) that emits these
+    /// overrides it. When `true`, the multi-royal generator runs an extra
+    /// `gen_lion_moves` pass that emits these
     /// [`WideMoveKind::LionMove`](super::WideMoveKind::LionMove) moves for the
     /// pieces [`role_is_full_lion`](WideVariant::role_is_full_lion) /
     /// [`role_lion_lines`](WideVariant::role_lion_lines) identify. Every other

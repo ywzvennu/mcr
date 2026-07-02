@@ -53,6 +53,13 @@
 //!   every non-Duck move, so a variant without the duck mechanic produces words
 //!   whose value is identical to the old `u32` layout (zero-extended) — its base
 //!   logic, ordering, and equality are unchanged.
+//!
+//! The rest of the high word carries two further default-off addenda that are
+//! mutually exclusive with the Duck fields (no variant sets more than one): the
+//! S-House **hand-gate** (bits 41..49) and the Chu-Shogi **Lion** addendum (bits
+//! 49..60) — an 8-bit intermediate/second-capture square plus two capture flags
+//! and a presence bit, set only by a [`WideMoveKind::LionMove`]. Every other move
+//! leaves all of these `0`.
 
 use alloc::string::String;
 use core::fmt;
