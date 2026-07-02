@@ -624,6 +624,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         &self.board
     }
 
+    /// Returns the board dimensions `(width, height)` in `(files, ranks)`, read
+    /// straight from this position's [`Geometry`] (`G::WIDTH`, `G::HEIGHT`).
+    ///
+    /// The value is fixed by the geometry type, so it is the same for every
+    /// position of a given variant; it is exposed here so a runtime
+    /// [`AnyWideVariant`](super::AnyWideVariant) — which erases the geometry —
+    /// can still report a variant's board size without naming its type.
+    #[must_use]
+    #[inline]
+    pub fn dimensions(&self) -> (u8, u8) {
+        (G::WIDTH, G::HEIGHT)
+    }
+
     /// Returns the side to move.
     #[must_use]
     #[inline]

@@ -53,6 +53,11 @@ suite under [`tests/`](tests).
 
 ## Fairy variant matrix (generic geometry layer)
 
+> For a **complete, always-current** reference of every registered variant —
+> board size, start FEN, notable pieces, special rules, and validation oracle —
+> see **[docs/variants.md](docs/variants.md)**. That table is generated straight
+> from the registries and drift-checked in CI, so it never falls behind the code.
+
 The 47 variants below ride the parallel **generic geometry layer**
 ([`mce::geometry`]): `GenericPosition<G, V>` over a compile-time
 [`Geometry`]-parametrised `Bitboard<G>` / `Square<G>`,
