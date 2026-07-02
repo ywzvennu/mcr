@@ -9,9 +9,22 @@
 //! ## Oracle and validation status (be precise about what is validated)
 //!
 //! The reference engine for Chu Shogi is **HaChu** (H. G. Muller), driven as a
-//! GPL subprocess oracle by the `compare-fairy` harness (issue #379). HaChu has no
-//! native `perft`, so validation is an external tree-walk using HaChu's `usermove`
-//! legality as the per-move oracle.
+//! GPL subprocess oracle by the `compare-fairy` harness (issue #379).
+//!
+//! **What is machine-validated against HaChu (and what is not):**
+//!
+//! * HaChu has **no native perft**, and the `ddugovic/hachu 0.23` build's CECP
+//!   `usermove` handler **segfaults** on a cold move (it parses against a legal-move
+//!   list only a prior search populates), so the intended external tree-walk is
+//!   **not runnable** with this build. Move **counts** are therefore mce-derived
+//!   regression values, not HaChu-confirmed node counts.
+//! * HaChu's `w` / `b` attack-map debug commands *do* work without `usermove`. The
+//!   start-position White **and** Black attack maps produced by mce match HaChu's
+//!   **exactly** (both colours) — a cross-check of the whole 20-type start army's
+//!   ordinary movement geometry. The isolated Horned Falcon / Soaring Eagle attack
+//!   maps also match HaChu on every ordinary slide/step, differing only on the
+//!   lion-power two-step squares HaChu deliberately omits from its static attack
+//!   table.
 //!
 //! **What this module implements and what it does NOT (yet):**
 //!
@@ -26,19 +39,15 @@
 //!   capture), the **double capture** (capturing two pieces in one turn via the
 //!   intermediate square), and the **lion-trading** restrictions are **not modeled**
 //!   — the [`WideMove`](crate::geometry::WideMove) type carries only a `from`/`to`
-//!   pair, with no room for the Lion's intermediate square. Those mechanics only
-//!   arise once a Lion (or a promoted lion-power piece) has an enemy piece within
-//!   two squares; at the **start position no enemy is within two squares of either
-//!   Lion**, so the leaper model is exact there and shallow start-position perft is
-//!   a valid cross-check against HaChu.
+//!   pair, with no room for the Lion's intermediate square.
 //! * The Chu **promotion condition** (promote on *entering* the zone from outside,
 //!   or on a *capture beginning within* the zone) is approximated by the generic
 //!   no-hand per-piece path, which promotes on any move **ending in the zone**. The
-//!   two differ only for moves made entirely within / out of the far four ranks —
-//!   deep in enemy territory, never in shallow start-position perft.
+//!   two differ only for moves made entirely within / out of the far four ranks.
 //!
-//! See `tests/perft_chu.rs` for the HaChu-cross-checked shallow perft counts and
-//! the per-piece movement unit tests below.
+//! See `tests/perft_chu.rs` for the mce regression perft counts and the per-piece
+//! movement unit tests, and the `compare-fairy` scratch drivers for the HaChu
+//! attack-map cross-check procedure.
 //!
 //! ## The army (White orientation; forward = up the board)
 //!
