@@ -364,6 +364,23 @@ impl WideVariant<Tori7x7> for ToriRules {
         )
     }
 
+    fn confine_pins_to_segment() -> bool {
+        // Tori fields *jumping* leapers — the Pheasant (a two-square forward
+        // Dabbaba jump) and the Goose (forward Alfil / backward Dabbaba jumps) —
+        // that can leap **past** the pinning slider (or past their own king) onto a
+        // collinear square that no longer shields the king. The default full-line
+        // pin mask would wrongly permit such a jump: e.g. a Pheasant pinned on a
+        // file by a forward-sliding Quail behind it can jump two squares forward,
+        // over the Quail, vacating the shielding square and exposing the king
+        // (issue #416, the illegal `f5f3`). Confining a pinned piece to the
+        // king-to-pinner segment (inclusive of the pinner's square) keeps exactly
+        // the moves that remain a blocker or capture the pinner. For Tori's sliders
+        // (Eagle, quails) the segment and the full line are equivalent, so this is
+        // byte-identical for every previously-validated Tori position and touches
+        // no other variant.
+        true
+    }
+
     fn promotion_config() -> PromotionConfig {
         // Tori's promotions are per-piece (Swallow → Goose, Falcon → Eagle), handled
         // by the generic per-piece promotion path; this static set is unused, but the
