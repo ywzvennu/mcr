@@ -9,7 +9,8 @@
 //! 1. `$MCE_FSF_BIN` (or `$FAIRY_STOCKFISH`) pointing at an executable;
 //! 2. a `fairy-stockfish` / `fairystockfish` on `PATH`;
 //! 3. a previously built binary under the crate's `build/` dir;
-//! 4. (only with `--build`) `git clone` + `make` of upstream FSF into `build/`.
+//! 4. (only with `--build`) shallow-fetch of a **pinned** FSF commit (see
+//!    [`PINNED_FSF_COMMIT`]) + `make` into `build/`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -35,6 +36,42 @@ pub struct Located {
     /// How it was obtained.
     pub source: Source,
 }
+
+/// The upstream Fairy-Stockfish repository.
+const FSF_REPO: &str = "https://github.com/fairy-stockfish/Fairy-Stockfish";
+
+/// The **pinned** Fairy-Stockfish commit the `--build` path checks out, rather
+/// than bleeding-edge `master` (issue #394).
+///
+/// # Why pin
+///
+/// FSF is this crate's live differential oracle. Cloning `master --depth 1`
+/// tracks a moving target: the same unmodified mce main can pass one day and, on
+/// the next rebuild, disagree — not because mce changed, but because upstream FSF
+/// did. Pinning makes the oracle reproducible: the same commit gives the same
+/// verdict for everyone, forever, and any real change of verdict is then a change
+/// in *mce*, which is what we want to catch.
+///
+/// # Why this commit
+///
+/// `1b5bdd40499bd5c7417bdc532d52fef8847bdf3f` — "Add Georgian chess" (#1004),
+/// 2026-05-23. It is the newest upstream commit that actually touches the engine
+/// or `variants.ini`; the only later `master` commit at the time of pinning
+/// (`fb78cb5`, the `020726 LB` build) is a pure GitHub-Actions dependabot bump
+/// (`.github/workflows/*.yml` only — verified `git diff --name-only 1b5bdd4
+/// fb78cb5` lists no `src/` or `variants.ini` file), so it is byte-for-byte
+/// identical in chess behaviour. This commit's variant rules match mce's
+/// validated perft pins, and the full differential-fuzz sweep (seeds 1–3,
+/// 8 games × 60 plies, every variant) reports **0 divergences** against it once
+/// the two documented non-mce/known cases are accounted for: the Empire FSF
+/// castle artifact (skipped node — see `difffuzz::is_empire_no_queenside_castle_artifact`,
+/// mce is correct) and the Tori pheasant pin bug held back for follow-up (see
+/// `difffuzz::HELD_BACK`). Health check for a fresh build: xiangqi `perft 3`
+/// = 79666.
+///
+/// To advance the pin, pick a newer commit, rebuild, and re-run the full sweep
+/// (`--difffuzz --seed {1,2,3} --games 8 --plies 60`) to confirm it stays clean.
+const PINNED_FSF_COMMIT: &str = "1b5bdd40499bd5c7417bdc532d52fef8847bdf3f";
 
 /// The build directory under the crate where a cloned/compiled FSF lives. It is
 /// git-ignored (see the repo `.gitignore`).
@@ -107,22 +144,11 @@ fn build_from_source() -> Result<Located, String> {
 
     if !repo.join("src").join("Makefile").exists() {
         eprintln!(
-            "compare-fairy: cloning Fairy-Stockfish into {} ...",
+            "compare-fairy: fetching pinned Fairy-Stockfish {} into {} ...",
+            PINNED_FSF_COMMIT,
             repo.display()
         );
-        let status = Command::new("git")
-            .args([
-                "clone",
-                "--depth",
-                "1",
-                "https://github.com/fairy-stockfish/Fairy-Stockfish",
-            ])
-            .arg(&repo)
-            .status()
-            .map_err(|e| format!("git clone failed to start: {e}"))?;
-        if !status.success() {
-            return Err("git clone of Fairy-Stockfish failed".to_string());
-        }
+        fetch_pinned(&repo)?;
     }
 
     let src = repo.join("src");
@@ -153,6 +179,35 @@ fn build_from_source() -> Result<Located, String> {
             bin.display()
         ))
     }
+}
+
+/// Shallow-clone exactly the pinned FSF commit into `repo` (issue #394).
+///
+/// A plain `git clone --depth 1` only fetches the branch tip, so it cannot land
+/// on an arbitrary historical commit. Instead we `init` an empty repo, add the
+/// remote, `fetch --depth 1` the pinned SHA directly (GitHub serves fetch-by-full-
+/// SHA), and detach onto it — a single-commit checkout with no history, as cheap
+/// as the old shallow clone but reproducible.
+fn fetch_pinned(repo: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(repo).map_err(|e| format!("mkdir {}: {e}", repo.display()))?;
+    let git = |args: &[&str]| -> Result<(), String> {
+        let status = Command::new("git")
+            .current_dir(repo)
+            .args(args)
+            .status()
+            .map_err(|e| format!("git {args:?} failed to start: {e}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("git {args:?} failed"))
+        }
+    };
+    if !repo.join(".git").exists() {
+        git(&["init", "-q"])?;
+        git(&["remote", "add", "origin", FSF_REPO])?;
+    }
+    git(&["fetch", "--depth", "1", "origin", PINNED_FSF_COMMIT])?;
+    git(&["checkout", "-q", "--detach", PINNED_FSF_COMMIT])
 }
 
 /// Whether `p` exists and is an executable file.
@@ -197,8 +252,11 @@ ONE of:
     build/ dir; needs git + make + a C++ compiler):
         cargo run --release -- --build
 
-  * Build it manually (GPL-3.0+ — driven as a SUBPROCESS only, never linked):
+  * Build it manually (GPL-3.0+ — driven as a SUBPROCESS only, never linked).
+    Check out the pinned commit so the oracle matches this harness (issue #394):
         git clone https://github.com/fairy-stockfish/Fairy-Stockfish
-        cd Fairy-Stockfish/src && make -j build ARCH=x86-64
+        cd Fairy-Stockfish
+        git checkout 1b5bdd40499bd5c7417bdc532d52fef8847bdf3f
+        cd src && make -j build ARCH=x86-64 largeboards=yes
         MCE_FSF_BIN=$PWD/stockfish cargo run --release
 ";

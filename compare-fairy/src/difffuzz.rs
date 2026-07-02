@@ -579,8 +579,21 @@ const SPECS: &[Spec] = &[
 ///   castle of the already-moved king. That exact node is skipped (see
 ///   [`is_schess_corner_castle_artifact`]); every other S-Chess node is checked.
 ///
-/// Resolved and released back into the default sweep (`HELD_BACK` is now EMPTY —
-/// the entire variant set runs clean under the differential fuzzer):
+/// Currently held back (deeper-sweep candidate awaiting a fix):
+///
+/// * **Tori** (Tori Shogi) — a latent **mce** bug surfaced by the deeper sweep
+///   (`--difffuzz --variant tori --seed 1 --games 8 --plies 60`, issue #394):
+///   a Pheasant pinned to its own king along a file is wrongly allowed to make
+///   its two-square forward *jump*, vacating the shielding square and leaving the
+///   king in check (FSF then has a king-capture in the child). mce generates the
+///   illegal `f5f3`; the correct `perft(1)` is 34, not 35. This is a sibling of
+///   the already-fixed "Tori Pheasant drop-interposition": the jump geometry
+///   needs the same post-move king-safety re-check. Tracked in mce issue #416;
+///   held back rather than fixed here (this crate is GPL-fenced and never touches
+///   the mce library). Repro FEN (Black to move):
+///   `*G*z1*y1*y*v/3*a1k1/*k*K*y2*z*Y/1*y*y*y*k*R*Y/1*Y1*Y*Y2/*V2*YK*Y*R/1*Z1*A*K*Z1[*Y*y] b - - 2 28`.
+///
+/// Resolved and released back into the default sweep:
 ///
 /// * **Shako** (issue #335) — FSF forbids castling the king across a square a
 ///   **cannon** attacks over a screen, but mce's castling king-walk danger map
@@ -599,7 +612,7 @@ const SPECS: &[Spec] = &[
 ///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
 ///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
 ///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
-const HELD_BACK: &[WideVariantId] = &[];
+const HELD_BACK: &[WideVariantId] = &[WideVariantId::Tori];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
@@ -689,6 +702,65 @@ fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
     fen.split(' ')
         .nth(2)
         .is_some_and(|castling| castling.contains(['A', 'H', 'a', 'h']))
+}
+
+/// Whether an Empire node is the FSF *no-black-queenside-castle* artifact, which
+/// cannot be faithfully cross-checked, so the fuzzer skips it (issue #394).
+///
+/// In Empire, White fields the Empire army (`TECDKCET`, no Rook pieces) and Black
+/// plays the standard chess army, which castles normally — both sides. mce
+/// generates Black's queenside castle (`e8c8`) whenever it is legal. FSF does
+/// **not**: it derives castling files from the start position, and because the
+/// opposing (White) army carries no `castlingRookPieces` on the queenside, FSF's
+/// auto-detection drops Black's queenside castle entirely — Black kingside
+/// (`e8g8`) is emitted, queenside never is. This is a long-standing FSF property,
+/// not upstream drift: a from-source 2023-01 FSF build refuses `e8c8` in Empire
+/// exactly like the pinned 2026 build, and it is unreachable from the pinned
+/// perft corpus (whose Empire positions never offer Black the queenside castle).
+/// mce is correct per Empire's rules; FSF simply cannot represent the move, so the
+/// two engines are not mutually checkable at such a node — the same targeted skip
+/// the S-Chess corner-castle artifact uses. Every other Empire node is checked.
+///
+/// The signal is a persistent *state*, not a single move: whenever Black's
+/// queenside castle is geometrically set up (king on e8, a-rook on a8, the `q`
+/// right present, and b8/c8/d8 empty) the extra mce move both surfaces directly
+/// (as Black's `perft(1)`) and leaks into the parent White node's `perft(2)`, so
+/// firing on the state skips both. The configuration is specific enough that it
+/// masks no other Empire movegen.
+fn is_empire_no_queenside_castle_artifact(spec: &Spec, fen: &str) -> bool {
+    if spec.id != WideVariantId::Empire {
+        return false;
+    }
+    let mut fields = fen.split(' ');
+    let board = fields.next().unwrap_or("");
+    // fields now yields side-to-move, then the castling/gating field.
+    let castling = fields.nth(1).unwrap_or("");
+    if !castling.contains('q') {
+        return false;
+    }
+    // Expand rank 8 (the first `/`-group) into one slot per file; a `*`-prefixed
+    // overflow piece occupies a single square (its base letter follows).
+    let rank8 = board.split('/').next().unwrap_or("");
+    let mut files: Vec<Option<char>> = Vec::with_capacity(8);
+    let mut chars = rank8.chars();
+    while let Some(c) = chars.next() {
+        if let Some(n) = c.to_digit(10) {
+            for _ in 0..n {
+                files.push(None);
+            }
+        } else if c == '*' {
+            files.push(chars.next());
+        } else {
+            files.push(Some(c));
+        }
+    }
+    // Black queenside castle available: a8 rook, e8 king, b8/c8/d8 empty.
+    files.len() >= 5
+        && files[0] == Some('r')
+        && files[1].is_none()
+        && files[2].is_none()
+        && files[3].is_none()
+        && files[4] == Some('k')
 }
 
 /// Cross-check one node: mce `perft(1)`/`perft(2)` + divide vs FSF's.
@@ -849,7 +921,10 @@ fn fuzz_game(
 
         // A documented FSF artifact (not an mce bug) is not cross-checkable; skip
         // the node but play on so the random walk still explores past it.
-        if is_schess_corner_castle_artifact(spec, &pos.to_fen()) {
+        let fen = pos.to_fen();
+        if is_schess_corner_castle_artifact(spec, &fen)
+            || is_empire_no_queenside_castle_artifact(spec, &fen)
+        {
             skipped += 1;
         } else {
             match check_node(engine, spec, &pos) {
@@ -1210,6 +1285,59 @@ mod tests {
         assert!(!is_schess_corner_castle_artifact(
             other,
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w ah - 0 1",
+        ));
+    }
+
+    /// The Empire no-black-queenside-castle skip fires exactly on the state where
+    /// Black's queenside castle is set up (king e8, a-rook a8, `q` right, b8/c8/d8
+    /// empty) — at both the Black node and its White parent — and nowhere else.
+    #[test]
+    fn empire_no_queenside_castle_artifact_is_precise() {
+        let empire = SPECS
+            .iter()
+            .find(|s| s.id == WideVariantId::Empire)
+            .expect("empire spec");
+        let other = SPECS
+            .iter()
+            .find(|s| s.id == WideVariantId::Capablanca)
+            .expect("capablanca spec");
+
+        // The reported divergence node (White to move) and its Black child both
+        // carry the state, so both are skipped.
+        assert!(is_empire_no_queenside_castle_artifact(
+            empire,
+            "r3k1*C1/p5p1/bnn*T2*D1/1pb2pq1/1P6/P1P1*E1pP/6*C*T/2*EK4 w q - 1 26",
+        ));
+        assert!(is_empire_no_queenside_castle_artifact(
+            empire,
+            "r3k1*C1/p5p1/bnn3*D1/1pb2pq1/1P3*T2/P1P1*E1pP/6*C*T/2*EK4 b q - 2 26",
+        ));
+
+        // No `q` right → not the artifact (Black cannot queenside castle).
+        assert!(!is_empire_no_queenside_castle_artifact(
+            empire,
+            "r3k1*C1/p5p1/bnn*T2*D1/1pb2pq1/1P6/P1P1*E1pP/6*C*T/2*EK4 w k - 1 26",
+        ));
+        // a-rook has left a8 → geometry broken.
+        assert!(!is_empire_no_queenside_castle_artifact(
+            empire,
+            "4k1*C1/p5p1/bnn3*D1/1pb2pq1/1P3*T2/P1P1*E1pP/6*C*T/r1*EK4 b q - 2 26",
+        ));
+        // A piece sits on d8 → the queenside path is not clear.
+        assert!(!is_empire_no_queenside_castle_artifact(
+            empire,
+            "r2bk1*C1/p5p1/bnn3*D1/1pb2pq1/1P3*T2/P1P1*E1pP/6*C*T/2*EK4 b q - 2 26",
+        ));
+        // The Empire start array (b8/c8/d8 occupied) is not the artifact.
+        assert!(!is_empire_no_queenside_castle_artifact(
+            empire,
+            "rnbqkbnr/pppppppp/8/8/8/PPPssPPP/8/*T*E*C*DK*C*E*T w kq - 0 1",
+        ));
+        // Restricted to Empire: another variant with a queenside-castle FEN is not
+        // affected.
+        assert!(!is_empire_no_queenside_castle_artifact(
+            other,
+            "r3k3/pppppppp/8/8/8/8/PPPPPPPP/R3K3 b q - 0 1",
         ));
     }
 }
