@@ -79,5 +79,10 @@ fn bench_wide_perft(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_variants, bench_wide_movegen, bench_wide_perft);
+criterion_group!(
+    benches,
+    bench_variants,
+    bench_wide_movegen,
+    bench_wide_perft
+);
 criterion_main!(benches);
