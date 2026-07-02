@@ -869,8 +869,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// multi-royal legality the move generator enforces. A side with no royal
     /// squares (Duck) is never in check.
     #[must_use]
+    #[inline]
     pub fn is_check(&self) -> bool {
-        let us = self.state.turn;
+        self.is_in_check(self.state.turn)
+    }
+
+    /// Returns `true` if `color`'s king(s) are in check right now, regardless of
+    /// whose turn it is.
+    ///
+    /// This is the color-parameterized form of [`is_check`](Self::is_check) (which
+    /// is exactly `is_in_check(turn)`): it applies the identical, variant-correct
+    /// royal-attack discipline to an arbitrary side. For a single-royal side it is
+    /// "a king square is attacked"; for a multi-king duple-check variant (Spartan)
+    /// it is "*every* royal is attacked"; a royalless side (Duck) is never in
+    /// check. Because a legal position never leaves the side that just moved in
+    /// check, `is_in_check(turn.opposite())` is always `false` after legal play.
+    #[must_use]
+    pub fn is_in_check(&self, color: Color) -> bool {
+        let us = color;
         // Alice chess: a king is attacked only by enemy pieces on the **same
         // plane**, so check is plane-restricted. Default-off, so every other
         // variant takes the standard occupancy-wide test below.
@@ -985,6 +1001,56 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
         }
         pins
+    }
+
+    /// The **absolutely pinned** friendly pieces of `color`: pieces that sit
+    /// alone on a ray between one of `color`'s royal squares and an enemy slider,
+    /// so moving them off that ray would expose the king.
+    ///
+    /// This is the exact pin relation the move generator itself uses (via the same
+    /// `compute_pins`), unioned over every royal square of `color` — so it is
+    /// variant-correct for the fairy compounds (a Hawk = B+N or Elephant = R+N
+    /// pins along its sliding component) and honours the per-variant pin
+    /// confinement (see [`WideVariant::confine_pins_to_segment`]). It reports no
+    /// pins for a side with no royal square (Duck). A pinned piece may still have
+    /// legal moves *along* its ray; use [`pin_ray_of`](Self::pin_ray_of) for that
+    /// line and [`legal_moves_from`](Self::legal_moves_from) for the moves that
+    /// survive the pin.
+    #[must_use]
+    pub fn pinned_pieces(&self, color: Color) -> Bitboard<G> {
+        let them = color.opposite();
+        let occ = self.board.occupied();
+        let mut acc = Bitboard::EMPTY;
+        for king in V::royal_squares(&self.board, color) {
+            acc |= self.compute_pins(king, color, them, occ).pinned;
+        }
+        acc
+    }
+
+    /// The line a pinned piece of `color` on `square` is confined to — the ray
+    /// through the pinning royal that the piece may move along without exposing
+    /// the king — or `None` if `square` does not hold an absolutely pinned piece
+    /// of `color`.
+    ///
+    /// The returned line is exactly the confinement mask the generator restricts
+    /// the piece to (the full king–slider line, or, for a variant that opts into
+    /// [`WideVariant::confine_pins_to_segment`], the king-to-pinner segment). When
+    /// several royals pin the same piece the first pinning royal's line is
+    /// reported.
+    #[must_use]
+    pub fn pin_ray_of(&self, color: Color, square: Square<G>) -> Option<Bitboard<G>> {
+        if self.board.color_at(square) != Some(color) {
+            return None;
+        }
+        let them = color.opposite();
+        let occ = self.board.occupied();
+        for king in V::royal_squares(&self.board, color) {
+            let pins = self.compute_pins(king, color, them, occ);
+            if pins.pinned.contains(square) {
+                return Some(pins.line_of(square));
+            }
+        }
+        None
     }
 
     // -- Move generation ---------------------------------------------------

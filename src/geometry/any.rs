@@ -458,6 +458,90 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// Whether `color`'s king(s) are in check right now, regardless of
+            /// whose turn it is — the type-erased forward of
+            /// [`GenericPosition::is_in_check`](super::GenericPosition::is_in_check).
+            /// `is_in_check(turn)` equals [`is_check`](Self::is_check).
+            #[must_use]
+            pub fn is_in_check(&self, color: Color) -> bool {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.is_in_check(color), )+
+                }
+            }
+
+            /// The royal (king) squares of `color`, as bare square indices
+            /// (ascending) — the type-erased forward of
+            /// [`GenericPosition::royal_squares`](super::GenericPosition::royal_squares).
+            /// Empty for a side whose king is non-royal (Duck, Dobutsu).
+            #[must_use]
+            pub fn royal_squares(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.royal_squares(color)), )+
+                }
+            }
+
+            /// The enemy pieces that attack a royal square of `color`, as bare
+            /// square indices (ascending) — the type-erased forward of
+            /// [`GenericPosition::checkers_of`](super::GenericPosition::checkers_of).
+            /// Excludes the royal-only flying-general confrontation; see
+            /// [`is_in_check`](Self::is_in_check) for the full verdict.
+            #[must_use]
+            pub fn checkers_of(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.checkers_of(color)), )+
+                }
+            }
+
+            /// The checkers of the side to move, as bare square indices
+            /// (ascending) — [`checkers_of`](Self::checkers_of) for
+            /// [`turn`](Self::turn), the type-erased forward of
+            /// [`GenericPosition::checkers`](super::GenericPosition::checkers).
+            #[must_use]
+            pub fn checkers(&self) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.checkers()), )+
+                }
+            }
+
+            /// The absolutely pinned pieces of `color`, as bare square indices
+            /// (ascending) — the type-erased forward of
+            /// [`GenericPosition::pinned_pieces`](super::GenericPosition::pinned_pieces).
+            #[must_use]
+            pub fn pinned_pieces(&self, color: Color) -> Vec<u8> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => square_indices(p.pinned_pieces(color)), )+
+                }
+            }
+
+            /// The line a pinned piece of `color` on `square` is confined to, as
+            /// bare square indices (ascending), or `None` if `square` holds no
+            /// absolutely pinned piece of `color` (or is off the board) — the
+            /// type-erased forward of
+            /// [`GenericPosition::pin_ray_of`](super::GenericPosition::pin_ray_of).
+            #[must_use]
+            pub fn pin_ray_of(&self, color: Color, square: u8) -> Option<Vec<u8>> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => {
+                        p.pin_ray_of(color, square_of(p, square)?).map(square_indices)
+                    } )+
+                }
+            }
+
+            /// The legal moves of the side to move whose origin is `square` — the
+            /// type-erased forward of
+            /// [`GenericPosition::legal_moves_from`](super::GenericPosition::legal_moves_from).
+            /// An off-board index yields an empty list. A drop is grouped under the
+            /// square it drops onto (its packed origin equals its target).
+            #[must_use]
+            pub fn legal_moves_from(&self, square: u8) -> Vec<WideMove> {
+                match self {
+                    $( AnyWideVariant::$variant(p) => match square_of(p, square) {
+                        Some(sq) => p.legal_moves_from(sq),
+                        None => Vec::new(),
+                    }, )+
+                }
+            }
+
             /// Serializes this position to FEN.
             #[must_use]
             pub fn to_fen(&self) -> String {
