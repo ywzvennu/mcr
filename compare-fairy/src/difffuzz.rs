@@ -185,6 +185,8 @@ fn centaur_to_fsf(fen: &str) -> String {
 /// * **Jieqi** — hidden-information Xiangqi; its FSF cross-check needs a
 ///   per-position identity reveal (see `jieqi.rs`), not a static dialect rewrite, so
 ///   it cannot be driven from an arbitrary fuzzed FEN.
+/// * **Chu** — 12x12 Chu Shogi is validated against the HaChu reference engine (the
+///   `--hachu` mode), not Fairy-Stockfish, so it carries no FSF difffuzz spec.
 const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1132,6 +1134,7 @@ mod tests {
             WideVariantId::Alice,
             WideVariantId::Duck,
             WideVariantId::Jieqi,
+            WideVariantId::Chu,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1139,10 +1142,10 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 3 by-design exclusions (Alice / Duck /
-        // Jieqi); the deeper-sweep follow-ups stay in SPECS but are skipped via
-        // `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 3);
+        // Every shipped variant minus the 4 by-design exclusions (Alice / Duck /
+        // Jieqi / Chu); the deeper-sweep follow-ups stay in SPECS but are skipped
+        // via `HELD_BACK` on the default run.
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 4);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never

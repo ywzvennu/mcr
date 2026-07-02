@@ -24,11 +24,10 @@ use core::str::FromStr;
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
     Caparandom, Centaur, Chak, Chancellor, Chennis, Chigorin, Chu, Courier, Dobutsu, Dragon, Duck,
-    Embassy,
-    Empire, FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
-    HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu,
-    Mansindam, Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako,
-    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
+    Embassy, Empire, FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand,
+    Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk,
+    Manchu, Mansindam, Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan,
+    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
     Synochess, Tencubed, Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant,
     Xiangfu, Xiangqi,
 };

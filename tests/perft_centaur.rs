@@ -28,9 +28,7 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_centaur -- --include-ignored`.
 
-use mce::geometry::{
-    perft as gperft, Cap10x8, Centaur, Square, WideMoveKind, WidePiece, WideRole,
-};
+use mce::geometry::{perft as gperft, Cap10x8, Centaur, Square, WideMoveKind, WidePiece, WideRole};
 use mce::Color;
 
 /// The Centaur Chess starting FEN (mce dialect), confirmed against
