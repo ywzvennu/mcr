@@ -18,7 +18,7 @@
 //! untouched. The companion [`WideVariantId`] is the string-addressable selector
 //! ([`FromStr`] from a canonical name or a common alias).
 
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
@@ -102,10 +102,19 @@ fn square_indices<G: Geometry>(squares: impl IntoIterator<Item = Square<G>>) -> 
 }
 
 /// Generates the [`WideVariantId`] selector and the [`AnyWideVariant`] runtime
-/// wrapper from a single table of `Variant, ConcreteAlias, "canonical" [, "alias"…]`
-/// rows, keeping the two enums and every forwarding `match` exhaustively in sync.
+/// wrapper from a single table of
+/// `Variant, ConcreteAlias, StorageType, "canonical" [, "alias"…]` rows, keeping
+/// the two enums and every forwarding `match` exhaustively in sync.
+///
+/// `ConcreteAlias` is the variant's concrete [`GenericPosition`](super::GenericPosition)
+/// type; `StorageType` is how the [`AnyWideVariant`] arm stores it — normally the
+/// same concrete type (stored inline), but a heap-`Box` of it for the few large
+/// arms (see the table's comment) so that the enum is not sized by its widest
+/// arm. Storage is only ever the concrete type or a `Box<ConcreteType>`, both of
+/// which are `From<ConcreteType>` (identity / `Box::new`) and `Deref` to the
+/// position, so the wrapping and forwarding below stay uniform.
 macro_rules! wide_variants {
-    ( $( $variant:ident, $alias:ty, $name:literal $( , $alt:literal )* ; )+ ) => {
+    ( $( $variant:ident, $pos:ty, $store:ty, $name:literal $( , $alt:literal )* ; )+ ) => {
         /// A stable, string-addressable identifier for a shipped fairy variant.
         ///
         /// Parse one from a name or alias with [`FromStr`] (case-insensitive,
@@ -183,14 +192,18 @@ macro_rules! wide_variants {
         /// underlying [`GenericPosition<G, V>`](super::GenericPosition) and pays
         /// only one branch.
         // The arms wrap positions of differing board geometries (`u64` vs `u128`
-        // backings, 3x4 up to 10x10) so their sizes genuinely differ; this runtime
-        // facade deliberately stores them inline rather than boxing every arm.
-        #[allow(clippy::large_enum_variant)]
+        // vs the two-limb `U256` backing, 3x4 up to 12x12) so their sizes
+        // genuinely differ. The common u64/u128 arms are stored inline — no
+        // allocation, no indirection — while the single U256 arm (12x12 Chu, at
+        // ~4512 B nearly 2x a u128 position) is boxed via its `StorageType` in the
+        // table, so the enum is sized by a u128 arm (~2400 B) instead of by Chu.
+        // Only Chu pays a heap indirection, and it is both rare and already the
+        // heaviest variant to compute.
         #[derive(Clone, Debug)]
         pub enum AnyWideVariant {
             $(
                 #[doc = concat!("The `", $name, "` variant.")]
-                $variant($alias),
+                $variant($store),
             )+
         }
 
@@ -199,7 +212,7 @@ macro_rules! wide_variants {
             #[must_use]
             pub fn startpos(id: WideVariantId) -> Self {
                 match id {
-                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$alias>::startpos()), )+
+                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$store>::from(<$pos>::startpos())), )+
                 }
             }
 
@@ -213,7 +226,7 @@ macro_rules! wide_variants {
             /// reports).
             pub fn from_fen(id: WideVariantId, fen: &str) -> Result<Self, WideFenError> {
                 let pos = match id {
-                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$alias>::from_fen(fen)?), )+
+                    $( WideVariantId::$variant => AnyWideVariant::$variant(<$store>::from(<$pos>::from_fen(fen)?)), )+
                 };
                 Ok(pos)
             }
@@ -280,7 +293,7 @@ macro_rules! wide_variants {
             #[must_use]
             pub fn play(&self, mv: &WideMove) -> Self {
                 match self {
-                    $( AnyWideVariant::$variant(p) => AnyWideVariant::$variant(p.play(mv)), )+
+                    $( AnyWideVariant::$variant(p) => AnyWideVariant::$variant(<$store>::from(p.play(mv))), )+
                 }
             }
 
@@ -299,7 +312,7 @@ macro_rules! wide_variants {
             #[cfg(test)]
             pub(crate) fn assert_make_unmake_walk(&self, depth: u32) {
                 match self {
-                    $( AnyWideVariant::$variant(p) => p.clone().assert_make_unmake_walk(depth), )+
+                    $( AnyWideVariant::$variant(p) => <$pos as Clone>::clone(p).assert_make_unmake_walk(depth), )+
                 }
             }
 
@@ -628,7 +641,7 @@ macro_rules! wide_variants {
                 let id = WideVariantId::from_index(vid).ok_or(WireError::UnknownVariant(vid))?;
                 match id {
                     $( WideVariantId::$variant =>
-                        Ok(AnyWideVariant::$variant(<$alias>::decode_body(rest)?)), )+
+                        Ok(AnyWideVariant::$variant(<$store>::from(<$pos>::decode_body(rest)?))), )+
                 }
             }
         }
@@ -636,68 +649,68 @@ macro_rules! wide_variants {
 }
 
 wide_variants! {
-    Alice, Alice, "alice";
-    Almost, Almost, "almost", "almostchess";
-    Amazon, Amazon, "amazon", "amazonchess";
-    Asean, Asean, "asean";
-    Bughouse, Bughouse, "bughouse", "bug";
-    Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
-    CannonShogi, CannonShogi, "cannonshogi", "cannon-shogi";
-    Capablanca, Capablanca, "capablanca", "capa";
-    Capahouse, Capahouse, "capahouse";
-    Caparandom, Caparandom, "caparandom", "caparandomchess", "capa960";
-    Centaur, Centaur, "centaur";
-    Chak, Chak, "chak";
-    Chancellor, Chancellor, "chancellor";
-    CheckShogi, CheckShogi, "checkshogi", "check-shogi";
-    Chennis, Chennis, "chennis";
-    Chigorin, Chigorin, "chigorin";
-    Chu, Chu, "chu", "chushogi", "chu-shogi";
-    Courier, Courier, "courier";
-    Dobutsu, Dobutsu, "dobutsu";
-    Dragon, Dragon, "dragon";
-    Duck, Duck, "duck";
-    Embassy, Embassy, "embassy";
-    Empire, Empire, "empire";
-    EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
-    FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
-    Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
-    Gothic, Gothic, "gothic";
-    Grand, Grand, "grand";
-    Grandhouse, Grandhouse, "grandhouse";
-    HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
-    Janggi, Janggi, "janggi", "korean";
-    Janus, Janus, "janus", "januschess";
-    Jieqi, Jieqi, "jieqi";
-    Khans, Khans, "khans";
-    Knightmate, Knightmate, "knightmate";
-    Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
-    Makpong, Makpong, "makpong";
-    Makruk, Makruk, "makruk";
-    Manchu, Manchu, "manchu", "manchuchess";
-    Mansindam, Mansindam, "mansindam";
-    Minishogi, Minishogi, "minishogi";
-    Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
-    Opulent, Opulent, "opulent";
-    Orda, Orda, "orda";
-    Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
-    Placement, Placement, "placement";
-    Seirawan, Seirawan, "seirawan", "schess", "s-chess";
-    Shako, Shako, "shako";
-    Shatar, Shatar, "shatar";
-    Shatranj, Shatranj, "shatranj";
-    Shinobi, Shinobi, "shinobi", "shinobiplus";
-    Shogi, Shogi, "shogi";
-    Shogun, Shogun, "shogun";
-    ShoShogi, ShoShogi, "shoshogi", "sho-shogi";
-    Shouse, Shouse, "shouse", "seirawanhouse";
-    Sittuyin, Sittuyin, "sittuyin", "burmese";
-    Spartan, Spartan, "spartan";
-    Synochess, Synochess, "synochess";
-    Tencubed, Tencubed, "tencubed";
-    Tori, Tori, "tori", "torishogi";
-    Xiangfu, Xiangfu, "xiangfu";
-    Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
+    Alice, Alice, Alice, "alice";
+    Almost, Almost, Almost, "almost", "almostchess";
+    Amazon, Amazon, Amazon, "amazon", "amazonchess";
+    Asean, Asean, Asean, "asean";
+    Bughouse, Bughouse, Bughouse, "bughouse", "bug";
+    Cambodian, Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
+    CannonShogi, CannonShogi, CannonShogi, "cannonshogi", "cannon-shogi";
+    Capablanca, Capablanca, Capablanca, "capablanca", "capa";
+    Capahouse, Capahouse, Capahouse, "capahouse";
+    Caparandom, Caparandom, Caparandom, "caparandom", "caparandomchess", "capa960";
+    Centaur, Centaur, Centaur, "centaur";
+    Chak, Chak, Chak, "chak";
+    Chancellor, Chancellor, Chancellor, "chancellor";
+    CheckShogi, CheckShogi, CheckShogi, "checkshogi", "check-shogi";
+    Chennis, Chennis, Chennis, "chennis";
+    Chigorin, Chigorin, Chigorin, "chigorin";
+    Chu, Chu, Box<Chu>, "chu", "chushogi", "chu-shogi";
+    Courier, Courier, Courier, "courier";
+    Dobutsu, Dobutsu, Dobutsu, "dobutsu";
+    Dragon, Dragon, Dragon, "dragon";
+    Duck, Duck, Duck, "duck";
+    Embassy, Embassy, Embassy, "embassy";
+    Empire, Empire, Empire, "empire";
+    EuroShogi, EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
+    FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
+    Gorogoro, Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
+    Gothic, Gothic, Gothic, "gothic";
+    Grand, Grand, Grand, "grand";
+    Grandhouse, Grandhouse, Grandhouse, "grandhouse";
+    HoppelPoppel, HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
+    Janggi, Janggi, Janggi, "janggi", "korean";
+    Janus, Janus, Janus, "janus", "januschess";
+    Jieqi, Jieqi, Jieqi, "jieqi";
+    Khans, Khans, Khans, "khans";
+    Knightmate, Knightmate, Knightmate, "knightmate";
+    Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
+    Makpong, Makpong, Makpong, "makpong";
+    Makruk, Makruk, Makruk, "makruk";
+    Manchu, Manchu, Manchu, "manchu", "manchuchess";
+    Mansindam, Mansindam, Mansindam, "mansindam";
+    Minishogi, Minishogi, Minishogi, "minishogi";
+    Minixiangqi, Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
+    Opulent, Opulent, Opulent, "opulent";
+    Orda, Orda, Orda, "orda";
+    Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
+    Placement, Placement, Placement, "placement";
+    Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
+    Shako, Shako, Shako, "shako";
+    Shatar, Shatar, Shatar, "shatar";
+    Shatranj, Shatranj, Shatranj, "shatranj";
+    Shinobi, Shinobi, Shinobi, "shinobi", "shinobiplus";
+    Shogi, Shogi, Shogi, "shogi";
+    Shogun, Shogun, Shogun, "shogun";
+    ShoShogi, ShoShogi, ShoShogi, "shoshogi", "sho-shogi";
+    Shouse, Shouse, Shouse, "shouse", "seirawanhouse";
+    Sittuyin, Sittuyin, Sittuyin, "sittuyin", "burmese";
+    Spartan, Spartan, Spartan, "spartan";
+    Synochess, Synochess, Synochess, "synochess";
+    Tencubed, Tencubed, Tencubed, "tencubed";
+    Tori, Tori, Tori, "tori", "torishogi";
+    Xiangfu, Xiangfu, Xiangfu, "xiangfu";
+    Xiangqi, Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
 }
 
 impl WideVariantId {

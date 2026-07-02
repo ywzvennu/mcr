@@ -119,5 +119,56 @@ Chu's ~1.9× footprint over a u128 variant is proportionate to its two-limb
 full-registry coverage, so future variants and any future regression in these
 paths now have an in-repo, FSF-free signal.
 
+# Optimization sweep (issue #420)
+
+Issue #409 (above) established the no-regression baseline; issue #420 then
+*optimized* against it. The measured result is one memory win and one honest
+speed negative.
+
+## Memory: box the U256 Chu arm of `AnyWideVariant`
+
+`AnyWideVariant` is a plain enum with one arm per shipped variant, each holding
+that variant's concrete position. A Rust enum is sized by its **largest** arm,
+and every arm was stored inline — so the whole facade was sized by its single
+U256 arm, the 12x12 Chu position (~4512 B, nearly 2x a u128 position). Every
+common u64/u128 variant therefore paid the Chu footprint even though its own
+position is ≤ 2400 B.
+
+The fix boxes only the Chu arm (`Chu(Box<Chu>)`), leaving every u64/u128 arm
+inline. The enum is now sized by a u128 position plus its discriminant, and only
+Chu — already the heaviest variant to compute and rarely instantiated — pays a
+single heap indirection.
+
+| type | before | after | note |
+|---|--:|--:|---|
+| `WideMove` | 8 | **8** | unchanged (guarded by `wide_move_is_eight_bytes`) |
+| `Chu` position (concrete, U256) | 4512 | 4512 | concrete type unchanged |
+| `Shogi` / other u128 position | 2400 | 2400 | unchanged |
+| **`AnyWideVariant` (runtime facade)** | **4512** | **2416** | **−46.5%** |
+
+`size_of` measured with a throwaway `examples/` binary on the same toolchain;
+the concrete positions are untouched, so all `size_of` values except the facade
+are identical to the #409 table. Byte-identity is covered node-for-node by the
+`enum_dispatch_matches_typed_path_for_every_variant` and
+`make_unmake_round_trips_deep` tests (both exercise the Chu arm), and by the
+broad deep `--ignored` perft suite — no node count changes for any variant.
+
+## Speed: honest negative — the one-hot slider reversal
+
+The hyperbola-quintessence slider core (`attacks::sliding`) reverses the one-hot
+source bit `s` via `s.reverse_bits()` on every call. Since `s` is a single bit
+at `sq.index()`, its full-width reversal is exactly `bit(BITS - 1 - index)`, so
+the `reverse_bits` (two 128-bit reversals plus a limb swap on U256) can be
+replaced with a direct `bit()`. It is byte-identical for a one-hot `s`.
+
+Measured, it **regressed** the very variants it targeted: chu movegen +13%,
+xiangqi movegen +11%, jieqi movegen +3% (the low-noise single-`legal_moves`
+benches). The cause is that `U256::from_bit` carries a `< 128` branch, whereas
+`reverse_bits` is branchless and CSE-friendly; the branch is slower than the
+reversal it was meant to save. Reverted, not shipped — a #310/#364-style
+negative. (The larger cannon-path per-node cost, e.g. the make/unmake scratch
+clone, is intrinsic to the `&self` legal-move API and was already minimized by
+#193/#353.)
+
 [`WideVariantId::ALL`]: https://docs.rs/mce/latest/mce/geometry/enum.WideVariantId.html
 [`AnyWideVariant`]: https://docs.rs/mce/latest/mce/geometry/enum.AnyWideVariant.html
