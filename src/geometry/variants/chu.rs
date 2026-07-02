@@ -380,6 +380,45 @@ impl WideVariant<Chu12x12> for ChuRules {
         )
     }
 
+    // --- Lion powers (igui, double capture, jitto pass) -------------------
+
+    fn has_lion_moves() -> bool {
+        true
+    }
+
+    fn role_is_full_lion(role: WideRole) -> bool {
+        // The Lion has lion power in all eight directions.
+        matches!(role, WideRole::ChuLion)
+    }
+
+    fn role_lion_lines(role: WideRole) -> &'static [(i8, i8)] {
+        // The two lion-power promoted pieces carry a *partial* (straight-line) lion
+        // power: the Horned Falcon straight forward, the Soaring Eagle along each
+        // forward diagonal. (Their sliding/leaping moves in the other directions
+        // are the ordinary `role_attacks` set.)
+        match role {
+            WideRole::HornedFalcon => &[(0, 1)],
+            WideRole::SoaringEagle => &[(1, 1), (-1, 1)],
+            _ => &[],
+        }
+    }
+
+    fn lion_style_promotion() -> bool {
+        true
+    }
+
+    fn role_promotion_forced(role: WideRole, color: Color, to_rank: u8) -> bool {
+        // A Pawn or Lance reaching the furthest rank can no longer move (both only
+        // advance straight forward), so it must take its "second chance" to promote
+        // there even on a non-capturing move. Every other Chu piece can always move
+        // from the deepest rank, so promotion stays optional for it.
+        let furthest = match color {
+            Color::White => 11,
+            Color::Black => 0,
+        };
+        to_rank == furthest && matches!(role, WideRole::Pawn | WideRole::Lance)
+    }
+
     fn in_promotion_zone(color: Color, rank: u8) -> bool {
         // The furthest four ranks: ranks 9–12 (indices 8–11) for White, ranks 1–4
         // (indices 0–3) for Black.
