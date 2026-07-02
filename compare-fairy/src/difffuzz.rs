@@ -135,6 +135,40 @@ fn amazon_to_fsf(fen: &str) -> String {
     }
 }
 
+/// Ai-Wok dialect: mce fields the Ai-Wok (Rook + Knight + Ferz) as the existing
+/// [`WideRole::Ship`], spelled with the second-bank overflow token `**s`/`**S`;
+/// FSF's `ai-wok` spells it `a`/`A`. Strip the `**` prefix from that token and
+/// remap the recycled base letter `s`->`a` (case-preserving) in the placement
+/// field. The bare Silver/Khon `s`/`S` (which has no `**` prefix) and every other
+/// letter and field are left untouched.
+fn aiwok_to_fsf(fen: &str) -> String {
+    let (placement, rest) = match fen.split_once(' ') {
+        Some((p, r)) => (p, Some(r)),
+        None => (fen, None),
+    };
+    let mut out = String::with_capacity(placement.len());
+    let mut chars = placement.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '*' && chars.peek() == Some(&'*') {
+            // A second-bank overflow token `**s`/`**S`, the Ai-Wok (Ship): consume
+            // the second `*`, then emit FSF's `a`/`A`, case-preserved.
+            chars.next();
+            match chars.next() {
+                Some('s') => out.push('a'),
+                Some('S') => out.push('A'),
+                Some(base) => out.push(base),
+                None => {}
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    match rest {
+        Some(r) => format!("{out} {r}"),
+        None => out,
+    }
+}
+
 /// Janus Chess dialect: mce spells the Janus (Bishop + Knight) as its Hawk `a`/`A`;
 /// FSF spells it `j`/`J`. Rewrite that letter in the placement field; every other
 /// letter and field is identical.
@@ -575,6 +609,25 @@ const SPECS: &[Spec] = &[
         fsf: "checkshogi",
         needs_ini: false,
         dialect: identity,
+    },
+    // Karouk and Ai-Wok are appended (out of alphabetical order) for the same
+    // seed-stability reason as Courier / EuroShogi / Checkshogi above: the
+    // per-variant fuzz seed is keyed on each spec's positional index, so a
+    // mid-list insert would re-roll every later variant's games. Both are FSF
+    // built-ins. Karouk is Cambodian spelled identically (its absent `1+1`
+    // check-counter field is filled with FSF's default, so mce's counter-free FEN
+    // parses); Ai-Wok spells its super-piece `**s` where FSF spells it `a`.
+    Spec {
+        id: WideVariantId::Karouk,
+        fsf: "karouk",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Aiwok,
+        fsf: "ai-wok",
+        needs_ini: false,
+        dialect: aiwok_to_fsf,
     },
 ];
 

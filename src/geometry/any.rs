@@ -22,14 +22,14 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
-    perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier, Dobutsu,
-    Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition, Geometry,
-    Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate,
-    Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Opulent, Orda,
-    Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
-    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori, WideEndReason, WideFenError,
-    WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
+    Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier,
+    Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
+    Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Karouk,
+    Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi,
+    Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
+    Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori, WideEndReason,
+    WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -649,6 +649,7 @@ macro_rules! wide_variants {
 }
 
 wide_variants! {
+    Aiwok, Aiwok, Aiwok, "ai-wok", "aiwok";
     Alice, Alice, Alice, "alice";
     Almost, Almost, Almost, "almost", "almostchess";
     Amazon, Amazon, Amazon, "amazon", "amazonchess";
@@ -682,6 +683,7 @@ wide_variants! {
     Janggi, Janggi, Janggi, "janggi", "korean";
     Janus, Janus, Janus, "janus", "januschess";
     Jieqi, Jieqi, Jieqi, "jieqi";
+    Karouk, Karouk, Karouk, "karouk", "kar-ouk", "kaouk";
     Khans, Khans, Khans, "khans";
     Knightmate, Knightmate, Knightmate, "knightmate";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
@@ -752,12 +754,14 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 62, "all 62 fairy variants are covered");
+        assert_eq!(count, 64, "all 64 fairy variants are covered");
     }
 
     #[test]
     fn from_str_accepts_documented_aliases() {
         let cases: &[(&str, WideVariantId)] = &[
+            ("aiwok", WideVariantId::Aiwok),
+            ("kaouk", WideVariantId::Karouk),
             ("bug", WideVariantId::Bughouse),
             ("ouk", WideVariantId::Cambodian),
             ("capa", WideVariantId::Capablanca),
@@ -878,6 +882,7 @@ mod tests {
 
     #[test]
     fn enum_dispatch_matches_typed_path_for_every_variant() {
+        agrees_with_typed!(WideVariantId::Aiwok, Aiwok, AnyWideVariant::Aiwok, 2);
         agrees_with_typed!(WideVariantId::Alice, Alice, AnyWideVariant::Alice, 2);
         agrees_with_typed!(WideVariantId::Almost, Almost, AnyWideVariant::Almost, 2);
         agrees_with_typed!(WideVariantId::Amazon, Amazon, AnyWideVariant::Amazon, 2);
@@ -979,6 +984,7 @@ mod tests {
         agrees_with_typed!(WideVariantId::Janggi, Janggi, AnyWideVariant::Janggi, 2);
         agrees_with_typed!(WideVariantId::Janus, Janus, AnyWideVariant::Janus, 2);
         agrees_with_typed!(WideVariantId::Jieqi, Jieqi, AnyWideVariant::Jieqi, 2);
+        agrees_with_typed!(WideVariantId::Karouk, Karouk, AnyWideVariant::Karouk, 2);
         agrees_with_typed!(WideVariantId::Khans, Khans, AnyWideVariant::Khans, 2);
         agrees_with_typed!(
             WideVariantId::Knightmate,
