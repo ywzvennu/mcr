@@ -153,6 +153,26 @@ fn janus_to_fsf(fen: &str) -> String {
     }
 }
 
+/// Centaur Chess dialect: mce spells the Centaur (King + Knight) with the Orda
+/// Kheshig letter `w`/`W`; FSF's INI `centaur` variant spells it `c`/`C`. Rewrite
+/// that letter in the placement field; the standard KQkq castling field carries no
+/// piece letters and the side-to-move `w` sits outside the placement field, so both
+/// are left untouched.
+fn centaur_to_fsf(fen: &str) -> String {
+    let map = |c: char| match c {
+        'w' => 'c',
+        'W' => 'C',
+        other => other,
+    };
+    match fen.split_once(' ') {
+        Some((placement, rest)) => {
+            let mapped: String = placement.chars().map(map).collect();
+            format!("{mapped} {rest}")
+        }
+        None => fen.chars().map(map).collect(),
+    }
+}
+
 /// Every variant the fuzzer cross-checks against FSF, each reusing its pinned-corpus
 /// module's dialect rewrite.
 ///
@@ -165,6 +185,8 @@ fn janus_to_fsf(fen: &str) -> String {
 /// * **Jieqi** — hidden-information Xiangqi; its FSF cross-check needs a
 ///   per-position identity reveal (see `jieqi.rs`), not a static dialect rewrite, so
 ///   it cannot be driven from an arbitrary fuzzed FEN.
+/// * **Chu** — 12x12 Chu Shogi is validated against the HaChu reference engine (the
+///   `--hachu` mode), not Fairy-Stockfish, so it carries no FSF difffuzz spec.
 const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -225,6 +247,16 @@ const SPECS: &[Spec] = &[
         fsf: "caparandom",
         needs_ini: false,
         dialect: crate::capablanca::fen_to_fsf,
+    },
+    Spec {
+        // Centaur Chess (10x8): the Capablanca board with the compounds replaced by
+        // two Centaurs (King + Knight). FSF has no built-in `centaur`; it is an INI
+        // variant (a `capablanca` descendant with `centaur = c`), so a variants.ini
+        // defining it must be loaded. mce spells the Centaur `w`, FSF `c`.
+        id: WideVariantId::Centaur,
+        fsf: "centaur",
+        needs_ini: true,
+        dialect: centaur_to_fsf,
     },
     Spec {
         id: WideVariantId::Chak,
@@ -1102,6 +1134,7 @@ mod tests {
             WideVariantId::Alice,
             WideVariantId::Duck,
             WideVariantId::Jieqi,
+            WideVariantId::Chu,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1109,10 +1142,10 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 3 by-design exclusions (Alice / Duck /
-        // Jieqi); the deeper-sweep follow-ups stay in SPECS but are skipped via
-        // `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 3);
+        // Every shipped variant minus the 4 by-design exclusions (Alice / Duck /
+        // Jieqi / Chu); the deeper-sweep follow-ups stay in SPECS but are skipped
+        // via `HELD_BACK` on the default run.
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 4);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never

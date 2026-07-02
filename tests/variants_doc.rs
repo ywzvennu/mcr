@@ -265,6 +265,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Chess960-style shuffled Capablanca setup with Shredder-notation castling to the fixed Capablanca destinations (king i/c); standard pawns and promotion. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant caparandom`).",
         },
+        WideVariantId::Centaur => Meta {
+            display: "Centaur Chess (10x8)",
+            pieces: "Standard army with the Archbishop/Chancellor replaced by two Centaurs (King + Knight, mce Kheshig).",
+            rules: "Capablanca board and castle geometry (king f to i/c); standard pawns, en passant, and last-rank promotion to Queen, Rook, Bishop, Knight, or Centaur. Win by checkmate.",
+            oracle: "Fairy-Stockfish (INI `centaur`).",
+        },
         WideVariantId::Chak => Meta {
             display: "Chak (9x9 Mayan chess)",
             pieces: "Rook, Vulture (knight), Jaguar (King + Knight), Serpent, Quetzal (eight-direction cannon), King, Soldier, Divine Lord, Shaman, and an immobile Temple.",
