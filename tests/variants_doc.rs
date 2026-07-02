@@ -283,6 +283,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess on a 9x9 board with castling on the standard files, double step, and en passant; pawns promote to Queen, Rook, Bishop, Knight, or Chancellor. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant chancellor`).",
         },
+        WideVariantId::CheckShogi => Meta {
+            display: "Checkshogi (Check Shogi, 9x9)",
+            pieces: "The standard 9x9 Shogi army: King, Rook (Dragon), Bishop (Horse), Gold and Silver Generals, Knight, Lance, Pawn, and their promoted forms.",
+            rules: "Standard 9x9 Shogi — hand, drops, far-three-ranks promotion, nifu and dead-piece drop rules — except that giving check wins the game outright (a checked side has no reply). Win by delivering check (or by checkmate/stalemate).",
+            oracle: "Fairy-Stockfish (`UCI_Variant checkshogi`).",
+        },
         WideVariantId::Chennis => Meta {
             display: "Chennis (7x7 flipping variant)",
             pieces: "Four flipping pairs — Pawn/Rook, Ferz/Cannon, Soldier/Bishop, Commoner/Knight — plus a region-confined King.",
@@ -336,6 +342,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             pieces: "Standard Black army vs a White Empire: Eagle, Cardinal, Tower, Duke (each moves like a Queen, captures on a short pattern) plus Soldiers.",
             rules: "Asymmetric; only Black castles; a pawn of either side promotes only to a Queen; flag-win when a king reaches the far rank, broad flying-general, and stalemate-is-loss.",
             oracle: "Fairy-Stockfish (`UCI_Variant empire`).",
+        },
+        WideVariantId::EuroShogi => Meta {
+            display: "EuroShogi (European Shogi, 8x8)",
+            pieces: "King, Gold General, Rook (Dragon), Bishop (Horse), Pawn, and a modified Knight — the two Shogi forward 2-1 jumps plus one step straight sideways. No Silver General and no Lance.",
+            rules: "Shogi on the 8x8 board with a hand and drops; promotion in the far three ranks is compulsory. The sideways-stepping Knight is never immobile, so it may be dropped anywhere; the Pawn keeps the last-rank and nifu drop restrictions. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant euroshogi`).",
         },
         WideVariantId::FogOfWar => Meta {
             display: "Fog of War (Dark Chess, 8x8)",

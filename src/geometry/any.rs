@@ -23,13 +23,13 @@ use core::str::FromStr;
 
 use super::{
     perft, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca, Capahouse,
-    Caparandom, Centaur, Chak, Chancellor, Chennis, Chigorin, Chu, Courier, Dobutsu, Dragon, Duck,
-    Embassy, Empire, FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand,
-    Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate, Kyotoshogi, Makpong, Makruk,
-    Manchu, Mansindam, Minishogi, Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan,
-    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
-    Synochess, Tencubed, Tori, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant,
-    Xiangfu, Xiangqi,
+    Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier, Dobutsu,
+    Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition, Geometry,
+    Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Khans, Knightmate,
+    Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi, Opulent, Orda,
+    Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
+    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori, WideEndReason, WideFenError,
+    WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -649,6 +649,7 @@ wide_variants! {
     Centaur, Centaur, "centaur";
     Chak, Chak, "chak";
     Chancellor, Chancellor, "chancellor";
+    CheckShogi, CheckShogi, "checkshogi", "check-shogi";
     Chennis, Chennis, "chennis";
     Chigorin, Chigorin, "chigorin";
     Chu, Chu, "chu", "chushogi", "chu-shogi";
@@ -658,6 +659,7 @@ wide_variants! {
     Duck, Duck, "duck";
     Embassy, Embassy, "embassy";
     Empire, Empire, "empire";
+    EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
     FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
     Gothic, Gothic, "gothic";
@@ -737,7 +739,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 60, "all 60 fairy variants are covered");
+        assert_eq!(count, 62, "all 62 fairy variants are covered");
     }
 
     #[test]
@@ -910,6 +912,12 @@ mod tests {
             AnyWideVariant::Chancellor,
             2
         );
+        agrees_with_typed!(
+            WideVariantId::CheckShogi,
+            CheckShogi,
+            AnyWideVariant::CheckShogi,
+            2
+        );
         agrees_with_typed!(WideVariantId::Chennis, Chennis, AnyWideVariant::Chennis, 2);
         agrees_with_typed!(
             WideVariantId::Chigorin,
@@ -923,6 +931,12 @@ mod tests {
         agrees_with_typed!(WideVariantId::Duck, Duck, AnyWideVariant::Duck, 2);
         agrees_with_typed!(WideVariantId::Embassy, Embassy, AnyWideVariant::Embassy, 2);
         agrees_with_typed!(WideVariantId::Empire, Empire, AnyWideVariant::Empire, 2);
+        agrees_with_typed!(
+            WideVariantId::EuroShogi,
+            EuroShogi,
+            AnyWideVariant::EuroShogi,
+            2
+        );
         agrees_with_typed!(
             WideVariantId::FogOfWar,
             FogOfWar,
