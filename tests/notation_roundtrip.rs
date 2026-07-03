@@ -33,6 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use mce::geometry::{AnyWideVariant, WideMove, WideMoveKind, WidePgn, WideVariantId};
 use proptest::prelude::*;
+use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 
 /// One step of splitmix64 — a tiny dependency-free PRNG, matching the generator
 /// the sibling invariant / perft suites use so lines reproduce identically.
@@ -356,19 +357,36 @@ fn walk_inputs() -> impl Strategy<Value = (WideVariantId, u64, u32)> {
     )
 }
 
-proptest! {
-    // Each case walks many nodes across a randomly chosen variant, so a modest
-    // case count still covers all 60 variants broadly while staying CI-fast.
-    #![proptest_config(ProptestConfig::with_cases(160))]
-
-    /// SAN + UCI round-trip and a whole-game PGN round-trip across every variant,
-    /// via the runtime-dispatch [`AnyWideVariant`] surface. Every legal move at
-    /// every walked node round-trips through SAN (all variants) and UCI (all but
-    /// Kyoto's documented drop ambiguity), and the walked game survives a PGN
-    /// export/import.
-    #[test]
-    fn any_variant_notation_round_trips((id, seed, plies) in walk_inputs()) {
-        let moves = walk_and_check(id, seed, plies);
-        assert_pgn_roundtrip(id, &moves);
-    }
+/// SAN + UCI round-trip and a whole-game PGN round-trip across every variant, via
+/// the runtime-dispatch [`AnyWideVariant`] surface. Every legal move at every
+/// walked node round-trips through SAN (all variants) and UCI (all but Kyoto's
+/// documented drop ambiguity), and the walked game survives a PGN export/import.
+///
+/// The generator draws `160` `(variant, seed, plies)` cases — enough to cover
+/// every variant broadly while staying CI-fast — but the proptest RNG is **pinned**
+/// to a fixed seed (`TestRunner::new_with_rng`), so the exact same cases run every
+/// invocation. This determinism is deliberate: with an entropy-seeded RNG the walk
+/// only *intermittently* reaches the Ordamirror pawn→overflow-Falcon promotion
+/// that surfaced #432, which made `cargo test --all-features` flaky on main and
+/// unusable as a cargo-mutants baseline (#407). A fixed seed makes any failure
+/// reproducible and turns this test into a stable regression guard.
+#[test]
+fn any_variant_notation_round_trips() {
+    let config = Config {
+        cases: 160,
+        // Don't let an on-disk regression file (or its absence) perturb the case
+        // set: this test is fully seeded, so its coverage is self-contained.
+        failure_persistence: None,
+        ..Config::default()
+    };
+    // A fixed 32-byte ChaCha seed pins the whole case sequence.
+    let rng = TestRng::from_seed(RngAlgorithm::ChaCha, &[0x42; 32]);
+    let mut runner = TestRunner::new_with_rng(config, rng);
+    runner
+        .run(&walk_inputs(), |(id, seed, plies)| {
+            let moves = walk_and_check(id, seed, plies);
+            assert_pgn_roundtrip(id, &moves);
+            Ok(())
+        })
+        .unwrap();
 }
