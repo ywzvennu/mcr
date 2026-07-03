@@ -240,6 +240,95 @@ jobs:
       - name: compare-fairy unit tests (FSF-free)
         run: cargo test --manifest-path compare-fairy/Cargo.toml
 
+  # Build + smoke-test the three consumer bindings (wasm / C / Python) and catch
+  # drift. Like `compare-fairy-unit`, these crates live OUTSIDE the workspace
+  # (path deps on mce, `publish = false`, `exclude`d from the published package),
+  # so the root `cargo build`/`cargo test` never touches them and they could rot
+  # silently. This job is the guard against that.
+  #
+  # NOT gated — it runs on every push/PR (no `if:`), alongside the other
+  # correctness gates (`ci`, `doc-gate`, `compare-fairy-unit`). The work is a
+  # handful of debug builds of the small binding crates plus their smoke tests
+  # (~a few minutes with the cargo cache warm); the cbindgen header-drift check in
+  # particular is most valuable *on the PR that edits the FFI surface*, so it
+  # belongs on the fast path rather than the weekly schedule. Nothing here builds
+  # a heavy external oracle (unlike `fairy-differential`), so no schedule gating is
+  # warranted.
+  bindings:
+    name: bindings (wasm/c/python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain (+ wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # wasm32-unknown-unknown is the mce-wasm build/test target; the C and
+          # Python bindings build for the host.
+          targets: wasm32-unknown-unknown
+
+      # Each binding is its own non-workspace crate with its own lockfile, so
+      # cache all three keyed independently of the root workspace.
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            bindings/wasm
+            bindings/c
+            bindings/python
+
+      # Pinned to the version used to (re)generate the committed include/mce.h so
+      # the drift diff below compares like-for-like; a formatting change in a newer
+      # cbindgen would otherwise show as spurious drift. Bump this in lockstep when
+      # the header is regenerated with a newer cbindgen.
+      - name: Install cbindgen
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cbindgen@0.29.4
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@wasm-pack
+
+      # -- C binding: header-drift check, then build + run the C smoke test ------
+      # Regenerate the header into a temp file and diff it against the committed
+      # include/mce.h. `diff` exits non-zero on ANY difference, failing the job:
+      # this is the guard that the checked-in header cannot drift from the FFI
+      # surface in src/lib.rs. build_test.sh then builds libmce.a and compiles +
+      # runs test.c against it.
+      - name: C — cbindgen header-drift check
+        working-directory: bindings/c
+        run: |
+          cbindgen --config cbindgen.toml --crate mce-c --output "$RUNNER_TEMP/mce.h"
+          if ! diff -u include/mce.h "$RUNNER_TEMP/mce.h"; then
+            echo "::error::bindings/c/include/mce.h is out of date." \
+              "Regenerate it: cbindgen --config cbindgen.toml --crate mce-c --output include/mce.h"
+            exit 1
+          fi
+
+      - name: C — build staticlib + run C smoke test
+        run: ./bindings/c/build_test.sh
+
+      # -- wasm binding: run tests/smoke.rs ON the wasm32 target under Node -------
+      # wasm-pack compiles the crate for wasm32-unknown-unknown and runs the
+      # `#[wasm_bindgen_test]`-annotated smoke tests in Node (preinstalled on the
+      # runner), i.e. on the real wasm target the binding ships to.
+      - name: wasm — wasm-pack test (Node)
+        run: wasm-pack test --node bindings/wasm
+
+      # -- Python binding: build the pyo3 extension and run pytest ---------------
+      # `pip install` uses maturin (the build backend declared in pyproject.toml)
+      # under build isolation to compile the abi3 extension and install it plus the
+      # `[test]` extra (pytest); then the smoke tests import `mce` and run.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Python — build extension + pytest
+        run: |
+          pip install "./bindings/python[test]"
+          pytest bindings/python/tests
+
   # Heavy differential + deep-perft job, GATED to the weekly schedule and manual
   # `workflow_dispatch` only (never per-PR), because it builds Fairy-Stockfish
   # from source (~2 min, GPL-3.0+) and runs the slow deep `--ignored` perft

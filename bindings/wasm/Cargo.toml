@@ -35,6 +35,14 @@ mce = { path = "../.." }
 # The JS/wasm boundary. `wasm-bindgen` generates the glue and the JS shim.
 wasm-bindgen = "0.2"
 
+[dev-dependencies]
+# Test harness for the `wasm32-unknown-unknown` target: lets `tests/smoke.rs`
+# run ON wasm under Node via `wasm-pack test --node` (see the `bindings` CI
+# job). Off-wasm (`cargo test`) the same tests fall back to the standard
+# harness — see the `cfg_attr` annotations in `tests/smoke.rs`. This crate
+# tracks a separate `0.3.x` line that pairs with `wasm-bindgen` 0.2.x above.
+wasm-bindgen-test = "0.3"
+
 [profile.release]
 # Small, fast wasm: thin LTO and a single codegen unit, optimize for size.
 opt-level = "s"

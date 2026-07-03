@@ -1,13 +1,24 @@
 //! Smoke test for the wasm binding logic.
 //!
-//! The `Game` type is the exact surface `wasm-bindgen` exports to JS; the crate
-//! also builds as an `rlib`, so we exercise that surface natively here. This
-//! covers the acceptance checks without needing a wasm runtime: startpos has 20
-//! legal moves, perft matches the known counts, and SAN round-trips.
+//! The `Game` type is the exact surface `wasm-bindgen` exports to JS. These
+//! tests exercise that surface both ways: on `wasm32-unknown-unknown` they run
+//! under the `wasm-bindgen-test` harness (`wasm-pack test --node`, the real wasm
+//! runtime), and off-wasm they run against the crate's `rlib` (`cargo test`) —
+//! see the per-test `cfg_attr` pairs below. Coverage: startpos has 20 legal
+//! moves, perft matches the known counts, and SAN round-trips.
 
 use mce_wasm::{FairyGame, Game};
 
-#[test]
+// On `wasm32-unknown-unknown` the tests run under the `wasm-bindgen-test`
+// harness (executed by `wasm-pack test --node` in CI, on the real wasm target);
+// off-wasm they run as ordinary `#[test]`s against the crate's `rlib` surface
+// (`cargo test`). The `cfg_attr` pairs on each test select the right attribute
+// per target, so the same acceptance checks run both ways.
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test;
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn startpos_has_twenty_legal_moves() {
     let g = Game::startpos(None).expect("standard startpos");
     assert_eq!(g.legal_moves().len(), 20, "startpos legal moves");
@@ -18,7 +29,8 @@ fn startpos_has_twenty_legal_moves() {
     assert!(g.outcome().is_none());
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn perft_matches_known_counts() {
     let g = Game::startpos(None).expect("startpos");
     // Canonical standard-chess perft node counts from the start position.
@@ -27,7 +39,8 @@ fn perft_matches_known_counts() {
     assert_eq!(g.perft(3), "8902");
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn san_round_trips() {
     let g = Game::startpos(None).expect("startpos");
     // UCI -> SAN -> UCI for a knight develop.
@@ -45,7 +58,8 @@ fn san_round_trips() {
     assert_eq!(sans.len(), 20);
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn play_advances_and_reaches_mate() {
     // Fool's mate: 1. f3 e5 2. g4 Qh4#.
     let mut g = Game::startpos(None).expect("startpos");
@@ -64,7 +78,8 @@ fn play_advances_and_reaches_mate() {
     assert_eq!(out.reason.as_deref(), Some("checkmate"));
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn status_and_analysis_queries() {
     let g = Game::startpos(None).expect("startpos");
     assert_eq!(g.status(), "ongoing");
@@ -101,7 +116,8 @@ fn status_and_analysis_queries() {
     assert_eq!(stale.status(), "stalemate");
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn variants_and_fen_round_trip() {
     let atomic = Game::startpos(Some("atomic".to_owned())).expect("atomic startpos");
     assert_eq!(atomic.variant(), "atomic");
@@ -113,7 +129,8 @@ fn variants_and_fen_round_trip() {
     assert_eq!(g.fen(), fen);
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn zobrist_is_stable_hex() {
     // zobrist is a stable 16-hex string; it changes as the position changes.
     let mut g = Game::startpos(None).expect("startpos");
@@ -124,7 +141,8 @@ fn zobrist_is_stable_hex() {
     assert_ne!(g.zobrist(), z0, "hash changes after a move");
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn fairy_startpos_and_perft_match_known_counts() {
     // Construct a fairy variant by name and run perft — the acceptance gate.
     // FSF-confirmed Xiangqi startpos counts (tests/perft_xiangqi.rs).
@@ -154,7 +172,8 @@ fn fairy_startpos_and_perft_match_known_counts() {
     assert!(names.iter().any(|n| n == "shogi"));
 }
 
-#[test]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
 fn fairy_play_advances_and_fen_round_trips() {
     let mut xq = FairyGame::startpos("xiangqi").expect("xiangqi startpos");
     let fen = xq.fen();
