@@ -316,6 +316,17 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// Test support (issue #438): walks a seeded random line of `plies`
+            /// legal moves, asserting make/unmake byte-identity (and key identity)
+            /// at every node — the deep-line counterpart of
+            /// [`assert_make_unmake_walk`](Self::assert_make_unmake_walk).
+            #[cfg(test)]
+            pub(crate) fn assert_make_unmake_line(&self, seed: u64, plies: u32) {
+                match self {
+                    $( AnyWideVariant::$variant(p) => <$pos as Clone>::clone(p).assert_make_unmake_line(seed, plies), )+
+                }
+            }
+
             /// The variant-aware game result, or `None` if the game is not over.
             #[must_use]
             pub fn outcome(&self) -> Option<WideOutcome> {
@@ -740,6 +751,7 @@ impl WideVariantId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn from_str_round_trips_every_canonical_name() {
@@ -829,6 +841,27 @@ mod tests {
     fn make_unmake_round_trips_deep() {
         for &id in WideVariantId::ALL {
             AnyWideVariant::startpos(id).assert_make_unmake_walk(3);
+        }
+    }
+
+    // Make/unmake byte-identity over a *deep* seeded random line (issue #438):
+    // for every variant, `AnyWideVariant::assert_make_unmake_line` plays a random
+    // self-play line and, at each node, checks that
+    // `GenericPosition::apply_with_undo` matches `play` and that `undo` restores
+    // the node byte-for-byte, hash included. The always-run walk above is
+    // exhaustive but shallow (depth 2); this reaches far deeper single lines,
+    // exercising captures, promotions, drops, and gates that only appear many
+    // plies in. Seeded via proptest for determinism, with a small case count
+    // since each case sweeps all 47+ variants.
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(6))]
+
+        /// Deep-line make/unmake byte-identity for every fairy variant.
+        #[test]
+        fn make_unmake_line_for_every_variant(seed in any::<u64>(), plies in 0u32..14) {
+            for &id in WideVariantId::ALL {
+                AnyWideVariant::startpos(id).assert_make_unmake_line(seed, plies);
+            }
         }
     }
 

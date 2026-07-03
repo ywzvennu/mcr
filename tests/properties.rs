@@ -57,9 +57,10 @@
 //! because both sides carry the *same* incremental key — the bug only affects
 //! incremental-vs-from-scratch, not make-vs-unmake.)
 
+use mce::geometry::{AnyWideVariant, WideVariantId};
 use mce::{
-    Antichess, AnyVariant, Atomic, Bitboard, Chess, Chess960, Crazyhouse, Horde, KingOfTheHill,
-    Position, RacingKings, Square, ThreeCheck, Variant, VariantId, VariantPosition,
+    perft_variant, Antichess, AnyVariant, Atomic, Bitboard, Chess, Chess960, Crazyhouse, Horde,
+    KingOfTheHill, Position, RacingKings, Square, ThreeCheck, Variant, VariantId, VariantPosition,
 };
 use proptest::prelude::*;
 
@@ -320,6 +321,186 @@ proptest! {
             VariantId::Atomic => assert_make_unmake(Atomic::startpos(), seed, plies),
             VariantId::Antichess => assert_make_unmake(Antichess::startpos(), seed, plies),
             VariantId::Crazyhouse => assert_make_unmake(Crazyhouse::startpos(), seed, plies),
+        }
+    }
+}
+
+// --- Wide / fairy variants (issue #438) ------------------------------------
+//
+// The nine core variants above run through [`AnyVariant`] and the concrete core
+// [`VariantPosition`] types. The 47+ fairy variants live behind the geometry
+// layer's runtime-dispatch [`AnyWideVariant`] enum, enumerated by
+// [`WideVariantId::ALL`]. They carry differing board geometries (u64/u128/U256
+// backings, 3x4 up to 12x12), so a single generic position type cannot span
+// them; the enum's public surface (`startpos`, `from_fen`, `legal_moves`,
+// `play`, `to_fen`, `to_uci`, `parse_uci`, `perft`, `outcome`) is what the
+// invariants below are stated over.
+//
+// The make/unmake byte-identity invariant and the `legal ⊆ pseudo_legal`
+// containment invariant need the concrete `GenericPosition` make/unmake and the
+// crate-internal pseudo-legal generators, which are not on this public surface;
+// they are covered by seeded proptests inside the crate (see
+// `src/geometry/{position,any}.rs` and `src/variant/mod.rs`).
+
+/// proptest case count for the wide-variant walks. Each case iterates **every**
+/// variant in [`WideVariantId::ALL`] (unlike the core walks, which draw one
+/// variant per case), so a small count already exercises all 47+ variants many
+/// plies deep; keeping it small bounds the wall-clock of the full sweep.
+const WIDE_CASES: u32 = 12;
+
+/// Plays up to `plies` uniformly random legal moves from the start position of
+/// the wide variant `id`, seeded by `seed`, and returns the **live**
+/// (non-terminal) position reached — the [`AnyWideVariant`] analogue of
+/// [`random_anyvariant`], stopping short of any move that ends the game so every
+/// returned position is legal, reachable, and FEN-serializable.
+fn random_wide(id: WideVariantId, seed: u64, plies: u32) -> AnyWideVariant {
+    let mut state = seed;
+    let mut pos = AnyWideVariant::startpos(id);
+    for _ in 0..plies {
+        if pos.outcome().is_some() {
+            break;
+        }
+        let moves = pos.legal_moves();
+        if moves.is_empty() {
+            break;
+        }
+        let pick = (splitmix64(&mut state) as usize) % moves.len();
+        let next = pos.play(&moves[pick]);
+        if next.outcome().is_some() {
+            break;
+        }
+        pos = next;
+    }
+    pos
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(WIDE_CASES))]
+
+    /// FEN round-trip across **every** fairy variant, from a seeded self-play
+    /// position in each. Asserted through the public `to_fen` contract
+    /// (`to_fen(from_fen(to_fen(p))) == to_fen(p)`), matching the core
+    /// `fen_round_trip`.
+    #[test]
+    fn wide_fen_round_trip(seed in any::<u64>(), plies in 0u32..24) {
+        for &id in WideVariantId::ALL {
+            let pos = random_wide(id, seed, plies);
+            let fen = pos.to_fen();
+            let reparsed = AnyWideVariant::from_fen(id, &fen)
+                .expect("a serialized legal wide position must re-parse");
+            prop_assert_eq!(reparsed.to_fen(), fen, "fen round trip for {}", id);
+        }
+    }
+}
+
+/// Asserts the perft internal-consistency invariants at a single position: the
+/// bulk depth-1 leaf count agrees with the materialized legal-move count, and
+/// `perft(depth)` equals the sum over the position's legal children of
+/// `perft(depth - 1)` (the children-sum recurrence). Generic over the core
+/// variant so one body covers them all; the wide analogue lives in
+/// `perft_children_sum_wide`.
+fn assert_perft_children_sum_core<V: Variant>(pos: &VariantPosition<V>, depth: u32) {
+    // Bulk (leaf-count) vs materialized legal-move count.
+    assert_eq!(
+        perft_variant(pos, 1),
+        pos.legal_moves().len() as u64,
+        "perft(1) must equal the legal-move count at {}",
+        pos.core().to_fen()
+    );
+    // Children-sum recurrence: perft(n) == Σ_child perft(n-1).
+    let whole = perft_variant(pos, depth);
+    let summed: u64 = pos
+        .legal_moves()
+        .iter()
+        .map(|mv| perft_variant(&pos.play(mv), depth - 1))
+        .sum();
+    assert_eq!(
+        whole,
+        summed,
+        "perft({}) must equal the sum of its children's perft({}) at {}",
+        depth,
+        depth - 1,
+        pos.core().to_fen()
+    );
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// Perft children-sum symmetry for the core variants: from a seeded self-play
+    /// position, `perft(n)` equals the sum over legal children of `perft(n-1)`,
+    /// and the bulk depth-1 count equals the materialized move count. An internal
+    /// consistency check that needs no external oracle.
+    #[test]
+    fn perft_children_sum_core(
+        which in 0usize..ALL_IDS.len(),
+        seed in any::<u64>(),
+        plies in 0u32..6,
+        depth in 2u32..=3,
+    ) {
+        fn reach<V: Variant>(mut pos: VariantPosition<V>, seed: u64, plies: u32) -> VariantPosition<V> {
+            let mut state = seed;
+            for _ in 0..plies {
+                if pos.outcome().is_some() { break; }
+                let moves = pos.legal_moves();
+                if moves.is_empty() { break; }
+                let pick = (splitmix64(&mut state) as usize) % moves.len();
+                pos = pos.play(&moves[pick]);
+            }
+            pos
+        }
+        match ALL_IDS[which] {
+            VariantId::Standard =>
+                assert_perft_children_sum_core(&reach(Chess::startpos(), seed, plies), depth),
+            VariantId::Chess960 =>
+                assert_perft_children_sum_core(&reach(Chess960::startpos(), seed, plies), depth),
+            VariantId::KingOfTheHill =>
+                assert_perft_children_sum_core(&reach(KingOfTheHill::startpos(), seed, plies), depth),
+            VariantId::ThreeCheck =>
+                assert_perft_children_sum_core(&reach(ThreeCheck::startpos(), seed, plies), depth),
+            VariantId::RacingKings =>
+                assert_perft_children_sum_core(&reach(RacingKings::startpos(), seed, plies), depth),
+            VariantId::Horde =>
+                assert_perft_children_sum_core(&reach(Horde::startpos(), seed, plies), depth),
+            VariantId::Atomic =>
+                assert_perft_children_sum_core(&reach(Atomic::startpos(), seed, plies), depth),
+            VariantId::Antichess =>
+                assert_perft_children_sum_core(&reach(Antichess::startpos(), seed, plies), depth),
+            VariantId::Crazyhouse =>
+                assert_perft_children_sum_core(&reach(Crazyhouse::startpos(), seed, plies), depth),
+        }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(WIDE_CASES))]
+
+    /// Perft children-sum symmetry for **every** fairy variant: from a seeded
+    /// self-play position, `perft(2)` equals the sum over legal children of
+    /// `perft(1)`, and the bulk depth-1 count equals the materialized move count.
+    /// The wide `perft` walks the tree by make/unmake while the children sum here
+    /// expands via `play`, so the equality also cross-checks the make/unmake tree
+    /// walk against the copy-make expansion. Depth is held at 2 to bound the
+    /// heaviest geometries (12x12 Chu, the large shogi boards).
+    #[test]
+    fn perft_children_sum_wide(seed in any::<u64>(), plies in 0u32..6) {
+        for &id in WideVariantId::ALL {
+            let pos = random_wide(id, seed, plies);
+            prop_assert_eq!(
+                pos.perft(1),
+                pos.legal_moves().len() as u64,
+                "perft(1) must equal the legal-move count for {} at {}",
+                id,
+                pos.to_fen()
+            );
+            let whole = pos.perft(2);
+            let summed: u64 = pos.legal_moves().iter().map(|mv| pos.play(mv).perft(1)).sum();
+            prop_assert_eq!(
+                whole, summed,
+                "perft(2) must equal the sum of its children's perft(1) for {} at {}",
+                id,
+                pos.to_fen()
+            );
         }
     }
 }
