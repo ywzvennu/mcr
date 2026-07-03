@@ -783,11 +783,46 @@ impl WideMove {
         out.push((b'0' + (rank_no % 10) as u8) as char);
     }
 
+    /// Appends the UCI promotion suffix for `role`: the role's lowercase base
+    /// letter, prefixed — for a role that has no bare letter of its own — with the
+    /// same disambiguation SAN uses (`+` for a Shogi promoted role, `*` / `**` /
+    /// `***` for the overflow tiers, `=` for the recycled third tier).
+    ///
+    /// A standard promotion (Queen, Rook, Bishop, Knight, and every other role
+    /// with its own letter) keeps the bare lowercase suffix, so `e7e8q` and every
+    /// existing UCI string is byte-identical. The prefix matters only for
+    /// **overflow** promotion roles whose base letter collides with a plain role's:
+    /// e.g. in Ordamirror a pawn may promote to either the Lancer (`f`) or the
+    /// overflow Falcon (also base `f`). Without the prefix both render `...f` and
+    /// the Falcon promotion is unrecoverable through [`parse_uci`]; with it they
+    /// render `...f` vs. `...*f`, so board-move UCI stays injective and each
+    /// promotion round-trips back to its exact [`WideMove`].
+    ///
+    /// [`parse_uci`]: super::GenericPosition::parse_uci
+    fn push_promotion_suffix(out: &mut String, role: WideRole) {
+        if role.is_promoted() {
+            out.push('+');
+        } else if role.is_overflow4() {
+            out.push_str("***");
+        } else if role.is_overflow2() {
+            out.push_str("**");
+        } else if role.is_overflow() {
+            out.push('*');
+        } else if role.is_overflow3() {
+            out.push('=');
+        }
+        out.push(role.char());
+    }
+
     /// Formats this move in UCI long algebraic notation over the geometry `G`.
     ///
     /// Squares render as a file letter plus a 1-based rank number (so a
     /// ten-rank board reaches `a10`). A promotion appends the promotion role's
-    /// lowercase letter; a drop uses the `{ROLE}@{square}` form.
+    /// lowercase letter, carrying the same `+` / `*` / `**` / `***` / `=` prefix
+    /// SAN uses when the role has no bare letter of its own (see
+    /// [`push_promotion_suffix`](WideMove::push_promotion_suffix)), so two
+    /// promotions to roles that share a base letter stay distinct; a drop uses the
+    /// `{ROLE}@{square}` form.
     ///
     /// ```
     /// use mce::geometry::{Cap10x8, Chess8x8, Square, WideMove, WideMoveKind, WideRole};
@@ -839,7 +874,7 @@ impl WideMove {
         Self::render_square::<G>(&mut s, self.from_index());
         Self::render_square::<G>(&mut s, self.to_index());
         if let Some(role) = self.promotion() {
-            s.push(role.char());
+            Self::push_promotion_suffix(&mut s, role);
         }
         // A Seirawan gate is rendered FSF-style as `/<PIECE>` appended to the base
         // move (e.g. `b1c3/H`); a gate onto the castling rook's square instead of
