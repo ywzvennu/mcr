@@ -137,6 +137,11 @@ fn uci_round_trip_pinned_fens() {
             WideVariantId::Janggi,
             "9/1k7/r1r3c2/9/9/9/J1C3J2/9/4K4/C1C3C2 w - - 0 1",
         ),
+        // Kyoto Shogi with a Silver in hand: it can be deployed either
+        // unpromoted (`S@..`) or in its promoted form (`+S@..`), reaching
+        // different positions. The two forms must render distinctly and each
+        // round-trip through UCI (issue #452).
+        (WideVariantId::Kyotoshogi, "p4/nk1l1/5/+S1K1N/+L3P[S] w - - 1 6"),
     ];
     for (id, fen) in cases {
         let pos = AnyWideVariant::from_fen(*id, fen).expect("pinned FEN parses");
@@ -148,6 +153,45 @@ fn uci_round_trip_pinned_fens() {
             assert_eq!(pos.parse_san(&san), Some(mv), "SAN {san:?} in {id} {fen}");
         }
     }
+}
+
+#[test]
+fn kyoto_promoted_drop_is_injective_and_round_trips() {
+    // Regression for issue #452: `WideMove::to_uci` was non-injective for the
+    // Kyoto-family dual-form drops. A held base piece may be dropped either
+    // unpromoted or in its promoted form onto the *same* square, reaching
+    // different positions; both used to render `S@b1`, so the promoted drop could
+    // not be recovered by `parse_uci`.
+    let pos = AnyWideVariant::from_fen(
+        WideVariantId::Kyotoshogi,
+        "p4/nk1l1/5/+S1K1N/+L3P[S] w - - 1 6",
+    )
+    .expect("kyoto drop FEN parses");
+
+    let base_drop = pos
+        .legal_moves()
+        .into_iter()
+        .find(|m| m.drop_role() == Some(WideRole::Silver) && m.to_index() == 1)
+        .expect("an unpromoted Silver drop on b1 is legal");
+    let promoted_drop = pos
+        .legal_moves()
+        .into_iter()
+        .find(|m| {
+            m.drop_role().map(|r| r.is_promoted()).unwrap_or(false) && m.to_index() == 1
+        })
+        .expect("a promoted Silver drop on b1 is legal");
+
+    // Distinct moves render to distinct UCI strings...
+    let base_uci = pos.to_uci(&base_drop);
+    let promoted_uci = pos.to_uci(&promoted_drop);
+    assert_eq!(base_uci, "S@b1");
+    assert_eq!(promoted_uci, "+S@b1");
+    assert_ne!(base_drop, promoted_drop);
+    assert_ne!(base_uci, promoted_uci);
+
+    // ...and each round-trips back to its own move (not the other).
+    assert_eq!(pos.parse_uci(&base_uci), Some(base_drop));
+    assert_eq!(pos.parse_uci(&promoted_uci), Some(promoted_drop));
 }
 
 #[test]

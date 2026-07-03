@@ -783,6 +783,26 @@ impl WideMove {
         out.push((b'0' + (rank_no % 10) as u8) as char);
     }
 
+    /// Appends the SAN-consistent disambiguation prefix a [`WideRole`] carries
+    /// when it has no bare letter of its own: `+` for a Shogi promoted role,
+    /// `*` / `**` / `***` for the overflow tiers, `=` for the recycled third tier.
+    /// A plain role (with its own letter) gets no prefix, so standard notation
+    /// stays byte-identical. Shared by the promotion suffix and the drop token so
+    /// both spell an overflow / promoted role the same way SAN does.
+    fn push_role_prefix(out: &mut String, role: WideRole) {
+        if role.is_promoted() {
+            out.push('+');
+        } else if role.is_overflow4() {
+            out.push_str("***");
+        } else if role.is_overflow2() {
+            out.push_str("**");
+        } else if role.is_overflow() {
+            out.push('*');
+        } else if role.is_overflow3() {
+            out.push('=');
+        }
+    }
+
     /// Appends the UCI promotion suffix for `role`: the role's lowercase base
     /// letter, prefixed — for a role that has no bare letter of its own — with the
     /// same disambiguation SAN uses (`+` for a Shogi promoted role, `*` / `**` /
@@ -800,17 +820,7 @@ impl WideMove {
     ///
     /// [`parse_uci`]: super::GenericPosition::parse_uci
     fn push_promotion_suffix(out: &mut String, role: WideRole) {
-        if role.is_promoted() {
-            out.push('+');
-        } else if role.is_overflow4() {
-            out.push_str("***");
-        } else if role.is_overflow2() {
-            out.push_str("**");
-        } else if role.is_overflow() {
-            out.push('*');
-        } else if role.is_overflow3() {
-            out.push('=');
-        }
+        Self::push_role_prefix(out, role);
         out.push(role.char());
     }
 
@@ -821,7 +831,12 @@ impl WideMove {
     /// lowercase letter, carrying the same `+` / `*` / `**` / `***` / `=` prefix
     /// SAN uses when the role has no bare letter of its own, so two
     /// promotions to roles that share a base letter stay distinct; a drop uses the
-    /// `{ROLE}@{square}` form.
+    /// `{ROLE}@{square}` form, where `{ROLE}` carries that same `+` / `*` / `**` /
+    /// `***` / `=` prefix for a promoted or overflow dropped role (so a Kyoto /
+    /// Micro Shogi promoted-form drop `+N@a1` renders distinctly from the base
+    /// drop `N@a1` and each round-trips through [`parse_uci`]).
+    ///
+    /// [`parse_uci`]: super::GenericPosition::parse_uci
     ///
     /// ```
     /// use mce::geometry::{Cap10x8, Chess8x8, Square, WideMove, WideMoveKind, WideRole};
@@ -863,7 +878,14 @@ impl WideMove {
             return s;
         }
         if let Some(role) = self.drop_role() {
-            let mut s = String::with_capacity(4);
+            let mut s = String::with_capacity(6);
+            // A dropped role that has no bare letter of its own — a Shogi promoted
+            // form (Kyoto / Micro Shogi's dual-form drops) or an overflow role —
+            // carries the same `+` / `*` / `**` / `***` / `=` prefix SAN uses, so a
+            // promoted drop (`+N@a1`) renders distinctly from the base drop (`N@a1`)
+            // and each round-trips. A plain role gets no prefix, so a Crazyhouse /
+            // Shogi drop (`P@e4`) stays byte-identical.
+            Self::push_role_prefix(&mut s, role);
             s.push(role.upper_char());
             s.push('@');
             Self::render_square::<G>(&mut s, self.to_index());
@@ -1245,6 +1267,30 @@ mod tests {
         // A drop on the j-file: C@j1.
         let d = WideMove::drop(WideRole::Cannon, Square::<Cap10x8>::new(9));
         assert_eq!(d.to_uci::<Cap10x8>(), "C@j1");
+    }
+
+    #[test]
+    fn uci_render_promoted_drop_is_distinct_from_base_drop() {
+        // Issue #452: a promoted-form drop (Kyoto / Micro Shogi's dual-form drops)
+        // must render distinctly from the base-form drop on the same square, or the
+        // two collide and the promoted drop cannot be recovered by `parse_uci`.
+        let sq = Square::<Cap10x8>::new(9); // j1
+        let base = WideRole::Silver;
+        let promoted = base.promoted_form();
+        assert!(promoted.is_promoted());
+
+        let base_drop = WideMove::drop(base, sq);
+        let promoted_drop = WideMove::drop(promoted, sq);
+
+        // A plain (base) drop keeps the bare `{ROLE}@{square}` form, byte-identical
+        // to before this fix.
+        assert_eq!(base_drop.to_uci::<Cap10x8>(), "S@j1");
+        // The promoted form carries the SAN `+` prefix, matching `push_role_token`.
+        assert_eq!(promoted_drop.to_uci::<Cap10x8>(), "+S@j1");
+        assert_ne!(
+            base_drop.to_uci::<Cap10x8>(),
+            promoted_drop.to_uci::<Cap10x8>()
+        );
     }
 
     #[test]

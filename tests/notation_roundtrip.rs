@@ -14,22 +14,21 @@
 //!   exact same [`WideMove`] — including two area paths that reach the same
 //!   destination through different elbow squares.
 //!
-//! * **Drop-letter UCI collisions** (documented notation limit): UCI's
-//!   `<ROLE>@<sq>` drop syntax carries only the *base* role letter, so two hand
-//!   pieces that share a base letter render one UCI string. Two families hit
-//!   this: Kyoto Shogi's face-up vs. flipped drop (`P@a1` vs. the promoted
-//!   `+P@a1`), and any variant whose hand holds an overflow role sharing a bare
-//!   piece's letter (Xiangfu's cannon `C@a8` vs. the overflow `=C@a8`). Both are
-//!   genuinely distinct legal moves that UCI cannot tell apart, but SAN keeps the
-//!   disambiguating `+` / `*` / `=` prefix, so the SAN round-trip is lossless
-//!   where the UCI one cannot be. This suite asserts that limit explicitly —
-//!   board-move UCI must stay injective, while a shared drop UCI is tolerated
-//!   only when SAN separates the colliding drops — rather than papering over it.
+//! * **Dual-form / overflow drops** (issue #452): a hand piece with no bare
+//!   letter of its own — a Kyoto / Micro Shogi flipped (promoted) form, or an
+//!   overflow role sharing a bare piece's base letter — now carries the same
+//!   `+` / `*` / `**` / `***` / `=` disambiguation prefix in its **UCI** drop
+//!   token that SAN already spells, so Kyoto's face-up vs. flipped drop render
+//!   `P@a1` vs. `+P@a1` (and Xiangfu's cannon `C@a8` vs. the overflow `=C@a8`).
+//!   Both were once a single UCI string that `parse_uci` could not tell apart;
+//!   the drop token is now injective, so every drop round-trips through UCI just
+//!   as it does through SAN. This suite asserts that: drop UCI, like board-move
+//!   UCI, must stay injective and lossless.
 //!
 //! Every check drives only the public `AnyWideVariant` API and plays no role in
 //! move generation, so movegen stays byte-identical.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use mce::geometry::{AnyWideVariant, WideMove, WideMoveKind, WidePgn, WideVariantId};
 use proptest::prelude::*;
@@ -48,20 +47,14 @@ fn splitmix64(state: &mut u64) -> u64 {
 /// Asserts, at one position, that every legal move round-trips through SAN
 /// (`move -> san -> move`, required of **every** variant), and audits UCI:
 ///
-/// * **Board moves** (everything that is not a drop) must have an injective UCI
-///   over the legal-move list and round-trip through it — including Chu Shogi
-///   Lion multi-step moves, whose intermediate square now keeps two area paths to
-///   one destination distinct. A UCI collision between two distinct *board* moves
-///   is a hard failure.
-///
-/// * **Drops** carry a documented UCI limit. UCI's `<ROLE>@<sq>` drop syntax uses
-///   only the *base* role letter, so two hand pieces sharing a base letter render
-///   the same UCI: Kyoto Shogi's face-up vs. flipped form (`P@a1` vs. `+P@a1`), or
-///   an overflow role colliding with a bare piece's letter (Xiangfu's cannon `C`
-///   vs. the overflow `=C`, both `C@a8`). Where that happens the move is resolved
-///   by SAN instead, which spells the disambiguating `+` / `*` / `=` prefix. This
-///   still fails on any *board*-move collision, and — for every drop-letter
-///   collision — proves the colliding drops have distinct, round-tripping SANs.
+/// UCI must be **injective and lossless over every legal move** — board moves and
+/// drops alike. Board moves stay distinct via their squares (including Chu Shogi
+/// Lion multi-step moves, whose intermediate square keeps two area paths to one
+/// destination apart); drops stay distinct via the role token, which since #452
+/// carries the same `+` / `*` / `**` / `***` / `=` prefix SAN uses for a promoted
+/// or overflow dropped role (so a Kyoto flipped drop `+P@a1` no longer collides
+/// with the face-up `P@a1`). Any shared UCI between two distinct legal moves — of
+/// any kind — is a hard failure.
 fn assert_node_roundtrips(pos: &AnyWideVariant) {
     let moves = pos.legal_moves();
     let mut by_uci: BTreeMap<String, Vec<WideMove>> = BTreeMap::new();
@@ -79,35 +72,23 @@ fn assert_node_roundtrips(pos: &AnyWideVariant) {
         by_uci.entry(pos.to_uci(mv)).or_default().push(*mv);
     }
     for (uci, group) in &by_uci {
-        if group.len() == 1 {
-            // A unique UCI must resolve back to its move: every board move, and
-            // every drop whose base letter is unambiguous.
-            assert_eq!(
-                pos.parse_uci(uci),
-                Some(group[0]),
-                "UCI {uci:?} did not round-trip in {} at {}",
-                pos.variant_id(),
-                pos.to_fen(),
-            );
-        } else {
-            // A UCI shared by several legal moves is only tolerated for the
-            // documented drop-letter ambiguity: every colliding move must be a
-            // drop, and SAN must tell them apart.
-            assert!(
-                group.iter().all(|m| m.is_drop()),
-                "non-drop moves share UCI {uci:?} in {} at {} — UCI must stay injective for board moves",
-                pos.variant_id(),
-                pos.to_fen(),
-            );
-            let sans: BTreeSet<String> = group.iter().map(|m| pos.san(m)).collect();
-            assert_eq!(
-                sans.len(),
-                group.len(),
-                "SAN must disambiguate the drop-letter UCI collision {uci:?} in {} at {}: {sans:?}",
-                pos.variant_id(),
-                pos.to_fen(),
-            );
-        }
+        // Every UCI string — board move or drop — must belong to exactly one legal
+        // move and resolve back to it.
+        assert_eq!(
+            group.len(),
+            1,
+            "distinct legal moves share UCI {uci:?} in {} at {} — UCI must stay injective: {:?}",
+            pos.variant_id(),
+            pos.to_fen(),
+            group.iter().map(|m| pos.san(m)).collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            pos.parse_uci(uci),
+            Some(group[0]),
+            "UCI {uci:?} did not round-trip in {} at {}",
+            pos.variant_id(),
+            pos.to_fen(),
+        );
     }
 }
 
@@ -273,32 +254,31 @@ fn chu_lion_moves_round_trip_through_san_and_uci() {
     assert!(saw_pass, "expected to observe a jitto pass Lion move");
 }
 
-/// The documented Kyoto Shogi UCI-drop limit. A piece dropped face-up vs. flipped
-/// is two distinct legal moves that share one UCI drop string, so UCI cannot tell
-/// them apart — but SAN spells the flipped form with a `+` prefix, so both SAN
-/// strings are distinct and each round-trips to its own move. This asserts the
-/// ambiguity exists in UCI *and* that SAN resolves it (never `Ambiguous`).
+/// Kyoto Shogi two-form drops round-trip through UCI (issue #452). A held piece
+/// dropped face-up vs. flipped (promoted) onto the same square is two distinct
+/// legal moves; their UCI drop tokens now differ by the `+` promoted prefix
+/// (`P@a1` vs. `+P@a1`), so each renders distinctly and `parse_uci` resolves each
+/// back to its own move — no collision, and SAN stays distinct too.
 #[test]
-fn kyoto_two_form_drops_are_uci_ambiguous_but_san_distinct() {
+fn kyoto_two_form_drops_are_uci_distinct_and_round_trip() {
     // A mid-game Kyoto Shogi position with pieces in hand, so a two-form drop is
-    // available. Reach it by seeded self-play until some drop is legal.
+    // available. Reach it by seeded self-play until a dual-form drop is legal.
     let mut state = 0xC0FF_EE12_3456_789Au64;
     let mut pos = AnyWideVariant::startpos(WideVariantId::Kyotoshogi);
-    let mut found_collision = false;
+    let mut saw_two_form = false;
 
-    for _ in 0..80 {
+    for _ in 0..120 {
         let moves = pos.legal_moves();
-        // Group drops by their UCI string; a collision is two distinct drops that
-        // share one UCI. Assert each drop's SAN round-trips regardless.
-        let mut by_uci: BTreeMap<String, Vec<WideMove>> = BTreeMap::new();
+
+        // Every distinct drop must render to a *distinct* UCI string.
+        let mut drop_ucis: BTreeMap<String, WideMove> = BTreeMap::new();
+        // Whether a base and a promoted drop of the same held piece both exist —
+        // the dual-form case this fix targets.
+        let mut base_drops = 0usize;
+        let mut promoted_drops = 0usize;
+
         for mv in &moves {
             let san = pos.san(mv);
-            assert_ne!(
-                pos.parse_san(&san),
-                None,
-                "every Kyoto move must round-trip through SAN: {san:?} at {}",
-                pos.to_fen(),
-            );
             assert_eq!(
                 pos.parse_san(&san),
                 Some(*mv),
@@ -306,32 +286,32 @@ fn kyoto_two_form_drops_are_uci_ambiguous_but_san_distinct() {
                 pos.to_fen(),
             );
             if mv.is_drop() {
-                by_uci.entry(pos.to_uci(mv)).or_default().push(*mv);
-            }
-        }
-        for (uci, group) in &by_uci {
-            if group.len() > 1 {
-                // The documented limit: >1 distinct legal drop share this UCI, and
-                // parse_uci can only return one of them.
-                found_collision = true;
-                let resolved = pos
-                    .parse_uci(uci)
-                    .expect("a shared UCI still resolves to one move");
-                assert!(
-                    group.contains(&resolved),
-                    "parse_uci({uci:?}) must return one of the colliding drops",
-                );
-                // But every colliding drop has a *distinct* SAN that round-trips.
-                let sans: std::collections::BTreeSet<String> =
-                    group.iter().map(|m| pos.san(m)).collect();
+                let uci = pos.to_uci(mv);
+                // No two distinct drops share a UCI string.
+                if let Some(prev) = drop_ucis.insert(uci.clone(), *mv) {
+                    assert_eq!(
+                        prev,
+                        *mv,
+                        "two distinct Kyoto drops share UCI {uci:?} at {}",
+                        pos.to_fen(),
+                    );
+                }
+                // Each drop round-trips through UCI back to itself.
                 assert_eq!(
-                    sans.len(),
-                    group.len(),
-                    "SAN must disambiguate the two-form Kyoto drops sharing UCI {uci:?}: {sans:?}",
+                    pos.parse_uci(&uci),
+                    Some(*mv),
+                    "Kyoto drop UCI {uci:?} did not round-trip at {}",
+                    pos.to_fen(),
                 );
+                match mv.drop_role() {
+                    Some(r) if r.is_promoted() => promoted_drops += 1,
+                    Some(_) => base_drops += 1,
+                    None => {}
+                }
             }
         }
-        if found_collision {
+        if base_drops > 0 && promoted_drops > 0 {
+            saw_two_form = true;
             break;
         }
         if moves.is_empty() {
@@ -342,8 +322,8 @@ fn kyoto_two_form_drops_are_uci_ambiguous_but_san_distinct() {
     }
 
     assert!(
-        found_collision,
-        "expected to reach a Kyoto position with two-form drop UCI collision",
+        saw_two_form,
+        "expected to reach a Kyoto position offering both base and promoted drops",
     );
 }
 
@@ -359,8 +339,9 @@ fn walk_inputs() -> impl Strategy<Value = (WideVariantId, u64, u32)> {
 
 /// SAN + UCI round-trip and a whole-game PGN round-trip across every variant, via
 /// the runtime-dispatch [`AnyWideVariant`] surface. Every legal move at every
-/// walked node round-trips through SAN (all variants) and UCI (all but Kyoto's
-/// documented drop ambiguity), and the walked game survives a PGN export/import.
+/// walked node round-trips through both SAN and UCI (all variants — Kyoto /
+/// Micro Shogi's dual-form drops included, since #452), and the walked game
+/// survives a PGN export/import.
 ///
 /// The generator draws `160` `(variant, seed, plies)` cases — enough to cover
 /// every variant broadly while staying CI-fast — but the proptest RNG is **pinned**
