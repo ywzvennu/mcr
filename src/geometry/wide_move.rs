@@ -819,8 +819,7 @@ impl WideMove {
     /// Squares render as a file letter plus a 1-based rank number (so a
     /// ten-rank board reaches `a10`). A promotion appends the promotion role's
     /// lowercase letter, carrying the same `+` / `*` / `**` / `***` / `=` prefix
-    /// SAN uses when the role has no bare letter of its own (see
-    /// [`push_promotion_suffix`](WideMove::push_promotion_suffix)), so two
+    /// SAN uses when the role has no bare letter of its own, so two
     /// promotions to roles that share a base letter stay distinct; a drop uses the
     /// `{ROLE}@{square}` form.
     ///
