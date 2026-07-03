@@ -146,7 +146,7 @@ fn chu_promotion_forced_on_entry_only() {
     // the zone promotes, with no plain alternative.
     let enter = ucis_from("k11/12/12/12/12/5R6/12/12/12/12/12/K11 w - - 0 1", "f7");
     assert!(
-        enter.iter().any(|m| m == "f7f9r"),
+        enter.iter().any(|m| m == "f7f9+r"),
         "entry must promote: {enter:?}"
     );
     assert!(
@@ -157,7 +157,7 @@ fn chu_promotion_forced_on_entry_only() {
     let within = ucis_from("k11/12/5R6/12/12/12/12/12/12/12/12/K11 w - - 0 1", "f10");
     assert!(within.contains(&"f10f11".to_string()));
     assert!(
-        !within.contains(&"f10f11r".to_string()),
+        !within.contains(&"f10f11+r".to_string()),
         "no promotion within zone: {within:?}"
     );
 }
