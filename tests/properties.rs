@@ -391,6 +391,32 @@ proptest! {
             prop_assert_eq!(reparsed.to_fen(), fen, "fen round trip for {}", id);
         }
     }
+
+    /// UCI round-trip across **every** fairy variant, from a seeded self-play
+    /// position in each: every legal move renders to a UCI string that
+    /// `parse_uci` resolves back to the same move (`parse_uci(to_uci(m)) == m`).
+    /// This holds only when `to_uci` is *injective* over the legal moves — no two
+    /// distinct moves may share a string — so it also guards against the
+    /// promoted-drop collision fixed in #452 (a Kyoto / Micro Shogi held piece
+    /// dropped unpromoted vs. promoted onto the same square). #438 deferred this
+    /// invariant pending that fix.
+    #[test]
+    fn wide_uci_round_trip(seed in any::<u64>(), plies in 0u32..24) {
+        for &id in WideVariantId::ALL {
+            let pos = random_wide(id, seed, plies);
+            for mv in pos.legal_moves() {
+                let uci = pos.to_uci(&mv);
+                prop_assert_eq!(
+                    pos.parse_uci(&uci),
+                    Some(mv),
+                    "uci round trip {:?} in {} ({})",
+                    uci,
+                    id,
+                    pos.to_fen()
+                );
+            }
+        }
+    }
 }
 
 /// Asserts the perft internal-consistency invariants at a single position: the

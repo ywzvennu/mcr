@@ -58,11 +58,11 @@
 //!    content of "legal ⊆ pseudo-legal": the crate exposes no pseudo-legal
 //!    generator, but a spurious or duplicated move in the legal list — the class of
 //!    bug that framing guards against — shows up here as a duplicate value or a
-//!    non-round-tripping rendering. SAN (not UCI) is used because UCI cannot
-//!    disambiguate Kyoto Shogi's two-form drops (dropping a piece face-up vs.
-//!    flipped both render `L@a1`), whereas SAN spells them `L@a1` vs. `+L@a1`; the
-//!    two are genuinely distinct legal moves, so this is a UCI notation limit, not
-//!    a generation defect.
+//!    non-round-tripping rendering. SAN is the human move language, so it is the
+//!    natural rendering to check here; it spells Kyoto Shogi's two-form drops as
+//!    `L@a1` vs. `+L@a1` (face-up vs. flipped). Since #452 UCI carries the same
+//!    `+` prefix and is equally injective — the dedicated UCI round-trip lives in
+//!    `notation_roundtrip.rs` and the `wide_uci_round_trip` property.
 //!
 //! # The Alice FEN caveat (documented, not a bug)
 //!
@@ -391,8 +391,9 @@ proptest! {
 
     /// Legal-move-list integrity across every variant: no duplicate move, and
     /// every legal move round-trips through SAN to exactly itself (so no two moves
-    /// collide on a rendering). SAN, not UCI, because UCI cannot disambiguate Kyoto
-    /// Shogi's two-form drops.
+    /// collide on a rendering). SAN is the human move language checked here; the
+    /// parallel UCI injectivity (Kyoto's two-form drops included, since #452) is
+    /// covered by `notation_roundtrip.rs` and the `wide_uci_round_trip` property.
     #[test]
     fn any_move_list_integrity((id, seed, plies) in walk_inputs()) {
         let pos = random_any(id, seed, plies);
