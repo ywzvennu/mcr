@@ -77,6 +77,48 @@ fn engine_matches_independent_brute_force() {
     assert_eq!(brute::perft(&bf, 1), 57);
 }
 
+/// Regression for the pinned-leaper jump bug (issue #426, the Wa analogue of the
+/// Tori Pheasant bug #416): a **Treacherous Fox** (`FAvWvD`, whose vertical Dabbaba
+/// step jumps two squares straight) pinned to its own Crane King along a file may
+/// **not** take that two-square jump, which would leap over the pinning slider and
+/// vacate the shielding square, exposing the king.
+///
+/// Here a Black Oxcart on d3 pins the White Fox on d2 to the White King on d1 along
+/// the d-file. The Fox's only legal move is to capture the pinning Oxcart (`d2d3`);
+/// its vertical Dabbaba jump `d2d4` — over the Oxcart, off the king-to-pinner
+/// segment — would leave the king in check and is illegal. mce previously emitted
+/// `d2d4` under the default full-line pin mask (perft(1) = 6); confining a pinned
+/// piece to the king-to-pinner segment drops it, giving the correct perft(1) = 5
+/// (four King steps + the Fox's capture of the pinner). Both the engine and the
+/// independent brute-force generator (whose legality is make-move + Crane-King
+/// safety) agree on 5.
+#[test]
+fn pinned_fox_cannot_take_its_forward_jump() {
+    const PIN_FEN: &str = "10k/11/11/11/11/11/11/11/3**d7/3**U7/3K7[] w - - 0 1";
+    let pos = Washogi::from_fen(PIN_FEN).expect("valid pinned-Fox Wa FEN");
+
+    // Correct perft(1) = 5: the four Crane-King steps (c1, e1, c2, e2) plus the
+    // Fox's `d2d3` capture of the pinning Oxcart. The illegal `d2d4` jump is gone.
+    assert_eq!(
+        gperft::<Washogi11x11, _>(&pos, 1),
+        5,
+        "pinned Fox must not keep its illegal d2d4 jump"
+    );
+
+    // No generated move may leave the moving side's own king attacked (mce's own
+    // self-consistency: the pin mask must never admit a king-exposing move).
+    for m in pos.legal_moves() {
+        let next = pos.play(&m);
+        if let Some(k) = next.board().king_of(mce::Color::White) {
+            assert!(
+                !next.is_attacked(k, mce::Color::Black),
+                "move {} leaves the White king in check",
+                m.to_uci::<Washogi11x11>()
+            );
+        }
+    }
+}
+
 /// A fully independent, naive, array-based Wa Shogi move generator and perft —
 /// written from scratch (its own 11x11 position model, move tables, hand, drops,
 /// promotion and Crane-King safety, with no use of the engine under test) to
