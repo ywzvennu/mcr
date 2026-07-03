@@ -25,11 +25,11 @@ use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
     Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier,
     Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
-    Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Karouk,
-    Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi, Minixiangqi,
-    Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
-    Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori, WideEndReason,
-    WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins,
+    Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Minishogi,
+    Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi,
+    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori,
+    WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -683,6 +683,7 @@ wide_variants! {
     Janggi, Janggi, Janggi, "janggi", "korean";
     Janus, Janus, Janus, "janus", "januschess";
     Jieqi, Jieqi, Jieqi, "jieqi";
+    Judkins, Judkins, Judkins, "judkins", "judkinsshogi", "judkins-shogi";
     Karouk, Karouk, Karouk, "karouk", "kar-ouk", "kaouk";
     Khans, Khans, Khans, "khans";
     Knightmate, Knightmate, Knightmate, "knightmate";
@@ -754,7 +755,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 64, "all 64 fairy variants are covered");
+        assert_eq!(count, 65, "all 65 fairy variants are covered");
     }
 
     #[test]
@@ -984,6 +985,7 @@ mod tests {
         agrees_with_typed!(WideVariantId::Janggi, Janggi, AnyWideVariant::Janggi, 2);
         agrees_with_typed!(WideVariantId::Janus, Janus, AnyWideVariant::Janus, 2);
         agrees_with_typed!(WideVariantId::Jieqi, Jieqi, AnyWideVariant::Jieqi, 2);
+        agrees_with_typed!(WideVariantId::Judkins, Judkins, AnyWideVariant::Judkins, 2);
         agrees_with_typed!(WideVariantId::Karouk, Karouk, AnyWideVariant::Karouk, 2);
         agrees_with_typed!(WideVariantId::Khans, Khans, AnyWideVariant::Khans, 2);
         agrees_with_typed!(

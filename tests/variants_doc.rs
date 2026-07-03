@@ -409,6 +409,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard Xiangqi geometry, palace, river, and flying-general; a dark piece moves as the Xiangqi piece native to its home square and reveals (from a hidden pool) the instant it moves.",
             oracle: "Rules-validated (not an FSF variant, hidden identities); the deterministic all-dark core perft-matches FSF `UCI_Variant xiangqi`.",
         },
+        WideVariantId::Judkins => Meta {
+            display: "Judkins Shogi (6x6 Shogi)",
+            pieces: "One each of King, Rook, Bishop, Gold and Silver Generals, Knight, and Pawn — no Lance.",
+            rules: "6x6 Shogi with a hand and drops and a two-rank promotion zone; nifu and dead-piece drop rules (Pawn last rank, Knight last two ranks), no uchifuzume. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant judkins`).",
+        },
         WideVariantId::Karouk => Meta {
             display: "Ka Ouk (Kar Ouk)",
             pieces: "Makruk army: Rook, Knight, Khon (silver), Met (ferz), King, single-step promote-to-Met pawns.",

@@ -629,6 +629,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: aiwok_to_fsf,
     },
+    // Judkins Shogi is appended (out of alphabetical order) for the same
+    // seed-stability reason as Courier / EuroShogi / Checkshogi / Karouk above: the
+    // per-variant fuzz seed is keyed on each spec's positional index, so a mid-list
+    // insert would re-roll every later variant's games. A FSF built-in (needs a
+    // `largeboards=yes` build) spelled identically to mce (`n s g k r b p` plus the
+    // `+`-promoted forms), so it takes the `identity` dialect.
+    Spec {
+        id: WideVariantId::Judkins,
+        fsf: "judkins",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

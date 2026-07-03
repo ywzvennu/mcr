@@ -1125,6 +1125,32 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// Returns the role a piece of `role` **flips into after any move that
+    /// captures** (the Micro Shogi `piecePromotionOnCapture` mechanic), or `None`
+    /// if the piece does not flip on capture. A base piece flips to its promoted
+    /// form and a promoted piece flips back to its base — but **only on a capturing
+    /// move**; a quiet move never flips.
+    ///
+    /// The default is `None` — no piece flips on capture, so the move-application
+    /// path never rewrites a captor's role and every other variant is
+    /// byte-identical. Only Micro Shogi overrides it: its Pawn ↔ promoted-Pawn,
+    /// Lance ↔ promoted-Lance, Bishop ↔ promoted-Bishop, and Rook ↔ promoted-Rook
+    /// pairs each toggle whenever the piece captures (FSF's
+    /// `mandatoryPiecePromotion` + `pieceDemotion` gated by
+    /// `piecePromotionOnCapture`). The King has no alternate form and never flips
+    /// (`None`).
+    ///
+    /// Like [`flips_on_move`](WideVariant::flips_on_move) this is a pure post-move
+    /// state transform — it changes the captor's role at its destination *after*
+    /// legality is decided, so the mask-based legality of the move itself is
+    /// unaffected (a flip can neither expose nor shield the mover's own king, only
+    /// the **next** position sees the flipped role). It also drives the dual-form
+    /// drop expansion (FSF `dropPromoted`) exactly as `flips_on_move` does for
+    /// Kyoto Shogi: a held base role may be dropped as either form.
+    fn flips_on_capture(_role: WideRole) -> Option<WideRole> {
+        None
+    }
+
     /// Returns the role a face-down piece of `role` standing on its origin square
     /// `from` is **revealed** to when it makes its first board move (the Jieqi
     /// mechanic), or `None` if the piece does not reveal.
