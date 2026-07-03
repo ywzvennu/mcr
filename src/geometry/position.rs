@@ -4042,6 +4042,79 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
     }
 
+    /// Test support (issue #438): walks a **single seeded random line** of up to
+    /// `plies` legal moves and, at every node, asserts for **every** legal move
+    /// that [`apply_with_undo`](Self::apply_with_undo) reaches the same position
+    /// as [`play`](Self::play) and that the matching [`undo`](Self::undo) restores
+    /// the position byte-for-byte — board, state, promoted mask, and the
+    /// from-scratch [`zobrist`](Self::zobrist) key. Where
+    /// [`assert_make_unmake_walk`](Self::assert_make_unmake_walk) covers the full
+    /// move tree to a shallow fixed depth, this reaches a *deep* random position
+    /// so the make/unmake path is exercised far past the exhaustive walk's depth.
+    /// `self` is byte-identical on entry and exit.
+    #[cfg(test)]
+    pub(crate) fn assert_make_unmake_line(&mut self, seed: u64, plies: u32) {
+        // A tiny inline splitmix64 so the walk is fully deterministic without a
+        // dependency; the same generator the proptest suites use.
+        fn splitmix64(state: &mut u64) -> u64 {
+            *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = *state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^ (z >> 31)
+        }
+        let mut state = seed;
+        for _ in 0..plies {
+            if self.outcome().is_some() {
+                break;
+            }
+            let before = self.clone();
+            let moves = before.legal_moves();
+            if moves.is_empty() {
+                break;
+            }
+            for mv in &moves {
+                let expected = before.play(mv);
+                let undo = self.apply_with_undo(mv);
+                assert!(
+                    self.board == expected.board
+                        && self.state == expected.state
+                        && self.promoted == expected.promoted,
+                    "apply_with_undo({}) diverged from play() at {}",
+                    mv.to_uci::<G>(),
+                    before.to_fen(),
+                );
+                assert_eq!(
+                    self.zobrist(),
+                    expected.zobrist(),
+                    "apply_with_undo({}) key diverged from play() at {}",
+                    mv.to_uci::<G>(),
+                    before.to_fen(),
+                );
+                self.undo(undo);
+                assert!(
+                    self.board == before.board
+                        && self.state == before.state
+                        && self.promoted == before.promoted,
+                    "undo({}) failed to restore {} (got {})",
+                    mv.to_uci::<G>(),
+                    before.to_fen(),
+                    self.to_fen(),
+                );
+                assert_eq!(
+                    self.zobrist(),
+                    before.zobrist(),
+                    "undo({}) failed to restore the key of {}",
+                    mv.to_uci::<G>(),
+                    before.to_fen(),
+                );
+            }
+            // Advance one random move and walk on the child.
+            let pick = (splitmix64(&mut state) as usize) % moves.len();
+            self.apply(&moves[pick]);
+        }
+    }
+
     /// Applies `mv` to this position **in place** (the copy-make / no-undo path).
     /// The move must be legal.
     fn apply(&mut self, mv: &WideMove) {

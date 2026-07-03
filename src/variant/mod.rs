@@ -1459,3 +1459,109 @@ where
         .map(|mv| perft_variant(&position.play(mv), depth - 1))
         .sum()
 }
+
+#[cfg(test)]
+mod legal_subset_pseudo {
+    //! `legal ⊆ pseudo_legal` containment (issue #438).
+    //!
+    //! Every legal move must be a pseudo-legal candidate: the legal set is
+    //! precisely the king-safety-filtered subset of the pre-filter candidate set,
+    //! so no legal move may sit outside it. This guards the fast pin/check-aware
+    //! generator against ever inventing a move the slower geometric generator
+    //! would not — the same seam the fixed `pseudo_then_filter_equals_fast_path`
+    //! pins, generalized to a broad seeded-self-play population across every core
+    //! variant.
+
+    use super::*;
+    use crate::{
+        Antichess, Atomic, Chess, Chess960, Crazyhouse, Horde, KingOfTheHill, RacingKings,
+        ThreeCheck,
+    };
+    use proptest::prelude::*;
+
+    /// A deterministic splitmix64 step, matching the property suites' walker.
+    fn splitmix64(state: &mut u64) -> u64 {
+        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+
+    /// The variant's pre-king-safety pseudo-legal candidate set, assembled exactly
+    /// as [`Variant::slow_legal_into`] does before its make-move filter runs: the
+    /// variant's own arbitrary-geometry castles when
+    /// [`Variant::VARIANT_CASTLING`] is set, otherwise [`Variant::gen_pseudo`].
+    fn pseudo_candidates<V: Variant>(core: &Position) -> Vec<Move> {
+        let mut pseudo = MoveList::new();
+        if V::VARIANT_CASTLING {
+            core.pseudo_no_castles_into(&mut pseudo);
+            V::generate_castles(core, &mut pseudo);
+        } else {
+            V::gen_pseudo(core, &mut pseudo);
+        }
+        pseudo.into_vec()
+    }
+
+    /// Walks a seeded random line and, at every node, asserts every legal move is
+    /// present in the pseudo-legal candidate set. Drops (crazyhouse) are the one
+    /// exception: they are variant-only moves injected by [`Variant::extra_moves`]
+    /// *after* the king-safety stage, not part of the geometric pseudo-legal set.
+    fn assert_legal_subset_pseudo<V: Variant>(mut pos: VariantPosition<V>, seed: u64, plies: u32) {
+        let mut state = seed;
+        let mut steps = 0;
+        loop {
+            if pos.outcome().is_some() {
+                break;
+            }
+            let legal = pos.legal_moves();
+            if legal.is_empty() {
+                break;
+            }
+            let pseudo = pseudo_candidates::<V>(pos.core());
+            for mv in &legal {
+                if mv.kind().is_drop() {
+                    continue;
+                }
+                assert!(
+                    pseudo.contains(mv),
+                    "legal move {} is not among the pseudo-legal candidates at {}",
+                    mv.to_uci(),
+                    pos.core().to_fen(),
+                );
+            }
+            if steps >= plies {
+                break;
+            }
+            let pick = (splitmix64(&mut state) as usize) % legal.len();
+            pos = pos.play(&legal[pick]);
+            steps += 1;
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// `legal ⊆ pseudo_legal` over a seeded self-play population, for each of
+        /// the nine core variants (selected by index so each draw exercises a
+        /// concrete `VariantPosition<V>` and its variant-specific pseudo path).
+        #[test]
+        fn legal_subset_of_pseudo(
+            which in 0usize..9,
+            seed in any::<u64>(),
+            plies in 0u32..32,
+        ) {
+            match which {
+                0 => assert_legal_subset_pseudo(Chess::startpos(), seed, plies),
+                1 => assert_legal_subset_pseudo(Chess960::startpos(), seed, plies),
+                2 => assert_legal_subset_pseudo(KingOfTheHill::startpos(), seed, plies),
+                3 => assert_legal_subset_pseudo(ThreeCheck::startpos(), seed, plies),
+                4 => assert_legal_subset_pseudo(RacingKings::startpos(), seed, plies),
+                5 => assert_legal_subset_pseudo(Horde::startpos(), seed, plies),
+                6 => assert_legal_subset_pseudo(Atomic::startpos(), seed, plies),
+                7 => assert_legal_subset_pseudo(Antichess::startpos(), seed, plies),
+                _ => assert_legal_subset_pseudo(Crazyhouse::startpos(), seed, plies),
+            }
+        }
+    }
+}
