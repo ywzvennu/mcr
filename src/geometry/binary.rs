@@ -648,6 +648,8 @@ pub fn decode_game(bytes: &[u8]) -> Result<(AnyWideVariant, Vec<WideMove>), Wire
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
     use crate::geometry::{Chess8x8, Seirawan, Shogi, Square, WideMoveKind, WideVariantId};
 
@@ -720,6 +722,60 @@ mod tests {
         ));
         // Truncated body (tag + partial flags).
         assert!(Pos::from_bytes(&[TAG_POSITION, 0]).is_err());
+    }
+
+    #[test]
+    fn board_role_byte_is_full_8_bits() {
+        // Wire-format v2 (issue #448): the board section stores a full 1-byte role
+        // per occupied square (plus a separate colour bitset), so a role index >=
+        // 128 — which the jumbo shogi armies (#401 Dai, #402 Tenjiku) will add — is
+        // carried without the v1 `& 0x7f` truncation. No real `WideRole` reaches
+        // index 128 yet, so we drive the decoder over a hand-built v2 board body:
+        // the full role byte must reach `WideRole::from_index` intact (rejected as
+        // `BadRole` only because no such role exists *yet*), never silently masked
+        // down to a different, valid role as a 7-bit field would.
+        type Pos = GenericPosition<Chess8x8, crate::geometry::StandardChess>;
+        let bitset = (Chess8x8::SQUARES as usize).div_ceil(8); // 8 bytes for 64 squares
+
+        // Build a body: 2 flag bytes (all optional sections off), an occupancy
+        // bitset with only square 0 set, an all-white colour bitset, then one role
+        // byte for square 0.
+        let body = |role_byte: u8| -> Vec<u8> {
+            let mut v = Vec::new();
+            v.extend_from_slice(&0u16.to_le_bytes()); // flags: nothing set, White to move
+            let mut occ = vec![0u8; bitset];
+            occ[0] = 0x01; // square 0 occupied
+            v.extend_from_slice(&occ);
+            v.extend_from_slice(&vec![0u8; bitset]); // colour plane: all White
+            v.push(role_byte);
+            v
+        };
+
+        // A role byte with bit 7 set (index 130) is read as index 130 — out of
+        // range *today*, so `BadRole(130)`. A v1 `& 0x7f` mask would have read it as
+        // index 2 (Bishop) and silently mis-decoded, so this proves the full byte
+        // is honoured and index 130 will round-trip once role 130 exists.
+        assert!(matches!(
+            Pos::decode_body(&body(130)),
+            Err(WireError::BadRole(130))
+        ));
+
+        // A high-but-valid index (126, the current top slot) still decodes to the
+        // right role, and the colour plane — not a role byte bit — decides colour.
+        let hi_role = WideRole::from_index(126).expect("index 126 is a valid role");
+        let pos = Pos::decode_body(&body(126)).expect("valid high-index role decodes");
+        let piece = pos.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();
+        assert_eq!(piece.role, hi_role);
+        assert_eq!(piece.color, Color::White);
+
+        // Flip the colour plane's square-0 bit: same role byte, now Black — proving
+        // colour rides its own plane, decoupled from the (now full) role byte.
+        let mut black_body = body(126);
+        black_body[2 + bitset] |= 0x01; // first byte of the colour bitset
+        let pos_b = Pos::decode_body(&black_body).expect("Black high-index role decodes");
+        let piece_b = pos_b.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();
+        assert_eq!(piece_b.role, hi_role);
+        assert_eq!(piece_b.color, Color::Black);
     }
 
     #[test]

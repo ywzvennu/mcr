@@ -1144,6 +1144,39 @@ mod tests {
     }
 
     #[test]
+    fn role_field_is_full_8_bits() {
+        // Wire-format v2 (issue #448): the packed role field is 8 bits (bits
+        // 16..24), so a synthetic role index >= 128 — which the jumbo shogi armies
+        // (#401 Dai, #402 Tenjiku) will introduce — packs and unpacks without the
+        // old 7-bit (`0x7f`) truncation, and without bleeding into the adjacent
+        // kind / gate fields. No real `WideRole` reaches index 128 yet, so this
+        // drives the raw packer directly (the typed `drop_role` accessor still
+        // gates on `WideRole::from_index`, which will accept the index once such a
+        // role lands); this proves the field can carry it safely today.
+        for role in [128u32, 200, 255] {
+            let m = WideMove::pack(9, 9, role, KIND_DROP);
+            // The raw role field round-trips the full 8-bit value.
+            assert_eq!(m.role_index(), role as usize);
+            // The kind tag is unaffected — the role did not overflow past bit 23.
+            assert_eq!(m.kind_tag(), KIND_DROP);
+            assert!(m.is_drop());
+            // The squares are intact and no gate bits were set by the overflow.
+            assert_eq!(m.from_index(), 9);
+            assert_eq!(m.to_index(), 9);
+            assert!(!m.is_gating());
+            // The whole high word stays zero (default-off addenda untouched).
+            assert_eq!(m.0 & 0xffff_ffff_0000_0000, 0);
+            // The raw word round-trips through to_raw / from_raw byte-for-byte.
+            assert_eq!(WideMove::from_raw(m.to_raw()), m);
+        }
+        // Index 255 (all eight role bits set) sits directly below the kind field;
+        // the adjacent kind still decodes, confirming no overlap at the boundary.
+        let hi = WideMove::pack(0, 0, 255, KIND_QUIET);
+        assert_eq!(hi.role_index(), 255);
+        assert_eq!(hi.kind_tag(), KIND_QUIET);
+    }
+
+    #[test]
     fn duck_addendum_round_trips_and_is_default_off() {
         let m = WideMove::new(
             Square::<Chess8x8>::new(8),  // a2
