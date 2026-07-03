@@ -141,8 +141,10 @@ fn malformed_input_is_rejected_without_panic() {
     // Move and game decoders likewise reject junk.
     assert_eq!(WideMove::from_bytes(&[]), Err(WireError::Truncated));
     assert!(matches!(decode_game(&[]), Err(WireError::Truncated)));
+    // `0xD4` is the v2 game tag (issue #448); the varint claims a longer position
+    // body than is present, so the decoder reports truncation, never panicking.
     assert!(matches!(
-        decode_game(&[0xC4, 200, 0, 0, 0]),
+        decode_game(&[0xD4, 200, 0, 0, 0]),
         Err(WireError::Truncated | WireError::BadValue | WireError::BadTag(_))
     ));
 }

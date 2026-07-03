@@ -21,28 +21,30 @@
 //! §4.4), zero for every non-Duck move.
 //!
 //! ```text
-//! bit:  31 30 | 29 | 28 27 | 26 25 24 23 | 22 21 20 19 18 17 16 | 15 ... 8 | 7 ... 0
-//!       \unus/ \rk/ \gate-/ \---kind----/ \---------role--------/ \--from--/ \--to--/
+//! bit:  31 | 30 | 29 28 | 27 26 25 24 | 23 22 21 20 19 18 17 16 | 15 ... 8 | 7 ... 0
+//!       \un/ \rk/ \gate-/ \---kind----/ \---------role----------/ \--from--/ \--to--/
 //! ```
 //!
 //! * **`to`** (bits 0..8): destination square index, `0..128`.
 //! * **`from`** (bits 8..16): origin square index, `0..128`. For a drop this is
 //!   redundant (a drop has `from == to`), so the public [`WideMove::from`]
 //!   reports the target square.
-//! * **`role`** (bits 16..23): a [`WideRole`] index `0..=127`, used as the
+//! * **`role`** (bits 16..24): a [`WideRole`] index `0..=255`, used as the
 //!   promotion role or the dropped role depending on the kind; unused (`0`)
-//!   otherwise. Seven bits since the Cannon Shogi cannon army grew
-//!   `WideRole::COUNT` past 64.
-//! * **`kind`** (bits 23..27): the [`WideMoveKind`] tag. Four bits hold the nine
+//!   otherwise. Eight bits (wire-format v2, issue #448) — widened from seven when
+//!   the 128-role budget filled to make room for the jumbo shogi armies (Dai /
+//!   Tenjiku, #401 / #402).
+//! * **`kind`** (bits 24..28): the [`WideMoveKind`] tag. Four bits hold the nine
 //!   kinds in use with headroom for future fairy kinds (gating, duck-placement,
 //!   palace moves) beyond the codes used today.
-//! * **`gate`** (bits 27..30): the Seirawan gating addendum. Bits 27..29 carry a
-//!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 29
+//! * **`gate`** (bits 28..31): the Seirawan gating addendum. Bits 28..30 carry a
+//!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 30
 //!   selects, for a castling base move, whether the reserve gates onto the
 //!   **rook's** vacated square (`1`) rather than the king's (`0`). For a
 //!   non-castling base move the gated square is always the move's origin, so
-//!   bit 29 is `0`. These bits are `0` for every non-gating move, so a variant
+//!   bit 30 is `0`. These bits are `0` for every non-gating move, so a variant
 //!   without gating produces byte-identical words to before this field existed.
+//!   Bit 31 is unused.
 //!
 //! ## Duck addendum (bits 32..40), Duck chess only
 //!
@@ -182,7 +184,7 @@ impl WideMoveKind {
     }
 }
 
-// Kind tag codes occupying bits 21..26 of the packed word.
+// Kind tag codes occupying bits 24..28 of the packed word.
 const KIND_QUIET: u32 = 0;
 const KIND_CAPTURE: u32 = 1;
 const KIND_DOUBLE_PUSH: u32 = 2;
@@ -200,22 +202,24 @@ const KIND_LION: u32 = 9;
 const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
 const ROLE_SHIFT: u32 = 16;
-const KIND_SHIFT: u32 = 23;
-const GATE_ROLE_SHIFT: u32 = 27;
-const GATE_ON_ROOK_SHIFT: u32 = 29;
+const KIND_SHIFT: u32 = 24;
+const GATE_ROLE_SHIFT: u32 = 28;
+const GATE_ON_ROOK_SHIFT: u32 = 30;
 
 const SQ_MASK: u32 = 0xff;
-// The role field is **7 bits** (bits 16..23), holding a `WideRole` index `0..=127`
-// — widened from 6 bits when the Cannon Shogi cannon army pushed `WideRole::COUNT`
-// past 64 (the promoted bishop-hopper is index 64, which a 6-bit field truncated to
-// 0 = Pawn). The kind field stays **4 bits** (codes `0..16`, ample for the nine
-// kinds) and the gate field each shift up one bit; both still fit below bit 30, so
-// the whole high (Duck / hand-gate) word from bit 32 is unchanged.
-const ROLE_MASK: u32 = 0x7f;
+// The role field is **8 bits** (bits 16..24), holding a `WideRole` index `0..=255`
+// — widened from 7 bits (wire-format v2, issue #448) once the 128-role budget filled
+// and the jumbo shogi armies (Dai / Tenjiku, #401 / #402) needed room past index 127.
+// A 7-bit field truncated index 128 to `0` = Pawn, silently corrupting the word. The
+// kind field stays **4 bits** (codes `0..16`, ample for the nine kinds) and the kind /
+// gate fields each shift up one bit into the previously-unused high bits; the top
+// field (gate-on-rook) now sits at bit 30, leaving bit 31 free, so the whole high
+// (Duck / hand-gate / Lion) word from bit 32 is unchanged.
+const ROLE_MASK: u32 = 0xff;
 const KIND_MASK: u32 = 0xf;
 const GATE_ROLE_MASK: u32 = 0x3;
 
-// Gated-reserve codes occupying bits 27..29. `0` means no gate.
+// Gated-reserve codes occupying bits 28..30. `0` means no gate.
 const GATE_NONE: u32 = 0;
 const GATE_HAWK: u32 = 1;
 const GATE_ELEPHANT: u32 = 2;
@@ -229,11 +233,18 @@ const DUCK_PRESENT: u64 = 1 << DUCK_PRESENT_SHIFT;
 // Hand-gate addendum (S-House), in free high-word bits above the Duck fields
 // (which occupy 32..41). Unlike the 2-bit Seirawan `GATE_ROLE` field (which only
 // encodes Hawk/Elephant), a hand-gate carries an arbitrary `WideRole` drawn from
-// the crazyhouse hand, so it needs the full 6-bit role index. The two gate
-// encodings are mutually exclusive (a variant gates either from the fixed
-// reserve or from the hand, never both), and every non-hand-gating move leaves
-// these bits `0`, so the words stay bit-identical for Seirawan and every other
-// variant.
+// the crazyhouse hand, so it needs a wider role field. The two gate encodings are
+// mutually exclusive (a variant gates either from the fixed reserve or from the
+// hand, never both), and every non-hand-gating move leaves these bits `0`, so the
+// words stay bit-identical for Seirawan and every other variant.
+//
+// This field stays **6 bits** even though the board role field widened to 8 (issue
+// #448): S-House is the *only* variant that gates from the hand, and its hand holds
+// standard chess roles plus the Hawk / Elephant reserves — every one an index far
+// below 64, so a 6-bit field never truncates. `with_hand_gate` `debug_assert!`s the
+// index stays `<= HAND_GATE_ROLE_MASK`; should a future hand-gating variant ever
+// gate a role at index >= 64, widen this field into the free high-word bits (bits
+// 60..64 above the Lion addendum are unused) and bump the wire-format version.
 const HAND_GATE_ROLE_SHIFT: u32 = 41; // bits 41..47: 6-bit WideRole index
 const HAND_GATE_ROLE_MASK: u64 = 0x3f;
 const HAND_GATE_PRESENT: u64 = 1 << 47;
@@ -494,13 +505,13 @@ impl WideMove {
         self.0 as u32
     }
 
-    /// The raw kind tag in bits 21..26.
+    /// The raw kind tag in bits 24..28.
     #[inline]
     const fn kind_tag(self) -> u32 {
         (self.base() >> KIND_SHIFT) & KIND_MASK
     }
 
-    /// The raw role index in bits 16..21.
+    /// The raw role index in bits 16..24.
     #[inline]
     const fn role_index(self) -> usize {
         ((self.base() >> ROLE_SHIFT) & ROLE_MASK) as usize
@@ -697,6 +708,14 @@ impl WideMove {
     #[inline]
     pub fn with_hand_gate<G: Geometry>(self, role: WideRole, square: GateSquare) -> WideMove {
         let _ = core::marker::PhantomData::<G>;
+        // The hand-gate role field is 6 bits (see `HAND_GATE_ROLE_MASK`). Every
+        // hand-gate-able role (S-House's chess pieces plus the Hawk / Elephant
+        // reserves) has an index well under 64, so this never truncates; a future
+        // hand-gating variant that gates an index >= 64 must widen the field first.
+        debug_assert!(
+            (role.index() as u64) <= HAND_GATE_ROLE_MASK,
+            "hand-gate role index exceeds the 6-bit HAND_GATE_ROLE field",
+        );
         let mut w = self.0 & !((HAND_GATE_ROLE_MASK << HAND_GATE_ROLE_SHIFT) | HAND_GATE_ON_ROOK);
         w |= HAND_GATE_PRESENT;
         w |= ((role.index() as u64) & HAND_GATE_ROLE_MASK) << HAND_GATE_ROLE_SHIFT;

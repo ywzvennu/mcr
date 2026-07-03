@@ -11,11 +11,16 @@
 //! # Versioning
 //!
 //! Every encoding begins with a **single tag byte** that selects both the value
-//! kind and the format version. The version-1 tags are [`TAG_MOVE`],
-//! [`TAG_POSITION`], [`TAG_ANY_POSITION`], and [`TAG_GAME`] (all in the `0xC_`
-//! range). A future incompatible layout takes a fresh tag value (e.g. the `0xD_`
-//! range) so an old decoder rejects it with [`WireError::BadTag`] rather than
-//! misreading it. The decoders never panic: malformed, truncated, or
+//! kind and the format version. The version-2 tags are [`TAG_MOVE`],
+//! [`TAG_POSITION`], [`TAG_ANY_POSITION`], and [`TAG_GAME`] (all in the `0xD_`
+//! range). Version 2 (issue #448) widened the role field to 8 bits: the packed
+//! [`WideMove`] word moved its kind / gate fields up one bit, and the position
+//! board section now stores a **separate colour bitset** plus a **full 1-byte
+//! role** per occupied square (rather than the v1 `colour << 7 | role` byte, which
+//! could not also hold the colour bit once the role filled all eight). The v1 tags
+//! were the `0xC_` range; a v1 decoder rejects a v2 tag with [`WireError::BadTag`]
+//! rather than misreading the moved fields. A future incompatible layout again
+//! takes a fresh tag value. The decoders never panic: malformed, truncated, or
 //! out-of-range input returns a [`WireError`].
 //!
 //! # Move layout ([`WideMove`])
@@ -34,9 +39,12 @@
 //!
 //! 1. a **`u16` flags** word (little-endian) marking which optional sections
 //!    follow (`F_EP` … `F_CLOCKS`) plus the side to move (`F_TURN_BLACK`);
-//! 2. the **board**: an occupancy bitset of `ceil(SQUARES / 8)` bytes, then one
-//!    byte per occupied square in ascending order — `color << 7 | role` (the role
-//!    index is `0..76`, so it fits the low 7 bits);
+//! 2. the **board** (wire-format v2): an occupancy bitset of `ceil(SQUARES / 8)`
+//!    bytes, a colour bitset of the same width (a set bit marks a **Black** piece
+//!    on that square), then one full role byte per occupied square in ascending
+//!    order (the `WideRole` index, `0..=255`). A separate colour plane is needed
+//!    because the 8-bit role now fills the whole byte, leaving no top bit to carry
+//!    the colour as v1 did;
 //! 3. the present optional sections, in flag-bit order: en passant (1 square
 //!    byte), castling (4 rook-file bytes, `255` = no right), Seirawan gating
 //!    (eligible bitset + a reserve nibble byte), the hand / setup pocket (a
@@ -56,14 +64,14 @@ use super::{
 };
 use crate::Color;
 
-/// Format tag for a standalone [`WideMove`] (version 1).
-pub const TAG_MOVE: u8 = 0xC1;
-/// Format tag for a typed [`GenericPosition`] body (version 1).
-pub const TAG_POSITION: u8 = 0xC2;
-/// Format tag for a self-describing [`AnyWideVariant`] position (version 1).
-pub const TAG_ANY_POSITION: u8 = 0xC3;
-/// Format tag for a game record — a start position plus a move list (version 1).
-pub const TAG_GAME: u8 = 0xC4;
+/// Format tag for a standalone [`WideMove`] (version 2).
+pub const TAG_MOVE: u8 = 0xD1;
+/// Format tag for a typed [`GenericPosition`] body (version 2).
+pub const TAG_POSITION: u8 = 0xD2;
+/// Format tag for a self-describing [`AnyWideVariant`] position (version 2).
+pub const TAG_ANY_POSITION: u8 = 0xD3;
+/// Format tag for a game record — a start position plus a move list (version 2).
+pub const TAG_GAME: u8 = 0xD4;
 
 // Position flag bits (a little-endian `u16` after the tag).
 const F_TURN_BLACK: u16 = 1 << 0;
@@ -396,16 +404,28 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         out.extend_from_slice(&flags.to_le_bytes());
 
-        // Board: occupancy bitset, then a colour+role byte per occupied square in
-        // ascending index order (the same order the decoder walks).
+        // Board (wire-format v2, issue #448): an occupancy bitset, then a colour
+        // bitset (a set bit marks a Black piece), then a full 1-byte role per
+        // occupied square in ascending index order (the same order the decoder
+        // walks). The colour rides in its own plane because an 8-bit role fills the
+        // whole role byte, leaving no top bit to carry it as v1 did.
         let occupied = board.occupied();
         encode_bitset(occupied, out);
+        let mut black = Bitboard::<G>::EMPTY;
         for sq in occupied {
             let piece = board
                 .piece_at(sq)
                 .expect("occupied square holds a piece by construction");
-            let color_bit = if piece.color == Color::Black { 0x80 } else { 0 };
-            out.push(color_bit | piece.role.index() as u8);
+            if piece.color == Color::Black {
+                black.set(sq);
+            }
+        }
+        encode_bitset(black, out);
+        for sq in occupied {
+            let piece = board
+                .piece_at(sq)
+                .expect("occupied square holds a piece by construction");
+            out.push(piece.role.index() as u8);
         }
 
         if let Some(ep) = state.ep_square {
@@ -463,17 +483,19 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let mut cur = Cursor::new(bytes);
         let flags = cur.u16_le()?;
 
+        // Board (wire-format v2, issue #448): occupancy bitset, colour bitset (a
+        // set bit marks a Black piece), then a full 1-byte role per occupied square.
         let occupied = decode_bitset::<G>(&mut cur)?;
+        let black = decode_bitset::<G>(&mut cur)?;
         let mut board = Board::<G>::empty();
         for sq in occupied {
-            let byte = cur.u8()?;
-            let color = if byte & 0x80 != 0 {
+            let role_ix = cur.u8()?;
+            let role = WideRole::from_index(role_ix as usize).ok_or(WireError::BadRole(role_ix))?;
+            let color = if black.contains(sq) {
                 Color::Black
             } else {
                 Color::White
             };
-            let role_ix = byte & 0x7f;
-            let role = WideRole::from_index(role_ix as usize).ok_or(WireError::BadRole(role_ix))?;
             board.set_piece(sq, WidePiece::new(color, role));
         }
 
