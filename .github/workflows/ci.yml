@@ -381,24 +381,26 @@ jobs:
           path: lcov.info
           if-no-files-found: error
 
-  # Mutation testing (cargo-mutants) — measures whether the perft pins + unit
-  # tests actually CATCH movegen/rules breakage. cargo-mutants rewrites one
-  # expression at a time across the library source (config: `.cargo/mutants.toml`,
-  # scoped to `src/**`, GPL-fenced crates excluded) and re-runs the FAST
-  # (non-ignored) test suite per mutant; a surviving ("MISSED") mutant is a
-  # change the suite did not detect — a genuinely-untested code path.
+  # Mutation testing (cargo-mutants) — measures whether the unit tests actually
+  # CATCH breakage in the code under test. cargo-mutants rewrites one expression
+  # at a time (config: `.cargo/mutants.toml`) and re-runs the test suite per
+  # mutant; a surviving ("MISSED") mutant is a change the suite did not detect —
+  # a genuinely-untested code path.
   #
-  # HEAVY (a full build+test per mutant, thousands of mutants), so GATED to the
-  # weekly schedule and manual `workflow_dispatch` only — never per-PR — matching
-  # the `fairy-differential` posture.
+  # GATED to the weekly schedule and manual `workflow_dispatch` only — never
+  # per-PR — matching the `fairy-differential` posture, since even the scoped run
+  # builds+tests once per mutant.
   #
-  # INFORMATIONAL for now: the run surfaces surviving mutants as a report and
-  # uploads the `mutants.out` directory as an artifact, but `|| true` keeps a
-  # surviving mutant from failing the job. Drop the `|| true` (and/or add
-  # `--in-diff`/a survivor budget) to turn this into a hard gate once the
-  # baseline survival rate is understood.
+  # ENFORCING over a proven-clean subset. `.cargo/mutants.toml` scopes the run to
+  # `src/board.rs` — the 8x8 piece-placement module, swept to zero surviving
+  # mutants — and runs the fast `--lib` unit suite per mutant. With that scope
+  # pinned survivor-free, the `|| true` is dropped so a NEW survivor (a change to
+  # `board.rs` behaviour that its unit tests fail to catch) fails the job. The
+  # enforcing scope is intentionally narrow; broadening it to the movegen/rules
+  # modules (`position.rs`, the geometry layer) is tracked in #445, gated on those
+  # modules being swept clean and the test scope widened to the perft suites.
   mutants:
-    name: mutants (cargo-mutants, report-only)
+    name: mutants (cargo-mutants, enforcing on src/board.rs)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -413,13 +415,12 @@ jobs:
       - name: Install cargo-mutants
         uses: taiki-e/install-action@cargo-mutants
 
-      # Reads `.cargo/mutants.toml` (scope + `--all-features` fast-suite test
-      # args + timeouts). `--no-shuffle` keeps the report order stable;
-      # `-j 2` parallelises within the runner. `|| true` keeps surviving mutants
-      # from failing the job (report-only); the artifact below carries the full
-      # outcome list regardless.
-      - name: cargo-mutants (report-only)
-        run: cargo mutants --no-shuffle -j 2 || true
+      # Reads `.cargo/mutants.toml` (scope + `--all-features --lib` test args +
+      # timeouts). `--no-shuffle` keeps the report order stable; `-j 2`
+      # parallelises within the runner. No `|| true`: a surviving mutant in scope
+      # now fails the job. The artifact below still carries the full outcome list.
+      - name: cargo-mutants (enforcing)
+        run: cargo mutants --no-shuffle -j 2
 
       - name: Upload mutants report
         if: always()

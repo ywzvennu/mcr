@@ -745,6 +745,33 @@ mod tests {
     }
 
     #[test]
+    fn parse_board_error_display_messages() {
+        // Each error variant renders a distinct, non-empty human-readable
+        // message. Pinning the exact text keeps `Display` from silently
+        // degrading to an empty string (which a stubbed formatter would produce).
+        assert_eq!(
+            ParseBoardError::TooFewRanks.to_string(),
+            "FEN placement has fewer than 8 ranks",
+        );
+        assert_eq!(
+            ParseBoardError::TooManyRanks.to_string(),
+            "FEN placement has more than 8 ranks",
+        );
+        assert_eq!(
+            ParseBoardError::RankWrongWidth { rank: 8, files: 7 }.to_string(),
+            "rank 8 of FEN placement covers 7 files, expected 8",
+        );
+        assert_eq!(
+            ParseBoardError::RankTooLong(3).to_string(),
+            "rank 3 of FEN placement extends past the h-file",
+        );
+        assert_eq!(
+            ParseBoardError::InvalidChar('x').to_string(),
+            "invalid character 'x' in FEN placement",
+        );
+    }
+
+    #[test]
     fn display_renders_standard_board() {
         let text = Board::standard().to_string();
         let lines: Vec<&str> = text.lines().collect();
