@@ -641,6 +641,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Micro Shogi is appended (out of alphabetical order) for the same
+    // seed-stability reason as Judkins above: a mid-list insert would re-roll every
+    // later variant's fuzz seed. A FSF built-in (needs a `largeboards=yes` build)
+    // spelled identically to mce (`k b r l p` plus the `+`-promoted forms), so it
+    // takes the `identity` dialect.
+    Spec {
+        id: WideVariantId::Micro,
+        fsf: "micro",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

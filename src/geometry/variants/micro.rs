@@ -50,11 +50,14 @@
 //! A captured piece is banked **unpromoted** (a captured +R enters the hand as a
 //! Rook) and flipped to the captor's side. On a turn a side may, instead of a board
 //! move, **drop** a held piece onto **any empty square** — Micro Shogi imposes
-//! *no* drop restrictions: there is **no nifu** (two unpromoted Pawns may share a
-//! file), no dead-piece rule (a Pawn or the Knight-moving forms may be dropped even
-//! on the last rank), and no `dropPromoted` (a held piece is always deployed in its
-//! base form). This matches FSF node-for-node, so the default
-//! [`WideVariant::drop_targets`] (every empty square) is used unchanged.
+//! *no* target restrictions: there is **no nifu** (two unpromoted Pawns may share a
+//! file) and no dead-piece rule (a Pawn or the Knight-moving forms may be dropped
+//! even on the last rank), so the default [`WideVariant::drop_targets`] (every empty
+//! square) is used unchanged. It does, however, have **dual-form drops** (FSF
+//! `dropPromoted`, the [`WideVariant::drops_can_promote`] hook): a held base piece
+//! may be deployed either in its base form *or* in its promoted (capture-flip) form
+//! — a held Lance drops as an `L` or a Silver-moving `+L`, and so on. This all
+//! matches FSF node-for-node.
 //!
 //! As in Shogi (#190), FSF's `micro` perft does **not** enforce *uchifuzume* (the
 //! no-pawn-drop-mate rule): a mating pawn drop is a legal move. mce matches FSF and

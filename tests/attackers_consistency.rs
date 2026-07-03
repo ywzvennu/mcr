@@ -44,15 +44,16 @@ use mce::geometry::{
     DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules,
     GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, JudkinsRules,
     KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
-    MansindamRules, MinishogiRules, MinixiangqiRules, OpulentRules, OrdaRules, OrdamirrorRules,
-    PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules, ShinobiRules,
-    ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules, Square,
-    StandardChess, SynochessRules, TencubedRules, ToriRules, WashogiRules, WideRole, WideVariant,
-    XiangfuRules, XiangqiRules,
+    MansindamRules, MicroRules, MinishogiRules, MinixiangqiRules, OpulentRules, OrdaRules,
+    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules,
+    ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
+    Square, StandardChess, SynochessRules, TencubedRules, ToriRules, WashogiRules, WideRole,
+    WideVariant, XiangfuRules, XiangqiRules,
 };
 use mce::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Courier12x8, Dobutsu3x4, Gorogoro5x6, Grand10x10,
-    Judkins6x6, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11, Xiangqi9x10,
+    Judkins6x6, Micro4x5, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11,
+    Xiangqi9x10,
 };
 use mce::Color;
 
@@ -942,6 +943,31 @@ variant_test!(
         "5k/6/6/6/P5/5K[] w - - 0 1",
         "2k3/6/6/P5/6/2K3[P] w - - 0 1",
         "2k3/6/R4r/6/6/2K3[Pp] w - - 0 1",
+    ]
+);
+
+// -- Micro Shogi (hand / dual-form drops / capture flip, 4x5) ----------------
+//
+// Micro Shogi packs one each of King, Rook, Bishop, Lance, and Pawn onto a 4x5
+// board, several starting pre-promoted, and flips a piece's form only when it
+// captures. Its Pawn and Lance are colour-directional, as are all three promoted
+// forms — the Gold-moving +R / +B, the Silver-moving +L, and the Knight-moving +P
+// (their attack sets point forward, so they are reverse-projected with the opposite
+// colour) — while its Rook, Bishop, and Lance are the symmetric / forward sliders.
+// This guards that each such role's `role_attacks` set and the `attackers_to`
+// reverse-projection agree on the distinct [`Micro4x5`] geometry. The corpus reuses
+// the FSF-confirmed FENs from `tests/perft_micro.rs` (the pre-promoted startpos, a
+// bare-king dual-form drop swarm, the capturing Rook, and the promoted-form trio).
+variant_test!(
+    micro,
+    Micro4x5,
+    MicroRules,
+    "micro",
+    [
+        "kb+r+l/p3/4/3P/+L+RBK[] w - - 0 1",
+        "3k/4/4/4/K3[RBLPrblp] w - - 0 1",
+        "3k/1l2/4/1R2/K3[] w - - 0 1",
+        "3k/4/1+R2/+L1+P1/K3[] w - - 0 1",
     ]
 );
 

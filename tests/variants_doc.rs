@@ -463,6 +463,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "9x9 crazyhouse with captures-to-hand and drops (nifu, no pawn on the last rank); mandatory far-three-ranks promotion; campmate when a King reaches the enemy back rank. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant mansindam`).",
         },
+        WideVariantId::Micro => Meta {
+            display: "Micro Shogi (4x5 Shogi)",
+            pieces: "One each of King, Rook, Bishop, Lance, and Pawn, with the Rook and Lance starting pre-promoted; promoted forms +R and +B move as Gold, +L as Silver, and +P as a Knight.",
+            rules: "4x5 Shogi with a hand and drops (dual-form, no nifu or dead-piece restrictions); no promotion zone — a piece flips form only on a capture (a base piece promotes, a promoted piece demotes). Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant micro`).",
+        },
         WideVariantId::Minishogi => Meta {
             display: "Minishogi (5x5 Shogi)",
             pieces: "One each of King, Rook, Bishop, Gold and Silver Generals, and Pawn — no Knight or Lance.",
