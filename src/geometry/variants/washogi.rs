@@ -433,6 +433,24 @@ impl WideVariant<Washogi11x11> for WashogiRules {
         )
     }
 
+    fn confine_pins_to_segment() -> bool {
+        // Wa fields *jumping* leapers — chiefly the Treacherous Fox / Promoted
+        // Running Rabbit (`FAvWvD`), whose Alfil (two-square diagonal) and vertical
+        // Dabbaba (two-square straight) steps *jump* the intervening square, and the
+        // Heavenly Horse's knight leaps. A pinned Fox can leap **past** the pinning
+        // slider (or past its own king) onto a collinear square that no longer
+        // shields the king: e.g. a Fox pinned on a file by a forward-sliding Oxcart
+        // directly ahead can jump two squares forward, over the Oxcart, vacating the
+        // shielding square and exposing the king (issue #426, the illegal `d2d4`).
+        // The default full-line pin mask wrongly permits such a jump. Confining a
+        // pinned piece to the king-to-pinner segment (inclusive of the pinner's
+        // square) keeps exactly the moves that remain a blocker or capture the
+        // pinner. For Wa's sliders (Oxcart, Cloud Eagle, Flying Falcon, the rooks,
+        // …) the segment and the full line are equivalent, so this is byte-identical
+        // for every previously-validated Wa position and touches no other variant.
+        true
+    }
+
     fn promotion_config() -> PromotionConfig {
         // Wa's promotions are per-piece (each promotable base has exactly one
         // promoted form, handled by the generic per-piece promotion path); this
