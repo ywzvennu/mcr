@@ -97,20 +97,16 @@ fn game_record_round_trips_for_every_variant() {
 }
 
 #[test]
-fn binary_is_no_larger_than_fen_for_every_variant() {
-    // The compactness claim: the encoded start position is no larger than the FEN
-    // string it replaces, for all 47 variants. Wire-format v2 (issue #448) widened
-    // the role field to 8 bits and moved colour into a separate bitset, costing an
-    // extra ~1 bit per occupied square; this leaves the encoding strictly smaller
-    // than FEN for every variant except Alice (a two-board variant), where the two
-    // are exactly equal — hence `<=` rather than `<`.
+fn binary_is_smaller_than_fen_for_every_variant() {
+    // The headline compactness claim: the encoded start position is shorter than
+    // the FEN string it replaces, for all 47 variants.
     for &id in WideVariantId::ALL {
         let pos = AnyWideVariant::startpos(id);
         let bytes = pos.to_bytes().len();
         let fen = pos.to_fen().len();
         assert!(
-            bytes <= fen,
-            "{id}: binary {bytes} bytes larger than FEN {fen} bytes",
+            bytes < fen,
+            "{id}: binary {bytes} bytes not smaller than FEN {fen} bytes",
         );
     }
 }

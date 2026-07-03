@@ -1,7 +1,7 @@
 //! A compact, versioned **binary wire format** for wide-layer moves and
 //! positions (issue #319), for the mcs server transport and on-disk storage.
 //!
-//! It is no larger than, and faster to parse than, the FEN + UCI strings, and — unlike a
+//! It is smaller and faster to parse than the FEN + UCI strings, and — unlike a
 //! FEN round trip — it is **lossless across every variant**: it preserves the
 //! Alice plane mask, the Janggi pass counter, and the crazyhouse promoted mask,
 //! none of which survive `from_fen`. `decode(encode(x))` reproduces `x` exactly
