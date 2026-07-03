@@ -2289,10 +2289,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // Flag-rank "campmate" (Synochess): a king may not step **onto** its own
         // goal rank while the enemy king already occupies that rank (the flag is
         // contested) — the only flag-rank king move then allowed is to capture the
-        // enemy king itself, which clears the contest. Precompute the contested
-        // flag rank once; `None` when the rule is off or the flag is uncontested.
-        // A move off the king lines can never be such a king move, so the
-        // fast-accept path stays correct.
+        // enemy king itself, which clears the contest. A flying-general flag variant
+        // instead defers this to its per-move faceoff verify (a blocker between the
+        // kings breaks the contest); see `flag_contest_defers_to_facing` below.
+        // Precompute the contested flag rank once; `None` when the rule is off or the
+        // flag is uncontested. A move off the king lines can never be such a king
+        // move, so the fast-accept path stays correct.
         let contested_flag_rank = self.contested_flag_rank(us);
 
         let mut scratch = self.clone();
@@ -2307,8 +2309,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         .is_none_or(|p| p.role != WideRole::King)
                 {
                     // King stepping onto an empty/non-king square of the contested
-                    // flag rank: forbidden.
-                    return;
+                    // flag rank: forbidden — **unless** the variant governs the flag
+                    // contest through the flying-general faceoff. That faceoff is
+                    // broken by any piece strictly between the two kings on the rank,
+                    // so this coarse whole-rank ban would wrongly drop a legal king
+                    // step; such variants defer to the per-move flying-general verify
+                    // (`cannon_move_is_legal`), which respects the blocker. Default-off
+                    // hook, so every other flag variant keeps the whole-rank ban.
+                    if !V::flag_contest_defers_to_facing() {
+                        return;
+                    }
                 }
             }
             if !must_verify_all && cannon_move_off_king_lines::<G>(&mv, king, king_lines) {

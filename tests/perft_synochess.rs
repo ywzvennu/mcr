@@ -158,6 +158,27 @@ fn campmate_white_deep() {
     check(CAMPMATE_WHITE, &[(5, 2726)]);
 }
 
+// -- Flying-general blocker (issue #435, FSF-confirmed) ----------------------
+
+/// Issue #435: the file-**or-rank** flying general must respect an intervening
+/// blocker. Black king a8, a Black elephant on **d8** breaking the rank-8
+/// king-to-king line, White king h7. The elephant breaks the faceoff, so the
+/// White king may step to g8 / h8 and perft(1) = 21 (FSF-confirmed). The coarse
+/// contested-flag-rank ban used to drop those two king moves, under-generating to
+/// 19 and mis-detecting the faceoff as unbroken.
+const FLYING_GENERAL_BLOCKER: &str = "k2v4/7K/8/8/8/8/PPPPPPPP/r6r[] w - - 0 1";
+
+/// The control for `FLYING_GENERAL_BLOCKER`: with d8 empty the two kings genuinely
+/// face down rank 8, so g8 / h8 are correctly forbidden and perft(1) = 19
+/// (FSF-confirmed). Pins that the fix does **not** over-generate.
+const FLYING_GENERAL_CONTROL: &str = "k7/7K/8/8/8/8/PPPPPPPP/r6r[] w - - 0 1";
+
+#[test]
+fn flying_general_respects_blocker() {
+    check(FLYING_GENERAL_BLOCKER, &[(1, 21)]);
+    check(FLYING_GENERAL_CONTROL, &[(1, 19)]);
+}
+
 // -- The starting FEN round-trips through mce's FEN I/O ----------------------
 
 #[test]
