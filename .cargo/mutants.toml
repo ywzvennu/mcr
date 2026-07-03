@@ -7,21 +7,40 @@
 # pins + unit tests did NOT catch — i.e. a genuinely-untested code path. A
 # "CAUGHT" mutant is one the suite rejects, which is the desired outcome.
 #
-# This run is INFORMATIONAL (see the gated `mutants` CI job): it surfaces
-# surviving mutants as a report; it is not (yet) a hard gate.
+# The gated `mutants` CI job is now ENFORCING (a surviving mutant fails the job),
+# but only over the proven-clean scope below — see `examine_globs`.
 
 # ---------------------------------------------------------------------------
-# Scope: mutate the library movegen/rules only.
+# Scope: the ENFORCING subset — modules swept to ZERO surviving mutants.
 # ---------------------------------------------------------------------------
-# Focus on the geometry layer (the generic engine + the per-variant generators
-# in `src/geometry/variants/`) and the concrete top-level rule modules in
-# `src/`. These are the move-generation and legality code paths the perft pins
-# are meant to pin down.
+# cargo-mutants rewrites one expression at a time and re-runs the suite; a
+# surviving ("MISSED") mutant is a behaviour change no test caught — a genuinely
+# untested code path. For the gate to be *enforcing* (`|| true` dropped in CI),
+# every mutant in scope must be caught, so the examine-list is deliberately
+# narrowed to the module(s) already swept survivor-free rather than all of
+# `src/**` (which carries thousands of not-yet-triaged mutants).
+#
+# `src/board.rs` — the 8x8 piece-placement type (`Board`): occupancy masks,
+# set/remove/get, FEN placement parse/serialize, and the `Display`/error
+# surface. Swept with cargo-mutants 27.x: 111 mutants → all caught or unviable,
+# 0 survivors (the one initial survivor — a stubbed `Display for
+# ParseBoardError` — is killed by `board::tests::parse_board_error_display_messages`).
+#
+# TODO(#445): expand the enforcing scope. The remaining high-value correctness
+# modules — `src/position.rs` and the rest of the concrete 8x8 core, plus
+# `src/geometry/position.rs` and `src/geometry/variant.rs` — are the natural next
+# targets, but each carries hundreds–thousands of mutants whose only killing
+# tests are the (slow) integration perft suites, so an exhaustive full-suite
+# sweep is not tractable on shared CI yet. They stay OUT of the enforcing list
+# until swept clean; add them here (and broaden the test scope below to match)
+# as follow-ups land.
 examine_globs = [
-    "src/**/*.rs",
+    "src/board.rs",
 ]
 
-# Exclude code that is not movegen/rules and would only add noise:
+# Everything not in `examine_globs` is implicitly out of scope; `exclude_globs`
+# only needs to name paths that a future broadened `examine_globs` might sweep in
+# but which carry no rules logic:
 #   - the GPL-fenced, NON-workspace sibling crates (`compare-fairy/`, `compare/`,
 #     `fuzz/`): they drive/ link GPL engines and are never published. They are
 #     separate packages outside this manifest, so cargo-mutants does not mutate
@@ -40,17 +59,23 @@ exclude_globs = [
 ]
 
 # ---------------------------------------------------------------------------
-# Test run per mutant: the FAST suite only.
+# Test run per mutant: the fast LIB unit tests only.
 # ---------------------------------------------------------------------------
-# cargo-mutants re-runs `cargo test` for every mutant. `cargo test` skips
-# `#[ignore]`d tests by default, so the expensive deep `--include-ignored` perft
-# sweeps (which the gated `fairy-differential` job runs) are NOT run here — only
-# the cheap non-ignored perft pins + unit tests, which are exactly what should
-# catch a movegen/rules mutant. `--all-features` is passed so feature-gated rule
-# paths (the `magic` attack table, `parallel`, `serde`) are also exercised, and
-# so the build matches the all-features test gate.
+# cargo-mutants re-runs `cargo test` for every mutant. The current enforcing
+# scope (`src/board.rs`) is exercised entirely by the crate's in-module `#[cfg(test)]`
+# unit tests, so `--lib` is the correct and *sufficient* test scope: `board.rs`
+# was verified to have 0 survivors under exactly these args, and restricting to
+# the library target skips compiling and running the ~99 integration test
+# binaries per mutant, keeping the enforcing run tractable on shared CI.
+# `--all-features` is passed so feature-gated paths (the `magic` attack table,
+# `parallel`, `serde`) are also built, matching the all-features test gate.
+#
+# NOTE for #445: when the enforcing `examine_globs` grows to include movegen /
+# rules modules whose mutants are only caught by the integration perft suites,
+# drop `--lib` here (revert to the full non-ignored suite) so those tests run —
+# otherwise integration-only survivors would slip through.
 test_tool = "cargo"
-additional_cargo_test_args = ["--all-features"]
+additional_cargo_test_args = ["--all-features", "--lib"]
 
 # ---------------------------------------------------------------------------
 # Timeouts: keep per-mutant runs bounded.
