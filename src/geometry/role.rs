@@ -1171,6 +1171,24 @@ impl WideRole {
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.
+    ///
+    /// # Role budget (7-bit field — nearly exhausted)
+    ///
+    /// The role index is a **7-bit field** everywhere it is packed: the binary
+    /// wire board byte is `color_bit | role.index()` with `color_bit = 1 << 7`
+    /// (`super::binary`), and [`WideMove`](super::WideMove) carries the role in
+    /// bits 16..23 (`ROLE_MASK == 0x7f`). That caps the table at **128** roles
+    /// (indices `0..=127`); adding a 128th role's index (`128`) would be
+    /// truncated by the `0x7f` mask to `0` (Pawn) and silently corrupt every
+    /// packed move — so `COUNT` must never exceed `128`.
+    ///
+    /// At `COUNT == 127` there is **exactly one** free slot (index `127`) left.
+    /// The jumbo shogi variants (issue #401 Dai, #402 Tenjiku) each introduce
+    /// several genuinely-new movers and cannot fit: landing them requires first
+    /// widening the role field to 8 bits (a wire-format version bump touching
+    /// `super::binary` and [`WideMove`](super::WideMove)). See issue #441 for the
+    /// budget audit and the widening design. Do **not** grow this past `127`
+    /// without that widening.
     pub const COUNT: usize = 127;
 
     /// Every role, in index order (pawn first, reserved last).
