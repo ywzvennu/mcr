@@ -83,15 +83,16 @@ pub use variants::{
     DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules, Empire, EmpireRules,
     EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
     GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
-    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Karouk, KaroukRules, Khans,
-    KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules,
-    Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Minishogi, MinishogiRules,
-    Minixiangqi, MinixiangqiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror,
-    OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
-    ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
-    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tori, ToriRules, Washogi,
-    WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Judkins, JudkinsRules, Karouk,
+    KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules,
+    Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules,
+    Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Opulent,
+    OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
+    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
+    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
+    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
+    Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules,
+    Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -451,6 +452,38 @@ geometry!(
     Minishogi5x5,
     u64,
     5,
+    5
+);
+
+geometry!(
+    /// The Judkins Shogi board: six files by six ranks (36 squares), backed by
+    /// `u64`.
+    ///
+    /// A small even-width (`6`) `u64` geometry hosting Judkins Shogi — a 6x6
+    /// reduction of Shogi with one each of King, Gold and Silver General, Knight,
+    /// Bishop, Rook, and Pawn (no Lance). A square index reaches `35`, and
+    /// edge-masked east/west shifts must not wrap past the sixth file. Files run
+    /// a..f, ranks 1..6. It reuses Shogi's persistent capture-fed hand, drops, and
+    /// promotion on the smaller board, with a two-rank promotion zone.
+    Judkins6x6,
+    u64,
+    6,
+    6
+);
+
+geometry!(
+    /// The Micro Shogi board: four files by five ranks (20 squares), backed by
+    /// `u64`.
+    ///
+    /// A tiny even-width (`4`) `u64` geometry hosting Micro Shogi — a 4x5 Shogi
+    /// whose pieces start pre-promoted and flip form (promote / demote) whenever
+    /// they capture. A square index reaches `19`, and edge-masked east/west shifts
+    /// must not wrap past the fourth file. Files run a..d, ranks 1..5. It reuses
+    /// Shogi's persistent capture-fed hand and drops (in either form) on the
+    /// smaller board.
+    Micro4x5,
+    u64,
+    4,
     5
 );
 

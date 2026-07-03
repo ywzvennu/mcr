@@ -3355,7 +3355,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // `flips_on_move` target, the per-move flip mechanic that also defines
             // the dual-form drop.
             if drops_can_promote {
-                if let Some(promoted) = V::flips_on_move(role) {
+                // The alternate form is the role's per-move flip target (Kyoto) or,
+                // where the variant flips only on capture (Micro Shogi), its
+                // capture-flip target — both name the held base role's second form.
+                if let Some(promoted) = V::flips_on_move(role).or_else(|| V::flips_on_capture(role))
+                {
                     let targets = V::drop_targets(promoted, us, board) & drop_mask;
                     for sq in targets {
                         out.push(WideMove::drop(promoted, sq));
@@ -4135,6 +4139,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             if let Some(flipped) = V::flips_on_move(moving.role) {
                 u.touch(flipped, &self.board);
             }
+            if mv.is_capture() {
+                if let Some(flipped) = V::flips_on_capture(moving.role) {
+                    u.touch(flipped, &self.board);
+                }
+            }
             if let Some(revealed) = V::reveal_on_move(moving.role, from) {
                 u.touch(revealed, &self.board);
             }
@@ -4297,6 +4306,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // rewrite only — it does not bank anything to hand.
         if let Some(flipped) = V::flips_on_move(moving.role) {
             self.board.set_piece(to, WidePiece::new(us, flipped));
+        }
+
+        // Micro Shogi capture flip (default-off): a piece toggles its form only
+        // when it **captures** (FSF `piecePromotionOnCapture`) — a base piece
+        // promotes, a promoted piece demotes — leaving a quiet move's role
+        // untouched. Like the Kyoto per-move flip above it is a post-move board
+        // rewrite at the destination, decided after legality, so the move's own
+        // legality is unaffected; only the next position sees the flipped role.
+        // Every non-capture and every non-flipping variant returns `None` / is not
+        // a capture and is byte-identical.
+        if mv.is_capture() {
+            if let Some(flipped) = V::flips_on_capture(moving.role) {
+                self.board.set_piece(to, WidePiece::new(us, flipped));
+            }
         }
 
         // Jieqi reveal (default-off): a face-down dark piece reveals its identity

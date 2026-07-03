@@ -409,6 +409,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard Xiangqi geometry, palace, river, and flying-general; a dark piece moves as the Xiangqi piece native to its home square and reveals (from a hidden pool) the instant it moves.",
             oracle: "Rules-validated (not an FSF variant, hidden identities); the deterministic all-dark core perft-matches FSF `UCI_Variant xiangqi`.",
         },
+        WideVariantId::Judkins => Meta {
+            display: "Judkins Shogi (6x6 Shogi)",
+            pieces: "One each of King, Rook, Bishop, Gold and Silver Generals, Knight, and Pawn — no Lance.",
+            rules: "6x6 Shogi with a hand and drops and a two-rank promotion zone; nifu and dead-piece drop rules (Pawn last rank, Knight last two ranks), no uchifuzume. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant judkins`).",
+        },
         WideVariantId::Karouk => Meta {
             display: "Ka Ouk (Kar Ouk)",
             pieces: "Makruk army: Rook, Knight, Khon (silver), Met (ferz), King, single-step promote-to-Met pawns.",
@@ -456,6 +462,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             pieces: "Shogi-chess hybrid army: Pawn, Knight, Bishop, Rook, Cardinal, Marshal, Queen, Angel, King, promoting to stronger forms (Guard, Centaur, Archer, Tiger, Rhino, Ship).",
             rules: "9x9 crazyhouse with captures-to-hand and drops (nifu, no pawn on the last rank); mandatory far-three-ranks promotion; campmate when a King reaches the enemy back rank. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant mansindam`).",
+        },
+        WideVariantId::Micro => Meta {
+            display: "Micro Shogi (4x5 Shogi)",
+            pieces: "One each of King, Rook, Bishop, Lance, and Pawn, with the Rook and Lance starting pre-promoted; promoted forms +R and +B move as Gold, +L as Silver, and +P as a Knight.",
+            rules: "4x5 Shogi with a hand and drops (dual-form, no nifu or dead-piece restrictions); no promotion zone — a piece flips form only on a capture (a base piece promotes, a promoted piece demotes). Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant micro`).",
         },
         WideVariantId::Minishogi => Meta {
             display: "Minishogi (5x5 Shogi)",
