@@ -292,6 +292,14 @@ impl WideVariant<Chess8x8> for SynochessRules {
         true
     }
 
+    fn flag_contest_defers_to_facing() -> bool {
+        // Synochess's flag contest is the flying-general faceoff: a king may enter
+        // its (enemy-king-held) flag rank whenever a piece breaks the king-to-king
+        // line, so the whole-rank ban would wrongly drop that legal step. Defer to
+        // the per-move flying-general verify, which respects the blocker.
+        true
+    }
+
     fn stalemate_is_loss() -> bool {
         true
     }

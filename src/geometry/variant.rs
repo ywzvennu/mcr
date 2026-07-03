@@ -717,11 +717,30 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// on the per-move verify path, and each consults this gate on its own path.
     ///
     /// Synochess additionally forbids a king from **moving onto** its own flag rank
-    /// while the enemy king already occupies it (the flag is contested) — capturing
-    /// the enemy king there is the only flag-rank move then permitted; that
-    /// contested-flag restriction is enforced only on the verify path Synochess
+    /// while the enemy king already occupies it *and faces it down that rank* (the
+    /// flag is contested) — a piece strictly between the two kings breaks the faceoff
+    /// and makes the step legal, exactly as the flying general does
+    /// ([`flag_contest_defers_to_facing`](WideVariant::flag_contest_defers_to_facing)).
+    /// That contested-flag restriction is enforced only on the verify path Synochess
     /// already takes for its cannons / flying general, so it never affects Orda.
     fn has_flag_win() -> bool {
+        false
+    }
+
+    /// Returns `true` if the contested-flag-rank restriction is governed by the
+    /// **flying-general faceoff** rather than a coarse whole-rank ban.
+    ///
+    /// When the enemy king already stands on this side's flag rank, a king may not
+    /// step onto that rank into a position **facing** the enemy king down the rank.
+    /// That faceoff — like the [`extra_royal_attack`](WideVariant::extra_royal_attack)
+    /// flying general — is broken by any piece strictly **between** the two kings, so
+    /// the step is legal when a blocker interposes. The default `false` forbids the
+    /// whole contested rank outright (the shared behaviour every flag variant without
+    /// a flying general relies on). A flying-general flag variant (Synochess) returns
+    /// `true`, deferring the contest to its per-move flying-general verify, which
+    /// respects the blocker instead of banning the entire rank. Only consulted while
+    /// [`has_flag_win`](WideVariant::has_flag_win) is `true`.
+    fn flag_contest_defers_to_facing() -> bool {
         false
     }
 
