@@ -319,7 +319,7 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
 mod tests {
     use super::*;
 
-    /// The corpus FENs all parse on the generic Khan's Chess engine, round-trip
+    /// The corpus FENs all parse on the generic engine for Khan's Chess, round-trip
     /// through mcr's FEN I/O, and the pinned shallow counts match the FSF-confirmed
     /// numbers in `tests/perft_khans.rs` (this runs without FSF present).
     #[test]

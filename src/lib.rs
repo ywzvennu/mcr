@@ -73,7 +73,7 @@
 //!   [`WideVariantId`](geometry::WideVariantId).
 //! - **Ataxx** — the [`ataxx`] module is a self-contained 7×7 stones game
 //!   (clone / jump / flip), **not** a chess variant: it shares none of the
-//!   chess engine's geometry, pieces, or move generator and stands entirely
+//!   chess core's geometry, pieces, or move generator and stands entirely
 //!   apart from the types above.
 //!
 //! ## Quick start
