@@ -11,11 +11,16 @@
 //! # Versioning
 //!
 //! Every encoding begins with a **single tag byte** that selects both the value
-//! kind and the format version. The version-1 tags are [`TAG_MOVE`],
-//! [`TAG_POSITION`], [`TAG_ANY_POSITION`], and [`TAG_GAME`] (all in the `0xC_`
-//! range). A future incompatible layout takes a fresh tag value (e.g. the `0xD_`
-//! range) so an old decoder rejects it with [`WireError::BadTag`] rather than
-//! misreading it. The decoders never panic: malformed, truncated, or
+//! kind and the format version. The version-2 tags are [`TAG_MOVE`],
+//! [`TAG_POSITION`], [`TAG_ANY_POSITION`], and [`TAG_GAME`] (all in the `0xD_`
+//! range). Version 2 (issue #448) widened the role field to 8 bits: the packed
+//! [`WideMove`] word moved its kind / gate fields up one bit, and the position
+//! board section now stores a **separate colour bitset** plus a **full 1-byte
+//! role** per occupied square (rather than the v1 `colour << 7 | role` byte, which
+//! could not also hold the colour bit once the role filled all eight). The v1 tags
+//! were the `0xC_` range; a v1 decoder rejects a v2 tag with [`WireError::BadTag`]
+//! rather than misreading the moved fields. A future incompatible layout again
+//! takes a fresh tag value. The decoders never panic: malformed, truncated, or
 //! out-of-range input returns a [`WireError`].
 //!
 //! # Move layout ([`WideMove`])
@@ -34,9 +39,16 @@
 //!
 //! 1. a **`u16` flags** word (little-endian) marking which optional sections
 //!    follow (`F_EP` … `F_CLOCKS`) plus the side to move (`F_TURN_BLACK`);
-//! 2. the **board**: an occupancy bitset of `ceil(SQUARES / 8)` bytes, then one
-//!    byte per occupied square in ascending order — `color << 7 | role` (the role
-//!    index is `0..76`, so it fits the low 7 bits);
+//! 2. the **board** (wire-format v2): an occupancy bitset of `ceil(SQUARES / 8)`
+//!    bytes, then a **colour plane** of `ceil(N / 8)` bytes (`N` = the piece
+//!    count) — one bit per occupied square in ascending index order, a set bit
+//!    marking a **Black** piece — then one full role byte per occupied square in
+//!    the same order (the `WideRole` index, `0..=255`). A separate colour plane is
+//!    needed because the 8-bit role now fills the whole byte, leaving no top bit to
+//!    carry the colour as v1 did; sizing it by the piece count `N` rather than the
+//!    board area keeps sparse positions compact. Occupancy is decoded first, so
+//!    `N` and the filled squares are known before the colour and role bytes are
+//!    read;
 //! 3. the present optional sections, in flag-bit order: en passant (1 square
 //!    byte), castling (4 rook-file bytes, `255` = no right), Seirawan gating
 //!    (eligible bitset + a reserve nibble byte), the hand / setup pocket (a
@@ -56,14 +68,14 @@ use super::{
 };
 use crate::Color;
 
-/// Format tag for a standalone [`WideMove`] (version 1).
-pub const TAG_MOVE: u8 = 0xC1;
-/// Format tag for a typed [`GenericPosition`] body (version 1).
-pub const TAG_POSITION: u8 = 0xC2;
-/// Format tag for a self-describing [`AnyWideVariant`] position (version 1).
-pub const TAG_ANY_POSITION: u8 = 0xC3;
-/// Format tag for a game record — a start position plus a move list (version 1).
-pub const TAG_GAME: u8 = 0xC4;
+/// Format tag for a standalone [`WideMove`] (version 2).
+pub const TAG_MOVE: u8 = 0xD1;
+/// Format tag for a typed [`GenericPosition`] body (version 2).
+pub const TAG_POSITION: u8 = 0xD2;
+/// Format tag for a self-describing [`AnyWideVariant`] position (version 2).
+pub const TAG_ANY_POSITION: u8 = 0xD3;
+/// Format tag for a game record — a start position plus a move list (version 2).
+pub const TAG_GAME: u8 = 0xD4;
 
 // Position flag bits (a little-endian `u16` after the tag).
 const F_TURN_BLACK: u16 = 1 << 0;
@@ -396,16 +408,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         out.extend_from_slice(&flags.to_le_bytes());
 
-        // Board: occupancy bitset, then a colour+role byte per occupied square in
-        // ascending index order (the same order the decoder walks).
+        // Board (wire-format v2, issue #448): an occupancy bitset, then a colour
+        // plane of `ceil(N/8)` bytes — one bit per occupied square in ascending
+        // index order, a set bit marking a Black piece — then a full 1-byte role
+        // per occupied square in the same order. The colour rides in its own plane
+        // because an 8-bit role fills the whole role byte, leaving no top bit to
+        // carry it as v1 did; sizing that plane by the piece count `N` (not the
+        // board area) keeps sparse positions compact.
         let occupied = board.occupied();
         encode_bitset(occupied, out);
+        // A piece count never exceeds the square count, so `ceil(N/8)` fits the same
+        // fixed buffer the occupancy bitset uses.
+        let mut colour = [0u8; MAX_BITSET_BYTES];
+        let mut n = 0usize;
         for sq in occupied {
             let piece = board
                 .piece_at(sq)
                 .expect("occupied square holds a piece by construction");
-            let color_bit = if piece.color == Color::Black { 0x80 } else { 0 };
-            out.push(color_bit | piece.role.index() as u8);
+            if piece.color == Color::Black {
+                colour[n / 8] |= 1 << (n % 8);
+            }
+            n += 1;
+        }
+        out.extend_from_slice(&colour[..n.div_ceil(8)]);
+        for sq in occupied {
+            let piece = board
+                .piece_at(sq)
+                .expect("occupied square holds a piece by construction");
+            out.push(piece.role.index() as u8);
         }
 
         if let Some(ep) = state.ep_square {
@@ -463,17 +493,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let mut cur = Cursor::new(bytes);
         let flags = cur.u16_le()?;
 
+        // Board (wire-format v2, issue #448): occupancy bitset, a colour plane of
+        // `ceil(N/8)` bytes (one bit per occupied square, ascending order, set =
+        // Black), then a full 1-byte role per occupied square in the same order.
         let occupied = decode_bitset::<G>(&mut cur)?;
+        let n = occupied.into_iter().count();
+        let colour = cur.take(n.div_ceil(8))?;
         let mut board = Board::<G>::empty();
-        for sq in occupied {
-            let byte = cur.u8()?;
-            let color = if byte & 0x80 != 0 {
+        for (i, sq) in occupied.into_iter().enumerate() {
+            let role_ix = cur.u8()?;
+            let role = WideRole::from_index(role_ix as usize).ok_or(WireError::BadRole(role_ix))?;
+            let color = if colour[i / 8] & (1 << (i % 8)) != 0 {
                 Color::Black
             } else {
                 Color::White
             };
-            let role_ix = byte & 0x7f;
-            let role = WideRole::from_index(role_ix as usize).ok_or(WireError::BadRole(role_ix))?;
             board.set_piece(sq, WidePiece::new(color, role));
         }
 
@@ -626,6 +660,8 @@ pub fn decode_game(bytes: &[u8]) -> Result<(AnyWideVariant, Vec<WideMove>), Wire
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
     use crate::geometry::{Chess8x8, Seirawan, Shogi, Square, WideMoveKind, WideVariantId};
 
@@ -698,6 +734,61 @@ mod tests {
         ));
         // Truncated body (tag + partial flags).
         assert!(Pos::from_bytes(&[TAG_POSITION, 0]).is_err());
+    }
+
+    #[test]
+    fn board_role_byte_is_full_8_bits() {
+        // Wire-format v2 (issue #448): the board section stores a full 1-byte role
+        // per occupied square (plus a separate colour bitset), so a role index >=
+        // 128 — which the jumbo shogi armies (#401 Dai, #402 Tenjiku) will add — is
+        // carried without the v1 `& 0x7f` truncation. No real `WideRole` reaches
+        // index 128 yet, so we drive the decoder over a hand-built v2 board body:
+        // the full role byte must reach `WideRole::from_index` intact (rejected as
+        // `BadRole` only because no such role exists *yet*), never silently masked
+        // down to a different, valid role as a 7-bit field would.
+        type Pos = GenericPosition<Chess8x8, crate::geometry::StandardChess>;
+        let bitset = (Chess8x8::SQUARES as usize).div_ceil(8); // 8 bytes for 64 squares
+
+        // Build a body: 2 flag bytes (all optional sections off), an occupancy
+        // bitset with only square 0 set, a 1-byte colour plane (one occupied
+        // square, White), then one role byte for square 0.
+        let body = |role_byte: u8| -> Vec<u8> {
+            let mut v = Vec::new();
+            v.extend_from_slice(&0u16.to_le_bytes()); // flags: nothing set, White to move
+            let mut occ = vec![0u8; bitset];
+            occ[0] = 0x01; // square 0 occupied
+            v.extend_from_slice(&occ);
+            v.push(0); // colour plane: ceil(1/8) = 1 byte, bit 0 clear = White
+            v.push(role_byte);
+            v
+        };
+
+        // A role byte with bit 7 set (index 130) is read as index 130 — out of
+        // range *today*, so `BadRole(130)`. A v1 `& 0x7f` mask would have read it as
+        // index 2 (Bishop) and silently mis-decoded, so this proves the full byte
+        // is honoured and index 130 will round-trip once role 130 exists.
+        assert!(matches!(
+            Pos::decode_body(&body(130)),
+            Err(WireError::BadRole(130))
+        ));
+
+        // A high-but-valid index (126, the current top slot) still decodes to the
+        // right role, and the colour plane — not a role byte bit — decides colour.
+        let hi_role = WideRole::from_index(126).expect("index 126 is a valid role");
+        let pos = Pos::decode_body(&body(126)).expect("valid high-index role decodes");
+        let piece = pos.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();
+        assert_eq!(piece.role, hi_role);
+        assert_eq!(piece.color, Color::White);
+
+        // Flip the colour plane's first bit (the sole occupied square): same role
+        // byte, now Black — proving colour rides its own plane, decoupled from the
+        // (now full) role byte.
+        let mut black_body = body(126);
+        black_body[2 + bitset] |= 0x01; // the 1-byte colour plane, right after occupancy
+        let pos_b = Pos::decode_body(&black_body).expect("Black high-index role decodes");
+        let piece_b = pos_b.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();
+        assert_eq!(piece_b.role, hi_role);
+        assert_eq!(piece_b.color, Color::Black);
     }
 
     #[test]

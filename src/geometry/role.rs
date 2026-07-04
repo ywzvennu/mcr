@@ -1172,23 +1172,24 @@ impl WideRole {
     ///
     /// This grows as fairy variants land and add roles.
     ///
-    /// # Role budget (7-bit field — nearly exhausted)
+    /// # Role budget (8-bit field — 256-role ceiling)
     ///
-    /// The role index is a **7-bit field** everywhere it is packed: the binary
-    /// wire board byte is `color_bit | role.index()` with `color_bit = 1 << 7`
-    /// (`super::binary`), and [`WideMove`](super::WideMove) carries the role in
-    /// bits 16..23 (`ROLE_MASK == 0x7f`). That caps the table at **128** roles
-    /// (indices `0..=127`); adding a 128th role's index (`128`) would be
-    /// truncated by the `0x7f` mask to `0` (Pawn) and silently corrupt every
-    /// packed move — so `COUNT` must never exceed `128`.
+    /// The role index is an **8-bit field** everywhere it is packed (wire-format
+    /// v2, issue #448): the binary wire board byte is now a **full 1-byte role**
+    /// alongside a separate colour bitset (`super::binary`), and
+    /// [`WideMove`](super::WideMove) carries the role in bits 16..24
+    /// (`ROLE_MASK == 0xff`). That caps the table at **256** roles (indices
+    /// `0..=255`); adding a 256th role's index (`256`) would be truncated by the
+    /// `0xff` mask to `0` (Pawn) and silently corrupt every packed move — so
+    /// `COUNT` must never exceed `256`.
     ///
-    /// At `COUNT == 127` there is **exactly one** free slot (index `127`) left.
-    /// The jumbo shogi variants (issue #401 Dai, #402 Tenjiku) each introduce
-    /// several genuinely-new movers and cannot fit: landing them requires first
-    /// widening the role field to 8 bits (a wire-format version bump touching
-    /// `super::binary` and [`WideMove`](super::WideMove)). See issue #441 for the
-    /// budget audit and the widening design. Do **not** grow this past `127`
-    /// without that widening.
+    /// At `COUNT == 127` there are **129** free slots left, ample room for the
+    /// jumbo shogi armies (issue #401 Dai, #402 Tenjiku), which #448 widened the
+    /// field to unblock. Before #448 the field was 7 bits (a 128-role ceiling,
+    /// one slot from full); see issue #441 for the budget audit and the widening
+    /// design. Do **not** grow this past `256` without another field widening (a
+    /// fresh wire-format version bump touching `super::binary` and
+    /// [`WideMove`](super::WideMove)).
     pub const COUNT: usize = 127;
 
     /// Every role, in index order (pawn first, reserved last).
