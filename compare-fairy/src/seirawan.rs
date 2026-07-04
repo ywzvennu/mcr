@@ -1,19 +1,19 @@
 //! Seirawan chess (S-Chess, 8x8) differential perft + timing against
 //! Fairy-Stockfish (issue #173).
 //!
-//! Seirawan runs on mce's **generic** 8x8 engine (`mce::geometry::Seirawan`, a
+//! Seirawan runs on mcr's **generic** 8x8 engine (`mcr::geometry::Seirawan`, a
 //! `GenericPosition<Chess8x8, SeirawanRules>`), not the concrete `AnyVariant`
 //! layer the shared corpus drives, so — like Makruk and Capablanca — it has its
 //! own corpus and comparison loop here. The FSF side selects
 //! `UCI_Variant seirawan`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput.
+//! match, and reports mcr-vs-FSF throughput.
 //!
 //! ## FEN dialect
 //!
-//! mce spells the Hawk (its [`WideRole::Hawk`](mce::geometry::WideRole)
+//! mcr spells the Hawk (its [`WideRole::Hawk`](mcr::geometry::WideRole)
 //! bishop-knight compound) `a`/`A` on the **board** — the same letter Capablanca's
 //! Archbishop uses, since the two share the role — whereas FSF's S-Chess spells the
-//! board Hawk `h`/`H`. (The Elephant is `e`/`E` in both, and mce's reserve `[..]`
+//! board Hawk `h`/`H`. (The Elephant is `e`/`E` in both, and mcr's reserve `[..]`
 //! bracket already prints the Hawk as `H`/`h`, matching FSF.) The mismatch only
 //! ever shows once a Hawk is **gated onto the board**: the hand-picked corpus below
 //! keeps both reserves un-gated, so its boards carry no Hawk and a verbatim FEN
@@ -28,13 +28,13 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Seirawan};
+use mcr::geometry::{perft as gperft, Chess8x8, Seirawan};
 
 use crate::uci::Engine;
 
-/// Rewrite an mce-dialect Seirawan FEN into the FSF dialect: the Hawk's letter
+/// Rewrite an mcr-dialect Seirawan FEN into the FSF dialect: the Hawk's letter
 /// `a`/`A` becomes `h`/`H` in the *placement* field only (which includes the
-/// reserve `[..]` bracket, though mce already prints reserve Hawks as `H`/`h`, so
+/// reserve `[..]` bracket, though mcr already prints reserve Hawks as `H`/`h`, so
 /// that part is a no-op). The Elephant `e`/`E`, the gating-rights castling field
 /// (whose file letters span `a`..`h`), and every other field are unchanged. For a
 /// board with no gated Hawk (every hand-picked corpus position) this is the
@@ -57,7 +57,7 @@ pub fn fen_to_fsf(fen: &str) -> String {
     }
 }
 
-/// One Seirawan corpus position, in the **mce dialect** (board Hawk = `a`/`A`).
+/// One Seirawan corpus position, in the **mcr dialect** (board Hawk = `a`/`A`).
 struct Case {
     label: &'static str,
     fen: &'static str,
@@ -98,17 +98,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -121,22 +121,22 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Seirawan corpus through mce and FSF. Returns the number of mismatches
+/// Run the Seirawan corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched). Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
     println!();
     println!("Seirawan / S-Chess (8x8) — generic engine vs FSF UCI_Variant seirawan (issue #173):");
     let head = format!(
         "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -155,10 +155,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -171,16 +171,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
 
     // Node-weighted aggregate throughput.
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "seirawan OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "seirawan OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -193,21 +193,21 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Seirawan parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH seirawan/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH seirawan/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Seirawan position through mce's generic perft and FSF's `go perft`.
+/// Run one Seirawan position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    // mce side: the generic Seirawan position over the 8x8 geometry.
-    let pos = Seirawan::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side: the generic Seirawan position over the 8x8 geometry.
+    let pos = Seirawan::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: rewrite a board Hawk's letter into the FSF dialect (a no-op for
     // every un-gated corpus board, but correct once a Hawk is gated on).
@@ -220,10 +220,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }

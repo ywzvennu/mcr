@@ -1,8 +1,8 @@
-//! `mce fairy` — surface the geometry-layer fairy variants (xiangqi, shogi,
+//! `mcr fairy` — surface the geometry-layer fairy variants (xiangqi, shogi,
 //! janggi, orda, …) from the shell.
 //!
 //! These variants live on the generic geometry engine and are reached at runtime
-//! through [`mce::geometry::AnyWideVariant`] / [`mce::geometry::WideVariantId`],
+//! through [`mcr::geometry::AnyWideVariant`] / [`mcr::geometry::WideVariantId`],
 //! a separate dispatch from the concrete engine's `AnyVariant` (which the other
 //! subcommands use). The operations mirror what the rest of the CLI already does
 //! for standard chess — list the variants, count perft nodes, inspect a position
@@ -11,11 +11,11 @@
 
 use clap::{Args, Subcommand};
 
-use mce::geometry::WideVariantId;
+use mcr::geometry::WideVariantId;
 
 use crate::util::{self, CliResult};
 
-/// Arguments for `mce fairy <SUBCOMMAND>`.
+/// Arguments for `mcr fairy <SUBCOMMAND>`.
 #[derive(Debug, Args)]
 pub struct FairyArgs {
     #[command(subcommand)]
@@ -44,7 +44,7 @@ struct PositionArgs {
     fen: String,
 }
 
-/// `mce fairy perft <VARIANT> <FEN|startpos> <DEPTH>`.
+/// `mcr fairy perft <VARIANT> <FEN|startpos> <DEPTH>`.
 #[derive(Debug, Args)]
 struct PerftArgs {
     #[command(flatten)]
@@ -56,7 +56,7 @@ struct PerftArgs {
     divide: bool,
 }
 
-/// `mce fairy play <VARIANT> <FEN|startpos> <UCI>...`.
+/// `mcr fairy play <VARIANT> <FEN|startpos> <UCI>...`.
 #[derive(Debug, Args)]
 struct PlayArgs {
     #[command(flatten)]
@@ -85,7 +85,7 @@ fn list() -> CliResult {
 
 /// Perft over a fairy variant. `AnyWideVariant` exposes a whole-tree `perft` but
 /// no divide, so the per-root-move breakdown is built by playing each root move
-/// and counting one ply shallower (the same shape `mce perft --variant` uses).
+/// and counting one ply shallower (the same shape `mcr perft --variant` uses).
 fn perft(args: PerftArgs) -> CliResult {
     let id = util::parse_wide_variant(&args.pos.variant)?;
     let pos = util::load_wide_variant(id, &args.pos.fen)?;
@@ -157,11 +157,11 @@ fn play(args: PlayArgs) -> CliResult {
 }
 
 /// Renders a fairy outcome as a short phrase.
-fn outcome_string(outcome: mce::geometry::WideOutcome) -> String {
+fn outcome_string(outcome: mcr::geometry::WideOutcome) -> String {
     match outcome {
-        mce::geometry::WideOutcome::Decisive { winner } => {
+        mcr::geometry::WideOutcome::Decisive { winner } => {
             format!("{} wins", util::side_name(winner))
         }
-        mce::geometry::WideOutcome::Draw => "draw".to_owned(),
+        mcr::geometry::WideOutcome::Draw => "draw".to_owned(),
     }
 }

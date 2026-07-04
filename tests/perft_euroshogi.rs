@@ -5,7 +5,7 @@
 //! **hand**, **drops**, and far-three-rank **promotion zone** machinery.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::EuroShogi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::EuroShogi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant euroshogi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position — the start-position perft-2 divide matches FSF
 //! move-for-move. The `compare-fairy/` harness re-runs that head-to-head on
@@ -20,7 +20,7 @@
 //! 1nbgkgn1/1r4b1/pppppppp/8/8/PPPPPPPP/1B4R1/1NGKGBN1[] w - - 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket; the piece
+//! mcr renders the same position with an empty `[]` holdings bracket; the piece
 //! letters coincide with FSF's — `k g n b r p` and the `+`-prefixed promoted
 //! forms — so no FEN dialect rewrite is needed. The FSF-confirmed startpos perft
 //! sequence is `25, 625, 15424, 380499, 9451149`.
@@ -37,13 +37,13 @@
 //! ## Note on *uchifuzume* (no pawn-drop mate)
 //!
 //! As with Shogi (#190), **FSF's `euroshogi` perft does not enforce uchifuzume**,
-//! so mce, validated node-for-node against FSF, does not filter it either. The
+//! so mcr, validated node-for-node against FSF, does not filter it either. The
 //! `drops` case exercises the dead-Pawn (no last-rank) and nifu Pawn-drop rules.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_euroshogi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, EuroShogi};
+use mcr::geometry::{perft as gperft, Chess8x8, EuroShogi};
 
 /// The EuroShogi starting FEN, confirmed against Fairy-Stockfish's `UCI_Variant
 /// euroshogi`. The hand is empty (`[]`).

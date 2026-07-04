@@ -26,7 +26,7 @@
 //!
 //! 1. **Starting array.** ASEAN uses the symmetric FIDE layout — both kings on
 //!    the e-file and both Mets on the d-file — rather than Makruk's mirrored
-//!    Met/King pair. Internally mce names the Khon `s` and the Met `m`, so the
+//!    Met/King pair. Internally mcr names the Khon `s` and the Met `m`, so the
 //!    placement is `rnsmksnr/.../RNSMKSNR`; rewriting `s→b`, `m→q` yields the
 //!    Fairy-Stockfish dialect `rnbqkbnr/.../RNBQKBNR`.
 //! 2. **Promotion.** A pawn promotes on the **last rank** (FIDE-style, rank
@@ -78,7 +78,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct AseanRules;
 
-/// The confirmed ASEAN starting placement (mce dialect; `s`=Khon, `m`=Met),
+/// The confirmed ASEAN starting placement (mcr dialect; `s`=Khon, `m`=Met),
 /// validated against Fairy-Stockfish `UCI_Variant asean`. Symmetric FIDE
 /// layout: both Mets on the d-file, both kings on the e-file.
 const ASEAN_START_PLACEMENT: &str = "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSMKSNR";

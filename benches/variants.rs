@@ -20,8 +20,8 @@
 //! name, e.g. `cargo bench --bench variants -- wide_variant_perft`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{Atomic, Crazyhouse};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::{Atomic, Crazyhouse};
 use std::hint::black_box;
 
 // A middlegame atomic position with live capture/explosion interactions.

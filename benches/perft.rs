@@ -8,7 +8,7 @@
 //! Run with `cargo bench --bench perft`.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use mce::{perft, Position};
+use mcr::{perft, Position};
 use std::hint::black_box;
 
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

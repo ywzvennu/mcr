@@ -1,11 +1,11 @@
-# mce fuzz targets
+# mcr fuzz targets
 
-Coverage-guided fuzz targets for the `mce` chess engine, built on
+Coverage-guided fuzz targets for the `mcr` chess rules library, built on
 [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) /
 [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html).
 
-This is a **separate nested crate** (`mce-fuzz`, `publish = false`) that depends
-on `mce` by path. It is not part of the published library, the parent crate's
+This is a **separate nested crate** (`mcr-fuzz`, `publish = false`) that depends
+on `mcr` by path. It is not part of the published library, the parent crate's
 workspace, or its normal `cargo build` / `cargo test`. The generated
 `fuzz/target`, `fuzz/corpus`, and `fuzz/artifacts` directories are gitignored and
 must never be committed.

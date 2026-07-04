@@ -47,12 +47,12 @@
 //! ## Confirmed starting FEN
 //!
 //! The starting array is pinned against Fairy-Stockfish's `UCI_Variant shatar`
-//! (whose dialect spells the Bers `j`; mce spells it `d`, the
+//! (whose dialect spells the Bers `j`; mcr spells it `d`, the
 //! [`WideRole::General`] letter, since `j` already names the Xiangqi Horse):
 //!
 //! ```text
 //! FSF : rnbjkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBJKBNR w - - 0 1
-//! mce : rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1
+//! mcr : rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1
 //! ```
 //!
 //! The Bers sits on the queen's file (file 3) beside the king (file 4). Both
@@ -78,7 +78,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ShatarRules;
 
-/// The confirmed Shatar starting FEN placement (mce dialect: the Bers is `d`,
+/// The confirmed Shatar starting FEN placement (mcr dialect: the Bers is `d`,
 /// the [`WideRole::General`] letter), validated against Fairy-Stockfish
 /// `UCI_Variant shatar`. The centre pawns start pre-advanced (`3p4` / `3P4`).
 const SHATAR_START_PLACEMENT: &str = "rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR";

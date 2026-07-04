@@ -40,7 +40,7 @@
 //! in-memory table).
 //!
 //! ```
-//! use mce::geometry::{AnyWideVariant, WideBook, WideVariantId};
+//! use mcr::geometry::{AnyWideVariant, WideBook, WideVariantId};
 //!
 //! let pos = AnyWideVariant::startpos(WideVariantId::Xiangqi);
 //! let mv = pos.legal_moves()[0];

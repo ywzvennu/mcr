@@ -34,11 +34,11 @@
 //!
 //! Adding a future variant is one `variant_test!` line.
 //!
-//! [`WideVariant::role_attack_is_leg_asymmetric`]: mce::geometry::WideVariant::role_attack_is_leg_asymmetric
-//! [`WideVariant::role_attack_is_directional`]: mce::geometry::WideVariant::role_attack_is_directional
-//! [`WideVariant::role_attacks`]: mce::geometry::WideVariant::role_attacks
+//! [`WideVariant::role_attack_is_leg_asymmetric`]: mcr::geometry::WideVariant::role_attack_is_leg_asymmetric
+//! [`WideVariant::role_attack_is_directional`]: mcr::geometry::WideVariant::role_attack_is_directional
+//! [`WideVariant::role_attacks`]: mcr::geometry::WideVariant::role_attacks
 
-use mce::geometry::{
+use mcr::geometry::{
     AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
     CapahouseRules, ChakRules, ChancellorRules, ChennisRules, CourierRules, DobutsuRules,
     DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules,
@@ -50,12 +50,12 @@ use mce::geometry::{
     Square, StandardChess, SynochessRules, TencubedRules, ToriRules, WashogiRules, WideRole,
     WideVariant, XiangfuRules, XiangqiRules,
 };
-use mce::geometry::{
+use mcr::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Courier12x8, Dobutsu3x4, Gorogoro5x6, Grand10x10,
     Judkins6x6, Micro4x5, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11,
     Xiangqi9x10,
 };
-use mce::Color;
+use mcr::Color;
 
 /// One step of splitmix64 — a tiny, fully deterministic, dependency-free PRNG.
 /// Used only to pick move indices during the random playouts, so its quality is
@@ -389,7 +389,7 @@ variant_test!(
 // Bers's `role_attacks` set and `attackers_to` reverse-projection agree, so a
 // Bers check is detected on both the forward (king-danger) and reverse
 // (`attackers_to`) paths. The corpus FENs are reused from `tests/perft_shatar.rs`
-// (each FSF-confirmed, in mce dialect with the Bers spelled `d`): the startpos,
+// (each FSF-confirmed, in mcr dialect with the Bers spelled `d`): the startpos,
 // the Bers-active and open middlegames, and the Robado-exercising position. (A
 // bare-king node generates zero moves but `attackers_to` is still defined and
 // must stay consistent, so the corpus keeps both sides armed.)
@@ -454,7 +454,7 @@ variant_test!(
 // Chancellor (`e` / `WideRole::Elephant`, geometrically symmetric) added to each
 // back rank, so only the pawn is colour-directional, exactly as standard chess.
 // This guards that the compound `role_attacks` and the `attackers_to` reverse-
-// projection agree on the distinct [`Chess9x9`] geometry. The corpus (mce dialect,
+// projection agree on the distinct [`Chess9x9`] geometry. The corpus (mcr dialect,
 // chancellor `e`) pairs a castling position with a developed midgame and a
 // promotion position, reusing the FSF-confirmed FENs from
 // `tests/perft_chancellor.rs`.
@@ -483,7 +483,7 @@ variant_test!(
 // `attackers_to` reverse-projection agree on the distinct [`Courier12x8`] geometry
 // — in particular that an Alfil check (a two-diagonal jump from a square collinear
 // with the king) is detected on both the forward (king-danger) and reverse paths.
-// The corpus (mce dialect) pairs the FSF-confirmed developed midgame and promotion
+// The corpus (mcr dialect) pairs the FSF-confirmed developed midgame and promotion
 // positions from `tests/perft_courier.rs` with an Alfil-check position and a
 // Wazir/Man/Ferz endgame (both sides armed so no node is a baring leaf).
 
@@ -510,7 +510,7 @@ variant_test!(
 // that the compound `role_attacks` and the `attackers_to` reverse-projection agree
 // even with a hand in pocket and a promoted piece (`Q~`) on the board. The corpus
 // mixes a castling position, a midgame with pieces in hand, and a promoted-queen
-// position (all in mce dialect, chancellor `e`).
+// position (all in mcr dialect, chancellor `e`).
 
 variant_test!(
     capahouse,
@@ -546,7 +546,7 @@ variant_test!(
 // sets — a promoted Queen attacks as a Queen — so this guards that the compound
 // `role_attacks` and the `attackers_to` reverse-projection agree even with a hand
 // in pocket and a promoted piece (`Q~`) on the board. The corpus mixes a developed
-// midgame with pieces in hand and a promoted-queen position (mce dialect, marshal
+// midgame with pieces in hand and a promoted-queen position (mcr dialect, marshal
 // `e`).
 
 variant_test!(
@@ -568,7 +568,7 @@ variant_test!(
 // geometrically symmetric, so `attackers_to` reverse-projects them with no
 // override; this guards that the two new leapers' `role_attacks` and the
 // reverse-projection agree (alongside the reused symmetric Marshal `e` / Cardinal
-// `a` compounds). Corpus in the mce dialect (`**w`, `**x`).
+// `a` compounds). Corpus in the mcr dialect (`**w`, `**x`).
 
 variant_test!(
     tencubed,
@@ -590,7 +590,7 @@ variant_test!(
 // symmetric, so `attackers_to` reverse-projects them with no override; this guards
 // that all three new leapers' `role_attacks` and the reverse-projection agree
 // (alongside the reused symmetric Chancellor `e` / Archbishop `a` compounds).
-// Corpus in the mce dialect (`**w`, `**y`, `**z`).
+// Corpus in the mcr dialect (`**w`, `**y`, `**z`).
 
 variant_test!(
     opulent,
@@ -610,7 +610,7 @@ variant_test!(
 // pawn is colour-directional. The unified crazyhouse hand (the `[..]` bracket) and
 // the promoted mask (a `~` token) never touch the attack sets, so this guards that
 // the compound `role_attacks` and the `attackers_to` reverse-projection agree even
-// with a hand in pocket and a promoted piece on the board. Corpus in mce dialect
+// with a hand in pocket and a promoted piece on the board. Corpus in mcr dialect
 // (Hawk `a`).
 
 variant_test!(
@@ -1296,7 +1296,7 @@ variant_test!(
 // startpos, a centred King, a developed middlegame, a Soldier in its promotion
 // half, a Quetzal-active position, a two-royal pseudo-royal position with a Divine
 // Lord and Shaman on the board, and a Divine Lord beside the enemy temple), each in
-// mce dialect with the six new pieces spelled `*s *q *w *l *p *o`.
+// mcr dialect with the six new pieces spelled `*s *q *w *l *p *o`.
 
 variant_test!(
     chak,
@@ -1325,7 +1325,7 @@ variant_test!(
 // on both the king-danger and `attackers_to` paths. The corpus reuses the
 // FSF-confirmed FENs from `tests/perft_shoshogi.rs` (the startpos, a developed
 // middlegame, a two-royal position, a Drunk Elephant in the promotion zone, and a
-// lone Crown Prince in check), each in mce dialect with the doubled-overflow
+// lone Crown Prince in check), each in mcr dialect with the doubled-overflow
 // tokens `**e` / `**c`.
 variant_test!(
     shoshogi,
@@ -1355,7 +1355,7 @@ variant_test!(
 // `attackers_to` reverse-projection agree on both the king-danger and `attackers_to`
 // paths. The corpus reuses the FSF-confirmed FENs from `tests/perft_mansindam.rs`:
 // the startpos, the drop swarm, the promoted-mover board, the lone Angel, and the
-// capture-to-hand midgame, each in mce dialect (Cardinal `a`, Marshal `e`, Angel
+// capture-to-hand midgame, each in mcr dialect (Cardinal `a`, Marshal `e`, Angel
 // `**a`, Rhino `**i`, Ship `**s`).
 variant_test!(
     mansindam,
@@ -1384,7 +1384,7 @@ variant_test!(
 // the `attackers_to` projection agree on both the king-danger and `attackers_to`
 // paths. The corpus reuses the FSF-confirmed FENs from `tests/perft_chennis.rs`:
 // the startpos, the flipping middlegame (a promoted Rook / Bishop / Cannon on the
-// board), and the two drop swarms, each in mce dialect (Ferz `m`, Soldier `z`,
+// board), and the two drop swarms, each in mcr dialect (Ferz `m`, Soldier `z`,
 // Commoner `*u`, Pawn `**p`).
 variant_test!(
     chennis,

@@ -1,11 +1,11 @@
-# mce — Python bindings
+# mcr — Python bindings
 
 Fast, Rust-backed chess move generation and rules — a drop-in-flavoured
 alternative to python-chess for the move-gen / rules layer, covering standard
 chess, Chess960, and the major variants (atomic, antichess, crazyhouse,
 king-of-the-hill, three-check, racing kings, horde).
 
-These are [pyo3](https://pyo3.rs) bindings over the `mce` Rust engine. The
+These are [pyo3](https://pyo3.rs) bindings over the `mcr` Rust engine. The
 extension is built with [maturin](https://www.maturin.rs).
 
 ## Build / install
@@ -19,17 +19,17 @@ maturin build --release     # wheel lands in target/wheels/
 ```
 
 A plain `cargo build` in this directory compiles the `cdylib` as a quick
-compile check, but `import mce` requires the maturin step (which names and
+compile check, but `import mcr` requires the maturin step (which names and
 places the artifact correctly).
 
 ## Quick start
 
 ```python
-import mce
+import mcr
 
-pos = mce.Position()                  # standard chess start position
+pos = mcr.Position()                  # standard chess start position
 assert len(pos.legal_moves()) == 20   # ["a2a3", "a2a4", ...]
-assert mce.perft(pos, 2) == 400
+assert mcr.perft(pos, 2) == 400
 
 pos.push("e2e4")                      # mutate in place (UCI)
 nxt = pos.play("e7e5")                # or get a new position, leaving pos as is
@@ -42,13 +42,13 @@ print(pos.zobrist())                  # 64-bit hash
 print(pos)                            # ASCII board
 
 # Variants:
-atomic = mce.Position(variant="atomic")
-zh = mce.Position.startpos("crazyhouse")
+atomic = mcr.Position(variant="atomic")
+zh = mcr.Position.startpos("crazyhouse")
 ```
 
 ## API
 
-`mce.Position(fen=None, variant="chess")` / `Position.startpos(variant="chess")`
+`mcr.Position(fen=None, variant="chess")` / `Position.startpos(variant="chess")`
 
 | member | returns | notes |
 | --- | --- | --- |
@@ -74,11 +74,11 @@ zh = mce.Position.startpos("crazyhouse")
 | `zobrist()` | `int` | 64-bit |
 | `str(pos)` | `str` | ASCII board |
 
-`mce.perft(position, depth) -> int`
+`mcr.perft(position, depth) -> int`
 
-`mce.FairyPosition(variant, fen=None)` mirrors `Position` for the geometry-layer
+`mcr.FairyPosition(variant, fen=None)` mirrors `Position` for the geometry-layer
 fairy variants (xiangqi, shogi, janggi, …) and also exposes `status()`;
-`mce.variants()` lists the fairy names. The analysis queries are 8x8-only.
+`mcr.variants()` lists the fairy names. The analysis queries are 8x8-only.
 Squares are algebraic (`"e4"`); colours are `"white"` / `"black"`.
 
 Invalid input (bad FEN, illegal/malformed UCI or SAN, unknown variant, a bad
@@ -89,13 +89,13 @@ square or colour) raises `ValueError`; nothing panics across the boundary.
 Load a FEN, list moves, play one, run perft, read the status — the full loop:
 
 ```python
-import mce
+import mcr
 
-pos = mce.Position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+pos = mcr.Position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 print(pos.legal_moves()[:5])          # ['a2a3', 'a2a4', 'b2b3', ...]
 print(pos.is_attacked("f3", "white")) # True (analysis query)
 pos.push("e2e4")
-print(mce.perft(pos, 2))              # node count after 1. e4
+print(mcr.perft(pos, 2))              # node count after 1. e4
 print(pos.status())                   # 'ongoing'
 ```
 

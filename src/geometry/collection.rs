@@ -20,7 +20,7 @@
 //!   [`from_pgn`](WidePgnCollection::from_pgn) to the identical records.
 //!
 //! ```
-//! use mce::geometry::{AnyWideVariant, WideGameRecord, WidePgnCollection, WideVariantId};
+//! use mcr::geometry::{AnyWideVariant, WideGameRecord, WidePgnCollection, WideVariantId};
 //!
 //! // Two short games of different variants, played by a fixed move list.
 //! fn played(id: WideVariantId, plies: usize) -> WideGameRecord {

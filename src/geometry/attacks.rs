@@ -47,7 +47,7 @@ use crate::Color;
 /// [`Square::offset`].
 ///
 /// ```
-/// use mce::geometry::{attacks::leaper_attacks, Chess8x8, Square};
+/// use mcr::geometry::{attacks::leaper_attacks, Chess8x8, Square};
 /// // Wazir (orthogonal one-steppers) on a corner reaches two squares.
 /// let wazir = leaper_attacks::<Chess8x8>(Square::new(0), &[(1, 0), (-1, 0), (0, 1), (0, -1)]);
 /// assert_eq!(wazir.count(), 2);
@@ -94,8 +94,8 @@ const KING_OFFSETS: [(i8, i8); 8] = [
 /// off a side edge are dropped, and a pawn on the far rank attacks nothing.
 ///
 /// ```
-/// use mce::geometry::{attacks::pawn_attacks, Chess8x8, Square};
-/// use mce::Color;
+/// use mcr::geometry::{attacks::pawn_attacks, Chess8x8, Square};
+/// use mcr::Color;
 /// // A white pawn in the centre attacks the two forward diagonals.
 /// assert_eq!(pawn_attacks::<Chess8x8>(Color::White, Square::new(28)).count(), 2);
 /// ```
@@ -112,7 +112,7 @@ pub fn pawn_attacks<G: Geometry>(color: Color, sq: Square<G>) -> Bitboard<G> {
 /// Returns the squares a knight on `sq` attacks.
 ///
 /// ```
-/// use mce::geometry::{attacks::knight_attacks, Chess8x8, Square};
+/// use mcr::geometry::{attacks::knight_attacks, Chess8x8, Square};
 /// // A knight in the centre of an 8x8 board reaches all eight squares.
 /// assert_eq!(knight_attacks::<Chess8x8>(Square::new(27)).count(), 8);
 /// ```
@@ -606,7 +606,7 @@ fn janggi_ray_down<G: Geometry>(
 /// region masks on top) and the Shako cannon (which adds none).
 ///
 /// ```
-/// use mce::geometry::{attacks::cannon_quiet_moves, Chess8x8, Bitboard, Square};
+/// use mcr::geometry::{attacks::cannon_quiet_moves, Chess8x8, Bitboard, Square};
 /// // On an empty 8x8 board a cannon on a1 quietly slides the whole rank and file
 /// // (14 squares), like a rook.
 /// let q = cannon_quiet_moves::<Chess8x8>(Square::new(0), Bitboard::EMPTY);
@@ -640,7 +640,7 @@ pub fn cannon_quiet_moves<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> 
 /// so Xiangqi and Janggi inherit it and add their region masks on top.
 ///
 /// ```
-/// use mce::geometry::{attacks::cannon_capture_targets, Chess8x8, Bitboard, Square};
+/// use mcr::geometry::{attacks::cannon_capture_targets, Chess8x8, Bitboard, Square};
 /// // Screen on a4, enemy on a7: a cannon on a1 captures over the screen onto a7.
 /// let occ = Bitboard::<Chess8x8>::EMPTY
 ///     .with(Square::new(24)) // a4 screen
@@ -693,7 +693,7 @@ pub fn cannon_capture_targets<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>)
 /// move set.
 ///
 /// ```
-/// use mce::geometry::{attacks::janggi_cannon_quiet, Chess8x8, Bitboard, Square};
+/// use mcr::geometry::{attacks::janggi_cannon_quiet, Chess8x8, Bitboard, Square};
 /// // a1 cannon, screen (non-cannon) on a4, nothing beyond: quiet jumps land on
 /// // a5..a8 (the empty squares past the one screen).
 /// let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24)); // a4 screen
@@ -732,7 +732,7 @@ pub fn janggi_cannon_quiet<G: Geometry>(
 /// geometry). Pure geometry on the orthogonals here.
 ///
 /// ```
-/// use mce::geometry::{attacks::janggi_cannon_capture, Chess8x8, Bitboard, Square};
+/// use mcr::geometry::{attacks::janggi_cannon_capture, Chess8x8, Bitboard, Square};
 /// // a1 cannon, non-cannon screen a4, enemy non-cannon a7: capture lands on a7.
 /// let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24)).with(Square::new(48));
 /// let caps = janggi_cannon_capture::<Chess8x8>(Square::new(0), occ, Bitboard::EMPTY);
@@ -807,7 +807,7 @@ fn diag_rays<G: Geometry>(sq: Square<G>) -> DiagRays<G> {
 /// geometry (occupancy-aware); the caller masks out friendly occupants.
 ///
 /// ```
-/// use mce::geometry::{attacks::diag_cannon_capture_targets, Chess8x8, Bitboard, Square};
+/// use mcr::geometry::{attacks::diag_cannon_capture_targets, Chess8x8, Bitboard, Square};
 /// // Screen on c3, enemy on e5: a bishop-cannon on a1 captures over the screen onto e5.
 /// let occ = Bitboard::<Chess8x8>::EMPTY
 ///     .with(Square::new(18)) // c3 screen
@@ -888,7 +888,7 @@ const HORSE_LEGS: [(i8, i8, i8, i8); 8] = [
 /// the board contributes nothing, and the masked shifts never wrap.
 ///
 /// ```
-/// use mce::geometry::{attacks::horse_attacks, Bitboard, Square, Xiangqi9x10};
+/// use mcr::geometry::{attacks::horse_attacks, Bitboard, Square, Xiangqi9x10};
 /// // A horse in the open reaches all eight knight squares with no leg blocked.
 /// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
 /// assert_eq!(horse_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 8);
@@ -934,7 +934,7 @@ const ELEPHANT_EYES: [(i8, i8, i8, i8); 4] = [
 /// same way it adds palace and river masks on top of the other primitives.
 ///
 /// ```
-/// use mce::geometry::{attacks::elephant_attacks_blockable, Bitboard, Square, Xiangqi9x10};
+/// use mcr::geometry::{attacks::elephant_attacks_blockable, Bitboard, Square, Xiangqi9x10};
 /// // A central elephant on an empty board reaches all four two-diagonal squares.
 /// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
 /// assert_eq!(elephant_attacks_blockable::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 4);
@@ -989,7 +989,7 @@ const MAHOUT_LEGS: [(i8, i8, i8, i8); 8] = [
 /// same attackers (no leg asymmetry, unlike the Xiangqi horse).
 ///
 /// ```
-/// use mce::geometry::{attacks::mahout_attacks_blockable, Bitboard, Square, Shogi9x9};
+/// use mcr::geometry::{attacks::mahout_attacks_blockable, Bitboard, Square, Shogi9x9};
 /// // A central Mahout on an empty board reaches all eight two-step squares.
 /// let sq = Square::<Shogi9x9>::from_file_rank(4, 4).unwrap();
 /// assert_eq!(mahout_attacks_blockable::<Shogi9x9>(sq, Bitboard::EMPTY).count(), 8);
@@ -1050,7 +1050,7 @@ const JANGGI_ELEPHANT_LEGS: [(i8, i8, i8, i8, i8, i8); 8] = [
 /// leg contributes nothing, and the masked offsets never wrap).
 ///
 /// ```
-/// use mce::geometry::{attacks::janggi_elephant_attacks, Bitboard, Square, Xiangqi9x10};
+/// use mcr::geometry::{attacks::janggi_elephant_attacks, Bitboard, Square, Xiangqi9x10};
 /// // A central elephant on an empty board reaches all eight long-diagonal squares.
 /// let sq = Square::<Xiangqi9x10>::from_file_rank(4, 4).unwrap();
 /// assert_eq!(janggi_elephant_attacks::<Xiangqi9x10>(sq, Bitboard::EMPTY).count(), 8);
@@ -1177,7 +1177,7 @@ fn step_toward<G: Geometry>(a: Square<G>, b: Square<G>) -> Option<(i8, i8)> {
 /// the empty set.
 ///
 /// ```
-/// use mce::geometry::{attacks::between, Chess8x8, Square};
+/// use mcr::geometry::{attacks::between, Chess8x8, Square};
 /// // C1 to C8 on an 8x8 board: the six squares strictly between.
 /// assert_eq!(between::<Chess8x8>(Square::new(2), Square::new(58)).count(), 6);
 /// ```
@@ -1204,7 +1204,7 @@ pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
 /// Both endpoints are included.
 ///
 /// ```
-/// use mce::geometry::{attacks::line, Chess8x8, Square};
+/// use mcr::geometry::{attacks::line, Chess8x8, Square};
 /// // A whole 8x8 file line has eight squares.
 /// assert_eq!(line::<Chess8x8>(Square::new(2), Square::new(34)).count(), 8);
 /// ```

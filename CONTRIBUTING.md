@@ -1,4 +1,4 @@
-# Contributing to mce
+# Contributing to mcr
 
 Thank you for your interest in contributing!
 
@@ -6,7 +6,7 @@ Thank you for your interest in contributing!
 
 > **IMPORTANT — read this before writing a single line.**
 
-`mce` is a clean-room implementation.
+`mcr` is a clean-room implementation.
 Every contributor must write original code.
 
 **You must not copy, translate, or closely paraphrase source code from any copyleft chess engine**, including but not limited to:

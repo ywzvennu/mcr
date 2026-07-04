@@ -7,10 +7,10 @@
 //! adds the same two compound pieces, so it reuses the [`Cap10x8`] geometry and the
 //! compound-piece defaults; the opening array and the castle files differ:
 //!
-//! * **Chancellor** (Rook + Knight) — mce's [`WideRole::Elephant`], FEN letter
+//! * **Chancellor** (Rook + Knight) — mcr's [`WideRole::Elephant`], FEN letter
 //!   `e`/`E` (FSF spells it `c`/`C`; the `compare-fairy/` harness reconciles).
-//! * **Archbishop** (Bishop + Knight) — mce's [`WideRole::Hawk`], FEN letter
-//!   `a`/`A` in both mce and FSF.
+//! * **Archbishop** (Bishop + Knight) — mcr's [`WideRole::Hawk`], FEN letter
+//!   `a`/`A` in both mcr and FSF.
 //!
 //! Every other rule is standard chess: pawns push one (or two from their second
 //! rank), capture diagonally, take en passant, and promote on the last rank to
@@ -30,10 +30,10 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkcabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKCABNR w KQkq - 0 1
-//! mce dialect: rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1
+//! mcr dialect: rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce). Back
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr). Back
 //! rank a-file to j-file: Rook, Knight, Bishop, Queen, King, Chancellor,
 //! Archbishop, Bishop, Knight, Rook.
 
@@ -43,7 +43,7 @@ use crate::geometry::position::{
 use crate::geometry::{Board, Cap10x8, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
-/// The confirmed Embassy starting placement in the mce dialect (chancellor =
+/// The confirmed Embassy starting placement in the mcr dialect (chancellor =
 /// `e`/`E`), byte-for-byte equivalent to Fairy-Stockfish's
 /// `rnbqkcabnr/.../RNBQKCABNR` modulo the chancellor's letter.
 const EMBASSY_START_PLACEMENT: &str = "rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR";

@@ -4,7 +4,7 @@
 //! river, advisors, or elephants.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Minixiangqi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Minixiangqi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant minixiangqi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/minixiangqi.rs`); this test pins the
@@ -16,34 +16,34 @@
 //!
 //! ```text
 //! FSF dialect: rcnkncr/p1ppp1p/7/7/7/P1PPP1P/RCNKNCR w - - 0 1
-//! mce dialect: rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1
+//! mcr dialect: rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1
 //! ```
 //!
-//! The two describe the same position; mce spells the Horse `j` and the Soldier
-//! `z` because the FSF letters `n p` already name the Knight / Pawn in mce's
-//! [`WideRole`](mce::geometry::WideRole). The chariots (`r`), cannons (`c`), and
+//! The two describe the same position; mcr spells the Horse `j` and the Soldier
+//! `z` because the FSF letters `n p` already name the Knight / Pawn in mcr's
+//! [`WideRole`](mcr::geometry::WideRole). The chariots (`r`), cannons (`c`), and
 //! king (`k`) match. The cannons sit on the b/f files of rank 2, the soldiers on
 //! ranks 2 / 6 (files a, c, d, e, g).
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_minixiangqi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Minixiangqi, Minixiangqi7x7};
+use mcr::geometry::{perft as gperft, Minixiangqi, Minixiangqi7x7};
 
-/// The Minixiangqi starting FEN (mce dialect), confirmed against
+/// The Minixiangqi starting FEN (mcr dialect), confirmed against
 /// Fairy-Stockfish's `UCI_Variant minixiangqi`.
 const STARTPOS: &str = "rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1";
 
 /// A developed **horse / cannon middlegame**, white to move: both sides have a
 /// horse and a cannon advanced off the back rank, so the position exercises the
 /// **horse hobbling-leg**, the **cannon** quiet rays and over-screen captures, and
-/// many ordinary captures at depth. FSF-confirmed move-for-move (mce dialect of
+/// many ordinary captures at depth. FSF-confirmed move-for-move (mcr dialect of
 /// FSF's `r1nkncr/p1ppp1p/2c4/2N4/7/P1PPP1P/R1CKNCR w`).
 const HORSE_CANNON_MID: &str = "r1jkjcr/z1zzz1z/2c4/2J4/7/Z1ZZZ1Z/R1CKJCR w - - 0 1";
 
 /// A **cannon over-screen capture** position, black to move: a white cannon on c4
 /// sees the black cannon on c6 over the soldier screen on c5, and the cannon quiet
-/// rays / over-screen captures are exercised throughout. FSF-confirmed (mce
+/// rays / over-screen captures are exercised throughout. FSF-confirmed (mcr
 /// dialect of FSF's `r1nkn1r/p1p1p1p/2c4/2C4/7/P2P2P/R2KN1R b`).
 const CANNON_CAP: &str = "r1jkj1r/z1z1z1z/2c4/2C4/7/Z2Z2Z/R2KJ1R b - - 0 1";
 
@@ -52,12 +52,12 @@ const CANNON_CAP: &str = "r1jkj1r/z1z1z1z/2c4/2C4/7/Z2Z2Z/R2KJ1R b - - 0 1";
 /// exercised together with the king-safety scan that must register the horse's
 /// (and the soldiers') attacks on the squares around the enemy king.
 ///
-/// This is the position that **previously mismatched FSF** (mce reported 290 at
+/// This is the position that **previously mismatched FSF** (mcr reported 290 at
 /// depth 4, FSF 248): the king-safety scan did not detect a soldier's *forward*
 /// attack on the square directly ahead of it, so it let the enemy king step into
 /// that square. Marking the Soldier's attack as color-directional (so
 /// `attackers_to` reverse-projects the opposing-color soldier pattern) fixes it.
-/// Pinned here as a regression. FSF-confirmed (mce dialect of FSF's
+/// Pinned here as a regression. FSF-confirmed (mcr dialect of FSF's
 /// `3k3/7/3N3/2P1P2/7/7/3K3 w`).
 const HORSE_HOBBLE: &str = "3k3/7/3J3/2Z1Z2/7/7/3K3 w - - 0 1";
 
@@ -66,10 +66,10 @@ const HORSE_HOBBLE: &str = "3k3/7/3J3/2Z1Z2/7/7/3K3 w - - 0 1";
 /// horse on d5. A white soldier on c5 attacks c6 (its forward step), and a soldier
 /// on e5 attacks e6, so the black king may step to neither — it has only d6d7.
 ///
-/// Before the directional-soldier-attack fix, mce's `attackers_to` projected the
+/// Before the directional-soldier-attack fix, mcr's `attackers_to` projected the
 /// *same*-color soldier pattern back from c6 (which points to c7, not c5) and so
 /// missed the c5 soldier, wrongly allowing d6c6 (and d6e6) and inflating perft.
-/// FSF-confirmed (mce dialect of FSF's `7/3k3/2PNP2/7/7/7/3K3 b`).
+/// FSF-confirmed (mcr dialect of FSF's `7/3k3/2PNP2/7/7/7/3K3 b`).
 const SOLDIER_GUARD: &str = "7/3k3/2ZJZ2/7/7/7/3K3 b - - 0 1";
 
 /// A **flying-general pin**, white to move: the two generals stand on the d-file

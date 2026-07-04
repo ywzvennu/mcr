@@ -170,5 +170,5 @@ negative. (The larger cannon-path per-node cost, e.g. the make/unmake scratch
 clone, is intrinsic to the `&self` legal-move API and was already minimized by
 #193/#353.)
 
-[`WideVariantId::ALL`]: https://docs.rs/mce/latest/mce/geometry/enum.WideVariantId.html
-[`AnyWideVariant`]: https://docs.rs/mce/latest/mce/geometry/enum.AnyWideVariant.html
+[`WideVariantId::ALL`]: https://docs.rs/mcr/latest/mcr/geometry/enum.WideVariantId.html
+[`AnyWideVariant`]: https://docs.rs/mcr/latest/mcr/geometry/enum.AnyWideVariant.html

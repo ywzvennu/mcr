@@ -17,7 +17,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 fuzz_target!(|data: &[u8]| {
     // The first byte selects the variant; the remainder is the candidate FEN.

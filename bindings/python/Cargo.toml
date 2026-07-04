@@ -1,12 +1,12 @@
-# mce-python — pyo3 Python bindings for the mce chess engine.
+# mcr-python — pyo3 Python bindings for the mcr chess rules library.
 #
-# This is a separate, nested crate. It is NOT part of the published `mce`
+# This is a separate, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build`/`cargo
-# test`; it depends on `mce` by path. It is `publish = false` and is never
+# test`; it depends on `mcr` by path. It is `publish = false` and is never
 # published from here — distribution happens as a Python wheel built by
 # `maturin` (see pyproject.toml), not via `cargo publish`.
 #
-# Build (preferred, produces an importable `mce` module / wheel):
+# Build (preferred, produces an importable `mcr` module / wheel):
 #     pip install maturin
 #     cd bindings/python
 #     maturin develop            # build + install into the active venv
@@ -16,16 +16,16 @@
 # compile check when maturin is unavailable.
 
 [package]
-name = "mce-python"
+name = "mcr-python"
 version = "0.0.0"
 edition = "2021"
 publish = false
 license = "MIT OR Apache-2.0"
 
 [lib]
-# The Python extension module is a C dynamic library. `name = "mce"` makes the
-# produced artifact `mce.so` / `mce.pyd`, i.e. `import mce`.
-name = "mce"
+# The Python extension module is a C dynamic library. `name = "mcr"` makes the
+# produced artifact `mcr.so` / `mcr.pyd`, i.e. `import mcr`.
+name = "mcr"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -34,12 +34,12 @@ crate-type = ["cdylib"]
 # CPython 3.8+ instead of one wheel per minor version.
 pyo3 = { version = "0.29", features = ["extension-module", "abi3-py38"] }
 
-# Path dependency on the parent mce library. Default features (std) are fine —
+# Path dependency on the parent mcr library. Default features (std) are fine —
 # the binding is a host-side wheel, not a no_std target.
-mce = { path = "../.." }
+mcr = { path = "../.." }
 
 [lints.rust]
-# The core mce library is unsafe-free; keep this binding's own code safe too.
+# The core mcr library is unsafe-free; keep this binding's own code safe too.
 # (pyo3's macro expansion contains its own audited unsafe, which this lint does
 # not reach — it only governs unsafe written directly in this crate.)
 unsafe_code = "deny"

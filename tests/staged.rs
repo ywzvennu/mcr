@@ -12,7 +12,7 @@
 
 use std::collections::BTreeSet;
 
-use mce::{
+use mcr::{
     Antichess, AnyVariant, Atomic, Chess, Chess960, Crazyhouse, Horde, KingOfTheHill, Move,
     Position, RacingKings, ThreeCheck, Variant, VariantId, VariantPosition,
 };
@@ -124,7 +124,7 @@ fn check_anyvariant(pos: &AnyVariant) {
     }
 
     // An illegal/stale TT move is ignored: the set and length are untouched.
-    let bogus = Move::new(mce::Square::A1, mce::Square::A2, mce::MoveKind::Quiet);
+    let bogus = Move::new(mcr::Square::A1, mcr::Square::A2, mcr::MoveKind::Quiet);
     if !legal.contains(&bogus) {
         let with_bogus = pos.staged_moves(Some(bogus));
         let with_bogus_set: BTreeSet<Move> = with_bogus.iter().copied().collect();
@@ -246,7 +246,7 @@ fn staged_captures_ordered_by_victim_value() {
 /// Re-derives the public victim value for a capture (mirrors the crate-internal
 /// MVV key) for the ordering assertion above.
 fn victim_value(pos: &Position, mv: &Move) -> i32 {
-    use mce::{MoveKind, Role};
+    use mcr::{MoveKind, Role};
     let value = |role: Role| match role {
         Role::Pawn => 100,
         Role::Knight => 320,

@@ -7,7 +7,7 @@
 //! see the per-test `cfg_attr` pairs below. Coverage: startpos has 20 legal
 //! moves, perft matches the known counts, and SAN round-trips.
 
-use mce_wasm::{FairyGame, Game};
+use mcr_wasm::{FairyGame, Game};
 
 // On `wasm32-unknown-unknown` the tests run under the `wasm-bindgen-test`
 // harness (executed by `wasm-pack test --node` in CI, on the real wasm target);

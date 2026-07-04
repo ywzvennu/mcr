@@ -4,9 +4,9 @@
 //! (campmate)** terminal rule and the broadened **flying-general** king faceoff.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Empire` perft and by Fairy-Stockfish (FSF, `UCI_Variant empire`,
+//! `mcr::geometry::Empire` perft and by Fairy-Stockfish (FSF, `UCI_Variant empire`,
 //! from its `variants.ini`) running `go perft` on the byte-identical position — the
-//! FSF divide matches mce's move-for-move, including each Empire piece's
+//! FSF divide matches mcr's move-for-move, including each Empire piece's
 //! Queen-move / short-capture split (the Eagle captures like a knight, the Cardinal
 //! like a bishop, the Tower like a rook, the Duke like a king, and all four *move*
 //! like a queen onto empty squares), the forward/sideways Soldier, Queen-only pawn
@@ -25,7 +25,7 @@
 //! ```
 //!
 //! with FSF's Empire letters `T E C D K S` (Tower, Eagle, Cardinal, Duke, King,
-//! Soldier). mce already names `e c t d` (Elephant / Cannon / Lieutenant / General)
+//! Soldier). mcr already names `e c t d` (Elephant / Cannon / Lieutenant / General)
 //! and `s` (Silver), so the four Empire pieces take `*`-prefixed overflow tokens
 //! (`*t *e *c *d`, recycling the FSF mnemonics) and the Soldier takes `z`; its
 //! canonical start FEN is
@@ -56,9 +56,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_empire -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Empire};
+use mcr::geometry::{perft as gperft, Chess8x8, Empire};
 
-/// The Empire starting FEN in mce's dialect, confirmed against FSF's
+/// The Empire starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant empire` / `position startpos`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T w kq - 0 1";
 
@@ -88,12 +88,12 @@ const FLAG_RACE: &str = "4k3/8/8/8/8/8/4K3/8 w - - 0 1";
 const FLYING_GENERAL: &str = "8/8/3k4/8/8/8/3K4/8 w - - 0 1";
 
 /// Issue #359 regression — the deep middlegame the #354 differential fuzzer flagged.
-/// mce reported one fewer legal move than FSF after the White Tower played `h1h3`,
+/// mcr reported one fewer legal move than FSF after the White Tower played `h1h3`,
 /// because the threat projection in `attackers_to` folded an Empire piece's quiet
 /// **Queen move** (here the Tower's `h3`–`c8` diagonal) into its *attack* set,
 /// falsely marking `c8` attacked and forbidding Black's legal queenside castle. The
 /// fix projects only the short **capture** pattern as a threat, so these counts now
-/// match FSF (which gives `h1h3` 38 children, not mce's prior 37).
+/// match FSF (which gives `h1h3` 38 children, not mcr's prior 37).
 const ISSUE_359_REPRO: &str =
     "r3kb1r/5ppp/2p4n/pp1pp3/P4Z2/2PZ1Pqb/*T*E*C2*E2/3*DK1*C*T w kq - 2 14";
 
@@ -106,7 +106,7 @@ const ISSUE_359_POST_H1H3: &str =
 /// king face-off down the vacated file (`d5xe6` opens the d-file between the kings
 /// on `d1`/`d8`). Fairy-Stockfish's special-cased en-passant legality re-checks only
 /// real slider attacks and never the flying-general pseudo-attacker, so it counts
-/// `d5e6` as legal; mce previously over-filtered it. The pinned counts match FSF.
+/// `d5e6` as legal; mcr previously over-filtered it. The pinned counts match FSF.
 const ISSUE_359_EP_FLYING_GENERAL: &str = "3k4/8/8/3Pp3/8/8/8/3K4 w - e6 0 1";
 
 /// Asserts the generic Empire perft equals each pinned `(depth, nodes)` count. Every
@@ -211,7 +211,7 @@ fn issue_359_ep_flying_general_cheap() {
     );
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

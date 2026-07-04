@@ -4,19 +4,19 @@
 //!
 //! Ten-Cubed is played on a ten-files by ten-ranks board (files a..j, ranks
 //! 1..10). Its army is the standard chess pieces plus **four** extra kinds — two
-//! compounds mce already models and two genuinely-new leapers:
+//! compounds mcr already models and two genuinely-new leapers:
 //!
-//! * **Marshal** (Rook + Knight) — mce's [`WideRole::Elephant`], FEN `e`/`E` in the
-//!   mce dialect (Fairy-Stockfish spells it `m`/`M`).
-//! * **Archbishop** (Bishop + Knight) — mce's [`WideRole::Hawk`], FEN `a`/`A` in
-//!   both mce and FSF.
+//! * **Marshal** (Rook + Knight) — mcr's [`WideRole::Elephant`], FEN `e`/`E` in the
+//!   mcr dialect (Fairy-Stockfish spells it `m`/`M`).
+//! * **Archbishop** (Bishop + Knight) — mcr's [`WideRole::Hawk`], FEN `a`/`A` in
+//!   both mcr and FSF.
 //! * **Wizard** ([`WideRole::Wizard`], Betza `CF` = Camel + Ferz) — a pure leaper
 //!   to the eight Camel `(±1,±3)`/`(±3,±1)` squares and the four Ferz `(±1,±1)`
-//!   one-steps. FEN token `**w`/`**W` in the mce dialect (FSF `w`/`W`).
+//!   one-steps. FEN token `**w`/`**W` in the mcr dialect (FSF `w`/`W`).
 //! * **Champion** ([`WideRole::TencubedChampion`], Betza `WAD` = Wazir + Alfil +
 //!   Dabbaba) — a pure leaper to the four Wazir `(±1,0)`/`(0,±1)` one-steps, the
 //!   four Dabbaba `(±2,0)`/`(0,±2)` jumps, and the four Alfil `(±2,±2)` jumps. FEN
-//!   token `**x`/`**X` in the mce dialect (FSF `c`/`C`).
+//!   token `**x`/`**X` in the mcr dialect (FSF `c`/`C`).
 //!
 //! Both leapers jump over any intervening piece; their attack sets are symmetric,
 //! so [`attackers_to`](crate::geometry::GenericPosition::attackers_to) reverse-projects
@@ -40,7 +40,7 @@
 //!
 //! ```text
 //! FSF dialect: 2cwamwc2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2CWAMWC2 w - - 0 1
-//! mce dialect: 2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1
+//! mcr dialect: 2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1
 //! ```
 //!
 //! The fairy pieces sit on the **outer** back rank (rank 10 / rank 1): champions on
@@ -69,7 +69,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TencubedRules;
 
-/// The confirmed Ten-Cubed starting placement in the mce dialect (marshal `e`,
+/// The confirmed Ten-Cubed starting placement in the mcr dialect (marshal `e`,
 /// wizard `**w`, champion `**x`), byte-equivalent to Fairy-Stockfish's
 /// `2CWAMWC2/1RNBQKBNR1/…` under the [`fen_to_fsf`](crate) letter map.
 const TENCUBED_START_PLACEMENT: &str =
@@ -203,7 +203,7 @@ impl WideVariant<Grand10x10> for TencubedRules {
 /// Ten-Cubed chess as a [`GenericPosition`] over the 10x10 [`Grand10x10`] geometry.
 ///
 /// Construct the starting position with
-/// [`Tencubed::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Tencubed::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Tencubed::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the army (Wizard + Champion leapers), the no-castling / pawn
 /// rules, and the restricted last-rank promotion set.
@@ -247,7 +247,7 @@ mod tests {
         v
     }
 
-    /// The startpos round-trips through the mce dialect FEN.
+    /// The startpos round-trips through the mcr dialect FEN.
     #[test]
     fn startpos_round_trips() {
         let pos = Tencubed::startpos();

@@ -26,11 +26,11 @@
 //!
 //! Run with `cargo bench --bench geometry`.
 //!
-//! [`legal_moves`]: mce::geometry::GenericPosition::legal_moves
+//! [`legal_moves`]: mcr::geometry::GenericPosition::legal_moves
 
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, BenchmarkGroup, Criterion};
-use mce::geometry::{
+use mcr::geometry::{
     perft, GenericPosition, Geometry, Grand, Minishogi, Minixiangqi, Seirawan, Shogi, WideVariant,
     Xiangqi,
 };

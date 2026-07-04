@@ -12,7 +12,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use mce::Position;
+use mcr::Position;
 
 #[derive(Arbitrary, Debug)]
 struct Input<'a> {

@@ -1,6 +1,6 @@
 # cargo-mutants configuration (https://mutants.rs)
 #
-# Mutation testing for the clean-room `mce` library: cargo-mutants rewrites one
+# Mutation testing for the clean-room `mcr` library: cargo-mutants rewrites one
 # expression at a time (a "mutant" — e.g. flips a `<` to `<=`, replaces a body
 # with `Default::default()`) and re-runs the test suite. A mutant that the suite
 # still passes ("MISSED" / survived) is a change to movegen/rules that the perft

@@ -7,7 +7,7 @@
 //! that left the latent Xiangqi horse/soldier bugs uncaught until Minixiangqi's
 //! random games (issue #199) hit them. This module closes the gap with a
 //! differential fuzzer: for each variant it plays random **legal** games from the
-//! start position and, at every node, asserts mce's `perft(1)`, `perft(2)`, and the
+//! start position and, at every node, asserts mcr's `perft(1)`, `perft(2)`, and the
 //! per-move divide equal FSF's `go perft 1` / `go perft 2` (+ divide) for the same
 //! position. Any divergence is a surfaced movegen bug; it prints the FEN, both
 //! dialects, and the differing move counts to reproduce.
@@ -42,7 +42,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 use crate::uci::Engine;
 
@@ -85,28 +85,28 @@ fn derive_seed(base: u64, variant_idx: usize, game: u32) -> u64 {
     Rng::new(mixed).next_u64()
 }
 
-/// The FSF-side description of a fuzzable variant: its mce identifier, the FSF
+/// The FSF-side description of a fuzzable variant: its mcr identifier, the FSF
 /// `UCI_Variant` name, whether it lives in `variants.ini` (vs a built-in), and the
-/// FEN-dialect rewrite that turns an mce FEN into the one FSF parses.
+/// FEN-dialect rewrite that turns an mcr FEN into the one FSF parses.
 struct Spec {
-    /// The mce runtime-dispatch identifier.
+    /// The mcr runtime-dispatch identifier.
     id: WideVariantId,
     /// FSF's `UCI_Variant` value.
     fsf: &'static str,
     /// Whether the variant is defined in `variants.ini` (not a FSF built-in).
     needs_ini: bool,
-    /// mce FEN -> FSF FEN. The pinned-corpus modules already encapsulate every
+    /// mcr FEN -> FSF FEN. The pinned-corpus modules already encapsulate every
     /// variant's letter/field rewrite; the fuzzer reuses those exact functions so
     /// the two engines always see the byte-identical position.
     dialect: fn(&str) -> String,
 }
 
-/// The dialect for variants mce and FSF spell identically: pass the FEN through.
+/// The dialect for variants mcr and FSF spell identically: pass the FEN through.
 fn identity(fen: &str) -> String {
     fen.to_string()
 }
 
-/// Amazon Chess dialect: mce spells the Amazon (Queen + Knight) with the
+/// Amazon Chess dialect: mcr spells the Amazon (Queen + Knight) with the
 /// second-bank overflow token `**a`/`**A`; FSF spells it `a`/`A`. Strip the `**`
 /// prefix from that token in the placement field; every other letter and field is
 /// identical.
@@ -135,7 +135,7 @@ fn amazon_to_fsf(fen: &str) -> String {
     }
 }
 
-/// Ai-Wok dialect: mce fields the Ai-Wok (Rook + Knight + Ferz) as the existing
+/// Ai-Wok dialect: mcr fields the Ai-Wok (Rook + Knight + Ferz) as the existing
 /// [`WideRole::Ship`], spelled with the second-bank overflow token `**s`/`**S`;
 /// FSF's `ai-wok` spells it `a`/`A`. Strip the `**` prefix from that token and
 /// remap the recycled base letter `s`->`a` (case-preserving) in the placement
@@ -169,7 +169,7 @@ fn aiwok_to_fsf(fen: &str) -> String {
     }
 }
 
-/// Janus Chess dialect: mce spells the Janus (Bishop + Knight) as its Hawk `a`/`A`;
+/// Janus Chess dialect: mcr spells the Janus (Bishop + Knight) as its Hawk `a`/`A`;
 /// FSF spells it `j`/`J`. Rewrite that letter in the placement field; every other
 /// letter and field is identical.
 fn janus_to_fsf(fen: &str) -> String {
@@ -187,7 +187,7 @@ fn janus_to_fsf(fen: &str) -> String {
     }
 }
 
-/// Centaur Chess dialect: mce spells the Centaur (King + Knight) with the Orda
+/// Centaur Chess dialect: mcr spells the Centaur (King + Knight) with the Orda
 /// Kheshig letter `w`/`W`; FSF's INI `centaur` variant spells it `c`/`C`. Rewrite
 /// that letter in the placement field; the standard KQkq castling field carries no
 /// piece letters and the side-to-move `w` sits outside the placement field, so both
@@ -214,7 +214,7 @@ fn centaur_to_fsf(fen: &str) -> String {
 /// * **Alice** — FSF has no Alice variant (two-board teleport ruleset), so there is
 ///   nothing to differentially check it against.
 /// * **Duck** — the neutral duck is a known harness artifact (#189): FSF's
-///   `go perft` counts duck placements differently from mce, a documented
+///   `go perft` counts duck placements differently from mcr, a documented
 ///   non-bug, so fuzzing it would only re-surface that noise.
 /// * **Jieqi** — hidden-information Xiangqi; its FSF cross-check needs a
 ///   per-position identity reveal (see `jieqi.rs`), not a static dialect rewrite, so
@@ -235,7 +235,7 @@ const SPECS: &[Spec] = &[
         dialect: crate::capablanca::fen_to_fsf,
     },
     Spec {
-        // Amazon Chess: mce spells the Amazon `**a`; FSF spells it `a`.
+        // Amazon Chess: mcr spells the Amazon `**a`; FSF spells it `a`.
         id: WideVariantId::Amazon,
         fsf: "amazon",
         needs_ini: false,
@@ -290,7 +290,7 @@ const SPECS: &[Spec] = &[
         // Centaur Chess (10x8): the Capablanca board with the compounds replaced by
         // two Centaurs (King + Knight). FSF has no built-in `centaur`; it is an INI
         // variant (a `capablanca` descendant with `centaur = c`), so a variants.ini
-        // defining it must be loaded. mce spells the Centaur `w`, FSF `c`.
+        // defining it must be loaded. mcr spells the Centaur `w`, FSF `c`.
         id: WideVariantId::Centaur,
         fsf: "centaur",
         needs_ini: true,
@@ -396,7 +396,7 @@ const SPECS: &[Spec] = &[
         dialect: crate::janggi::fen_to_fsf,
     },
     Spec {
-        // Janus: mce spells the Janus (Bishop + Knight) `a`; FSF spells it `j`.
+        // Janus: mcr spells the Janus (Bishop + Knight) `a`; FSF spells it `j`.
         id: WideVariantId::Janus,
         fsf: "janus",
         needs_ini: false,
@@ -457,7 +457,7 @@ const SPECS: &[Spec] = &[
         dialect: crate::minixiangqi::fen_to_fsf,
     },
     Spec {
-        // Opulent (10x10, Grand geometry): mce spells the Wizard `**w`, Lion `**y`,
+        // Opulent (10x10, Grand geometry): mcr spells the Wizard `**w`, Lion `**y`,
         // augmented Knight `**z`, and Chancellor `e`; FSF spells them `w`/`l`/`n`/`c`.
         id: WideVariantId::Opulent,
         fsf: "opulent",
@@ -555,7 +555,7 @@ const SPECS: &[Spec] = &[
         dialect: crate::synochess::to_fsf_dialect,
     },
     Spec {
-        // Ten-Cubed (10x10, Grand geometry): mce spells the Wizard `**w`, Champion
+        // Ten-Cubed (10x10, Grand geometry): mcr spells the Wizard `**w`, Champion
         // `**x`, and Marshal `e`; FSF spells them `w`/`c`/`m`.
         id: WideVariantId::Tencubed,
         fsf: "tencubed",
@@ -588,7 +588,7 @@ const SPECS: &[Spec] = &[
     // its exact game stream and its clean sweep — byte-identical.
     Spec {
         // Courier chess (12x8) — its short-range Alfil / Man / Wazir / Ferz take
-        // mce's `*x`/`*u`/`*j`/`m` tokens, rewritten to FSF's `e`/`m`/`w`/`f` by a
+        // mcr's `*x`/`*u`/`*j`/`m` tokens, rewritten to FSF's `e`/`m`/`w`/`f` by a
         // single-pass scan. A FSF built-in (needs a `largeboards=yes` build).
         id: WideVariantId::Courier,
         fsf: "courier",
@@ -599,9 +599,9 @@ const SPECS: &[Spec] = &[
     // same seed-stability reason as Courier above: the per-variant fuzz seed is
     // keyed on each spec's positional index, so a mid-list insert would re-roll
     // every later variant's games. Both are FSF built-ins spelled identically to
-    // mce (EuroShogi's `k g n b r p` + `+`-promoted forms; Checkshogi is Shogi's
+    // mcr (EuroShogi's `k g n b r p` + `+`-promoted forms; Checkshogi is Shogi's
     // letters), so each takes the `identity` dialect. FSF fills Checkshogi's absent
-    // `1+1` check-counter field with its default, so mce's counter-free FEN parses.
+    // `1+1` check-counter field with its default, so mcr's counter-free FEN parses.
     Spec {
         id: WideVariantId::EuroShogi,
         fsf: "euroshogi",
@@ -619,7 +619,7 @@ const SPECS: &[Spec] = &[
     // per-variant fuzz seed is keyed on each spec's positional index, so a
     // mid-list insert would re-roll every later variant's games. Both are FSF
     // built-ins. Karouk is Cambodian spelled identically (its absent `1+1`
-    // check-counter field is filled with FSF's default, so mce's counter-free FEN
+    // check-counter field is filled with FSF's default, so mcr's counter-free FEN
     // parses); Ai-Wok spells its super-piece `**s` where FSF spells it `a`.
     Spec {
         id: WideVariantId::Karouk,
@@ -637,7 +637,7 @@ const SPECS: &[Spec] = &[
     // seed-stability reason as Courier / EuroShogi / Checkshogi / Karouk above: the
     // per-variant fuzz seed is keyed on each spec's positional index, so a mid-list
     // insert would re-roll every later variant's games. A FSF built-in (needs a
-    // `largeboards=yes` build) spelled identically to mce (`n s g k r b p` plus the
+    // `largeboards=yes` build) spelled identically to mcr (`n s g k r b p` plus the
     // `+`-promoted forms), so it takes the `identity` dialect.
     Spec {
         id: WideVariantId::Judkins,
@@ -648,7 +648,7 @@ const SPECS: &[Spec] = &[
     // Micro Shogi is appended (out of alphabetical order) for the same
     // seed-stability reason as Judkins above: a mid-list insert would re-roll every
     // later variant's fuzz seed. A FSF built-in (needs a `largeboards=yes` build)
-    // spelled identically to mce (`k b r l p` plus the `+`-promoted forms), so it
+    // spelled identically to mcr (`k b r l p` plus the `+`-promoted forms), so it
     // takes the `identity` dialect.
     Spec {
         id: WideVariantId::Micro,
@@ -667,42 +667,42 @@ const SPECS: &[Spec] = &[
 /// The #239 deeper-sweep candidates were triaged in #336; three were resolved
 /// there and no longer need holding back:
 ///
-/// * **Spartan** — a real mce bug (a White Persian pawn promoted to the *Spartan*
+/// * **Spartan** — a real mcr bug (a White Persian pawn promoted to the *Spartan*
 ///   army set plus an illegal King); fixed in `SpartanRules::promotion_targets`.
-/// * **Seirawan / Shouse** — the only residual is an FSF artifact, not an mce bug:
+/// * **Seirawan / Shouse** — the only residual is an FSF artifact, not an mcr bug:
 ///   S-Chess shares one FEN field for castling rights and gating-eligible squares,
 ///   so once a king has moved (losing castling) while a corner rook stays
-///   gating-eligible, mce serializes that surviving gate as a bare corner-file
+///   gating-eligible, mcr serializes that surviving gate as a bare corner-file
 ///   letter `A`/`H`/`a`/`h`; FSF has no encoding for "corner rook still gates but
 ///   the king has moved" and reads it as a *castling right*, emitting an illegal
 ///   castle of the already-moved king. That exact node is skipped (see
 ///   [`is_schess_corner_castle_artifact`]); every other S-Chess node is checked.
-/// * **Sho Shogi** (issue #454) — the only residual is an FSF artifact, not an mce
-///   bug: mce lets a side **promote a Drunk Elephant into a Crown Prince** (a
+/// * **Sho Shogi** (issue #454) — the only residual is an FSF artifact, not an mcr
+///   bug: mcr lets a side **promote a Drunk Elephant into a Crown Prince** (a
 ///   second royal) on a move that FSF's generator confines away — a King already
 ///   in check escaping by gaining a second royal, or a Drunk Elephant pinned in
 ///   front of its King stepping off the pin *because the promotion makes the
 ///   exposure legal*. Both engines agree the resulting two-royal position is not in
 ///   check (a two-royal side is never in check and may leave either king en prise),
-///   so mce's move set is legitimately larger; FSF simply never generates it.
+///   so mcr's move set is legitimately larger; FSF simply never generates it.
 ///   Rather than skip such nodes wholesale (the divergence usually surfaces one ply
 ///   down, inside `perft(2)`), [`check_node`] discounts exactly those moves via
 ///   [`shoshogi_fsf_visible_count`] so the cross-check stays faithful while still
 ///   catching any *other* Sho Shogi movegen difference.
 ///
-/// Currently held back (an FSF oracle limitation, not an mce bug):
+/// Currently held back (an FSF oracle limitation, not an mcr bug):
 ///
 /// * **Janggi** (issue #442) — FSF over-generates the **pass** (the general staying
 ///   put, `from == to`) under an in-check position, an illegal move (a pass cannot
-///   resolve check) that mce correctly rejects (`position.rs` gates the pass behind
+///   resolve check) that mcr correctly rejects (`position.rs` gates the pass behind
 ///   `!in_check`). Unlike the Sho Shogi artifact — a clean per-move rule discounted
 ///   by [`shoshogi_fsf_visible_count`] — FSF's Janggi in-check pass is **not
 ///   uniform**: it appears under some piece checks (e.g. a Horse check, and every
 ///   checkmate, where FSF then reports the pass as the sole "legal" move) but not
-///   others (e.g. a Chariot check, where FSF omits it and agrees with mce), so no
-///   fixed mce-side discount reconstructs FSF's count. It also cannot be keyed on
+///   others (e.g. a Chariot check, where FSF omits it and agrees with mcr), so no
+///   fixed mcr-side discount reconstructs FSF's count. It also cannot be keyed on
 ///   [`is_in_check`](AnyWideVariant::is_in_check): both generals share the central
-///   file and face each other constantly, and mce (correctly) treats a bikjang
+///   file and face each other constantly, and mcr (correctly) treats a bikjang
 ///   facing as a check, so `is_in_check` fires on ~60% of nodes while FSF's
 ///   `Checkers` (piece-only) does not. The false divergences scale with fuzz depth
 ///   (in-check nodes become common past ~80 plies), so Janggi is held back from the
@@ -712,19 +712,19 @@ const SPECS: &[Spec] = &[
 ///
 /// * **Sittuyin** (issue #442) — FSF *suppresses* a legal in-place/diagonal
 ///   promotion (a Pawn promoting to the General / `Met` Ferz) when that promotion
-///   uncovers a **discovered check**, a move mce correctly generates; so mce's move
-///   set is legitimately larger (the divergent children show mce with one more move
-///   than FSF). Confirmed mce-correct in the #422 bug-hunt. Clean at the previous
+///   uncovers a **discovered check**, a move mcr correctly generates; so mcr's move
+///   set is legitimately larger (the divergent children show mcr with one more move
+///   than FSF). Confirmed mcr-correct in the #422 bug-hunt. Clean at the previous
 ///   gate depth but surfaces once games or plies grow, so it is held back from the
 ///   deep sweep and kept at its proven-clean depth explicitly; the fixed-corpus
 ///   differential and `tests/perft_sittuyin.rs` pin its exact node counts.
 ///
 /// * **Synochess** (issue #442) — FSF *drops* a legal castle keyed on the enemy
-///   king's square (an FSF-internal restriction mce does not share); mce correctly
+///   king's square (an FSF-internal restriction mcr does not share); mcr correctly
 ///   generates the castle. E.g. from a mid-game node White's queenside `e1c1` is
 ///   legal and even gives check (the a1 rook lands on d1, checking the black king
 ///   down an open d-file), yet FSF omits it — the sole root divergence, every other
-///   move matching. Confirmed mce-correct (the same class the #422 bug-hunt found
+///   move matching. Confirmed mcr-correct (the same class the #422 bug-hunt found
 ///   for Empire, whose `is_empire_no_queenside_castle_artifact` skip is the
 ///   analogue). Clean at the previous gate depth but surfaces as games/plies grow,
 ///   so it is held back from the deep sweep and kept at its proven-clean depth
@@ -734,23 +734,23 @@ const SPECS: &[Spec] = &[
 /// * **Empire** (issue #442) — the same enemy-king-keyed castle drop as Synochess,
 ///   on the **kingside**: after a White king step FSF omits Black's legal `e8g8`
 ///   (king e8→g8 with f8/g8 empty and unattacked), the sole child divergence, while
-///   mce generates it. The corpus differential's targeted
+///   mcr generates it. The corpus differential's targeted
 ///   [`is_empire_no_queenside_castle_artifact`] skip covers only the *queenside*
 ///   case; the kingside variant surfaces once the fuzzer runs deeper, so Empire is
 ///   held back from the deep sweep and kept at its proven-clean depth explicitly.
-///   Confirmed mce-correct; `tests/perft_empire.rs` pins its node counts.
+///   Confirmed mcr-correct; `tests/perft_empire.rs` pins its node counts.
 ///
 /// Resolved and released back into the default sweep:
 ///
-/// * **Tori** (Tori Shogi, issue #416) — a latent **mce** bug surfaced by the
+/// * **Tori** (Tori Shogi, issue #416) — a latent **mcr** bug surfaced by the
 ///   deeper sweep (`--difffuzz --variant tori --seed 1 --games 8 --plies 60`,
 ///   issue #394): a Pheasant pinned to its own king along a file was wrongly
 ///   allowed to make its two-square forward *jump*, vacating the shielding square
-///   and leaving the king in check (FSF then has a king-capture in the child). mce
+///   and leaving the king in check (FSF then has a king-capture in the child). mcr
 ///   generated the illegal `f5f3`; the correct `perft(1)` is 34, not 35. A sibling
 ///   of the already-fixed "Tori Pheasant drop-interposition" — a *jumping* leaper
 ///   can leap past the pinning slider (or its own king) off the king-to-pinner
-///   segment. Fixed in mce by confining a pinned Tori piece to that segment
+///   segment. Fixed in mcr by confining a pinned Tori piece to that segment
 ///   (`ToriRules::confine_pins_to_segment`, the same hook Courier uses), which is
 ///   byte-identical for Tori's sliders and every other variant. Repro FEN (Black
 ///   to move):
@@ -758,13 +758,13 @@ const SPECS: &[Spec] = &[
 ///   Clean over seeds 1-3 (8 games × 80 plies, 0 divergences).
 ///
 /// * **Shako** (issue #335) — FSF forbids castling the king across a square a
-///   **cannon** attacks over a screen, but mce's castling king-walk danger map
+///   **cannon** attacks over a screen, but mcr's castling king-walk danger map
 ///   (built by *forward*-projecting each enemy piece) missed a cannon's
 ///   over-screen capture on the *empty* transit square the king walks onto. The
 ///   fix re-tests each transit square with the king placed on it (see
 ///   `GenericPosition::gen_castles`), so the cannon's forward projection lands on
 ///   it. Repro: `c1q1ck4/vrn6v/2pp2p1r1/4p1n2p/pp3p1ppb/1Q2PP4/PN1P3P2/
-///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mce's `f2d2` is now
+///   1PP1N1P1Pb/1R3KB2R/1V1CB3VC b Q - 1 17`, then `e10e5` — mcr's `f2d2` is now
 ///   correctly illegal (the e2 transit square is hit by the e5 cannon over the e3
 ///   screen). Now clean under the differential fuzzer.
 ///
@@ -789,7 +789,7 @@ pub struct Config {
     pub games: u32,
     /// Maximum plies per game (a game also stops early at a terminal node).
     pub plies: u32,
-    /// Restrict to a single mce variant name, or `None` for all.
+    /// Restrict to a single mcr variant name, or `None` for all.
     pub variant: Option<String>,
 }
 
@@ -808,11 +808,11 @@ impl Default for Config {
 struct Divergence {
     fen: String,
     fsf_fen: String,
-    mce_p1: u64,
+    mcr_p1: u64,
     fsf_p1: u64,
-    mce_p2: u64,
+    mcr_p2: u64,
     fsf_p2: u64,
-    mce_divide: Vec<(String, u64)>,
+    mcr_divide: Vec<(String, u64)>,
     fsf_divide: Vec<(String, u64)>,
 }
 
@@ -827,11 +827,11 @@ struct VariantStat {
     skipped: bool,
 }
 
-/// Resolve the FSF `variants.ini`: `$MCE_FSF_VARIANTS_INI`, then a sibling
+/// Resolve the FSF `variants.ini`: `$MCR_FSF_VARIANTS_INI`, then a sibling
 /// `variants.ini` beside the FSF binary (the upstream `…/src/stockfish` +
 /// `…/src/variants.ini` layout).
 fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("MCE_FSF_VARIANTS_INI") {
+    if let Ok(p) = std::env::var("MCR_FSF_VARIANTS_INI") {
         let path = PathBuf::from(p);
         if path.is_file() {
             return Some(path);
@@ -847,7 +847,7 @@ fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
 /// S-Chess folds castling rights and gating-eligible back-rank squares into one FEN
 /// field. Gating is per-piece — a back-rank piece may introduce a Hawk/Elephant on
 /// its **first** move (pychess/chessvariants) — so once a king has moved (losing
-/// castling) a corner rook that has *not* moved is still gating-eligible. mce
+/// castling) a corner rook that has *not* moved is still gating-eligible. mcr
 /// serializes that surviving corner gate as a bare corner-file letter (`A`/`H` for
 /// White, `a`/`h` for Black) in the field. FSF has no encoding for "corner rook
 /// still gates but the king has moved": it reads the corner letter as a *castling
@@ -875,7 +875,7 @@ fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
 /// cannot be faithfully cross-checked, so the fuzzer skips it (issue #394).
 ///
 /// In Empire, White fields the Empire army (`TECDKCET`, no Rook pieces) and Black
-/// plays the standard chess army, which castles normally — both sides. mce
+/// plays the standard chess army, which castles normally — both sides. mcr
 /// generates Black's queenside castle (`e8c8`) whenever it is legal. FSF does
 /// **not**: it derives castling files from the start position, and because the
 /// opposing (White) army carries no `castlingRookPieces` on the queenside, FSF's
@@ -884,13 +884,13 @@ fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
 /// not upstream drift: a from-source 2023-01 FSF build refuses `e8c8` in Empire
 /// exactly like the pinned 2026 build, and it is unreachable from the pinned
 /// perft corpus (whose Empire positions never offer Black the queenside castle).
-/// mce is correct per Empire's rules; FSF simply cannot represent the move, so the
+/// mcr is correct per Empire's rules; FSF simply cannot represent the move, so the
 /// two engines are not mutually checkable at such a node — the same targeted skip
 /// the S-Chess corner-castle artifact uses. Every other Empire node is checked.
 ///
 /// The signal is a persistent *state*, not a single move: whenever Black's
 /// queenside castle is geometrically set up (king on e8, a-rook on a8, the `q`
-/// right present, and b8/c8/d8 empty) the extra mce move both surfaces directly
+/// right present, and b8/c8/d8 empty) the extra mcr move both surfaces directly
 /// (as Black's `perft(1)`) and leaks into the parent White node's `perft(2)`, so
 /// firing on the state skips both. The configuration is specific enough that it
 /// masks no other Empire movegen.
@@ -935,13 +935,13 @@ fn is_empire_no_queenside_castle_artifact(spec: &Spec, fen: &str) -> bool {
 ///
 /// Sho Shogi's Crown Prince is a *second royal*; while a side holds two royals
 /// neither is royal, so the side is never in check and may leave *either* king en
-/// prise (mce and FSF **agree** on that rule — a two-royal side with both kings
+/// prise (mcr and FSF **agree** on that rule — a two-royal side with both kings
 /// attacked still gets every move). The one place they part is *generation*: a
 /// Drunk Elephant that is pinned to, or shielding, its lone King is confined by
 /// FSF (as any single-royal pinned/blocking piece would be), so FSF never emits
 /// the move that steps it off that line — even though, *because that move also
 /// promotes it to a second royal*, the resulting position is one both engines
-/// agree is legal (not in check). mce generates it; FSF does not.
+/// agree is legal (not in check). mcr generates it; FSF does not.
 ///
 /// Such a move is spelled with the `**c` doubled-overflow promotion token (both
 /// colours) and is legal *solely* because of the promotion — detectable as its
@@ -971,7 +971,7 @@ fn shoshogi_fsf_visible_count(pos: &AnyWideVariant) -> u64 {
         .count() as u64
 }
 
-/// Cross-check one node: mce `perft(1)`/`perft(2)` + divide vs FSF's.
+/// Cross-check one node: mcr `perft(1)`/`perft(2)` + divide vs FSF's.
 ///
 /// Returns `Ok(())` when the two engines agree, `Ok-with-Err` carrying a
 /// [`Divergence`] when they disagree, or an outer `Err` for an FSF protocol/parse
@@ -984,20 +984,20 @@ fn check_node(
     let fen = pos.to_fen();
     let fsf_fen = (spec.dialect)(&fen);
 
-    // Re-parse the mce side from the FEN string FSF is fed, so both engines
+    // Re-parse the mcr side from the FEN string FSF is fed, so both engines
     // evaluate the *same stateless position*. FSF's `position fen` carries no move
-    // history, so comparing it against an in-game mce position would wrongly flag
+    // history, so comparing it against an in-game mcr position would wrongly flag
     // history-only state that the FEN does not encode (e.g. Janggi's
     // consecutive-pass adjudication) as a movegen divergence. Re-parsing makes the
-    // comparison FEN-to-FEN; a failure here would itself be an mce round-trip bug.
+    // comparison FEN-to-FEN; a failure here would itself be an mcr round-trip bug.
     let node = AnyWideVariant::from_fen(spec.id, &fen)
-        .map_err(|e| format!("mce failed to re-parse its own FEN {fen:?}: {e:?}"))?;
+        .map_err(|e| format!("mcr failed to re-parse its own FEN {fen:?}: {e:?}"))?;
 
-    // ---- mce side: perft(1) is the legal-move count; perft(2)'s divide is each
+    // ---- mcr side: perft(1) is the legal-move count; perft(2)'s divide is each
     // legal move's child perft(1). --------------------------------------------
     //
-    // Sho Shogi carries one FSF discrepancy that is an FSF limitation, not an mce
-    // bug (issue #454): while a lone King is in check, mce also lets the side
+    // Sho Shogi carries one FSF discrepancy that is an FSF limitation, not an mcr
+    // bug (issue #454): while a lone King is in check, mcr also lets the side
     // **promote a Drunk Elephant into a Crown Prince** (gaining a second royal,
     // which drops the check under the count-thresholded pseudo-royalty), an escape
     // FSF's in-check generator never emits. It usually surfaces one ply down, in a
@@ -1007,22 +1007,22 @@ fn check_node(
     let is_shoshogi = spec.id == WideVariantId::ShoShogi;
     let moves = node.legal_moves();
     let root_ucis: Vec<String> = moves.iter().map(|mv| node.to_uci(mv)).collect();
-    let mut mce_p1 = 0u64;
-    let mut mce_divide: Vec<(String, u64)> = Vec::with_capacity(moves.len());
-    let mut mce_p2 = 0u64;
+    let mut mcr_p1 = 0u64;
+    let mut mcr_divide: Vec<(String, u64)> = Vec::with_capacity(moves.len());
+    let mut mcr_p2 = 0u64;
     for (mv, uci) in moves.iter().zip(root_ucis.iter()) {
         if is_shoshogi && shoshogi_move_is_omitted_escape(uci, &root_ucis) {
             continue;
         }
-        mce_p1 += 1;
+        mcr_p1 += 1;
         let child = node.play(mv);
         let child_nodes = if is_shoshogi {
             shoshogi_fsf_visible_count(&child)
         } else {
             child.perft(1)
         };
-        mce_p2 += child_nodes;
-        mce_divide.push((uci.clone(), child_nodes));
+        mcr_p2 += child_nodes;
+        mcr_divide.push((uci.clone(), child_nodes));
     }
 
     // ---- FSF side -----------------------------------------------------------
@@ -1040,20 +1040,20 @@ fn check_node(
     // move's subtree size is well defined, so the sorted count vectors must match.
     // A mismatch there (even with equal totals) is a genuine divergence in how the
     // node's successors are generated.
-    let mut mce_counts: Vec<u64> = mce_divide.iter().map(|&(_, n)| n).collect();
+    let mut mcr_counts: Vec<u64> = mcr_divide.iter().map(|&(_, n)| n).collect();
     let mut fsf_counts: Vec<u64> = fsf_divide.iter().map(|&(_, n)| n).collect();
-    mce_counts.sort_unstable();
+    mcr_counts.sort_unstable();
     fsf_counts.sort_unstable();
 
-    if mce_p1 != fsf_p1 || mce_p2 != fsf_p2 || mce_counts != fsf_counts {
+    if mcr_p1 != fsf_p1 || mcr_p2 != fsf_p2 || mcr_counts != fsf_counts {
         return Ok(Err(Box::new(Divergence {
             fen,
             fsf_fen,
-            mce_p1,
+            mcr_p1,
             fsf_p1,
-            mce_p2,
+            mcr_p2,
             fsf_p2,
-            mce_divide,
+            mcr_divide,
             fsf_divide,
         })));
     }
@@ -1066,23 +1066,23 @@ fn report_divergence(id: WideVariantId, fsf: &str, d: &Divergence) {
         "*** DIFFFUZZ DIVERGENCE {} (UCI_Variant {fsf}) ***",
         id.as_str()
     );
-    eprintln!("    mce FEN : {}", d.fen);
+    eprintln!("    mcr FEN : {}", d.fen);
     eprintln!("    FSF FEN : {}", d.fsf_fen);
-    eprintln!("    perft(1): mce={} fsf={}", d.mce_p1, d.fsf_p1);
-    eprintln!("    perft(2): mce={} fsf={}", d.mce_p2, d.fsf_p2);
+    eprintln!("    perft(1): mcr={} fsf={}", d.mcr_p1, d.fsf_p1);
+    eprintln!("    perft(2): mcr={} fsf={}", d.mcr_p2, d.fsf_p2);
 
     // Localise: group both divides by child count and show where the multisets
     // diverge, plus the raw labelled lists for hand inspection.
-    let mut mce_by_count: BTreeMap<u64, usize> = BTreeMap::new();
-    for &(_, n) in &d.mce_divide {
-        *mce_by_count.entry(n).or_default() += 1;
+    let mut mcr_by_count: BTreeMap<u64, usize> = BTreeMap::new();
+    for &(_, n) in &d.mcr_divide {
+        *mcr_by_count.entry(n).or_default() += 1;
     }
     let mut fsf_by_count: BTreeMap<u64, usize> = BTreeMap::new();
     for &(_, n) in &d.fsf_divide {
         *fsf_by_count.entry(n).or_default() += 1;
     }
     eprintln!("    divide child-count histogram (count -> #moves):");
-    let mut keys: Vec<u64> = mce_by_count
+    let mut keys: Vec<u64> = mcr_by_count
         .keys()
         .chain(fsf_by_count.keys())
         .copied()
@@ -1090,16 +1090,16 @@ fn report_divergence(id: WideVariantId, fsf: &str, d: &Divergence) {
     keys.sort_unstable();
     keys.dedup();
     for k in keys {
-        let m = mce_by_count.get(&k).copied().unwrap_or(0);
+        let m = mcr_by_count.get(&k).copied().unwrap_or(0);
         let f = fsf_by_count.get(&k).copied().unwrap_or(0);
         if m != f {
-            eprintln!("      {k:>6}: mce {m}  fsf {f}   <- differs");
+            eprintln!("      {k:>6}: mcr {m}  fsf {f}   <- differs");
         }
     }
     eprintln!(
-        "    mce divide ({} moves): {}",
-        d.mce_divide.len(),
-        fmt_divide(&d.mce_divide)
+        "    mcr divide ({} moves): {}",
+        d.mcr_divide.len(),
+        fmt_divide(&d.mcr_divide)
     );
     eprintln!(
         "    fsf divide ({} moves): {}",
@@ -1147,7 +1147,7 @@ fn fuzz_game(
             break;
         }
 
-        // A documented FSF artifact (not an mce bug) is not cross-checkable; skip
+        // A documented FSF artifact (not an mcr bug) is not cross-checkable; skip
         // the node but play on so the random walk still explores past it.
         let fen = pos.to_fen();
         if is_schess_corner_castle_artifact(spec, &fen)
@@ -1254,7 +1254,7 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, cfg: &Config) -> usize {
             }
         }
     } else {
-        println!("  no variants.ini found (set $MCE_FSF_VARIANTS_INI); INI variants skipped");
+        println!("  no variants.ini found (set $MCR_FSF_VARIANTS_INI); INI variants skipped");
     }
 
     // Resolve the optional single-variant filter up front so a bad name fails fast.
@@ -1379,13 +1379,13 @@ mod tests {
         }
     }
 
-    /// The mce side of the cross-check is internally consistent for every fuzzable
+    /// The mcr side of the cross-check is internally consistent for every fuzzable
     /// variant: walking a short seeded random game, `perft(2)` always equals the
     /// sum of each legal move's child `perft(1)` (the divide), and `play` never
-    /// panics. This validates the fuzzer's mce-side arithmetic without FSF, so it
+    /// panics. This validates the fuzzer's mcr-side arithmetic without FSF, so it
     /// runs in the default `cargo test`.
     #[test]
-    fn mce_side_self_consistent_on_random_games() {
+    fn mcr_side_self_consistent_on_random_games() {
         for (idx, spec) in SPECS.iter().enumerate() {
             let mut rng = Rng::new(derive_seed(0x239, idx, 0));
             let mut pos = AnyWideVariant::startpos(spec.id);
@@ -1581,7 +1581,7 @@ mod tests {
     fn shoshogi_fsf_visible_count_discounts_only_crown_prince_escapes() {
         // Issue #454's node: White's lone King (h3) is in check from the Pawn on
         // h4, and the Drunk Elephant on d6 promotes to a Crown Prince (`d6d7**c`).
-        // mce has 4 legal evasions; FSF sees 3.
+        // mcr has 4 legal evasions; FSF sees 3.
         let node = AnyWideVariant::from_fen(
             WideVariantId::ShoShogi,
             "7k1/l3**er2l/1p+N1Ng2n/ps1**Esbp2/9/P2PPPPpp/LG4GK1/6S1R/2S5L w - - 0 50",
@@ -1615,7 +1615,7 @@ mod tests {
         );
 
         // A Drunk Elephant (d7) pinned in front of its King (d1) by a Rook (d8),
-        // the side NOT in check: mce lets it step off the pin *only by promoting*
+        // the side NOT in check: mcr lets it step off the pin *only by promoting*
         // (six `**c` moves whose non-promoting twins are illegal); FSF omits all
         // six. The `d7d8`/`d7d8**c` pair that captures the pinner keeps its legal
         // twin, so it is not discounted.

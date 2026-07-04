@@ -4,9 +4,9 @@
 //! win**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Shinobi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Shinobi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! shinobi`) running `go perft` on the byte-identical position — the FSF divide
-//! matches mce's move-for-move, including the clan piece movements, the drop
+//! matches mcr's move-for-move, including the clan piece movements, the drop
 //! reserve, the mandatory promotion of a piece entering (or leaving) the far
 //! zone, and the flag-win terminal node. The `compare-fairy/` harness re-runs
 //! that head-to-head on demand (`compare-fairy/src/shinobi.rs`); this test pins
@@ -21,7 +21,7 @@
 //! ```
 //!
 //! with FSF's clan letters `c d h j` (Commoner, Bers, Shogi Knight, Archbishop).
-//! mce uses the same board but its own role letters — the Commoner is `f`, the
+//! mcr uses the same board but its own role letters — the Commoner is `f`, the
 //! Bers `d` (= Spartan General, Rook + Ferz), the Shogi Knight `*n` (an overflow
 //! role recycling the Knight's `n`), and the Archbishop `a` (= Hawk, Bishop +
 //! Knight); the Commoner `*u` (overflow, recycling the Advisor's `u`), the Fers
@@ -57,9 +57,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shinobi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Shinobi};
+use mcr::geometry::{perft as gperft, Chess8x8, Shinobi};
 
-/// The Shinobi starting FEN in mce's dialect, confirmed against FSF's
+/// The Shinobi starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant shinobi` / `position startpos`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/L*N1*UK1*NL[L*NMMDA] w kq - 0 1";
 

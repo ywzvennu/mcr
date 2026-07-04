@@ -2,7 +2,7 @@
 //!
 //! GPL FENCE: this module never links HaChu. It spawns the externally provided
 //! `hachu` binary as a child process and talks to it over stdin/stdout using the
-//! CECP text protocol. Everything here is original mce-side code; the HaChu
+//! CECP text protocol. Everything here is original mcr-side code; the HaChu
 //! binary's licensing does not cross the process boundary.
 //!
 //! Why CECP and not UCI: unlike Fairy-Stockfish, HaChu speaks the XBoard/WinBoard
@@ -22,7 +22,7 @@
 //! HaChu has no native `perft` command (its only non-standard debug commands are
 //! `p`/`f`/`w`/`b`/`l`, which print board/attack diagnostics). A node-by-node
 //! perft is therefore driven *externally* — the harness walks the tree and uses
-//! HaChu as a move oracle. That external walk needs mce's own large-shogi move
+//! HaChu as a move oracle. That external walk needs mcr's own large-shogi move
 //! generator, which is issue #380; see `hachu.rs`.
 
 use std::io::{BufRead, BufReader, Write};

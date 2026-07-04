@@ -4,7 +4,7 @@
 //! crazyhouse promoted-square (`~`) revert end-to-end.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Shouse::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Shouse::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant shouse`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/shouse.rs`); this test pins the FSF-confirmed numbers so a
@@ -20,15 +20,15 @@
 //!
 //! The `[AEae]` is the crazyhouse hand (the starting Hawk/Elephant reserves) and
 //! the `KQBCDFGkqbcdfg` castling field carries the castling rights plus the
-//! gating-eligible back-rank files, exactly as in Seirawan. mce spells the Hawk
+//! gating-eligible back-rank files, exactly as in Seirawan. mcr spells the Hawk
 //! `a`/`A` (its census/Capablanca letter) where FSF's S-House uses `H`/`h`; the
-//! Elephant is `e`/`E` in both, so the shown FEN is the **mce dialect** and the
+//! Elephant is `e`/`E` in both, so the shown FEN is the **mcr dialect** and the
 //! `compare-fairy/` harness rewrites the one Hawk letter when driving FSF.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shouse -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, GateSquare, Shouse, WideRole};
+use mcr::geometry::{perft as gperft, Chess8x8, GateSquare, Shouse, WideRole};
 
 /// The S-House starting FEN, confirmed against FSF `UCI_Variant shouse`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[AEae] w KQBCDFGkqbcdfg - 0 1";
@@ -51,7 +51,7 @@ const PROMOTED_REVERT: &str = "Q~r1k4/8/8/8/8/8/8/4K3[] b - - 0 1";
 /// the `a4`-Bishop's `a4`-`e8` diagonal; moving it (`b5xc7` or `b5xd6`) delivers
 /// a *double* check — the Knight directly plus the unmasked Bishop. Black's only
 /// reply is the king flight `e8d8`, which may **still gate** the held Hawk onto
-/// the vacated `e8` (`e8d8h`). mce previously returned early on double check
+/// the vacated `e8` (`e8d8h`). mcr previously returned early on double check
 /// before the gating pass, dropping that gated escape and under-counting
 /// `perft(2)` by 2. Both positions are pinned against FSF (`UCI_Variant shouse`).
 const DOUBLE_CHECK_GATE_1: &str =
@@ -59,7 +59,7 @@ const DOUBLE_CHECK_GATE_1: &str =
 const DOUBLE_CHECK_GATE_2: &str =
     "rnq1kbnr/2p1pp1p/pp1p3p/1N1P1p1E/B7/7E/P2PPPPP/1RBQKBNR[Aa] w KkqCDFGbfg - 0 16";
 
-/// `(depth, nodes)` rows confirmed identical between mce and FSF.
+/// `(depth, nodes)` rows confirmed identical between mcr and FSF.
 struct Perft {
     fen: &'static str,
     rows: &'static [(u32, u64)],

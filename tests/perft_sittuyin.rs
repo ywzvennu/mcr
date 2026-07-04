@@ -3,9 +3,9 @@
 //! **special Met promotion**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Sittuyin::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Sittuyin::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! sittuyin`) running `go perft` on the byte-identical position — the FSF divide
-//! matches mce's move-for-move, including the placement drops and the special
+//! matches mcr's move-for-move, including the placement drops and the special
 //! promotion. The `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/sittuyin.rs`); this test pins the FSF-confirmed numbers so
 //! a regression is caught even without FSF present.
@@ -18,7 +18,7 @@
 //! 8/8/4pppp/pppp4/4PPPP/PPPP4/8/8[KSSFRRNNkssfrrnn] w - - 0 1
 //! ```
 //!
-//! mce uses the same board placement and `[..]` pocket but its own role letters
+//! mcr uses the same board placement and `[..]` pocket but its own role letters
 //! (the Met is `m`, not FSF's `f`, and the pocket is written in role-index order),
 //! so its canonical start FEN is
 //!
@@ -48,12 +48,12 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_sittuyin -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Chess8x8, Sittuyin, Square, WideMoveKind, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
-/// The Sittuyin starting FEN in mce's dialect, confirmed against FSF's
+/// The Sittuyin starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant sittuyin` / `position startpos`.
 const STARTPOS: &str = "8/8/4pppp/pppp4/4PPPP/PPPP4/8/8[NNRRKMSSnnrrkmss] w - - 0 1";
 

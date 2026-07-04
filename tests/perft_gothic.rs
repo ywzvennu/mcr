@@ -2,7 +2,7 @@
 //! Capablanca-board variant with a different back-rank order.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Gothic::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Gothic::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant gothic`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` differential fuzzer re-runs the
 //! head-to-head on demand (`--difffuzz --variant gothic`); this test pins the
@@ -12,16 +12,16 @@
 //!
 //! ```text
 //! FSF dialect: rnbqckabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQCKABNR w KQkq - 0 1
-//! mce dialect: rnbqekabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQEKABNR w KQkq - 0 1
+//! mcr dialect: rnbqekabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQEKABNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce). The
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr). The
 //! deep layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_gothic -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Gothic};
+use mcr::geometry::{perft as gperft, Cap10x8, Gothic};
 
-/// The Gothic starting FEN (mce dialect), confirmed against FSF's
+/// The Gothic starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant gothic`.
 const STARTPOS: &str = "rnbqekabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQEKABNR w KQkq - 0 1";
 

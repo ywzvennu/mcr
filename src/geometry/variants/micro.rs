@@ -60,7 +60,7 @@
 //! matches FSF node-for-node.
 //!
 //! As in Shogi (#190), FSF's `micro` perft does **not** enforce *uchifuzume* (the
-//! no-pawn-drop-mate rule): a mating pawn drop is a legal move. mce matches FSF and
+//! no-pawn-drop-mate rule): a mating pawn drop is a legal move. mcr matches FSF and
 //! leaves [`WideVariant::pawn_drop_mate_forbidden`] `false`.
 //!
 //! ## Confirmed starting FEN
@@ -71,7 +71,7 @@
 //! kb+r+l/p3/4/3P/+L+RBK[] w - - 0 1
 //! ```
 //!
-//! mce uses the same board placement and an empty `[]` holdings bracket. The
+//! mcr uses the same board placement and an empty `[]` holdings bracket. The
 //! FSF-confirmed startpos perft sequence is `9, 80, 767, 7256, 71328`.
 
 use crate::geometry::position::{

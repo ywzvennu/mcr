@@ -5,7 +5,7 @@
 //! forward-knight square) and the queen/Met (a two-square straight advance). The
 //! node counts below are pinned **and cross-checked against Fairy-Stockfish**
 //! (FSF, `UCI_Variant cambodian`): every `(depth, nodes)` pair here was produced
-//! identically by `mce::geometry::Cambodian::perft` and by FSF's `go perft` on
+//! identically by `mcr::geometry::Cambodian::perft` and by FSF's `go perft` on
 //! the byte-identical FEN. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (see `compare-fairy/src/main.rs --cambodian`); this test pins the
 //! confirmed numbers so a regression is caught without FSF present.
@@ -23,8 +23,8 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_cambodian -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cambodian, Chess8x8, Square, WideMoveKind, WideRole};
-use mce::Color;
+use mcr::geometry::{perft as gperft, Cambodian, Chess8x8, Square, WideMoveKind, WideRole};
+use mcr::Color;
 
 /// The Cambodian starting FEN, confirmed byte-for-byte against Fairy-Stockfish's
 /// `UCI_Variant cambodian` / `position startpos`.

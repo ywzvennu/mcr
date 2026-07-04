@@ -80,7 +80,7 @@ fn piece_from_ascii(b: u8) -> Option<Piece> {
 /// on every square.
 ///
 /// ```
-/// use mce::{Board, Color, Piece, Role, Square};
+/// use mcr::{Board, Color, Piece, Role, Square};
 ///
 /// let board = Board::standard();
 /// assert_eq!(
@@ -102,7 +102,7 @@ impl Board {
     /// Creates a board with no pieces on it.
     ///
     /// ```
-    /// use mce::Board;
+    /// use mcr::Board;
     /// assert!(Board::empty().occupied().is_empty());
     /// ```
     #[must_use]
@@ -120,7 +120,7 @@ impl Board {
     /// `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR`.
     ///
     /// ```
-    /// use mce::Board;
+    /// use mcr::Board;
     /// assert_eq!(
     ///     Board::standard().to_fen_placement(),
     ///     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
@@ -192,7 +192,7 @@ impl Board {
     /// role).
     ///
     /// ```
-    /// use mce::{Board, Color, Piece, Role};
+    /// use mcr::{Board, Color, Piece, Role};
     /// let board = Board::standard();
     /// let white_pawns = board.by_piece(Piece::new(Color::White, Role::Pawn));
     /// assert_eq!(white_pawns.count(), 8);
@@ -252,7 +252,7 @@ impl Board {
     /// All occupancy masks are updated together so the board stays consistent.
     ///
     /// ```
-    /// use mce::{Board, Color, Piece, Role, Square};
+    /// use mcr::{Board, Color, Piece, Role, Square};
     /// let mut board = Board::empty();
     /// board.set_piece(Square::D4, Piece::new(Color::White, Role::Queen));
     /// assert_eq!(
@@ -271,7 +271,7 @@ impl Board {
     /// Removes any piece from `square`, returning what was there (if anything).
     ///
     /// ```
-    /// use mce::{Board, Color, Piece, Role, Square};
+    /// use mcr::{Board, Color, Piece, Role, Square};
     /// let mut board = Board::standard();
     /// assert_eq!(
     ///     board.remove_piece(Square::E1),
@@ -304,7 +304,7 @@ impl Board {
     /// a-file to the h-file.
     ///
     /// ```
-    /// use mce::Board;
+    /// use mcr::Board;
     /// let board = Board::from_fen_placement("8/8/8/8/8/8/8/8").unwrap();
     /// assert!(board.occupied().is_empty());
     /// ```
@@ -381,7 +381,7 @@ impl Board {
     /// their FEN letters.
     ///
     /// ```
-    /// use mce::Board;
+    /// use mcr::Board;
     /// assert_eq!(
     ///     Board::standard().to_fen_placement(),
     ///     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",

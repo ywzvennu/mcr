@@ -1,15 +1,15 @@
 #!/bin/sh
-# build_test.sh — build the mce C ABI and compile + run the C smoke test.
+# build_test.sh — build the mcr C ABI and compile + run the C smoke test.
 #
-# Builds the staticlib (libmce.a) with cargo, then compiles test.c against it
+# Builds the staticlib (libmcr.a) with cargo, then compiles test.c against it
 # and runs it. Requires a C compiler (cc/gcc/clang) and a Rust toolchain.
 #
 # Usage (from this bindings/c/ directory):
 #     ./build_test.sh
 #
-# The header is committed at include/mce.h; regenerate it after changing the
+# The header is committed at include/mcr.h; regenerate it after changing the
 # FFI surface with:
-#     cbindgen --config cbindgen.toml --crate mce-c --output include/mce.h
+#     cbindgen --config cbindgen.toml --crate mcr-c --output include/mcr.h
 set -eu
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -20,7 +20,7 @@ CC=${CC:-cc}
 echo "==> building the static library (cargo build --release)"
 cargo build --release
 
-LIB="target/release/libmce.a"
+LIB="target/release/libmcr.a"
 if [ ! -f "$LIB" ]; then
     echo "error: $LIB not found" >&2
     exit 1

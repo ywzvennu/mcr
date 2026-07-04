@@ -14,7 +14,7 @@ use std::str::FromStr;
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 #[derive(Arbitrary, Debug)]
 struct Input<'a> {

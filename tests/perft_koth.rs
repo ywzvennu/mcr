@@ -1,6 +1,6 @@
 //! Perft for King of the Hill through the generic variant layer.
 //!
-//! The hill rule only affects [`mce::VariantPosition::outcome`], never which
+//! The hill rule only affects [`mcr::VariantPosition::outcome`], never which
 //! moves are legal, so move generation from any non-terminal placement must
 //! match standard chess exactly. These tests run the standard reference
 //! positions and depths (the same numbers as `tests/perft.rs` and
@@ -11,7 +11,7 @@
 //! ongoing; the one exception — a position with a king already on the hill — is
 //! terminal and its perft is asserted to be zero in a dedicated test.
 
-use mce::{perft, perft_variant, Chess, KingOfTheHill, Position};
+use mcr::{perft, perft_variant, Chess, KingOfTheHill, Position};
 
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const KIWIPETE: &str = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";

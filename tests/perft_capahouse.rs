@@ -2,7 +2,7 @@
 //! — **Capablanca chess plus crazyhouse drops**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Capahouse::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Capahouse::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant capahouse`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/capahouse.rs`); this test pins the FSF-confirmed
@@ -14,17 +14,17 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR[] w KQkq - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce); the
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr); the
 //! trailing `[]` is the empty crazyhouse hand. The deep layers are `#[ignore]`d so
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_capahouse -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Capahouse, WideMoveKind, WideRole};
+use mcr::geometry::{perft as gperft, Cap10x8, Capahouse, WideMoveKind, WideRole};
 
-/// The Capahouse starting FEN (mce dialect), confirmed against FSF.
+/// The Capahouse starting FEN (mcr dialect), confirmed against FSF.
 const STARTPOS: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1";
 
 /// A drop-heavy position: both sides hold a queen and a rook in hand, so move

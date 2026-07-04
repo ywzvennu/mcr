@@ -1,20 +1,20 @@
 //! Shatranj (medieval chess) differential perft + timing against Fairy-Stockfish
 //! (issue #262).
 //!
-//! Shatranj runs on mce's **generic** engine (`mce::geometry::Shatranj`, a
+//! Shatranj runs on mcr's **generic** engine (`mcr::geometry::Shatranj`, a
 //! `GenericPosition<Chess8x8, ShatranjRules>`), not the concrete `AnyVariant`
 //! layer the rest of this harness drives, so it has its own small corpus and
 //! comparison loop here (like Makruk). `shatranj` is an FSF **built-in** (no
 //! `variants.ini` needed): select `UCI_Variant shatranj`, set the FEN, run `go
-//! perft`, assert the node counts match, and report mce-vs-FSF throughput.
+//! perft`, assert the node counts match, and report mcr-vs-FSF throughput.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same Shatranj position with different piece letters.
+//! mcr and FSF render the same Shatranj position with different piece letters.
 //! FSF's `shatranj` uses `b` for the Alfil (elephant) and `q` for the Ferz
-//! (counselor); mce reuses `b`/`q` for its Bishop/Queen, so the Ferz takes the
+//! (counselor); mcr reuses `b`/`q` for its Bishop/Queen, so the Ferz takes the
 //! Makruk Met `m` and the Alfil — past the exhausted single-letter alphabet — the
-//! `*`-prefixed overflow token `*x`. [`to_fsf_dialect`] maps mce's letters
+//! `*`-prefixed overflow token `*x`. [`to_fsf_dialect`] maps mcr's letters
 //! (`*x → b`, `m → q`, both cases) back to FSF's over the whole FEN. The Rook /
 //! Knight / King / Pawn carry none of the remapped letters, so the swap is
 //! unambiguous. The comparison asserts only node counts, so the move-string
@@ -25,11 +25,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Shatranj};
+use mcr::geometry::{perft as gperft, Chess8x8, Shatranj};
 
 use crate::uci::Engine;
 
-/// One Shatranj corpus position. The FEN is mce's dialect; the FSF side
+/// One Shatranj corpus position. The FEN is mcr's dialect; the FSF side
 /// translates it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -65,13 +65,13 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Translates an mce-dialect Shatranj FEN to FSF's dialect: Alfil `*x → b`, Ferz
+/// Translates an mcr-dialect Shatranj FEN to FSF's dialect: Alfil `*x → b`, Ferz
 /// `m → q` (both cases), over the whole FEN. The Rook / Knight / King / Pawn carry
 /// none of these letters, so the swap is safe.
 ///
-/// The Alfil is an mce **overflow** role: its token is the two characters `*x`
+/// The Alfil is an mcr **overflow** role: its token is the two characters `*x`
 /// (white `*X`), so it is collapsed to FSF's single `b`/`B` before the per-char
-/// swap. No other mce token starts with `*`, so a plain sequence replace is safe.
+/// swap. No other mcr token starts with `*`, so a plain sequence replace is safe.
 pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.replace("*X", "B")
         .replace("*x", "b")
@@ -89,17 +89,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -112,15 +112,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Shatranj corpus through mce and FSF. Returns the number of mismatches
+/// Run the Shatranj corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched). Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
     println!();
@@ -129,7 +129,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     );
     let head = format!(
         "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -148,10 +148,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -164,16 +164,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
 
     // Node-weighted aggregate throughput.
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "shatranj OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "shatranj OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -186,23 +186,23 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Shatranj parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH shatranj/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH shatranj/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Shatranj position through mce's generic perft and FSF's `go perft`.
+/// Run one Shatranj position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    // mce side: the generic Shatranj position.
-    let pos = Shatranj::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side: the generic Shatranj position.
+    let pos = Shatranj::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
-    // FSF side: rewrite the mce dialect to FSF's `b`/`q` letters.
+    // FSF side: rewrite the mcr dialect to FSF's `b`/`q` letters.
     let fsf_fen = to_fsf_dialect(case.fen);
     engine.set_variant("shatranj", false)?;
     engine.set_position(&fsf_fen)?;
@@ -212,10 +212,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }

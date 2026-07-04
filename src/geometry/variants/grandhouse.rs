@@ -15,7 +15,7 @@
 //! [`GrandRules`]:
 //!
 //! * **Marshal** (Rook + Knight) — [`WideRole::Elephant`], FEN letter `e`/`E` in
-//!   the mce dialect (Fairy-Stockfish spells the marshal/chancellor `c`/`C`; the
+//!   the mcr dialect (Fairy-Stockfish spells the marshal/chancellor `c`/`C`; the
 //!   `compare-fairy/` harness reconciles the one-letter difference).
 //! * **Cardinal** (Bishop + Knight) — [`WideRole::Hawk`], FEN letter `a`/`A` in
 //!   both dialects.
@@ -45,10 +45,10 @@
 //!
 //! ```text
 //! FSF dialect: r8r/1nbqkcabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKCABN1/R8R[] w - - 0 1
-//! mce dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1
+//! mcr dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1
 //! ```
 //!
-//! The two differ only in the marshal's letter (`c` in FSF, `e` in mce); the
+//! The two differ only in the marshal's letter (`c` in FSF, `e` in mcr); the
 //! trailing `[]` is the empty crazyhouse hand. There is no castling (`-`), as in
 //! Grand.
 

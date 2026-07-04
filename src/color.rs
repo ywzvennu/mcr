@@ -21,7 +21,7 @@ impl Color {
     /// Returns the opposing color.
     ///
     /// ```
-    /// use mce::Color;
+    /// use mcr::Color;
     /// assert_eq!(Color::White.opposite(), Color::Black);
     /// assert_eq!(Color::Black.opposite(), Color::White);
     /// ```

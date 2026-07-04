@@ -25,7 +25,7 @@
 //! `u128` backing and the non-power-of-two width.
 //!
 //! ```
-//! use mce::geometry::{Bitboard, Chess8x8, Geometry, Square};
+//! use mcr::geometry::{Bitboard, Chess8x8, Geometry, Square};
 //!
 //! let bb = Bitboard::<Chess8x8>::from_square(Square::new(0));
 //! assert_eq!(bb.count(), 1);
@@ -267,7 +267,7 @@ pub const fn board_mask_u256(squares: u16) -> U256 {
 /// dimensions.
 ///
 /// ```
-/// use mce::{geometry, geometry::Geometry};
+/// use mcr::{geometry, geometry::Geometry};
 /// geometry!(
 ///     /// A ten-by-ten board on a `u128` backing.
 ///     Board10x10, u128, 10, 10

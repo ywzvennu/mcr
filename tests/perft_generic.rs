@@ -6,14 +6,14 @@
 //! legal generator, make-move, and perft — must produce node counts
 //! byte-identical to the frozen concrete 8x8 engine. The standard published
 //! perft positions (startpos, Kiwipete, CPW 3-6) are checked against both the
-//! concrete `mce::perft` and the pinned reference numbers.
+//! concrete `mcr::perft` and the pinned reference numbers.
 //!
 //! The cheap layers run as ordinary tests. The deep layers are `#[ignore]`d so
 //! `cargo test` stays fast; run them with
 //! `cargo test --release --test perft_generic -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, GenericPosition, StandardChess};
-use mce::{perft as cperft, Position};
+use mcr::geometry::{perft as gperft, Chess8x8, GenericPosition, StandardChess};
+use mcr::{perft as cperft, Position};
 
 type GenPos = GenericPosition<Chess8x8, StandardChess>;
 

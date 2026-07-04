@@ -24,11 +24,11 @@
 //!
 //! Run with `cargo bench --bench largeboard`.
 //!
-//! [`perft`]: mce::geometry::perft
+//! [`perft`]: mcr::geometry::perft
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use mce::geometry::{perft, Chu, Chu12x12, Grand, Seirawan, WideMove, U256};
-use mce::{Move, Position};
+use mcr::geometry::{perft, Chu, Chu12x12, Grand, Seirawan, WideMove, U256};
+use mcr::{Move, Position};
 use std::hint::black_box;
 use std::mem::{align_of, size_of};
 

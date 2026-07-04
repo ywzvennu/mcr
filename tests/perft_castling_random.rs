@@ -26,7 +26,7 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_castling_random -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Cap10x8, Capablanca, Capahouse, Chess8x8, Seirawan, WideMoveKind,
 };
 
@@ -88,7 +88,7 @@ fn capablanca_shredder_fen_parses() {
 /// The randomised-castling discovered-check edge case: White may castle queenside
 /// only if the departing b1 rook does not unmask the black a1 rook onto the king's
 /// c1 landing square. It does, so the castle is illegal — FSF perft(1) = 19,
-/// perft(2) = 225 (without the post-castle safety test mce would count 20 / more).
+/// perft(2) = 225 (without the post-castle safety test mcr would count 20 / more).
 #[test]
 fn capablanca_castle_discovered_check_forbidden() {
     let fen = "4k5/10/10/10/10/10/10/rR2K4R w Q - 0 1";

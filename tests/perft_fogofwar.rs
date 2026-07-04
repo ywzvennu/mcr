@@ -9,7 +9,7 @@
 //! and its node counts are perft-validatable.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::FogOfWar::perft` and by Fairy-Stockfish (FSF) running
+//! `mcr::geometry::FogOfWar::perft` and by Fairy-Stockfish (FSF) running
 //! `go perft` on the byte-identical position. FSF has no built-in `fogofwar`, so
 //! the harness defines it in `variants.ini` (inheriting the built-in `chess`):
 //!
@@ -50,8 +50,8 @@
 //! * **Castling ignores attacked squares.** The castling-rich position keeps
 //!   `O-O` / `O-O-O` even when the king passes through an attacked square.
 
-use mce::geometry::{perft as gperft, Chess8x8, FogOfWar, Square, WideMoveKind};
-use mce::Color;
+use mcr::geometry::{perft as gperft, Chess8x8, FogOfWar, Square, WideMoveKind};
+use mcr::Color;
 
 /// The Fog of War starting FEN, confirmed against FSF's `UCI_Variant fogofwar`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

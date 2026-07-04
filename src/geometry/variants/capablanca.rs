@@ -6,11 +6,11 @@
 //! Capablanca chess is played on a ten-files by eight-ranks board (files a..j).
 //! Beyond the standard chess army it adds two compound pieces:
 //!
-//! * **Archbishop** (Bishop + Knight) — mce's [`WideRole::Hawk`], whose default
+//! * **Archbishop** (Bishop + Knight) — mcr's [`WideRole::Hawk`], whose default
 //!   movement (`bishop | knight`) is already the archbishop's. FEN letter `a`.
-//! * **Chancellor** (Rook + Knight) — mce's [`WideRole::Elephant`], whose
+//! * **Chancellor** (Rook + Knight) — mcr's [`WideRole::Elephant`], whose
 //!   default movement (`rook | knight`) is already the chancellor's. FEN letter
-//!   `e` (mce's letter for the rook-knight compound; Fairy-Stockfish spells it
+//!   `e` (mcr's letter for the rook-knight compound; Fairy-Stockfish spells it
 //!   `c`, a dialect difference the `compare-fairy/` harness reconciles).
 //!
 //! Every other rule is standard chess: pawns push one (or two from their second
@@ -28,11 +28,11 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR w KQkq - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1
 //! ```
 //!
 //! The two strings differ only in the chancellor's letter (`c` in FSF, `e` in
-//! mce). Back rank, a-file to j-file: Rook, Knight, Archbishop, Bishop, Queen,
+//! mcr). Back rank, a-file to j-file: Rook, Knight, Archbishop, Bishop, Queen,
 //! King, Bishop, Chancellor, Knight, Rook. The king stands on the f-file
 //! (file 5); the castling rooks are the a-file (file 0) and j-file (file 9)
 //! rooks.
@@ -63,7 +63,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CapablancaRules;
 
-/// The confirmed Capablanca starting FEN placement in the mce dialect
+/// The confirmed Capablanca starting FEN placement in the mcr dialect
 /// (chancellor = `e`/`E`), byte-for-byte equivalent to Fairy-Stockfish's
 /// `rnabqkbcnr/.../RNABQKBCNR` modulo the chancellor's letter.
 const CAPABLANCA_START_PLACEMENT: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR";

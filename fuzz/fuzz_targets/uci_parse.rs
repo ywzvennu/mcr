@@ -9,7 +9,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use mce::{Crazyhouse, Position};
+use mcr::{Crazyhouse, Position};
 
 fuzz_target!(|data: &[u8]| {
     // UCI move tokens are ASCII text; non-UTF-8 input is not a UCI move.

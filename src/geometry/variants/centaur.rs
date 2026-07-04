@@ -8,7 +8,7 @@
 //!
 //! * **Centaur** ([`WideRole::Kheshig`]) — a **King + Knight** leaper (sixteen
 //!   squares; it moves and captures alike), exactly Fairy-Stockfish's built-in
-//!   `centaur` piece type (Betza `KN`). FSF spells it `c`/`C`; mce reuses the
+//!   `centaur` piece type (Betza `KN`). FSF spells it `c`/`C`; mcr reuses the
 //!   Orda [`WideRole::Kheshig`] letter `w`/`W` (the `compare-fairy/` harness
 //!   reconciles the dialect).
 //!
@@ -25,10 +25,10 @@
 //!
 //! ```text
 //! FSF dialect: rcnbqkbncr/pppppppppp/10/10/10/10/PPPPPPPPPP/RCNBQKBNCR w KQkq - 0 1
-//! mce dialect: rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1
+//! mcr dialect: rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1
 //! ```
 //!
-//! The two strings differ only in the centaur's letter (`c` in FSF, `w` in mce).
+//! The two strings differ only in the centaur's letter (`c` in FSF, `w` in mcr).
 //! Back rank, a-file to j-file: Rook, Centaur, Knight, Bishop, Queen, King,
 //! Bishop, Knight, Centaur, Rook. The king stands on the f-file (file 5); the
 //! castling rooks are the a-file (file 0) and j-file (file 9) rooks.
@@ -60,7 +60,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CentaurRules;
 
-/// The confirmed Centaur Chess starting FEN placement in the mce dialect
+/// The confirmed Centaur Chess starting FEN placement in the mcr dialect
 /// (centaur = `w`/`W`, the Orda Kheshig letter), byte-for-byte equivalent to
 /// Fairy-Stockfish's `rcnbqkbncr/.../RCNBQKBNCR` modulo the centaur's letter.
 const CENTAUR_START_PLACEMENT: &str = "rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR";

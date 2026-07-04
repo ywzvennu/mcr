@@ -3,9 +3,9 @@
 //! and the **Berolina Hoplite** pawn.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Spartan::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Spartan::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! spartan`) running `go perft` on the byte-identical position — the FSF divide
-//! matches mce's move-for-move, including the Lieutenant's move-only sideways
+//! matches mcr's move-for-move, including the Lieutenant's move-only sideways
 //! step, the Berolina Hoplite's jumping double advance, multi-king / duple-check
 //! legality (a king may be left en prise while another survives), and Hoplite
 //! promotion (to King only while the side has a single king). The
@@ -22,7 +22,7 @@
 //! ```
 //!
 //! with FSF's Spartan letters `l g k c w h` (Lieutenant, General, King, Captain,
-//! Warlord, Hoplite). mce uses the same board but its own role letters — the
+//! Warlord, Hoplite). mcr uses the same board but its own role letters — the
 //! Lieutenant is `t`, the General `d`, the Captain `i`, the Warlord `a` (Hawk),
 //! the Hoplite `h` — so its canonical start FEN is
 //!
@@ -54,9 +54,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_spartan -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Spartan};
+use mcr::geometry::{perft as gperft, Chess8x8, Spartan};
 
-/// The Spartan starting FEN in mce's dialect, confirmed against FSF's
+/// The Spartan starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant spartan` / `position startpos`.
 const STARTPOS: &str = "tdkiikat/hhhhhhhh/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
 
@@ -229,7 +229,7 @@ fn white_promotion_midgame_matches_fsf() {
     check(WHITE_PROMO_MIDGAME, &[(1, 39), (2, 1262), (3, 49801)]);
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

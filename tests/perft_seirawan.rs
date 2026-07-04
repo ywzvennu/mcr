@@ -3,7 +3,7 @@
 //! mechanic end-to-end.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Seirawan::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Seirawan::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant seirawan`) running `go perft` on the byte-identical position.
 //! The startpos depth-4 count (`782599`) is the value pinned in FSF's own
 //! `tests/perft.sh`. The `compare-fairy/` harness re-runs that head-to-head on
@@ -18,7 +18,7 @@
 //! rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[HEhe] w KQBCDFGkqbcdfg - 0 1
 //! ```
 //!
-//! mce uses the **same dialect** FSF does for S-Chess (`H`/`h` Hawk, `E`/`e`
+//! mcr uses the **same dialect** FSF does for S-Chess (`H`/`h` Hawk, `E`/`e`
 //! Elephant), so the FEN is byte-identical. The FEN carries two extensions over
 //! plain chess: the `[HEhe]` holdings (the reserves in hand) and the gating
 //! rights folded into the castling field (`KQBCDFGkqbcdfg`), where the `KQkq`
@@ -28,11 +28,11 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_seirawan -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Chess8x8, GateRole, GateSquare, Seirawan, Square, WideMoveKind, WidePiece,
     WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
 /// The Seirawan starting FEN, confirmed against Fairy-Stockfish's
 /// `UCI_Variant seirawan`.
@@ -41,7 +41,7 @@ const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[HEhe] w KQBC
 /// A midgame position exercising gating: both knights are developed off their
 /// back-rank squares (so their first moves are spent), with both reserves still
 /// in hand and the remaining back-rank pieces gating-eligible. Pinned against FSF
-/// `UCI_Variant seirawan` (its `go perft` divide matches mce's move-for-move).
+/// `UCI_Variant seirawan` (its `go perft` divide matches mcr's move-for-move).
 const MID_GATING: &str =
     "r1bqkb1r/pppppppp/2n2n2/8/8/2N2N2/PPPPPPPP/R1BQKB1R[HEhe] w KQBCDEFGkqbcdefg - 4 3";
 

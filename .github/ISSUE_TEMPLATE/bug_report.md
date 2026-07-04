@@ -24,7 +24,7 @@ labels: type:bug
 
 ## Environment
 
-- `mce` version / commit:
+- `mcr` version / commit:
 - Rust version (`rustc --version`):
 - OS:
 

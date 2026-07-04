@@ -33,10 +33,10 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Dd] w KQkq - 0 1
-//! mce dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1
+//! mcr dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the Dragon's letter (`D`/`d` in FSF, `a`/`A` in the mce
+//! The two differ only in the Dragon's letter (`D`/`d` in FSF, `a`/`A` in the mcr
 //! census dialect — the same one Capablanca's Archbishop and Seirawan's Hawk use).
 //! The `[Aa]` is the fixed pocket (the starting Dragon reserves), and the `compare-fairy/`
 //! harness rewrites that one letter when driving FSF.

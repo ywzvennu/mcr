@@ -30,7 +30,7 @@
 
 use std::collections::BTreeMap;
 
-use mce::geometry::{AnyWideVariant, WideMove, WideMoveKind, WidePgn, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideMove, WideMoveKind, WidePgn, WideVariantId};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 

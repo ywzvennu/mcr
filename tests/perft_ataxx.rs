@@ -1,9 +1,9 @@
-//! Ataxx perft validation for the standalone `mce::ataxx` module (issue #280).
+//! Ataxx perft validation for the standalone `mcr::ataxx` module (issue #280).
 //!
 //! Ataxx is **not** a chess variant — it has no pieces, no king, and no attacks
 //! — so it lives in its own self-contained module rather than on the chess
 //! engine (see `src/ataxx.rs`). The node counts below were produced
-//! **identically** by `mce::ataxx::Position::perft` and by Fairy-Stockfish
+//! **identically** by `mcr::ataxx::Position::perft` and by Fairy-Stockfish
 //! (`UCI_Variant ataxx`, `go perft`) on the byte-identical FEN; the live
 //! head-to-head re-runs on demand via `compare-fairy/src/ataxx.rs`. This test
 //! pins the FSF-confirmed numbers so a regression is caught even without FSF
@@ -19,7 +19,7 @@
 //! (depths 5 and 6) are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_ataxx -- --include-ignored`.
 
-use mce::ataxx::{Color, Move, Outcome, Position};
+use mcr::ataxx::{Color, Move, Outcome, Position};
 
 const STARTPOS: &str = "P5p/7/7/7/7/7/p5P w 0 1";
 

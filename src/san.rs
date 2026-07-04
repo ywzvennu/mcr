@@ -80,7 +80,7 @@ impl Position {
     /// board and computes the check/mate suffix by playing the move.
     ///
     /// ```
-    /// use mce::Position;
+    /// use mcr::Position;
     /// let pos = Position::startpos();
     /// let e4 = pos.parse_uci("e2e4").unwrap();
     /// assert_eq!(pos.san(&e4), "e4");
@@ -195,7 +195,7 @@ impl Position {
     /// and trailing `+`/`#`/`!`/`?` glyphs.
     ///
     /// ```
-    /// use mce::Position;
+    /// use mcr::Position;
     /// let pos = Position::startpos();
     /// let nf3 = pos.parse_san("Nf3").unwrap();
     /// assert_eq!(nf3.to_uci(), "g1f3");

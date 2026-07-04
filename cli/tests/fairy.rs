@@ -1,4 +1,4 @@
-//! Smoke test for the `mce fairy` subcommand: construct a fairy variant by name
+//! Smoke test for the `mcr fairy` subcommand: construct a fairy variant by name
 //! and run perft at a low depth, asserting the FSF-confirmed node counts pinned
 //! in the library's own `tests/perft_xiangqi.rs` / `tests/perft_shogi.rs`.
 //!
@@ -7,16 +7,16 @@
 
 use std::process::Command;
 
-/// Runs the `mce` binary with `args` and returns its stdout as a string,
+/// Runs the `mcr` binary with `args` and returns its stdout as a string,
 /// asserting a successful exit.
 fn run(args: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_mce"))
+    let output = Command::new(env!("CARGO_BIN_EXE_mcr"))
         .args(args)
         .output()
-        .expect("spawn mce binary");
+        .expect("spawn mcr binary");
     assert!(
         output.status.success(),
-        "`mce {}` failed: {}",
+        "`mcr {}` failed: {}",
         args.join(" "),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -82,7 +82,7 @@ fn fairy_inspect_and_play_round_trip() {
 
 #[test]
 fn unknown_fairy_variant_fails() {
-    let output = Command::new(env!("CARGO_BIN_EXE_mce"))
+    let output = Command::new(env!("CARGO_BIN_EXE_mcr"))
         .args([
             "fairy",
             "perft",
@@ -91,7 +91,7 @@ fn unknown_fairy_variant_fails() {
             "1",
         ])
         .output()
-        .expect("spawn mce binary");
+        .expect("spawn mcr binary");
     assert!(
         !output.status.success(),
         "unknown variant must exit nonzero"

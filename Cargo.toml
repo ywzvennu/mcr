@@ -1,4 +1,4 @@
-# mce — Modular Chess Engine
+# mcr — Modular Chess Rules
 #
 # A permissively licensed (MIT OR Apache-2.0), clean-room chess move-generation
 # and rules library covering standard chess, Chess960, and the major variants.
@@ -6,7 +6,7 @@
 # derive from any copyleft engine.
 
 [package]
-name = "mce"
+name = "mcr"
 description = "Clean-room, permissively licensed (MIT OR Apache-2.0) chess move-generation and rules library covering standard chess, Chess960, and 60+ fairy variants (Shogi, Xiangqi, Makruk, Capablanca, Chu Shogi, and more) validated against Fairy-Stockfish. Rules and move generation only — no search or evaluation."
 version = "0.3.0"
 # Release-readiness is staged, but the actual crates.io upload is user-gated:
@@ -17,13 +17,13 @@ publish = false
 edition = "2021"
 rust-version = "1.83"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ywzvennu/mce"
-homepage = "https://github.com/ywzvennu/mce"
-documentation = "https://docs.rs/mce"
+repository = "https://github.com/ywzvennu/mcr"
+homepage = "https://github.com/ywzvennu/mcr"
+documentation = "https://docs.rs/mcr"
 readme = "README.md"
 keywords = ["chess", "shogi", "xiangqi", "variants", "perft"]
 categories = ["game-development", "games", "no-std"]
-authors = ["MCE contributors"]
+authors = ["MCR contributors"]
 # The published package is the library crate only: src/, README, LICENSEs,
 # CHANGELOG, and the architecture docs. The GPL-fenced and non-published sibling
 # crates each live behind their own Cargo.toml, so Cargo already drops them from
@@ -118,8 +118,8 @@ serde_json = "1"
 # dependency graph or rules. `doc = false` keeps it out of the rustdoc surface;
 # its inline unit tests still run under `cargo test`.
 [[bin]]
-name = "mce-uci"
-path = "src/bin/mce-uci.rs"
+name = "mcr-uci"
+path = "src/bin/mcr-uci.rs"
 doc = false
 bench = false
 

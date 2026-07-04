@@ -58,7 +58,7 @@
 //! 8/pppppppp/8/8/8/8/PPPPPPPP/8[KQRRBBNNkqrrbbnn] w - - 0 1
 //! ```
 //!
-//! mce uses the same board and `[..]` pocket but writes the pocket in role-index
+//! mcr uses the same board and `[..]` pocket but writes the pocket in role-index
 //! order (Knights, Bishops, Rooks, Queen, King), so its canonical start FEN is
 //!
 //! ```text
@@ -66,7 +66,7 @@
 //! ```
 //!
 //! The two are the same position; the standard piece letters (`K Q R B N`) are
-//! shared with FSF, so the `compare-fairy/` harness drives FSF with mce's FEN
+//! shared with FSF, so the `compare-fairy/` harness drives FSF with mcr's FEN
 //! unchanged (FSF accepts the pocket bracket in any order).
 
 use crate::geometry::position::{

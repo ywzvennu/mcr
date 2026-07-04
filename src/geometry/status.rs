@@ -215,8 +215,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// the history-dependent rules need [`GenericGame::status`].
     ///
     /// ```
-    /// use mce::geometry::{Chess8x8, GameStatus, GenericPosition, StandardChess};
-    /// use mce::Color;
+    /// use mcr::geometry::{Chess8x8, GameStatus, GenericPosition, StandardChess};
+    /// use mcr::Color;
     /// // Fool's mate: white is checkmated, so Black wins.
     /// let pos = GenericPosition::<Chess8x8, StandardChess>::from_fen(
     ///     "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",

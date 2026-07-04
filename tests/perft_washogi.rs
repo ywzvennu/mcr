@@ -29,9 +29,9 @@
 //!   independent generator (the no-oracle cross-validation); the deeper layers are
 //!   `#[ignore]`d.
 
-use mce::geometry::{perft as gperft, Washogi, Washogi11x11};
+use mcr::geometry::{perft as gperft, Washogi, Washogi11x11};
 
-/// The Wa Shogi starting FEN (mce overflow spelling; empty hand).
+/// The Wa Shogi starting FEN (mcr overflow spelling; empty hand).
 const STARTPOS: &str = "**f**j**h**l**nk**o**k**g**m**d/1**v3**q3**t1/\
 **b**b**b**r**b**b**b**u**b**b**b/11/11/11/11/11/\
 **B**B**B**U**B**B**B**R**B**B**B/1**T3**Q3**V1/\
@@ -86,7 +86,7 @@ fn engine_matches_independent_brute_force() {
 /// Here a Black Oxcart on d3 pins the White Fox on d2 to the White King on d1 along
 /// the d-file. The Fox's only legal move is to capture the pinning Oxcart (`d2d3`);
 /// its vertical Dabbaba jump `d2d4` — over the Oxcart, off the king-to-pinner
-/// segment — would leave the king in check and is illegal. mce previously emitted
+/// segment — would leave the king in check and is illegal. mcr previously emitted
 /// `d2d4` under the default full-line pin mask (perft(1) = 6); confining a pinned
 /// piece to the king-to-pinner segment drops it, giving the correct perft(1) = 5
 /// (four King steps + the Fox's capture of the pinner). Both the engine and the
@@ -105,13 +105,13 @@ fn pinned_fox_cannot_take_its_forward_jump() {
         "pinned Fox must not keep its illegal d2d4 jump"
     );
 
-    // No generated move may leave the moving side's own king attacked (mce's own
+    // No generated move may leave the moving side's own king attacked (mcr's own
     // self-consistency: the pin mask must never admit a king-exposing move).
     for m in pos.legal_moves() {
         let next = pos.play(&m);
-        if let Some(k) = next.board().king_of(mce::Color::White) {
+        if let Some(k) = next.board().king_of(mcr::Color::White) {
             assert!(
-                !next.is_attacked(k, mce::Color::Black),
+                !next.is_attacked(k, mcr::Color::Black),
                 "move {} leaves the White king in check",
                 m.to_uci::<Washogi11x11>()
             );

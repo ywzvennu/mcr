@@ -1,4 +1,4 @@
-//! The `mce` subcommands, one module each.
+//! The `mcr` subcommands, one module each.
 
 pub mod convert;
 pub mod fairy;

@@ -5,9 +5,9 @@
 //! Janus is played on the same ten-files by eight-ranks board as Capablanca. Its
 //! only compound piece is the Janus (a.k.a. Archbishop / Cardinal):
 //!
-//! * **Janus** (Bishop + Knight) — mce's [`WideRole::Hawk`], whose default
+//! * **Janus** (Bishop + Knight) — mcr's [`WideRole::Hawk`], whose default
 //!   movement (`bishop | knight`) is already the Janus's. FEN letter `a`/`A` in
-//!   the mce dialect (Fairy-Stockfish spells the Janus `j`/`J`, a dialect
+//!   the mcr dialect (Fairy-Stockfish spells the Janus `j`/`J`, a dialect
 //!   difference the `compare-fairy/` harness reconciles). There is **no
 //!   Chancellor** in Janus Chess.
 //!
@@ -28,10 +28,10 @@
 //!
 //! ```text
 //! FSF dialect: rjnbkqbnjr/pppppppppp/10/10/10/10/PPPPPPPPPP/RJNBKQBNJR w KQkq - 0 1
-//! mce dialect: ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1
+//! mcr dialect: ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the Janus's letter (`j` in FSF, `a` in mce). Back rank
+//! The two differ only in the Janus's letter (`j` in FSF, `a` in mcr). Back rank
 //! a-file to j-file: Rook, Janus, Knight, Bishop, King, Queen, Bishop, Knight,
 //! Janus, Rook.
 
@@ -41,7 +41,7 @@ use crate::geometry::position::{
 use crate::geometry::{Board, Cap10x8, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
-/// The confirmed Janus starting placement in the mce dialect (Janus = `a`/`A`),
+/// The confirmed Janus starting placement in the mcr dialect (Janus = `a`/`A`),
 /// byte-for-byte equivalent to Fairy-Stockfish's `rjnbkqbnjr/.../RJNBKQBNJR`
 /// modulo the Janus's letter.
 const JANUS_START_PLACEMENT: &str = "ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR";

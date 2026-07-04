@@ -2,7 +2,7 @@
 //! with the Queen replaced by a Chancellor (Rook + Knight).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Almost::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Almost::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant almost`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` differential fuzzer re-runs the head-to-head on demand
 //! (`--difffuzz --variant almost`); this test pins the FSF-confirmed numbers so a
@@ -12,18 +12,18 @@
 //!
 //! ```text
 //! FSF dialect: rnbckbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBCKBNR w KQkq - 0 1
-//! mce dialect: rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1
+//! mcr dialect: rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce, mce's
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr, mcr's
 //! letter for the rook-knight compound [`WideRole::Elephant`]).
 //!
 //! The deep layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_almost -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Almost, Chess8x8};
+use mcr::geometry::{perft as gperft, Almost, Chess8x8};
 
-/// The Almost Chess starting FEN (mce dialect), confirmed against FSF's
+/// The Almost Chess starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant almost`.
 const STARTPOS: &str = "rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1";
 

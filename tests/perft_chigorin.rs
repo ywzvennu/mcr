@@ -3,7 +3,7 @@
 //! (bishops + a queen), with colour-restricted pawn promotion.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Chigorin::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Chigorin::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant chigorin`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` differential fuzzer re-runs the head-to-head on demand
 //! (`--difffuzz --variant chigorin`); this test pins the FSF-confirmed numbers so
@@ -13,16 +13,16 @@
 //!
 //! ```text
 //! FSF dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNCKNNR w KQkq - 0 1
-//! mce dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1
+//! mcr dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in White's chancellor letter (`c` in FSF, `e` in mce). The
+//! The two differ only in White's chancellor letter (`c` in FSF, `e` in mcr). The
 //! deep layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_chigorin -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Chigorin};
+use mcr::geometry::{perft as gperft, Chess8x8, Chigorin};
 
-/// The Chigorin starting FEN (mce dialect), confirmed against FSF's
+/// The Chigorin starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant chigorin`.
 const STARTPOS: &str = "rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1";
 

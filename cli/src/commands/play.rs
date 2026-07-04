@@ -1,4 +1,4 @@
-//! `mce play` — seeded random self-play.
+//! `mcr play` — seeded random self-play.
 //!
 //! Picks uniformly random legal moves from the start position until the game
 //! ends (or a ply cap is hit), printing the move list and the final result. The
@@ -12,7 +12,7 @@
 
 use clap::Args;
 
-use mce::{AnyVariant, Game, Move, Outcome, Pgn, VariantId};
+use mcr::{AnyVariant, Game, Move, Outcome, Pgn, VariantId};
 
 use crate::util::{self, CliError, CliResult, SplitMix64};
 
@@ -20,7 +20,7 @@ use crate::util::{self, CliError, CliResult, SplitMix64};
 /// against a pathological non-terminating line.
 const DEFAULT_MAX_PLIES: usize = 1024;
 
-/// Arguments for `mce play`.
+/// Arguments for `mcr play`.
 #[derive(Debug, Args)]
 pub struct PlayArgs {
     /// Variant rule set (default: standard chess).
@@ -125,7 +125,7 @@ fn play_variant(id: VariantId, args: &PlayArgs) -> CliResult {
 /// Prints the final result line.
 fn report_outcome(
     outcome: Option<Outcome>,
-    end_reason: Option<mce::EndReason>,
+    end_reason: Option<mcr::EndReason>,
     plies: usize,
     max: usize,
 ) {

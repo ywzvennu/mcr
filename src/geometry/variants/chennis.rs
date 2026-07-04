@@ -69,7 +69,7 @@
 //! 1fkm3/1p1s3/7/7/7/3S1P1/3MKF1[] w - 0 1
 //! ```
 //!
-//! mce renders the same placement in its own dialect (the Ferz is `m`, the Soldier
+//! mcr renders the same placement in its own dialect (the Ferz is `m`, the Soldier
 //! `z`, the Commoner `*u`, the Pawn `**p`) with an empty `[]` holdings bracket; the
 //! `compare-fairy/` harness rewrites each token to FSF's spelling when driving FSF.
 
@@ -88,7 +88,7 @@ use super::super::Chennis7x7;
 pub struct ChennisRules;
 
 /// The confirmed Chennis starting placement (the hand is empty at the start), in
-/// mce dialect: the Ferz is `m` ([`WideRole::Met`]), the Soldier `z`
+/// mcr dialect: the Ferz is `m` ([`WideRole::Met`]), the Soldier `z`
 /// ([`WideRole::Soldier`]), the Commoner `*u` ([`WideRole::Commoner`]) and the
 /// Pawn `**p` ([`WideRole::ChennisPawn`]). This is FSF's `1fkm3/1p1s3/7/7/7/3S1P1/3MKF1`
 /// rewritten token-for-token.

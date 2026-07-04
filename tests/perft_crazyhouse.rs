@@ -8,7 +8,7 @@
 //! shallow depths and the deeper levels are `#[ignore]`d — run them with
 //! `cargo test --release -- --ignored`.
 
-use mce::{perft_variant, Crazyhouse};
+use mcr::{perft_variant, Crazyhouse};
 
 /// Parses a crazyhouse FEN (the fixture uses the 4-field EPD form without move
 /// clocks; the parser defaults those) and runs perft to `depth`.

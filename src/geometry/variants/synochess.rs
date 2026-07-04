@@ -46,8 +46,8 @@
 //!
 //! ## Confirmed starting FEN
 //!
-//! From FSF's `variants.ini` (`[synochess:pocketknight]`, `startFen`). mce and FSF
-//! agree on the position but spell the Black pieces differently. mce avoids the
+//! From FSF's `variants.ini` (`[synochess:pocketknight]`, `startFen`). mcr and FSF
+//! agree on the position but spell the Black pieces differently. mcr avoids the
 //! letters `a e s` (already the Hawk / Rook+Knight Elephant / Silver), so the
 //! Elephant is `v` (Fers-Alfil) and the Soldier is `z`; the Commoner "Advisor"
 //! lands **past the exhausted single-letter alphabet** (the Orda army claimed the
@@ -59,7 +59,7 @@
 //!
 //! ```text
 //! FSF dialect: rneakenr/8/1c4c1/1ss2ss1/8/8/PPPPPPPP/RNBQKBNR[ss] w KQ - 0 1
-//! mce dialect: rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1
+//! mcr dialect: rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1
 //! ```
 
 use crate::geometry::position::{
@@ -87,7 +87,7 @@ const FERS_ALFIL_OFFSETS: [(i8, i8); 8] = [
     (-2, -2),
 ];
 
-/// The starting placement, mce dialect (see the [module docs](self)).
+/// The starting placement, mcr dialect (see the [module docs](self)).
 const SYNOCHESS_START_PLACEMENT: &str = "rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR";
 
 /// The Synochess rule layer: a zero-sized [`WideVariant`] over [`Chess8x8`].
@@ -347,7 +347,7 @@ impl WideVariant<Chess8x8> for SynochessRules {
 /// Synochess as a [`GenericPosition`] over the 8x8 [`Chess8x8`] geometry.
 ///
 /// Construct the starting position with
-/// [`Synochess::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Synochess::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Synochess::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the armies, the Soldier pocket, and the campmate / king-faceoff
 /// rules.

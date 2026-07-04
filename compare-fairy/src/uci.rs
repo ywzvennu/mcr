@@ -2,7 +2,7 @@
 //!
 //! GPL FENCE: this module never links FSF. It spawns the externally provided
 //! `fairy-stockfish` binary as a child process and talks to it over stdin/stdout
-//! using the UCI text protocol. Everything here is original mce-side code; the
+//! using the UCI text protocol. Everything here is original mcr-side code; the
 //! FSF binary's GPL licensing does not cross the process boundary.
 //!
 //! The driver speaks only the subset of UCI the perft comparison needs:

@@ -4,9 +4,9 @@
 //! soldier promotion to a Khan**, and the **flag-win (campmate)** terminal rule.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Khans` perft and by Fairy-Stockfish (FSF, `UCI_Variant khans`)
+//! `mcr::geometry::Khans` perft and by Fairy-Stockfish (FSF, `UCI_Variant khans`)
 //! running `go perft` on the byte-identical position — the FSF divide matches
-//! mce's move-for-move, including each Khan piece's distinctive move/capture split:
+//! mcr's move-for-move, including each Khan piece's distinctive move/capture split:
 //! the Lancer (knight move, rook capture), Archer (knight move, bishop capture),
 //! Kheshig (King + Knight), Khan (knight *move*, **king** *capture* — `mNcK`), and
 //! Khan soldier (forward *half*-knight move, straight-forward step capture —
@@ -24,7 +24,7 @@
 //! ```
 //!
 //! with FSF's letters `l h a t k s` (Lancer, Kheshig, Archer, Khan, King, soldier).
-//! mce reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the shared Orda pieces take
+//! mcr reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the shared Orda pieces take
 //! the letters Lancer `f`, Kheshig `w`, Archer `y`, and the two new Khan pieces take
 //! overflow-3 tokens `=t` (Khan) / `=s` (soldier):
 //!
@@ -54,9 +54,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_khans -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Khans};
+use mcr::geometry::{perft as gperft, Chess8x8, Khans};
 
-/// The Khan's Chess starting FEN in mce's dialect, confirmed against FSF's
+/// The Khan's Chess starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant khans` / `position startpos`.
 const STARTPOS: &str = "fwy=tkywf/=s=s=s=s=s=s=s=s/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
 
@@ -190,7 +190,7 @@ fn flag_race_cheap() {
     );
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

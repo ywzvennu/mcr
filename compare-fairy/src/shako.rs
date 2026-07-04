@@ -1,12 +1,12 @@
 //! Shako (10x10) differential perft + timing against Fairy-Stockfish (issue
 //! #184).
 //!
-//! Shako runs on mce's **generic** `u128` engine (`mce::geometry::Shako`, a
+//! Shako runs on mcr's **generic** `u128` engine (`mcr::geometry::Shako`, a
 //! `GenericPosition<Grand10x10, ShakoRules>`), not the concrete 8x8 `AnyVariant`
 //! layer the rest of this harness drives, so it has its own corpus and comparison
 //! loop here (mirroring `grand.rs`). The FSF side selects `UCI_Variant shako`,
 //! sets the FEN, runs `go perft`, asserts the node counts match, and reports
-//! mce-vs-FSF throughput. The corpus deliberately exercises the **cannon**:
+//! mcr-vs-FSF throughput. The corpus deliberately exercises the **cannon**:
 //! captures over a screen, and checks delivered over a screen (the
 //! screen-dependent king-safety path).
 //!
@@ -18,10 +18,10 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF agree on the position but spell the **elephant** differently: FSF
-//! uses `e`/`E` (its Fers-Alfil), but mce already uses `e`/`E` for the Rook+Knight
+//! mcr and FSF agree on the position but spell the **elephant** differently: FSF
+//! uses `e`/`E` (its Fers-Alfil), but mcr already uses `e`/`E` for the Rook+Knight
 //! Elephant (the Capablanca/Grand marshal), so the Shako elephant takes the free
-//! letter `v`/`V` ([`WideRole::FersAlfil`](mce::geometry::WideRole::FersAlfil)).
+//! letter `v`/`V` ([`WideRole::FersAlfil`](mcr::geometry::WideRole::FersAlfil)).
 //! The cannon is `c`/`C` in both. [`fen_to_fsf`] rewrites the elephant's letter;
 //! the placement is otherwise byte-identical.
 //!
@@ -30,11 +30,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Grand10x10, Shako};
+use mcr::geometry::{perft as gperft, Grand10x10, Shako};
 
 use crate::uci::Engine;
 
-/// One Shako corpus position, in the **mce dialect** (elephant = `v`).
+/// One Shako corpus position, in the **mcr dialect** (elephant = `v`).
 struct Case {
     label: &'static str,
     fen: &'static str,
@@ -81,7 +81,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrite an mce-dialect Shako FEN into the FSF dialect: the elephant's letter
+/// Rewrite an mcr-dialect Shako FEN into the FSF dialect: the elephant's letter
 /// `v`/`V` becomes `e`/`E` in the *placement* field only (the other FEN fields
 /// carry no piece letters). The cannon `c`/`C` is unchanged.
 pub fn fen_to_fsf(fen: &str) -> String {
@@ -104,17 +104,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -127,15 +127,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Shako corpus through mce and FSF. Returns the number of mismatches
+/// Run the Shako corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched, or FSF lacks `shako` and the suite is skipped).
 /// Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -152,7 +152,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
 
     let head = format!(
         "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -171,10 +171,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -186,16 +186,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "shako OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "shako OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -208,10 +208,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Shako parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH shako/{} depth {}: mce={} fsf={}  mce FEN: {}  FSF FEN: {}",
+                "  MISMATCH shako/{} depth {}: mcr={} fsf={}  mcr FEN: {}  FSF FEN: {}",
                 r.label,
                 r.depth,
-                r.mce_nodes,
+                r.mcr_nodes,
                 r.fsf_nodes,
                 r.fen,
                 fen_to_fsf(r.fen),
@@ -221,12 +221,12 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     mismatches
 }
 
-/// Run one Shako position through mce's generic perft and FSF's `go perft`.
+/// Run one Shako position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Shako::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Grand10x10, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Shako::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Grand10x10, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("shako", false)?;
@@ -237,10 +237,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -274,13 +274,13 @@ mod tests {
         }
     }
 
-    /// The mce -> FSF dialect rewrite swaps only the elephant's letter and leaves
+    /// The mcr -> FSF dialect rewrite swaps only the elephant's letter and leaves
     /// the cannon and every other field intact.
     #[test]
     fn fen_dialect_rewrites_only_the_elephant() {
-        let mce = "c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1";
+        let mcr = "c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1";
         let fsf = "c8c/ernbqkbnre/pppppppppp/10/10/10/10/PPPPPPPPPP/ERNBQKBNRE/C8C w KQkq - 0 1";
-        assert_eq!(fen_to_fsf(mce), fsf);
+        assert_eq!(fen_to_fsf(mcr), fsf);
         // The cannon `C`/`c` is untouched, and the trailing fields are left alone.
         let out = fen_to_fsf("V9/10/10/10/10/10/10/10/10/c8C b - - 1 9");
         assert_eq!(out, "E9/10/10/10/10/10/10/10/10/c8C b - - 1 9");

@@ -1,30 +1,30 @@
 //! Shogun differential perft + timing against Fairy-Stockfish (issue #227).
 //!
-//! Shogun runs on mce's **generic** engine (`mce::geometry::Shogun`, a
+//! Shogun runs on mcr's **generic** engine (`mcr::geometry::Shogun`, a
 //! `GenericPosition<Chess8x8, ShogunRules>`), like the other fairy variants, so it
 //! has its own corpus and comparison loop here. The FSF side selects
 //! `UCI_Variant shogun`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput.
+//! match, and reports mcr-vs-FSF throughput.
 //!
 //! ## Not a built-in: variants.ini
 //!
 //! `shogun` is **not** an FSF built-in — it is defined in FSF's `variants.ini`.
-//! The suite `load`s a `variants.ini` resolved from `$MCE_FSF_VARIANTS_INI`
+//! The suite `load`s a `variants.ini` resolved from `$MCR_FSF_VARIANTS_INI`
 //! before checking the variant (mirroring the Shinobi / Synochess suites), after
 //! which `has_variant("shogun")` is true. If the env var is unset or the binary
 //! still lacks `shogun`, the block skips gracefully.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same Shogun position with **different tokens for the
+//! mcr and FSF render the same Shogun position with **different tokens for the
 //! promoted pieces**. In FSF a promoted piece is a base letter carrying a `+`
 //! marker (`+P` Commoner, `+N` Centaur, `+B` Archbishop, `+R` Chancellor, `+F`
-//! Queen) and the bare fers is `F`. mce reuses **existing roles** for those
+//! Queen) and the bare fers is `F`. mcr reuses **existing roles** for those
 //! compounds — Commoner `*u` (overflow, recycling the Advisor's `u`), Centaur =
 //! Kheshig `w`, Archbishop = Hawk `a`, Chancellor = Elephant `e`, Queen `q`, Met
-//! (fers) `m` — so [`to_fsf_dialect`] maps each mce token to FSF's:
+//! (fers) `m` — so [`to_fsf_dialect`] maps each mcr token to FSF's:
 //!
-//! | piece      | mce | FSF |
+//! | piece      | mcr | FSF |
 //! |------------|-----|-----|
 //! | Commoner   | `*u`/`*U` | `+p`/`+P` |
 //! | Centaur    | `w`/`W`   | `+n`/`+N` |
@@ -44,11 +44,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Shogun};
+use mcr::geometry::{perft as gperft, Chess8x8, Shogun};
 
 use crate::uci::Engine;
 
-/// One Shogun corpus position. The FEN is mce's dialect; the FSF side translates
+/// One Shogun corpus position. The FEN is mcr's dialect; the FSF side translates
 /// it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -82,7 +82,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Translates an mce-dialect Shogun FEN to FSF's dialect by mapping the
+/// Translates an mcr-dialect Shogun FEN to FSF's dialect by mapping the
 /// promoted-piece tokens to FSF's `+base` markers (and the bare Met to FSF's
 /// fers): Commoner `*u`/`*U → +p`/`+P`, Centaur `w`/`W → +n`/`+N`, Archbishop
 /// `a`/`A → +b`/`+B`, Chancellor `e`/`E → +r`/`+R`, Queen `q`/`Q → +f`/`+F`, Met
@@ -122,17 +122,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -145,15 +145,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Shogun corpus through mce and FSF. Returns the number of mismatches
+/// Run the Shogun corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched). Prints a table and a one-line summary. If the FSF
 /// binary does not advertise the `shogun` variant (no `variants.ini` loaded), the
 /// whole block is skipped (returns 0) rather than reporting spurious mismatches.
@@ -162,11 +162,11 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     println!("Shogun — generic engine vs FSF UCI_Variant shogun (issue #227):");
 
     // Shogun is an INI variant (not an FSF built-in): load FSF's variants.ini from
-    // `$MCE_FSF_VARIANTS_INI` before checking for the variant, mirroring the
+    // `$MCR_FSF_VARIANTS_INI` before checking for the variant, mirroring the
     // Shinobi suite. Skip gracefully if it is unset or still lacks `shogun`.
-    let ini = std::env::var("MCE_FSF_VARIANTS_INI").unwrap_or_default();
+    let ini = std::env::var("MCR_FSF_VARIANTS_INI").unwrap_or_default();
     if ini.is_empty() {
-        println!("  SKIP: set $MCE_FSF_VARIANTS_INI to an FSF variants.ini defining `shogun`.");
+        println!("  SKIP: set $MCR_FSF_VARIANTS_INI to an FSF variants.ini defining `shogun`.");
         return 0;
     }
     if let Err(e) = engine.load_variants(&ini) {
@@ -179,7 +179,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
     let head = format!(
         "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -198,10 +198,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -214,16 +214,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
 
     // Node-weighted aggregate throughput.
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "shogun OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "shogun OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -236,21 +236,21 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Shogun parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH shogun/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH shogun/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Shogun position through mce's generic perft and FSF's `go perft`.
+/// Run one Shogun position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    // mce side: the generic Shogun position (mce dialect).
-    let pos = Shogun::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side: the generic Shogun position (mcr dialect).
+    let pos = Shogun::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: translate the promoted-piece tokens to FSF's dialect.
     let fsf_fen = to_fsf_dialect(case.fen);
@@ -262,10 +262,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -301,14 +301,14 @@ mod tests {
         }
     }
 
-    /// The dialect swap rewrites mce's promoted-piece tokens to FSF's `+base`
+    /// The dialect swap rewrites mcr's promoted-piece tokens to FSF's `+base`
     /// markers (and the bare Met to FSF's fers), and leaves the standard army and
     /// the structural fields untouched.
     #[test]
     fn dialect_swap_maps_promoted_tokens() {
         // The start array: the d-file Queen (`q`/`Q`) is FSF's promoted fers `+f`/`+F`.
-        let mce = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1";
-        let fsf = to_fsf_dialect(mce);
+        let mcr = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1";
+        let fsf = to_fsf_dialect(mcr);
         assert_eq!(
             fsf,
             "rnb+fkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB+FKBNR[] w KQkq - 0 1"

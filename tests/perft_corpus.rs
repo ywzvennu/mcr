@@ -3,7 +3,7 @@
 //! Validation elsewhere leans on the Fairy-Stockfish (FSF) subprocess in
 //! `compare-fairy/` for a live differential. That harness stays, but it needs an
 //! external GPL binary present. This corpus is the complement: a single,
-//! self-contained runner that checks mce's move generation against *pinned*
+//! self-contained runner that checks mcr's move generation against *pinned*
 //! reference node counts, so core correctness is provable in a plain
 //! `cargo test` with **no external engine present**.
 //!
@@ -15,7 +15,7 @@
 //! # Provenance
 //!
 //! Every pinned count carries a documented source. Nothing here is derived from
-//! mce itself — the references are external facts:
+//! mcr itself — the references are external facts:
 //!
 //! - **Standard chess** — the canonical Chess Programming Wiki (CPW) perft
 //!   results: the initial position (depths 1–6 = 20 / 400 / 8902 / 197281 /
@@ -34,7 +34,7 @@
 //!   constant. Each is tagged with the FSF confirmation. The values also match
 //!   the per-variant `tests/perft_*.rs` suites, which were validated
 //!   node-for-node against FSF when each variant landed. **This test never
-//!   invokes FSF** — it only checks mce against the pinned constants.
+//!   invokes FSF** — it only checks mcr against the pinned constants.
 //! - **Generic-geometry Capablanca-family & long-tail variants** (almost, amazon,
 //!   chigorin, gothic, embassy, janus, caparandom, chancellor, courier, tencubed,
 //!   opulent) — like the wide/fairy set, no published perft table exists, so each
@@ -43,9 +43,9 @@
 //!   2026-07-02** and also matches the per-variant `tests/perft_<name>.rs` suites.
 //! - **Chu Shogi** (12x12) — the reference oracle is **HaChu** (no FSF perft). The
 //!   depth-1/2 counts are byte-identical/node-for-node HaChu matches; depth-3 pins
-//!   mce's *correct* 48319 (HaChu 0.23 yields 48317 via a documented
-//!   anti-diagonal-Lion bug that misses two legal captures — mce is right); depth-4
-//!   is an mce regression pin. See `tests/perft_chu.rs` for the full write-up.
+//!   mcr's *correct* 48319 (HaChu 0.23 yields 48317 via a documented
+//!   anti-diagonal-Lion bug that misses two legal captures — mcr is right); depth-4
+//!   is an mcr regression pin. See `tests/perft_chu.rs` for the full write-up.
 //!
 //! # Layering
 //!
@@ -56,12 +56,12 @@
 //! cargo test --release --test perft_corpus -- --include-ignored
 //! ```
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Almost, Amazon, AnyWideVariant, Cap10x8, Caparandom, Chancellor, Chess8x8,
     Chess9x9, Chigorin, Chu, Chu12x12, Courier, Courier12x8, Embassy, Gothic, Grand10x10, Janus,
     Opulent, Tencubed, WideVariantId,
 };
-use mce::{perft, perft_variant, AnyVariant, Chess960, Position, VariantId};
+use mcr::{perft, perft_variant, AnyVariant, Chess960, Position, VariantId};
 
 /// One reference position: a label, its FEN, and the pinned `(depth, nodes)`
 /// pairs. Pairs at depth `> cheap_max` are gated behind `#[ignore]`.
@@ -581,19 +581,19 @@ fn wide_variants_deep() {
 // startpos perft, pinned as constants. Each was produced with `UCI_Variant
 // <name>` / `go perft` on the FSF oracle (`largeboards=yes` for the wide
 // boards) and **re-confirmed against FSF on 2026-07-02**. The same numbers
-// appear in the per-variant `tests/perft_<name>.rs` suites. FENs are the mce
-// dialect (compound pieces spelled with mce's overflow tokens); FSF spells the
+// appear in the per-variant `tests/perft_<name>.rs` suites. FENs are the mcr
+// dialect (compound pieces spelled with mcr's overflow tokens); FSF spells the
 // compounds with its own single letters (see each `tests/perft_<name>.rs`).
-// This test never invokes FSF — it only checks mce against the pinned counts.
+// This test never invokes FSF — it only checks mcr against the pinned counts.
 // ===========================================================================
 
-/// A generic-geometry reference: a label, its mce-dialect FEN, the pinned
+/// A generic-geometry reference: a label, its mcr-dialect FEN, the pinned
 /// `(depth, nodes)` pairs, and the cheap-layer cutoff. Checked through the typed
-/// [`mce::geometry::perft`] for the geometry named by the enclosing group.
+/// [`mcr::geometry::perft`] for the geometry named by the enclosing group.
 struct GeomCase {
     /// A short human label (the variant name).
     label: &'static str,
-    /// The startpos in the mce FEN dialect.
+    /// The startpos in the mcr FEN dialect.
     fen: &'static str,
     /// The pinned `(depth, node-count)` reference pairs.
     nodes: &'static [(u32, u64)],
@@ -604,7 +604,7 @@ struct GeomCase {
 /// Emits a `<cheap>` / `<deep>` `#[test]` pair that runs every [`GeomCase`] in
 /// `$cases` through `gperft::<$geom, _>`, the cheap test keeping depths
 /// `<= cheap_max` and the `#[ignore]`d deep test the rest. `$ty` is the variant
-/// position type (its `from_fen` parses the mce-dialect FEN).
+/// position type (its `from_fen` parses the mcr-dialect FEN).
 macro_rules! geom_group {
     ($cheap:ident, $deep:ident, $ty:ty, $geom:ty, $cases:expr) => {
         #[test]
@@ -814,14 +814,14 @@ geom_group!(
 //
 // The reference oracle is HaChu (H. G. Muller); FSF has no Chu perft. Depth 1
 // (36) is a byte-identical move-set match; depth 2 (1296) matches HaChu
-// node-for-node. Depth 3 pins mce's **correct** 48319: HaChu 0.23 yields 48317
+// node-for-node. Depth 3 pins mcr's **correct** 48319: HaChu 0.23 yields 48317
 // because of a documented anti-diagonal-Lion bug (it misses two legal captures
-// after `1. f3f5 d8d7`) — mce is right, and every other node matches. Depth 4
-// (1802285) is an mce-only regression pin (a node-by-node HaChu cross-check at
+// after `1. f3f5 d8d7`) — mcr is right, and every other node matches. Depth 4
+// (1802285) is an mcr-only regression pin (a node-by-node HaChu cross-check at
 // ~1.8M nodes is intractable). See `tests/perft_chu.rs` for the full write-up.
 // ===========================================================================
 
-/// Chu start-position perft, cheap layer (depths 1-3). Depth 3's 48319 is mce's
+/// Chu start-position perft, cheap layer (depths 1-3). Depth 3's 48319 is mcr's
 /// correct value (HaChu 0.23's buggy 48317 is *not* pinned; see the module head).
 #[test]
 fn chu_cheap() {
@@ -831,7 +831,7 @@ fn chu_cheap() {
     assert_eq!(gperft::<Chu12x12, _>(&pos, 3), 48319);
 }
 
-/// Chu start-position perft, deep layer (depth 4): an mce regression pin.
+/// Chu start-position perft, deep layer (depth 4): an mcr regression pin.
 #[test]
 #[ignore = "deep perft; run with --release --test perft_corpus -- --ignored"]
 fn chu_deep() {

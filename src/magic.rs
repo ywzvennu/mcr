@@ -70,9 +70,9 @@
 //! occupancies — it is ~18% faster per lookup than the checked read, i.e. it does
 //! remove real cost in a tight loop (a sharper result than the safe window form
 //! above, which pays for slice creation and a dead cache tail). But at full perft,
-//! measured on the drift-immune interleaved mce-vs-reference ratio, the effect
+//! measured on the drift-immune interleaved mcr-vs-reference ratio, the effect
 //! washes into run-to-run noise (~0–4%, flat on the wide-board variants) because
-//! the slider read is a small fraction of movegen work. mce already outperforms
+//! the slider read is a small fraction of movegen work. mcr already outperforms
 //! the reference on every variant, so there is no deficit the `unsafe` would
 //! close. The crate keeps `unsafe_code = "deny"` and the safe read: an ~18%
 //! isolated win that does not survive at the level that matters is not worth the

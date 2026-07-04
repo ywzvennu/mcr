@@ -8,12 +8,12 @@
 
 #![cfg(feature = "serde")]
 
-use mce::geometry::{
+use mcr::geometry::{
     Board as WideBoard, CannonShogi, Chess8x8, GateRole, GateSquare, GenericPlacement,
     GenericPosition, Geometry, Seirawan, Shogi, Shogi9x9, Sittuyin, Square as WideSquare, WideMove,
     WideMoveKind, WideRole, WideVariant, Xiangqi, Xiangqi9x10,
 };
-use mce::{
+use mcr::{
     AnyVariant, Bitboard, Board, CheckCounters, Color, CrazyhouseState, EndReason, File, Move,
     MoveKind, Outcome, Piece, Position, Rank, Role, Square, VariantId,
 };
@@ -282,7 +282,7 @@ fn generic_positions_round_trip_via_fen() {
     position_round_trips(Sittuyin::startpos());
     position_round_trips(CannonShogi::startpos());
 
-    // A non-startpos FEN with a mid-game clock (the documented mce Xiangqi
+    // A non-startpos FEN with a mid-game clock (the documented mcr Xiangqi
     // dialect, side to move flipped).
     position_round_trips(
         Xiangqi::from_fen("rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR b - - 3 7")

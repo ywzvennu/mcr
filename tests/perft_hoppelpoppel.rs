@@ -6,9 +6,9 @@
 //! (pieces, pawns, castling, en passant, a standard king).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::HoppelPoppel` perft and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::HoppelPoppel` perft and by Fairy-Stockfish (FSF,
 //! `UCI_Variant hoppelpoppel`, a built-in) running `go perft` on the byte-identical
-//! position — the FSF divide matches mce's move-for-move, including each piece's
+//! position — the FSF divide matches mcr's move-for-move, including each piece's
 //! move/capture split (the Knight-Bishop's bishop-diagonal captures vs its quiet
 //! knight jumps; the Bishop-Knight's knight-leap captures vs its quiet bishop
 //! slides), the `q r b n` pawn promotion (`b` / `n` being the variant pieces, not
@@ -24,10 +24,10 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-//! mce dialect: r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1
+//! mcr dialect: r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1
 //! ```
 //!
-//! In FSF the back rank's `n` / `b` are the redefined pieces. mce already names `n`
+//! In FSF the back rank's `n` / `b` are the redefined pieces. mcr already names `n`
 //! the standard Knight and `b` the standard Bishop, so the Hoppel-Poppel pieces
 //! take `*`-prefixed **overflow** tokens — `*h` (Knight-Bishop, the "Hoppel"
 //! mnemonic) and `*b` (Bishop-Knight, recycling the FSF `BISKNI` letter) — turning
@@ -49,9 +49,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_hoppelpoppel -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, HoppelPoppel};
+use mcr::geometry::{perft as gperft, Chess8x8, HoppelPoppel};
 
-/// The Hoppel-Poppel starting FEN in mce's dialect, confirmed against FSF's
+/// The Hoppel-Poppel starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant hoppelpoppel` / `position startpos`.
 const STARTPOS: &str = "r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1";
 
@@ -144,7 +144,7 @@ fn tactic_cheap() {
     check(TACTIC, &[(1, 22), (2, 463), (3, 8732), (4, 186494)]);
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

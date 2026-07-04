@@ -5,7 +5,7 @@
 //! full-information, deterministic position, so Fairy-Stockfish's
 //! `UCI_Variant bughouse` `go perft` **is** meaningful for it. Every `(depth,
 //! nodes)` pair below was produced **identically** by
-//! `mce::geometry::Bughouse::perft` and by FSF running `go perft` on the
+//! `mcr::geometry::Bughouse::perft` and by FSF running `go perft` on the
 //! byte-identical position; the `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/bughouse.rs`), and this test pins the
 //! FSF-confirmed numbers so a regression is caught even without FSF present.
@@ -22,7 +22,7 @@
 //! ## FEN dialect
 //!
 //! Bughouse uses only **standard chess pieces** (`K Q R B N P`), whose letters are
-//! identical in mce and FSF, so the FEN is passed to FSF unchanged. The trailing
+//! identical in mcr and FSF, so the FEN is passed to FSF unchanged. The trailing
 //! `[..]` is the crazyhouse hand (empty `[]` at the start); FSF accepts it present
 //! or omitted.
 //!
@@ -38,8 +38,8 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_bughouse -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Bughouse, Chess8x8, WideRole};
-use mce::Color;
+use mcr::geometry::{perft as gperft, Bughouse, Chess8x8, WideRole};
+use mcr::Color;
 
 /// The Bughouse starting FEN, confirmed against FSF — standard array, empty hand.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1";
@@ -63,7 +63,7 @@ const QDROP: &str = "4k3/8/8/8/8/8/8/4K3[Q] w - - 0 1";
 /// against FSF.
 const RICH: &str = "r3k2r/8/8/8/8/8/8/R3K2R[QRBNPqrbnp] w KQkq - 0 1";
 
-/// `(depth, nodes)` rows confirmed identical between mce and FSF.
+/// `(depth, nodes)` rows confirmed identical between mcr and FSF.
 struct Perft {
     fen: &'static str,
     rows: &'static [(u32, u64)],

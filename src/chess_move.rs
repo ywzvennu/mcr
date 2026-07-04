@@ -208,7 +208,7 @@ const FLAG_MASK: u16 = 0xf;
 /// `e1` to `g1`), matching the UCI convention for standard chess.
 ///
 /// ```
-/// use mce::{Move, MoveKind, Square};
+/// use mcr::{Move, MoveKind, Square};
 /// let m = Move::new(Square::E2, Square::E4, MoveKind::DoublePawnPush);
 /// assert_eq!(m.to_uci(), "e2e4");
 /// ```
@@ -377,7 +377,7 @@ impl Move {
     /// rendered as the king's two-square move (`e1g1`, `e1c1`).
     ///
     /// ```
-    /// use mce::{Move, MoveKind, Role, Square};
+    /// use mcr::{Move, MoveKind, Role, Square};
     /// assert_eq!(
     ///     Move::new(Square::E2, Square::E4, MoveKind::DoublePawnPush).to_uci(),
     ///     "e2e4",

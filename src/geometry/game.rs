@@ -46,7 +46,7 @@
 //! (defenders recomputed with the attacker lifted off the board). It is a faithful
 //! **subset**: it does not model FSF's discovered-attack chases, the impaired-horse
 //! and flying-general-pin refinements, or the exact single-victim identity tracked
-//! across the cycle (mce instead requires a qualifying chase on **every** cycle
+//! across the cycle (mcr instead requires a qualifying chase on **every** cycle
 //! ply, the same structural rule as perpetual check). These cover the dominant
 //! cases (a Chariot/Horse/Cannon harrying one piece) and agree with FSF on them.
 //!
@@ -884,7 +884,7 @@ mod tests {
 
     #[test]
     fn janggi_facing_side_must_break_or_pass_and_breaking_avoids_bikjang() {
-        // Fairy-Stockfish (and mce's move generator) forbid **any non-pass move that
+        // Fairy-Stockfish (and mcr's move generator) forbid **any non-pass move that
         // leaves the generals facing** once they already face — so a
         // two-consecutive-facing bikjang is only ever reachable through a pass, and
         // the wrapper's `st->bikjang && st->previous->bikjang` history check

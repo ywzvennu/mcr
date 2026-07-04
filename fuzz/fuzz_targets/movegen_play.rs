@@ -17,7 +17,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use mce::Position;
+use mcr::Position;
 
 /// A fuzzed game: an optional FEN seed plus a list of move selectors. Each
 /// selector is reduced modulo the number of legal moves to choose one.

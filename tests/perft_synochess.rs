@@ -5,9 +5,9 @@
 //! **campmate** flag-rank win, and a **file-or-rank flying general**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Synochess::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Synochess::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! synochess`, from its `variants.ini`) running `go perft` on the byte-identical
-//! position — the FSF divide matches mce's move-for-move, including the Janggi
+//! position — the FSF divide matches mcr's move-for-move, including the Janggi
 //! cannon (which needs a screen to move *and* capture and may neither screen over
 //! nor capture another cannon), the Soldier's forward/sideways step, the two
 //! Soldier drops onto empty rank-5 squares (never replenished by captures), the
@@ -27,9 +27,9 @@
 //! ```
 //!
 //! with FSF's letters `e a s` for the Elephant (Fers-Alfil), Advisor (Commoner),
-//! and Soldier. mce reuses `e`/`a`/`s` for other roles, so its Synochess pieces
+//! and Soldier. mcr reuses `e`/`a`/`s` for other roles, so its Synochess pieces
 //! take distinct letters — Elephant `v`, Advisor `f`, Soldier `z` — giving the
-//! canonical mce start FEN
+//! canonical mcr start FEN
 //!
 //! ```text
 //! rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1
@@ -41,9 +41,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_synochess -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Synochess};
+use mcr::geometry::{perft as gperft, Chess8x8, Synochess};
 
-/// The Synochess starting FEN in mce's dialect, White to move.
+/// The Synochess starting FEN in mcr's dialect, White to move.
 const STARTPOS: &str = "rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1";
 
 /// The starting position with **Black** to move: 50 replies — every Black piece
@@ -179,7 +179,7 @@ fn flying_general_respects_blocker() {
     check(FLYING_GENERAL_CONTROL, &[(1, 19)]);
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

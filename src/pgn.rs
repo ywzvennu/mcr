@@ -31,7 +31,7 @@
 //! tokens, preserved verbatim), and variations all round-trip.
 //!
 //! ```
-//! use mce::Pgn;
+//! use mcr::Pgn;
 //!
 //! let text = "[Event \"Test\"]\n[Result \"1-0\"]\n\n1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0\n";
 //! let pgn = Pgn::from_pgn(text).unwrap();
@@ -42,7 +42,7 @@
 //! ```
 //!
 //! ```
-//! use mce::Pgn;
+//! use mcr::Pgn;
 //!
 //! // A mainline with a variation branching at Black's first reply.
 //! let pgn = Pgn::from_pgn("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *\n").unwrap();

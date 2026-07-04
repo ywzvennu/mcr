@@ -28,17 +28,17 @@
 //! deterministic `splitmix64` random playouts (no `rand` dependency), so a
 //! failure always reproduces. Adding a variant is one `variant_test!` line.
 
-use mce::geometry::{
+use mcr::geometry::{
     Bitboard, CannonShogiRules, CapablancaRules, ChennisRules, DobutsuRules, DuckRules,
     EmpireRules, GenericPosition, Geometry, JanggiRules, JieqiRules, MakrukRules, MinishogiRules,
     MinixiangqiRules, SeirawanRules, ShakoRules, ShinobiRules, ShogiRules, SittuyinRules,
     SpartanRules, Square, StandardChess, SynochessRules, WideVariant, XiangqiRules,
 };
-use mce::geometry::{
+use mcr::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Dobutsu3x4, Grand10x10, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
     Xiangqi9x10,
 };
-use mce::Color;
+use mcr::Color;
 
 /// One step of splitmix64 — a tiny, fully deterministic, dependency-free PRNG,
 /// matching the generator used by the sibling attack/perft suites.

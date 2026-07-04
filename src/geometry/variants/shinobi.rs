@@ -13,9 +13,9 @@
 //!   castling — the only side that castles. Its pawns, however, promote into a
 //!   **Commoner** (see below), not into `N/B/R/Q`.
 //! * **White = the clan.** A back rank of Lances, Shogi Knights, a Commoner and
-//!   the King (`L*N1*UK1*NL` in mce letters), a rank of standard pawns, and a
+//!   the King (`L*N1*UK1*NL` in mcr letters), a rank of standard pawns, and a
 //!   **starting hand** `[L*NMMDA]` (two Fers, a Lance, a Shogi Knight, a Bers, and
-//!   an Archbishop) it may drop. The clan pieces, in mce roles:
+//!   an Archbishop) it may drop. The clan pieces, in mcr roles:
 //!   * **Commoner** ([`WideRole::Commoner`]) — a non-royal king-mover (one step in
 //!     any of the eight directions); it may be captured freely and never defines
 //!     check. A promoting Pawn (either colour) becomes a Commoner.
@@ -67,7 +67,7 @@
 //! ```
 //!
 //! with FSF's clan letters `c d h j` (Commoner, Bers, Shogi Knight, Archbishop).
-//! mce uses the same board but its own role tokens. The Commoner and Shogi Knight
+//! mcr uses the same board but its own role tokens. The Commoner and Shogi Knight
 //! land past the exhausted single-letter alphabet, so they are **overflow** roles
 //! written with the `*` prefix and a recycled base letter: Commoner `*u`
 //! (recycling the Advisor's `u`, shared with Synochess's Commoner) and Shogi
@@ -94,7 +94,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ShinobiRules;
 
-/// The confirmed Shinobi starting placement, in mce's role letters (Black = the
+/// The confirmed Shinobi starting placement, in mcr's role letters (Black = the
 /// standard army; White = `L *N _ *U K _ *N L` on the back rank — Lance, Shogi
 /// Knight, Commoner, King — over a rank of standard pawns). The Shogi Knight and
 /// Commoner are **overflow** roles with no bare letter, so they carry the `*`

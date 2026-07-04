@@ -56,17 +56,17 @@
 //! ## Confirmed starting FEN
 //!
 //! Pinned against Fairy-Stockfish's `UCI_Variant courier` / `position startpos`.
-//! mce and FSF render the same position with different piece letters: FSF uses
+//! mcr and FSF render the same position with different piece letters: FSF uses
 //! `E` for the Alfil (Courier), `M` for the Man, `W` for the Wazir, and `F` for
-//! the Ferz, but mce reuses those letters (or their bare forms) for other roles,
-//! so the Courier pieces take mce's overflow / Met tokens — the Alfil `*x`, the
+//! the Ferz, but mcr reuses those letters (or their bare forms) for other roles,
+//! so the Courier pieces take mcr's overflow / Met tokens — the Alfil `*x`, the
 //! Man `*u`, the Wazir `*j`, and the Ferz the Makruk Met `m`. The `compare-fairy`
 //! harness rewrites these (`*x → e`, `*u → m`, `*j → w`, `m → f`) when driving
 //! FSF:
 //!
 //! ```text
 //! FSF dialect: rnebmk1wbenr/1ppppp1pppp1/6f5/p5p4p/P5P4P/6F5/1PPPPP1PPPP1/RNEBMK1WBENR w - - 0 1
-//! mce dialect: rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1
+//! mcr dialect: rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1
 //! ```
 
 use crate::geometry::attacks;
@@ -91,7 +91,7 @@ use crate::Color;
 pub struct CourierRules;
 
 /// The confirmed Courier starting FEN placement, validated against
-/// Fairy-Stockfish `UCI_Variant courier` (mce dialect — see the [module
+/// Fairy-Stockfish `UCI_Variant courier` (mcr dialect — see the [module
 /// docs](self)).
 const COURIER_START_PLACEMENT: &str =
     "rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR";
@@ -197,7 +197,7 @@ impl WideVariant<Courier12x8> for CourierRules {
 /// Courier chess as a [`GenericPosition`] over the 12x8 [`Courier12x8`] geometry.
 ///
 /// Construct the starting position with
-/// [`Courier::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Courier::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Courier::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the pieces, the no-castling / single-step-pawn rules, and the
 /// baring / stalemate-loss terminal rules.
@@ -213,7 +213,7 @@ mod tests {
     const STARTPOS: &str =
         "rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1";
 
-    /// The canonical start FEN round-trips through the mce dialect.
+    /// The canonical start FEN round-trips through the mcr dialect.
     #[test]
     fn startpos_round_trips() {
         let pos = Courier::startpos();

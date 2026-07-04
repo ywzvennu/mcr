@@ -548,7 +548,7 @@ mod tests {
         // Issue #121 repro found by the differential fuzzer (#109). The white king
         // on a2 may step to b3, adjacent to the black king on c4: the bishop on d1
         // "attacks" b3, but it could never capture the king there without the blast
-        // also catching the adjacent black king, so b3 is immune. mce previously
+        // also catching the adjacent black king, so b3 is immune. mcr previously
         // omitted a2b3.
         let pos: Atomic = "8/8/8/3p4/2k2pp1/8/K7/3b4 w - - 0 1".parse().unwrap();
         assert!(

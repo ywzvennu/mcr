@@ -64,7 +64,7 @@
 //! 8/8/4pppp/pppp4/4PPPP/PPPP4/8/8[KSSFRRNNkssfrrnn] w - - 0 1
 //! ```
 //!
-//! mce uses the same board placement and holdings bracket but its own role
+//! mcr uses the same board placement and holdings bracket but its own role
 //! letters (the Met is `m`, not FSF's `f`, and the bracket is written in role-
 //! index order):
 //!

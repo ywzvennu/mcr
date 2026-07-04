@@ -3,9 +3,9 @@
 //! places its eight back-rank pieces onto its own first rank.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Placement::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Placement::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! placement`) running `go perft` on the byte-identical position — the FSF divide
-//! matches mce's move-for-move, including the deployment drops, the bishop
+//! matches mcr's move-for-move, including the deployment drops, the bishop
 //! opposite-color constraint, and the deployment-conferred castling rights. The
 //! `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/placement.rs`); this test pins the FSF-confirmed numbers so
@@ -19,7 +19,7 @@
 //! 8/pppppppp/8/8/8/8/PPPPPPPP/8[KQRRBBNNkqrrbbnn] w - - 0 1
 //! ```
 //!
-//! mce uses the same board and `[..]` pocket but writes the pocket in role-index
+//! mcr uses the same board and `[..]` pocket but writes the pocket in role-index
 //! order (Knights, Bishops, Rooks, Queen, King), so its canonical start FEN is
 //!
 //! ```text
@@ -27,7 +27,7 @@
 //! ```
 //!
 //! The two are the same position; the standard piece letters (`K Q R B N`) are
-//! shared with FSF, so `compare-fairy/` drives FSF with mce's FEN unchanged.
+//! shared with FSF, so `compare-fairy/` drives FSF with mcr's FEN unchanged.
 //!
 //! ## Confirmed semantics (all pinned move-for-move against FSF)
 //!
@@ -48,9 +48,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_placement -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Placement};
+use mcr::geometry::{perft as gperft, Chess8x8, Placement};
 
-/// The Placement starting FEN in mce's dialect, confirmed against FSF's
+/// The Placement starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant placement` / `position startpos`.
 const STARTPOS: &str = "8/pppppppp/8/8/8/8/PPPPPPPP/8[NNBBRRQKnnbbrrqk] w - - 0 1";
 

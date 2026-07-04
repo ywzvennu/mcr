@@ -27,7 +27,7 @@ use crate::{Bitboard, Color, Square};
 /// last rank attacks nothing.
 ///
 /// ```
-/// use mce::{attacks::pawn_attacks, Bitboard, Color, Square};
+/// use mcr::{attacks::pawn_attacks, Bitboard, Color, Square};
 /// let a = pawn_attacks(Color::White, Square::E4);
 /// assert_eq!(a, Bitboard::from(Square::D5) | Bitboard::from(Square::F5));
 /// ```
@@ -40,7 +40,7 @@ pub fn pawn_attacks(color: Color, sq: Square) -> Bitboard {
 /// Returns the squares a knight on `sq` attacks.
 ///
 /// ```
-/// use mce::{attacks::knight_attacks, Square};
+/// use mcr::{attacks::knight_attacks, Square};
 /// assert_eq!(knight_attacks(Square::A1).count(), 2);
 /// assert_eq!(knight_attacks(Square::D4).count(), 8);
 /// ```
@@ -54,7 +54,7 @@ pub fn knight_attacks(sq: Square) -> Bitboard {
 /// squares).
 ///
 /// ```
-/// use mce::{attacks::king_attacks, Square};
+/// use mcr::{attacks::king_attacks, Square};
 /// assert_eq!(king_attacks(Square::A1).count(), 3);
 /// assert_eq!(king_attacks(Square::E4).count(), 8);
 /// ```
@@ -144,7 +144,7 @@ pub fn queen_attacks(sq: Square, occupied: Bitboard) -> Bitboard {
 /// squares yield the empty set.
 ///
 /// ```
-/// use mce::{attacks::between, Bitboard, Square};
+/// use mcr::{attacks::between, Bitboard, Square};
 /// let mid = between(Square::C1, Square::C8);
 /// assert_eq!(mid.count(), 6);
 /// assert!(!mid.contains(Square::C1) && !mid.contains(Square::C8));
@@ -162,7 +162,7 @@ pub fn between(a: Square, b: Square) -> Bitboard {
 /// Both endpoints are included.
 ///
 /// ```
-/// use mce::{attacks::line, Bitboard, Square};
+/// use mcr::{attacks::line, Bitboard, Square};
 /// let l = line(Square::C1, Square::C5);
 /// assert_eq!(l, Bitboard::FILE_C);
 /// assert_eq!(line(Square::A1, Square::B3), Bitboard::EMPTY);

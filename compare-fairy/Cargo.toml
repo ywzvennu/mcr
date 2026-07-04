@@ -1,23 +1,23 @@
-# mce compare-fairy — perft comparison harness driving Fairy-Stockfish.
+# mcr compare-fairy — perft comparison harness driving Fairy-Stockfish.
 #
-# This is a SEPARATE, nested crate. It is NOT part of the published `mce`
+# This is a SEPARATE, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build` / `cargo
-# test`; it depends on `mce` by path only.
+# test`; it depends on `mcr` by path only.
 #
 # GPL FENCE (hard requirement): Fairy-Stockfish (FSF) is GPL-3.0-or-later. This
 # harness DOES NOT link, copy, read, or otherwise incorporate any FSF source or
 # binary. It drives an externally provided `fairy-stockfish` UCI binary purely
 # AS A SUBPROCESS over a process boundary (spawn, write UCI commands to stdin,
 # read node counts from stdout). No GPL code links into anything; the FSF binary
-# is never committed or distributed by this repository. `mce` itself does not
+# is never committed or distributed by this repository. `mcr` itself does not
 # depend on FSF (not even as a dev-dependency). This crate is `publish = false`.
 
 [package]
-name = "mce-compare-fairy"
+name = "mcr-compare-fairy"
 version = "0.0.0"
 edition = "2021"
 publish = false
-# Apache-2.0 OR MIT: this crate contains only original mce-side code; it links
+# Apache-2.0 OR MIT: this crate contains only original mcr-side code; it links
 # NO GPL code (it only spawns the FSF binary as a subprocess). The licensing of
 # the FSF binary it drives is FSF's own and does not propagate across the
 # process boundary.
@@ -27,20 +27,20 @@ license = "MIT OR Apache-2.0"
 # `default-features = false` plus explicit `std` keeps the harness on the full
 # std build (it spawns subprocesses and does FEN string surgery) while leaving
 # the `magic` slider feature togglable independently of `default`.
-mce = { path = "..", default-features = false, features = ["std"] }
+mcr = { path = "..", default-features = false, features = ["std"] }
 
 [features]
-# Forward to the mce dependency's `magic` feature so the same harness can
+# Forward to the mcr dependency's `magic` feature so the same harness can
 # measure magic-on vs magic-off sliders:
 #   cargo run --release --features magic
-magic = ["mce/magic"]
+magic = ["mcr/magic"]
 
-# Enables the mce side of the HaChu large-shogi perft comparison (issue #379's
-# `--hachu` mode). OFF by default: mce does not yet implement a Chu-Shogi
+# Enables the mcr side of the HaChu large-shogi perft comparison (issue #379's
+# `--hachu` mode). OFF by default: mcr does not yet implement a Chu-Shogi
 # variant/move generator (only the 12x12 board geometry), so there is nothing to
 # cross-check against the HaChu oracle. Issue #380 adds Chu-Shogi rules and will
-# flip this on (and, at that point, wire it to the mce feature that gates the
-# variant, e.g. `large-shogi = ["mce/chu"]`). Until then it is a harness-local
+# flip this on (and, at that point, wire it to the mcr feature that gates the
+# variant, e.g. `large-shogi = ["mcr/chu"]`). Until then it is a harness-local
 # switch that only selects the perft-comparison code path in `hachu.rs`.
 large-shogi = []
 

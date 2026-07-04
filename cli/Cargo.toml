@@ -1,48 +1,48 @@
-# mce-cli — the unified `mce` command-line tool.
+# mcr-cli — the unified `mcr` command-line tool.
 #
-# This is a separate, nested crate. It is NOT part of the published `mce`
+# This is a separate, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build`/`cargo
-# test`; it depends on `mce` by path and is a pure CONSUMER of the public API.
+# test`; it depends on `mcr` by path and is a pure CONSUMER of the public API.
 # It is `publish = false` and is never published from here.
 #
 # It consolidates the repo's example tools (perft / fen_inspect / random_game)
-# into a single `mce` binary, plus FEN/PGN conversion and validation helpers.
+# into a single `mcr` binary, plus FEN/PGN conversion and validation helpers.
 #
 # Build:                         cargo build              (in this directory)
 # With parallel perft:           cargo build --features parallel
 # Run:                           cargo run -- perft startpos 5
 [package]
-name = "mce-cli"
+name = "mcr-cli"
 version = "0.0.0"
 edition = "2021"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "Unified `mce` command-line tool over the mce chess library."
+description = "Unified `mcr` command-line tool over the mcr chess library."
 
-# The binary is named `mce` regardless of the crate name.
+# The binary is named `mcr` regardless of the crate name.
 [[bin]]
-name = "mce"
+name = "mcr"
 path = "src/main.rs"
 
 [features]
-# Off by default. Forwards to the mce `parallel` feature so `mce perft
+# Off by default. Forwards to the mcr `parallel` feature so `mcr perft
 # --parallel` uses the rayon-backed root split. With it off, `--parallel` falls
 # back to the serial counter (and says so). Build with `--features parallel` to
 # enable, e.g. `cargo build --features parallel`.
-parallel = ["mce/parallel"]
+parallel = ["mcr/parallel"]
 
 [dependencies]
 # The argument parser. `clap` is a dependency of THIS separate crate only; the
-# core mce library's dependency graph is unaffected (`cargo tree -e normal` for
-# mce is unchanged).
+# core mcr library's dependency graph is unaffected (`cargo tree -e normal` for
+# mcr is unchanged).
 clap = { version = "4", features = ["derive"] }
 
-# Path dependency on the parent mce crate. This tool is a CONSUMER of mce; it is
-# never a dependency of mce, so the mce package stays clean.
-mce = { path = ".." }
+# Path dependency on the parent mcr crate. This tool is a CONSUMER of mcr; it is
+# never a dependency of mcr, so the mcr package stays clean.
+mcr = { path = ".." }
 
 [lints.rust]
-# The core mce library is unsafe-free; keep this tool's own code safe too.
+# The core mcr library is unsafe-free; keep this tool's own code safe too.
 unsafe_code = "deny"
 
 [lints.clippy]

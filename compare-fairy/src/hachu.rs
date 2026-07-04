@@ -31,8 +31,8 @@
 //! handing it a deliberately illegal `usermove`, which under HaChu's always-on
 //! debug output makes it print its full move list (see
 //! [`Engine::dump_legal_moves`](crate::xboard::Engine::dump_legal_moves)). With
-//! mce's Dai Shogi variant now implemented (`mce::geometry::Dai`), this mode walks
-//! the start-position tree and cross-checks mce against the oracle:
+//! mcr's Dai Shogi variant now implemented (`mcr::geometry::Dai`), this mode walks
+//! the start-position tree and cross-checks mcr against the oracle:
 //!
 //! * **perft(1)** — the full legal-move set, node-for-node (71 moves);
 //! * **perft(2)** — a divide (each root move's Black-reply count).
@@ -56,7 +56,7 @@ const REQUIRED_VARIANTS: &[&str] = &["chu", "dai", "tenjiku"];
 
 /// Run the HaChu-oracle mode: confirm the large-shogi variants, drive the Chu
 /// readiness handshake, then run the Dai Shogi external perft comparison (issue
-/// #401). Returns the number of real parity mismatches (0 when mce matches HaChu at
+/// #401). Returns the number of real parity mismatches (0 when mcr matches HaChu at
 /// the validated depths); a missing HaChu binary or an absent Dai move dump skips
 /// cleanly, returning 0, exactly like the FSF-absent skip.
 pub fn run(build: bool) -> usize {
@@ -74,7 +74,7 @@ pub fn run(build: bool) -> usize {
         }
     };
     let src = match &located.source {
-        Source::Env => "env $MCE_HACHU_BIN".to_string(),
+        Source::Env => "env $MCR_HACHU_BIN".to_string(),
         Source::Path(n) => format!("PATH ({n})"),
         Source::Prebuilt(p) => format!("prebuilt {}", p.display()),
         Source::Built(p) => format!("built {}", p.display()),
@@ -132,12 +132,12 @@ pub fn run(build: bool) -> usize {
     dai_mismatches + compare_tenjiku(&located.bin)
 }
 
-/// The coordinate string for an mce Dai move on the 15x15 board (files `a..o`,
+/// The coordinate string for an mcr Dai move on the 15x15 board (files `a..o`,
 /// ranks `1..15`), matching HaChu's move-dump notation. Promotions are dropped to
 /// the bare origin/destination (start-position perft never reaches the far five
 /// ranks, so no promotion suffix arises at the validated depths).
-fn mce_uci(m: &mce::geometry::WideMove) -> String {
-    use mce::geometry::Dai15x15;
+fn mcr_uci(m: &mcr::geometry::WideMove) -> String {
+    use mcr::geometry::Dai15x15;
     let f = m.from::<Dai15x15>();
     let t = m.to::<Dai15x15>();
     format!(
@@ -149,9 +149,9 @@ fn mce_uci(m: &mce::geometry::WideMove) -> String {
     )
 }
 
-/// mce's legal moves for `pos` as sorted, deduped coordinate strings.
-fn mce_moves(pos: &mce::geometry::Dai) -> Vec<String> {
-    let mut v: Vec<String> = pos.legal_moves().iter().map(mce_uci).collect();
+/// mcr's legal moves for `pos` as sorted, deduped coordinate strings.
+fn mcr_moves(pos: &mcr::geometry::Dai) -> Vec<String> {
+    let mut v: Vec<String> = pos.legal_moves().iter().map(mcr_uci).collect();
     v.sort();
     v.dedup();
     v
@@ -159,10 +159,10 @@ fn mce_moves(pos: &mce::geometry::Dai) -> Vec<String> {
 
 /// Play the coordinate move `uci` on `pos`, returning the resulting position, or
 /// `None` if it is not one of `pos`'s legal moves.
-fn mce_play(pos: &mce::geometry::Dai, uci: &str) -> Option<mce::geometry::Dai> {
+fn mcr_play(pos: &mcr::geometry::Dai, uci: &str) -> Option<mcr::geometry::Dai> {
     pos.legal_moves()
         .iter()
-        .find(|m| mce_uci(m) == uci)
+        .find(|m| mcr_uci(m) == uci)
         .map(|m| pos.play(m))
 }
 
@@ -192,7 +192,7 @@ fn hachu_moves(bin: &str, seq: &[String]) -> Option<Vec<String>> {
     None
 }
 
-/// Compare mce's Dai move generation against the HaChu oracle at the start
+/// Compare mcr's Dai move generation against the HaChu oracle at the start
 /// position: perft(1) node-for-node (the full move set) and perft(2) as a divide
 /// (each root move's reply count). Returns the number of real mismatches (HaChu
 /// per-node subprocess crashes are reported but not counted, as they are oracle
@@ -200,8 +200,8 @@ fn hachu_moves(bin: &str, seq: &[String]) -> Option<Vec<String>> {
 fn compare_dai(bin: &str) -> usize {
     println!();
     println!("  Dai Shogi (15x15) external perft vs HaChu (issue #401):");
-    let start = mce::geometry::Dai::startpos();
-    let mce_start = mce_moves(&start);
+    let start = mcr::geometry::Dai::startpos();
+    let mcr_start = mcr_moves(&start);
 
     // perft(1): full move-set comparison.
     let Some(hachu_start) = hachu_moves(bin, &[]) else {
@@ -209,26 +209,26 @@ fn compare_dai(bin: &str) -> usize {
         return 0;
     };
     let mut mismatches = 0usize;
-    let only_mce: Vec<&String> = mce_start
+    let only_mcr: Vec<&String> = mcr_start
         .iter()
         .filter(|m| !hachu_start.contains(m))
         .collect();
     let only_hachu: Vec<&String> = hachu_start
         .iter()
-        .filter(|m| !mce_start.contains(m))
+        .filter(|m| !mcr_start.contains(m))
         .collect();
-    if only_mce.is_empty() && only_hachu.is_empty() {
+    if only_mcr.is_empty() && only_hachu.is_empty() {
         println!(
             "    perft(1): {} moves, node-for-node identical to HaChu.",
-            mce_start.len()
+            mcr_start.len()
         );
     } else {
-        mismatches += only_mce.len() + only_hachu.len();
+        mismatches += only_mcr.len() + only_hachu.len();
         println!(
-            "    perft(1) MISMATCH: mce={} hachu={} (mce-only {:?}, hachu-only {:?})",
-            mce_start.len(),
+            "    perft(1) MISMATCH: mcr={} hachu={} (mcr-only {:?}, hachu-only {:?})",
+            mcr_start.len(),
             hachu_start.len(),
-            only_mce,
+            only_mcr,
             only_hachu
         );
     }
@@ -237,18 +237,18 @@ fn compare_dai(bin: &str) -> usize {
     let mut roots_ok = 0usize;
     let mut root_mismatch = 0usize;
     let mut crashes = 0usize;
-    for root in &mce_start {
-        let child = mce_play(&start, root).expect("mce root move replays");
-        let mce_replies = mce_moves(&child).len();
+    for root in &mcr_start {
+        let child = mcr_play(&start, root).expect("mcr root move replays");
+        let mcr_replies = mcr_moves(&child).len();
         match hachu_moves(bin, std::slice::from_ref(root)) {
             Some(hc) => {
-                if hc.len() == mce_replies {
+                if hc.len() == mcr_replies {
                     roots_ok += 1;
                 } else {
                     root_mismatch += 1;
                     mismatches += 1;
                     println!(
-                        "    perft(2) MISMATCH after {root}: mce={mce_replies} hachu={}",
+                        "    perft(2) MISMATCH after {root}: mcr={mcr_replies} hachu={}",
                         hc.len()
                     );
                 }
@@ -258,18 +258,18 @@ fn compare_dai(bin: &str) -> usize {
     }
     println!(
         "    perft(2) divide: {roots_ok}/{} roots match, {root_mismatch} mismatch, {crashes} HaChu-crash node(s) skipped.",
-        mce_start.len()
+        mcr_start.len()
     );
     println!("    total real mismatches: {mismatches}");
     mismatches
 }
 
-/// The coordinate string for an mce Tenjiku move on the 16x16 board (files `a..p`,
+/// The coordinate string for an mcr Tenjiku move on the 16x16 board (files `a..p`,
 /// ranks `1..16`), matching HaChu's move-dump notation. Promotions are dropped to
 /// the bare origin/destination (start-position perft never reaches the promotion
 /// zone, so no promotion suffix arises at the validated depths).
-fn mce_uci_tenjiku(m: &mce::geometry::WideMove) -> String {
-    use mce::geometry::Tenjiku16x16;
+fn mcr_uci_tenjiku(m: &mcr::geometry::WideMove) -> String {
+    use mcr::geometry::Tenjiku16x16;
     let f = m.from::<Tenjiku16x16>();
     let t = m.to::<Tenjiku16x16>();
     format!(
@@ -281,9 +281,9 @@ fn mce_uci_tenjiku(m: &mce::geometry::WideMove) -> String {
     )
 }
 
-/// mce's legal moves for `pos` as sorted, deduped coordinate strings.
-fn mce_moves_tenjiku(pos: &mce::geometry::Tenjiku) -> Vec<String> {
-    let mut v: Vec<String> = pos.legal_moves().iter().map(mce_uci_tenjiku).collect();
+/// mcr's legal moves for `pos` as sorted, deduped coordinate strings.
+fn mcr_moves_tenjiku(pos: &mcr::geometry::Tenjiku) -> Vec<String> {
+    let mut v: Vec<String> = pos.legal_moves().iter().map(mcr_uci_tenjiku).collect();
     v.sort();
     v.dedup();
     v
@@ -291,10 +291,10 @@ fn mce_moves_tenjiku(pos: &mce::geometry::Tenjiku) -> Vec<String> {
 
 /// Play the coordinate move `uci` on `pos`, returning the resulting position, or
 /// `None` if it is not one of `pos`'s legal moves.
-fn mce_play_tenjiku(pos: &mce::geometry::Tenjiku, uci: &str) -> Option<mce::geometry::Tenjiku> {
+fn mcr_play_tenjiku(pos: &mcr::geometry::Tenjiku, uci: &str) -> Option<mcr::geometry::Tenjiku> {
     pos.legal_moves()
         .iter()
-        .find(|m| mce_uci_tenjiku(m) == uci)
+        .find(|m| mcr_uci_tenjiku(m) == uci)
         .map(|m| pos.play(m))
 }
 
@@ -324,19 +324,19 @@ fn hachu_moves_tenjiku(bin: &str, seq: &[String]) -> Option<Vec<String>> {
     None
 }
 
-/// Compare mce's Tenjiku move generation against the HaChu oracle at the start
+/// Compare mcr's Tenjiku move generation against the HaChu oracle at the start
 /// position: perft(1) node-for-node (the full move set) and perft(2) as a divide
 /// (each root move's reply count). Returns the number of real mismatches (HaChu
 /// per-node subprocess crashes are reported but not counted, as they are oracle
 /// flakiness, not move differences). At the start the two armies are separated by
 /// empty ranks, so every move here is a non-capture — the depth range over which
-/// mce's ordinary movement (and the documented-unmodelled jump-capture / burn
+/// mcr's ordinary movement (and the documented-unmodelled jump-capture / burn
 /// powers, which fire only on captures) is provably exercised node-for-node.
 fn compare_tenjiku(bin: &str) -> usize {
     println!();
     println!("  Tenjiku Shogi (16x16) external perft vs HaChu (issue #402):");
-    let start = mce::geometry::Tenjiku::startpos();
-    let mce_start = mce_moves_tenjiku(&start);
+    let start = mcr::geometry::Tenjiku::startpos();
+    let mcr_start = mcr_moves_tenjiku(&start);
 
     // perft(1): full move-set comparison.
     let Some(hachu_start) = hachu_moves_tenjiku(bin, &[]) else {
@@ -345,39 +345,39 @@ fn compare_tenjiku(bin: &str) -> usize {
         // leaving no EDGE-sentinel border for its 0x88-style neighbour scans (its own
         // burn code comments "assumes 32x16 board"), and a padded rebuild crashes
         // just the same. So HaChu cannot serve as a live Tenjiku oracle here — a
-        // genuine HaChu limitation, not an mce difference. mce's Tenjiku start
+        // genuine HaChu limitation, not an mcr difference. mcr's Tenjiku start
         // position and per-piece movement are instead validated directly against
         // HaChu's own source tables (`variant.c` tenjikuPieces / tenArray and the
         // `GenNonCapts` non-capture semantics); see `tests/perft_tenjiku.rs`.
         println!(
             "    SKIP: HaChu crashes on `variant tenjiku` (deterministic segfault; \
-             HaChu limitation). mce generates {} start-position moves, validated \
+             HaChu limitation). mcr generates {} start-position moves, validated \
              against HaChu's source tables in tests/perft_tenjiku.rs.",
-            mce_start.len()
+            mcr_start.len()
         );
         return 0;
     };
     let mut mismatches = 0usize;
-    let only_mce: Vec<&String> = mce_start
+    let only_mcr: Vec<&String> = mcr_start
         .iter()
         .filter(|m| !hachu_start.contains(m))
         .collect();
     let only_hachu: Vec<&String> = hachu_start
         .iter()
-        .filter(|m| !mce_start.contains(m))
+        .filter(|m| !mcr_start.contains(m))
         .collect();
-    if only_mce.is_empty() && only_hachu.is_empty() {
+    if only_mcr.is_empty() && only_hachu.is_empty() {
         println!(
             "    perft(1): {} moves, node-for-node identical to HaChu.",
-            mce_start.len()
+            mcr_start.len()
         );
     } else {
-        mismatches += only_mce.len() + only_hachu.len();
+        mismatches += only_mcr.len() + only_hachu.len();
         println!(
-            "    perft(1) MISMATCH: mce={} hachu={} (mce-only {:?}, hachu-only {:?})",
-            mce_start.len(),
+            "    perft(1) MISMATCH: mcr={} hachu={} (mcr-only {:?}, hachu-only {:?})",
+            mcr_start.len(),
             hachu_start.len(),
-            only_mce,
+            only_mcr,
             only_hachu
         );
     }
@@ -386,18 +386,18 @@ fn compare_tenjiku(bin: &str) -> usize {
     let mut roots_ok = 0usize;
     let mut root_mismatch = 0usize;
     let mut crashes = 0usize;
-    for root in &mce_start {
-        let child = mce_play_tenjiku(&start, root).expect("mce root move replays");
-        let mce_replies = mce_moves_tenjiku(&child).len();
+    for root in &mcr_start {
+        let child = mcr_play_tenjiku(&start, root).expect("mcr root move replays");
+        let mcr_replies = mcr_moves_tenjiku(&child).len();
         match hachu_moves_tenjiku(bin, std::slice::from_ref(root)) {
             Some(hc) => {
-                if hc.len() == mce_replies {
+                if hc.len() == mcr_replies {
                     roots_ok += 1;
                 } else {
                     root_mismatch += 1;
                     mismatches += 1;
                     println!(
-                        "    perft(2) MISMATCH after {root}: mce={mce_replies} hachu={}",
+                        "    perft(2) MISMATCH after {root}: mcr={mcr_replies} hachu={}",
                         hc.len()
                     );
                 }
@@ -407,7 +407,7 @@ fn compare_tenjiku(bin: &str) -> usize {
     }
     println!(
         "    perft(2) divide: {roots_ok}/{} roots match, {root_mismatch} mismatch, {crashes} HaChu-crash node(s) skipped.",
-        mce_start.len()
+        mcr_start.len()
     );
     println!("    total real mismatches: {mismatches}");
     mismatches
@@ -418,21 +418,21 @@ mod tests {
     use super::REQUIRED_VARIANTS;
 
     #[test]
-    fn mce_dai_start_has_seventy_one_moves() {
-        // The mce side of the oracle comparison, independent of HaChu: the Dai
+    fn mcr_dai_start_has_seventy_one_moves() {
+        // The mcr side of the oracle comparison, independent of HaChu: the Dai
         // start position has the HaChu-validated 71 legal moves.
-        let start = mce::geometry::Dai::startpos();
-        assert_eq!(super::mce_moves(&start).len(), 71);
+        let start = mcr::geometry::Dai::startpos();
+        assert_eq!(super::mcr_moves(&start).len(), 71);
     }
 
     #[test]
-    fn mce_tenjiku_start_has_seventy_two_moves() {
-        // The mce side of the Tenjiku comparison, independent of HaChu (which
+    fn mcr_tenjiku_start_has_seventy_two_moves() {
+        // The mcr side of the Tenjiku comparison, independent of HaChu (which
         // crashes on `variant tenjiku`): the start position has 72 legal moves,
         // reconciled move-for-move against HaChu's source tables (see
         // `tests/perft_tenjiku.rs`).
-        let start = mce::geometry::Tenjiku::startpos();
-        assert_eq!(super::mce_moves_tenjiku(&start).len(), 72);
+        let start = mcr::geometry::Tenjiku::startpos();
+        assert_eq!(super::mcr_moves_tenjiku(&start).len(), 72);
     }
 
     #[test]

@@ -64,7 +64,7 @@
 //!
 //! The Swallow-drop-mate rule (FSF `shogiPawnDropMateIllegal`) is **not** applied
 //! here: like Shogi against FSF (see [`Shogi`](crate::geometry::Shogi)), FSF's `torishogi` move generation
-//! lists a mating swallow drop in its `go perft` divide, so mce matches FSF and
+//! lists a mating swallow drop in its `go perft` divide, so mcr matches FSF and
 //! leaves [`pawn_drop_mate_forbidden`](WideVariant::pawn_drop_mate_forbidden) at
 //! its `false` default.
 //!
@@ -76,7 +76,7 @@
 //! rpckcpl/3f3/sssssss/2s1S2/SSSSSSS/3F3/LPCKCPR[-] w 0 1
 //! ```
 //!
-//! In mce's overflow spelling (each bird is a `*`-prefixed overflow role) this is
+//! In mcr's overflow spelling (each bird is a `*`-prefixed overflow role) this is
 //! the `TORI_PLACEMENT` below; the `compare-fairy/` harness rewrites each
 //! `*<base>` token to FSF's letter when driving FSF.
 
@@ -95,7 +95,7 @@ use super::super::Tori7x7;
 pub struct ToriRules;
 
 /// The confirmed Tori Shogi starting placement (the hand is empty at the start),
-/// in mce's overflow spelling of the FSF start `rpckcpl/3f3/sssssss/2s1S2/SSSSSSS/3F3/LPCKCPR`.
+/// in mcr's overflow spelling of the FSF start `rpckcpl/3f3/sssssss/2s1S2/SSSSSSS/3F3/LPCKCPR`.
 const TORI_PLACEMENT: &str =
     "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/2*y1*Y2/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R";
 

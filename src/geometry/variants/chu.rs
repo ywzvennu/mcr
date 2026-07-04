@@ -22,12 +22,12 @@
 //!   suppressed entries) gives an external HaChu perft; `setboard` drives arbitrary
 //!   positions for isolated Lion / promotion checks.
 //! * From the start position: **perft(1) = 36** matches HaChu **byte-for-byte**, and
-//!   **perft(2) = 1296** matches **node-for-node**. At **perft(3)** mce counts 48319
+//!   **perft(2) = 1296** matches **node-for-node**. At **perft(3)** mcr counts 48319
 //!   and HaChu 48317; the trees agree at every node **except one** (after
 //!   `1. f3f5 d8d7`), where HaChu 0.23 fails to generate the two legal
 //!   *anti-diagonal* distance-two Lion captures of the Black Go-Between on d7 — a
 //!   **HaChu bug** (its Lion captures a distance-two enemy on the a1–l12 diagonal
-//!   but not the opposite one, shown in isolation via `setboard`). mce is correct.
+//!   but not the opposite one, shown in isolation via `setboard`). mcr is correct.
 //!
 //! **What this module implements:**
 //!
@@ -82,10 +82,10 @@ use super::super::Chu12x12;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ChuRules;
 
-/// The confirmed Chu Shogi starting placement (mce dialect), matching the HaChu
+/// The confirmed Chu Shogi starting placement (mcr dialect), matching the HaChu
 /// oracle's `variant chu` board. The chirality is cross-checked against HaChu: its
 /// King sits on **f1** (verified — the piece there is the one that may step straight
-/// back, which only the King may) and its Lion on **f3**, and mce reproduces HaChu's
+/// back, which only the King may) and its Lion on **f3**, and mcr reproduces HaChu's
 /// start-position legal-move set exactly (see `perft_chu`). White (uppercase) holds
 /// ranks 1–5; Black is the 180° rotation on ranks 8–12. Reading White's back rank
 /// a..l: Lance, Ferocious Leopard, Copper, Silver, Gold, King, Drunk Elephant, Gold,
@@ -561,7 +561,7 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// Chu Shogi (middle shogi, 12x12) as a [`GenericPosition`] over [`Chu12x12`].
 ///
 /// Construct the starting position with
-/// [`Chu::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect) with
+/// [`Chu::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect) with
 /// [`Chu::from_fen`](GenericPosition::from_fen). See the [module docs](self) for the
 /// army, the two-royal rule, the promotion zone, and the Lion's validation status.
 pub type Chu = GenericPosition<Chu12x12, ChuRules>;

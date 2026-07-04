@@ -1,5 +1,5 @@
 //! Chak (9x9 Mayan chess) perft validation on the generic engine (issue #228) —
-//! the variant exercising the [`Shogi9x9`](mce::geometry::Shogi9x9) geometry with
+//! the variant exercising the [`Shogi9x9`](mcr::geometry::Shogi9x9) geometry with
 //! six new pieces (Serpent, Quetzal, Shaman, Divine Lord, Soldier, Temple), the
 //! **King→Divine-Lord / Soldier→Shaman promotion on reaching one's own half**, the
 //! **region-confined** Shaman and Divine Lord, the **eight-direction cannon** (the
@@ -8,9 +8,9 @@
 //! Lord reaching the enemy temple ends the game).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Chak` perft and by Fairy-Stockfish (FSF, `UCI_Variant chak`,
+//! `mcr::geometry::Chak` perft and by Fairy-Stockfish (FSF, `UCI_Variant chak`,
 //! from its `variants.ini`) running `go perft` on the byte-identical position — the
-//! FSF divide matches mce's move-for-move, including each new piece's movement, the
+//! FSF divide matches mcr's move-for-move, including each new piece's movement, the
 //! Quetzal's screen-hop captures, the mandatory King/Soldier promotion (triggered
 //! when the origin *or* destination is in the far half), the region confinement of
 //! the Shaman / Divine Lord, the all-royals-safe pseudo-royal legality, and the
@@ -28,7 +28,7 @@
 //!
 //! with FSF's Chak letters `r v s q k j o p` (Rook, Vulture, Serpent, Quetzal,
 //! King, Jaguar, Temple, Soldier; the Shaman `w` and Divine Lord `d` are
-//! promotion-only). mce reuses `r`/`n`/`k` (Rook / Knight=Vulture / King) and `w`
+//! promotion-only). mcr reuses `r`/`n`/`k` (Rook / Knight=Vulture / King) and `w`
 //! (Kheshig=Jaguar), and spells the six new pieces with `*`-prefixed overflow
 //! tokens (`*s *q *w *l *p *o`); its canonical start FEN is
 //!
@@ -44,9 +44,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_chak -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chak, Shogi9x9};
+use mcr::geometry::{perft as gperft, Chak, Shogi9x9};
 
-/// The Chak starting FEN in mce's dialect, confirmed against FSF's
+/// The Chak starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant chak` / `position startpos`.
 const STARTPOS: &str =
     "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1";
@@ -93,7 +93,7 @@ const TEMPLE_WIN: &str =
 /// number here also matched FSF chak `go perft` on the same FEN.
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Chak::from_fen(fen).expect("valid Chak FEN");
-    // The FEN round-trips through mce's overflow-token I/O.
+    // The FEN round-trips through mcr's overflow-token I/O.
     assert_eq!(pos.to_fen(), fen, "Chak FEN round-trips: {fen}");
     for &(depth, expected) in cases {
         let got = gperft::<Shogi9x9, _>(&pos, depth);

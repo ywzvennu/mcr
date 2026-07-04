@@ -1,4 +1,4 @@
-//! mce-vs-shakmaty comprehensive benchmark — hundreds of positions, all
+//! mcr-vs-shakmaty comprehensive benchmark — hundreds of positions, all
 //! variants, plus non-perft micro-benchmarks (issue #86).
 //!
 //! The suite has three position pools:
@@ -15,7 +15,7 @@
 //!
 //! * **Parity (cheap, over EVERYTHING):** a shallow perft on every position in
 //!   every pool through both engines, asserting the counts agree (and, for EPD,
-//!   that mce also matches the published reference). Hundreds of positions and
+//!   that mcr also matches the published reference). Hundreds of positions and
 //!   millions of nodes are cross-checked. Any mismatch fails loudly and exits
 //!   non-zero.
 //! * **Timing (expensive, over a graded subset):** the rigorous interleaved A/B
@@ -23,33 +23,33 @@
 //!   generated positions at deeper depths.
 //!
 //! Plus **micro-benchmarks** (legal_moves / play / FEN round-trip vs shakmaty;
-//! SAN / zobrist mce-only) and the existing **memory** (allocs/bytes/RSS/static
+//! SAN / zobrist mcr-only) and the existing **memory** (allocs/bytes/RSS/static
 //! footprint) tables.
 //!
 //! ```text
-//! cargo run --release --bin mce-compare              # default (HQ sliders)
-//! cargo run --release --features magic --bin mce-compare   # magic sliders
-//! cargo run --release --bin mce-compare -- --csv    # machine-readable rows
-//! cargo run --release --bin mce-compare -- --json
-//! cargo run --release --bin mce-compare -- --full   # deeper timing, full corpus
+//! cargo run --release --bin mcr-compare              # default (HQ sliders)
+//! cargo run --release --features magic --bin mcr-compare   # magic sliders
+//! cargo run --release --bin mcr-compare -- --csv    # machine-readable rows
+//! cargo run --release --bin mcr-compare -- --json
+//! cargo run --release --bin mcr-compare -- --full   # deeper timing, full corpus
 //! ```
 //!
 //! See the per-module docs for the CPU and memory methodology (unchanged from the
 //! original harness). This binary links GPL-3.0+ shakmaty for benchmarking only;
-//! it is never published or distributed and does not affect the mce library's
+//! it is never published or distributed and does not affect the mcr library's
 //! licensing.
 
 use std::time::Instant;
 
-use mce_compare::alloc;
-use mce_compare::epd;
-use mce_compare::footprint;
-use mce_compare::gen::{self, GenPos};
-use mce_compare::micro;
-use mce_compare::rss;
-use mce_compare::runtime::{McePos, ShakPos};
-use mce_compare::stats::{summarize, TimeStats};
-use mce_compare::{mce_perft, shakmaty_perft, Case, CASES, VARIANTS};
+use mcr_compare::alloc;
+use mcr_compare::epd;
+use mcr_compare::footprint;
+use mcr_compare::gen::{self, GenPos};
+use mcr_compare::micro;
+use mcr_compare::rss;
+use mcr_compare::runtime::{McrPos, ShakPos};
+use mcr_compare::stats::{summarize, TimeStats};
+use mcr_compare::{mcr_perft, shakmaty_perft, Case, CASES, VARIANTS};
 
 /// Install the counting allocator as the program-wide global allocator.
 #[global_allocator]
@@ -100,22 +100,22 @@ struct Measured {
     depth: u32,
     nodes: u64,
     matched: bool,
-    mce: TimeStats,
+    mcr: TimeStats,
     shak: TimeStats,
-    mce_alloc: alloc::AllocDelta,
+    mcr_alloc: alloc::AllocDelta,
     shak_alloc: alloc::AllocDelta,
 }
 
 impl Measured {
-    fn mce_mnps(&self) -> f64 {
-        self.nodes as f64 / self.mce.median_s / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        self.nodes as f64 / self.mcr.median_s / 1e6
     }
     fn shak_mnps(&self) -> f64 {
         self.nodes as f64 / self.shak.median_s / 1e6
     }
     fn ratio(&self) -> f64 {
-        if self.mce.median_s > 0.0 {
-            self.shak.median_s / self.mce.median_s
+        if self.mcr.median_s > 0.0 {
+            self.shak.median_s / self.mcr.median_s
         } else {
             f64::NAN
         }
@@ -130,10 +130,10 @@ struct Parity {
     ref_checked: usize,
     ref_mismatches: usize,
     skipped: usize,
-    /// Generated positions where mce and shakmaty diverge *because* a variant
+    /// Generated positions where mcr and shakmaty diverge *because* a variant
     /// terminal (king on the hill, third check, completed race, king explosion,
     /// pieces shed) is reached inside the shallow perft tree — shakmaty stops
-    /// expanding the decided line, mce keeps counting. These are not bugs; they
+    /// expanding the decided line, mcr keeps counting. These are not bugs; they
     /// are the documented incomparable cases, counted and skipped, not failed.
     incomparable_terminal: usize,
     per_variant: Vec<(&'static str, usize, u64)>,
@@ -151,22 +151,22 @@ fn terminal_divergent(variant: &str) -> bool {
     )
 }
 
-/// Does any line within `depth` plies from this mce position reach a variant
+/// Does any line within `depth` plies from this mcr position reach a variant
 /// terminal? Used to confirm a koth/three-check/… mismatch is the documented
 /// terminal divergence (so we can skip it) rather than a real bug.
-fn reaches_terminal(pos: &McePos, depth: u32) -> bool {
+fn reaches_terminal(pos: &McrPos, depth: u32) -> bool {
     pos.any_reaches_terminal(depth)
 }
 
 fn main() {
     let opts = parse_args();
 
-    println!("mce vs shakmaty — comprehensive benchmark (issue #86)");
+    println!("mcr vs shakmaty — comprehensive benchmark (issue #86)");
     #[cfg(feature = "magic")]
-    println!("mce slider backend: magic bitboards (--features magic)");
+    println!("mcr slider backend: magic bitboards (--features magic)");
     #[cfg(not(feature = "magic"))]
-    println!("mce slider backend: hyperbola-quintessence (default)");
-    println!("engines: mce (path) vs shakmaty 0.27");
+    println!("mcr slider backend: hyperbola-quintessence (default)");
+    println!("engines: mcr (path) vs shakmaty 0.27");
     println!(
         "tier: {}",
         if opts.full {
@@ -271,7 +271,7 @@ fn parse_args() -> Opts {
             "--json" => o.mode = OutputMode::Json,
             "--full" => o.full = true,
             "--help" | "-h" => {
-                println!("usage: mce-compare [--csv | --json] [--full]");
+                println!("usage: mcr-compare [--csv | --json] [--full]");
                 println!("  --full : deeper timing + deeper parity over the whole corpus");
                 println!("  build with --features magic for the magic-bitboard slider numbers");
                 std::process::exit(0);
@@ -289,7 +289,7 @@ fn parse_args() -> Opts {
 /// Run the shallow-perft parity cross-check over every position in every pool.
 ///
 /// For each position we run both engines at [`PARITY_DEPTH`] and assert equality;
-/// for EPD positions we additionally assert mce matches the published reference
+/// for EPD positions we additionally assert mcr matches the published reference
 /// count at that depth. Positions shakmaty cannot represent (rare, documented)
 /// are skipped and counted, never silently dropped.
 fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -> Parity {
@@ -319,7 +319,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
     // ---- curated basket (all variants) ------------------------------------
     for case in CASES {
         let (Some(m), Some(s)) = (
-            McePos::parse(case.variant, case.fen),
+            McrPos::parse(case.variant, case.fen),
             ShakPos::parse(case.variant, case.fen),
         ) else {
             skipped += 1;
@@ -333,7 +333,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
         if mn != sn {
             mismatches += 1;
             eprintln!(
-                "*** PARITY MISMATCH basket {}/{} d{depth}: mce={mn} shak={sn} ***",
+                "*** PARITY MISMATCH basket {}/{} d{depth}: mcr={mn} shak={sn} ***",
                 case.variant, case.position
             );
         }
@@ -342,7 +342,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
     // ---- EPD suite (standard chess; also reference-checked) ---------------
     for e in epd_entries {
         let (Some(m), Some(s)) = (
-            McePos::parse("standard", &e.fen),
+            McrPos::parse("standard", &e.fen),
             ShakPos::parse("standard", &e.fen),
         ) else {
             skipped += 1;
@@ -356,7 +356,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
         if mn != sn {
             mismatches += 1;
             eprintln!(
-                "*** PARITY MISMATCH epd {} d{depth}: mce={mn} shak={sn} ***",
+                "*** PARITY MISMATCH epd {} d{depth}: mcr={mn} shak={sn} ***",
                 e.fen
             );
         }
@@ -365,7 +365,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
             if mn != r.nodes {
                 ref_mismatches += 1;
                 eprintln!(
-                    "*** REFERENCE MISMATCH epd {} d{depth}: mce={mn} reference={} ***",
+                    "*** REFERENCE MISMATCH epd {} d{depth}: mcr={mn} reference={} ***",
                     e.fen, r.nodes
                 );
             }
@@ -375,7 +375,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
     // ---- generated baskets (all variants) ---------------------------------
     for g in generated {
         let (Some(m), Some(s)) = (
-            McePos::parse(g.variant, &g.fen),
+            McrPos::parse(g.variant, &g.fen),
             ShakPos::parse(g.variant, &g.fen),
         ) else {
             // shakmaty refused this position (e.g. variant-terminal / pocket):
@@ -396,7 +396,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
             }
             mismatches += 1;
             eprintln!(
-                "*** PARITY MISMATCH gen {}/{} d{depth} fen={}: mce={mn} shak={sn} ***",
+                "*** PARITY MISMATCH gen {}/{} d{depth} fen={}: mcr={mn} shak={sn} ***",
                 g.variant, g.label, g.fen
             );
             continue;
@@ -420,7 +420,7 @@ fn run_parity(epd_entries: &[epd::EpdEntry], generated: &[GenPos], full: bool) -
 
 fn print_parity(p: &Parity) {
     println!(
-        "parity — shallow perft cross-check over ALL positions (mce == shakmaty == reference):"
+        "parity — shallow perft cross-check over ALL positions (mcr == shakmaty == reference):"
     );
     let head = format!(
         "{:<16} {:>10} {:>16}",
@@ -447,7 +447,7 @@ fn print_parity(p: &Parity) {
     );
     println!(
         "  generated positions skipped (variant terminal reached inside the perft tree — \
-shakmaty prunes, mce counts on; documented incomparable case): {}",
+shakmaty prunes, mcr counts on; documented incomparable case): {}",
         p.incomparable_terminal,
     );
     if p.mismatches == 0 && p.ref_mismatches == 0 {
@@ -495,13 +495,13 @@ fn build_timing_subset(generated: &[GenPos], full: bool) -> Vec<GenTiming> {
         let mut picked = 0usize;
         // Scan the pool on a stride, but only keep positions both engines accept
         // *and* (for terminal-divergent variants) whose perft tree reaches no
-        // variant terminal within `depth` — otherwise mce and shakmaty would
+        // variant terminal within `depth` — otherwise mcr and shakmaty would
         // diverge and the timing position would falsely flag a mismatch.
         for &g in &pool {
             if picked >= per {
                 break;
             }
-            let Some(m) = McePos::parse(variant, &g.fen) else {
+            let Some(m) = McrPos::parse(variant, &g.fen) else {
                 continue;
             };
             if ShakPos::parse(variant, &g.fen).is_none() {
@@ -524,88 +524,88 @@ fn build_timing_subset(generated: &[GenPos], full: bool) -> Vec<GenTiming> {
 
 /// Time a single static-basket [`Case`] (the original deep-perft methodology).
 fn measure_case(case: &'static Case) -> Measured {
-    let mut mce_nodes = 0;
+    let mut mcr_nodes = 0;
     let mut shak_nodes = 0;
     for _ in 0..WARMUP {
-        mce_nodes = mce_perft(case);
+        mcr_nodes = mcr_perft(case);
         shak_nodes = shakmaty_perft(case);
     }
-    let (mce, shak) = interleaved(
-        || mce_nodes = mce_perft(case),
+    let (mcr, shak) = interleaved(
+        || mcr_nodes = mcr_perft(case),
         || shak_nodes = shakmaty_perft(case),
     );
-    let matched = mce_nodes == shak_nodes;
+    let matched = mcr_nodes == shak_nodes;
     if !matched {
         eprintln!(
-            "*** NODE COUNT MISMATCH for {}/{} (depth {}): mce={} shakmaty={} ***",
-            case.variant, case.position, case.depth, mce_nodes, shak_nodes
+            "*** NODE COUNT MISMATCH for {}/{} (depth {}): mcr={} shakmaty={} ***",
+            case.variant, case.position, case.depth, mcr_nodes, shak_nodes
         );
     }
-    let mce_alloc = measure_allocs(|| mce_perft(case));
+    let mcr_alloc = measure_allocs(|| mcr_perft(case));
     let shak_alloc = measure_allocs(|| shakmaty_perft(case));
     Measured {
         variant: case.variant,
         position: case.position.to_string(),
         depth: case.depth,
-        nodes: mce_nodes,
+        nodes: mcr_nodes,
         matched,
-        mce,
+        mcr,
         shak,
-        mce_alloc,
+        mcr_alloc,
         shak_alloc,
     }
 }
 
 /// Time one generated-position timing entry through the runtime dispatch.
 fn measure_gen(g: &GenTiming) -> Measured {
-    let m = McePos::parse(g.variant, &g.fen).expect("gen position parses in mce");
+    let m = McrPos::parse(g.variant, &g.fen).expect("gen position parses in mcr");
     let s = ShakPos::parse(g.variant, &g.fen).expect("gen position parses in shakmaty");
-    let mut mce_nodes = 0;
+    let mut mcr_nodes = 0;
     let mut shak_nodes = 0;
     for _ in 0..WARMUP {
-        mce_nodes = m.perft(g.depth);
+        mcr_nodes = m.perft(g.depth);
         shak_nodes = s.perft(g.depth);
     }
-    let (mce, shak) = interleaved(
-        || mce_nodes = m.perft(g.depth),
+    let (mcr, shak) = interleaved(
+        || mcr_nodes = m.perft(g.depth),
         || shak_nodes = s.perft(g.depth),
     );
-    let matched = mce_nodes == shak_nodes;
+    let matched = mcr_nodes == shak_nodes;
     if !matched {
         eprintln!(
-            "*** NODE COUNT MISMATCH for {}/{} (depth {}): mce={} shakmaty={} ***",
-            g.variant, g.label, g.depth, mce_nodes, shak_nodes
+            "*** NODE COUNT MISMATCH for {}/{} (depth {}): mcr={} shakmaty={} ***",
+            g.variant, g.label, g.depth, mcr_nodes, shak_nodes
         );
     }
-    let mce_alloc = measure_allocs(|| m.perft(g.depth));
+    let mcr_alloc = measure_allocs(|| m.perft(g.depth));
     let shak_alloc = measure_allocs(|| s.perft(g.depth));
     Measured {
         variant: g.variant,
         position: format!("gen:{}", g.label),
         depth: g.depth,
-        nodes: mce_nodes,
+        nodes: mcr_nodes,
         matched,
-        mce,
+        mcr,
         shak,
-        mce_alloc,
+        mcr_alloc,
         shak_alloc,
     }
 }
 
-/// Interleaved A/B sampling of two closures; returns (mce stats, shak stats).
-fn interleaved(mut mce: impl FnMut(), mut shak: impl FnMut()) -> (TimeStats, TimeStats) {
-    let mut mce_samples = Vec::with_capacity(SAMPLES);
+/// Interleaved A/B sampling of two closures; returns (mcr stats, shak stats).
+fn interleaved(mut mcr: impl FnMut(), mut shak: impl FnMut()) -> (TimeStats, TimeStats) {
+    let mut mcr_samples = Vec::with_capacity(SAMPLES);
     let mut shak_samples = Vec::with_capacity(SAMPLES);
     for i in 0..SAMPLES {
         if i % 2 == 0 {
-            mce_samples.push(time_once(&mut mce));
+            mcr_samples.push(time_once(&mut mcr));
             shak_samples.push(time_once(&mut shak));
         } else {
             shak_samples.push(time_once(&mut shak));
-            mce_samples.push(time_once(&mut mce));
+            mcr_samples.push(time_once(&mut mcr));
         }
     }
-    (summarize(&mce_samples), summarize(&shak_samples))
+    (summarize(&mcr_samples), summarize(&shak_samples))
 }
 
 fn time_once(mut f: impl FnMut()) -> u64 {
@@ -629,13 +629,13 @@ fn per_variant_cpu_table(m: &[Measured]) {
     );
     let head = format!(
         "{:<16} {:>5} {:>14} {:>11} {:>11} {:>8} {:>9}",
-        "variant", "pos", "total nodes", "mce Mn/s", "shak Mn/s", "ratio", "max cv",
+        "variant", "pos", "total nodes", "mcr Mn/s", "shak Mn/s", "ratio", "max cv",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
 
     let mut g_nodes = 0u64;
-    let mut g_mce_s = 0.0;
+    let mut g_mcr_s = 0.0;
     let mut g_shak_s = 0.0;
     for &variant in VARIANTS {
         let rows: Vec<&Measured> = m.iter().filter(|r| r.variant == variant).collect();
@@ -643,23 +643,23 @@ fn per_variant_cpu_table(m: &[Measured]) {
             continue;
         }
         let nodes: u64 = rows.iter().map(|r| r.nodes).sum();
-        let mce_s: f64 = rows.iter().map(|r| r.mce.median_s).sum();
+        let mcr_s: f64 = rows.iter().map(|r| r.mcr.median_s).sum();
         let shak_s: f64 = rows.iter().map(|r| r.shak.median_s).sum();
         let max_cv = rows
             .iter()
-            .map(|r| r.mce.cv().max(r.shak.cv()))
+            .map(|r| r.mcr.cv().max(r.shak.cv()))
             .fold(0.0, f64::max);
         g_nodes += nodes;
-        g_mce_s += mce_s;
+        g_mcr_s += mcr_s;
         g_shak_s += shak_s;
         println!(
             "{:<16} {:>5} {:>14} {:>11.1} {:>11.1} {:>8.2} {:>8.1}%",
             variant,
             rows.len(),
             nodes,
-            nodes as f64 / mce_s / 1e6,
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / shak_s / 1e6,
-            shak_s / mce_s,
+            shak_s / mcr_s,
             max_cv * 100.0,
         );
     }
@@ -669,9 +669,9 @@ fn per_variant_cpu_table(m: &[Measured]) {
         "OVERALL",
         m.len(),
         g_nodes,
-        g_nodes as f64 / g_mce_s / 1e6,
+        g_nodes as f64 / g_mcr_s / 1e6,
         g_nodes as f64 / g_shak_s / 1e6,
-        g_shak_s / g_mce_s,
+        g_shak_s / g_mcr_s,
         "",
     );
 }
@@ -681,31 +681,31 @@ fn memory_table(m: &[Measured]) {
     println!("memory — heap allocations during the timing-subset perft, summed per variant:");
     let head = format!(
         "{:<16} {:>5} {:>14} {:>13} {:>14} {:>13}",
-        "variant", "pos", "mce allocs", "mce KiB", "shak allocs", "shak KiB",
+        "variant", "pos", "mcr allocs", "mcr KiB", "shak allocs", "shak KiB",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
 
-    let (mut g_mce_c, mut g_mce_b, mut g_shak_c, mut g_shak_b) = (0u64, 0u64, 0u64, 0u64);
+    let (mut g_mcr_c, mut g_mcr_b, mut g_shak_c, mut g_shak_b) = (0u64, 0u64, 0u64, 0u64);
     for &variant in VARIANTS {
         let rows: Vec<&Measured> = m.iter().filter(|r| r.variant == variant).collect();
         if rows.is_empty() {
             continue;
         }
-        let mce_c: u64 = rows.iter().map(|r| r.mce_alloc.count).sum();
-        let mce_b: u64 = rows.iter().map(|r| r.mce_alloc.bytes).sum();
+        let mcr_c: u64 = rows.iter().map(|r| r.mcr_alloc.count).sum();
+        let mcr_b: u64 = rows.iter().map(|r| r.mcr_alloc.bytes).sum();
         let shak_c: u64 = rows.iter().map(|r| r.shak_alloc.count).sum();
         let shak_b: u64 = rows.iter().map(|r| r.shak_alloc.bytes).sum();
-        g_mce_c += mce_c;
-        g_mce_b += mce_b;
+        g_mcr_c += mcr_c;
+        g_mcr_b += mcr_b;
         g_shak_c += shak_c;
         g_shak_b += shak_b;
         println!(
             "{:<16} {:>5} {:>14} {:>13.1} {:>14} {:>13.1}",
             variant,
             rows.len(),
-            mce_c,
-            mce_b as f64 / 1024.0,
+            mcr_c,
+            mcr_b as f64 / 1024.0,
             shak_c,
             shak_b as f64 / 1024.0,
         );
@@ -715,19 +715,19 @@ fn memory_table(m: &[Measured]) {
         "{:<16} {:>5} {:>14} {:>13.1} {:>14} {:>13.1}",
         "OVERALL",
         m.len(),
-        g_mce_c,
-        g_mce_b as f64 / 1024.0,
+        g_mcr_c,
+        g_mcr_b as f64 / 1024.0,
         g_shak_c,
         g_shak_b as f64 / 1024.0,
     );
 }
 
-/// Micro-benchmark table (mce vs shakmaty where comparable).
+/// Micro-benchmark table (mcr vs shakmaty where comparable).
 fn micro_table(results: &[micro::MicroResult], sample: usize) {
     println!("micro-benchmarks — non-perft hot paths over a {sample}-position standard sample:");
     let head = format!(
         "{:<20} {:>14} {:>14} {:>8} {:>8}",
-        "operation", "mce ops/s", "shak ops/s", "ratio", "mce cv",
+        "operation", "mcr ops/s", "shak ops/s", "ratio", "mcr cv",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -743,10 +743,10 @@ fn micro_table(results: &[micro::MicroResult], sample: usize) {
         println!(
             "{:<20} {:>14.0} {} {} {:>7.1}%",
             r.name,
-            r.mce_ops,
+            r.mcr_ops,
             shak,
             ratio,
-            r.mce_cv * 100.0,
+            r.mcr_cv * 100.0,
         );
     }
 }
@@ -770,9 +770,9 @@ fn micro_sample_fens(epd_entries: &[epd::EpdEntry]) -> Vec<String> {
 fn emit_csv(m: &[Measured]) {
     println!("--- csv ---");
     println!(
-        "variant,position,depth,nodes,matched,mce_mnps,shak_mnps,ratio,\
-mce_median_s,shak_median_s,mce_min_s,shak_min_s,mce_cv,shak_cv,\
-mce_allocs,mce_bytes,shak_allocs,shak_bytes"
+        "variant,position,depth,nodes,matched,mcr_mnps,shak_mnps,ratio,\
+mcr_median_s,shak_median_s,mcr_min_s,shak_min_s,mcr_cv,shak_cv,\
+mcr_allocs,mcr_bytes,shak_allocs,shak_bytes"
     );
     for r in m {
         println!(
@@ -782,17 +782,17 @@ mce_allocs,mce_bytes,shak_allocs,shak_bytes"
             r.depth,
             r.nodes,
             r.matched,
-            r.mce_mnps(),
+            r.mcr_mnps(),
             r.shak_mnps(),
             r.ratio(),
-            r.mce.median_s,
+            r.mcr.median_s,
             r.shak.median_s,
-            r.mce.min_s,
+            r.mcr.min_s,
             r.shak.min_s,
-            r.mce.cv(),
+            r.mcr.cv(),
             r.shak.cv(),
-            r.mce_alloc.count,
-            r.mce_alloc.bytes,
+            r.mcr_alloc.count,
+            r.mcr_alloc.bytes,
             r.shak_alloc.count,
             r.shak_alloc.bytes,
         );
@@ -807,26 +807,26 @@ fn emit_json(m: &[Measured]) {
         let comma = if i + 1 < m.len() { "," } else { "" };
         println!(
             "  {{\"variant\":\"{}\",\"position\":\"{}\",\"depth\":{},\"nodes\":{},\
-\"matched\":{},\"mce_mnps\":{:.3},\"shak_mnps\":{:.3},\"ratio\":{:.4},\
-\"mce_median_s\":{:.9},\"shak_median_s\":{:.9},\"mce_min_s\":{:.9},\"shak_min_s\":{:.9},\
-\"mce_cv\":{:.5},\"shak_cv\":{:.5},\"mce_allocs\":{},\"mce_bytes\":{},\
+\"matched\":{},\"mcr_mnps\":{:.3},\"shak_mnps\":{:.3},\"ratio\":{:.4},\
+\"mcr_median_s\":{:.9},\"shak_median_s\":{:.9},\"mcr_min_s\":{:.9},\"shak_min_s\":{:.9},\
+\"mcr_cv\":{:.5},\"shak_cv\":{:.5},\"mcr_allocs\":{},\"mcr_bytes\":{},\
 \"shak_allocs\":{},\"shak_bytes\":{}}}{}",
             r.variant,
             r.position,
             r.depth,
             r.nodes,
             r.matched,
-            r.mce_mnps(),
+            r.mcr_mnps(),
             r.shak_mnps(),
             r.ratio(),
-            r.mce.median_s,
+            r.mcr.median_s,
             r.shak.median_s,
-            r.mce.min_s,
+            r.mcr.min_s,
             r.shak.min_s,
-            r.mce.cv(),
+            r.mcr.cv(),
             r.shak.cv(),
-            r.mce_alloc.count,
-            r.mce_alloc.bytes,
+            r.mcr_alloc.count,
+            r.mcr_alloc.bytes,
             r.shak_alloc.count,
             r.shak_alloc.bytes,
             comma,

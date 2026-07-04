@@ -1,8 +1,8 @@
-# mce-fuzz — fuzz targets for the mce chess engine.
+# mcr-fuzz — fuzz targets for the mcr chess rules library.
 #
 # This is a separate, nested cargo-fuzz crate. It is NOT part of the published
-# `mce` library, the workspace, or the normal `cargo build`/`cargo test` of the
-# parent crate; it depends on `mce` by path. Fuzzing requires a nightly
+# `mcr` library, the workspace, or the normal `cargo build`/`cargo test` of the
+# parent crate; it depends on `mcr` by path. Fuzzing requires a nightly
 # toolchain and the `cargo-fuzz` subcommand:
 #
 #     cargo install cargo-fuzz
@@ -13,7 +13,7 @@
 # gitignored and must never be committed.
 
 [package]
-name = "mce-fuzz"
+name = "mcr-fuzz"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -25,7 +25,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
 
-[dependencies.mce]
+[dependencies.mcr]
 path = ".."
 
 # Keep release-ish optimization for fuzzing throughput while preserving

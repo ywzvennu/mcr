@@ -44,10 +44,10 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppppp.../RNBQKBNR[HEhe] w KQBCDFGkqbcdfg - 0 1
-//! mce dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[AEae] w KQBCDFGkqbcdfg - 0 1
+//! mcr dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[AEae] w KQBCDFGkqbcdfg - 0 1
 //! ```
 //!
-//! The two differ only in the Hawk's letter (`H` in FSF, `a`/`A` in the mce census
+//! The two differ only in the Hawk's letter (`H` in FSF, `a`/`A` in the mcr census
 //! dialect — the same one Capablanca's Archbishop uses; the Elephant is `e`/`E` in
 //! both). The `compare-fairy/` harness reconciles that one letter. The `[AEae]` is
 //! the crazyhouse hand (the starting Hawk/Elephant reserves) and the

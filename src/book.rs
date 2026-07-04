@@ -2,7 +2,7 @@
 //!
 //! A Polyglot book maps positions to suggested moves, each with a weight. A
 //! position is identified by the **Polyglot Zobrist key** — a hash that is
-//! *separate* from mce's own incremental [`Zobrist`](crate::Zobrist) key: it
+//! *separate* from mcr's own incremental [`Zobrist`](crate::Zobrist) key: it
 //! uses Polyglot's own fixed, public-domain set of 781 random 64-bit constants
 //! and its own scheme (piece-square, castling rights, the en-passant file *only*
 //! when an enemy pawn can actually capture, and the side to move). The constant
@@ -26,8 +26,8 @@
 //! [Polyglot]: http://hgm.nubati.net/book_format.html
 //!
 //! ```
-//! use mce::Position;
-//! use mce::book::polyglot_key;
+//! use mcr::Position;
+//! use mcr::book::polyglot_key;
 //!
 //! assert_eq!(polyglot_key(&Position::startpos()), 0x463b_9618_1691_fc9c);
 //! ```
@@ -38,9 +38,9 @@ use alloc::vec::Vec;
 /// One decoded entry of a Polyglot book: the packed move, its weight, and the
 /// learn field, for a single position key.
 ///
-/// The [`mv`](BookEntry::mv) is already decoded into an mce [`Move`] for the
+/// The [`mv`](BookEntry::mv) is already decoded into an mcr [`Move`] for the
 /// position it was looked up in (Polyglot's castling-as-king-takes-rook encoding
-/// converted to mce's king-to-destination form; see [`decode_move`]).
+/// converted to mcr's king-to-destination form; see [`decode_move`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BookEntry {
     /// The book's suggested move, decoded for the queried position.
@@ -130,7 +130,7 @@ impl Book {
         u32::from_be_bytes([r[12], r[13], r[14], r[15]])
     }
 
-    /// Returns every book entry for `position`, decoded into mce [`Move`]s.
+    /// Returns every book entry for `position`, decoded into mcr [`Move`]s.
     ///
     /// The position's [`polyglot_key`] is binary-searched against the
     /// sorted-by-key entries; all entries sharing that key are returned in their
@@ -228,7 +228,7 @@ pub fn weighted_pick(entries: &[BookEntry], random: u64) -> Option<BookEntry> {
 
 /// Computes the **Polyglot Zobrist key** of `position`.
 ///
-/// This is the hash Polyglot books are keyed by, and is *independent* of mce's
+/// This is the hash Polyglot books are keyed by, and is *independent* of mcr's
 /// own incremental [`Zobrist`](crate::Zobrist) key: it uses Polyglot's fixed
 /// public-domain table of 781 random constants (`RANDOM64`) and its own
 /// scheme:
@@ -325,7 +325,7 @@ fn en_passant_capturable(position: &Position, ep: Square) -> bool {
 /// black-king 10, white-king 11. The index is `2 * role_rank + white_bit`.
 #[inline]
 fn polyglot_piece_index(color: Color, role: Role) -> usize {
-    // Polyglot's role order matches mce's (pawn, knight, bishop, rook, queen,
+    // Polyglot's role order matches mcr's (pawn, knight, bishop, rook, queen,
     // king), so the role rank is its position in that sequence.
     let role_rank = match role {
         Role::Pawn => 0,
@@ -342,13 +342,13 @@ fn polyglot_piece_index(color: Color, role: Role) -> usize {
     2 * role_rank + white_bit
 }
 
-/// Decodes a packed Polyglot move u16 into an mce [`Move`] for `position`.
+/// Decodes a packed Polyglot move u16 into an mcr [`Move`] for `position`.
 ///
 /// The 16-bit move packs, from the low bits: destination file (3), destination
 /// row (3), origin file (3), origin row (3), and a 3-bit promotion piece
 /// (0 = none, 1 = knight, … 4 = queen). Castling is encoded as the king
 /// capturing its *own* rook (e.g. white O-O is `e1h1`), which this converts to
-/// mce's king-moves-two-squares form. The decoded kind (capture, double push,
+/// mcr's king-moves-two-squares form. The decoded kind (capture, double push,
 /// en passant, promotion, castle) is resolved against `position`, since the
 /// packed move alone does not distinguish them.
 ///
@@ -373,7 +373,7 @@ pub fn decode_move(packed: u16, position: &Position) -> Option<Move> {
     }
 
     // Polyglot encodes castling as the king capturing its own rook: the `to`
-    // square holds the mover's own rook on the back rank. Convert to mce's
+    // square holds the mover's own rook on the back rank. Convert to mcr's
     // king-to-g/c-file form and tag the side.
     if mover.role == Role::King {
         if let Some(target) = board.piece_at(to) {

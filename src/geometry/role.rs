@@ -49,7 +49,7 @@ pub const OVERFLOW_PREFIX_3: char = '=';
 /// Movement is intentionally absent — this enum is identity only.
 ///
 /// ```
-/// use mce::geometry::WideRole;
+/// use mcr::geometry::WideRole;
 /// assert_eq!(WideRole::Pawn.index(), 0);
 /// assert_eq!(WideRole::from_char('a'), Some(WideRole::Hawk));
 /// assert_eq!(WideRole::Hawk.char(), 'a');
@@ -497,7 +497,7 @@ pub enum WideRole {
     // already the Ordamirror Falcon's overflow base here), `c` (crane, the
     // Cannon's bare letter and the Empire Cardinal's overflow base), `l`/`r`
     // (quails) and `p` (pheasant); the promoted swallow and falcon are the `+S`
-    // (goose) and `+F` (eagle) tokens. mce gives each its own overflow base,
+    // (goose) and `+F` (eagle) tokens. mcr gives each its own overflow base,
     // chosen distinct from every other overflow role (the Chak army already
     // recycles `s`, `o`, `l` and `p`, so Tori cannot reuse them) — `y` swallow,
     // `g` goose, `a` falcon, `i` eagle, `k` crane, `v` left quail, `r` right
@@ -1805,7 +1805,7 @@ impl WideRole {
             // distinct recycled base letter within the fresh fifth tier (the
             // fourth `***` tier is full). The `compare-fairy` harness never uses
             // these letters (it drives HaChu with coordinates, not piece letters),
-            // so they need only be self-consistent for mce's own FEN round-trip.
+            // so they need only be self-consistent for mcr's own FEN round-trip.
             WideRole::FireDemon => 'i',
             WideRole::GreatGeneral => 'g',
             WideRole::ViceGeneral => 'v',
@@ -2320,7 +2320,7 @@ impl WideRole {
     /// reserved roles have none, so `'?'` yields `None`).
     ///
     /// ```
-    /// use mce::geometry::WideRole;
+    /// use mcr::geometry::WideRole;
     /// assert_eq!(WideRole::from_char('N'), Some(WideRole::Knight));
     /// assert_eq!(WideRole::from_char('c'), Some(WideRole::Cannon));
     /// assert_eq!(WideRole::from_char('?'), None);

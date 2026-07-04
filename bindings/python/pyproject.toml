@@ -1,4 +1,4 @@
-# Build configuration for the `mce` Python extension module.
+# Build configuration for the `mcr` Python extension module.
 #
 # Built with maturin against the pyo3 cdylib in this crate. Develop and build:
 #
@@ -8,16 +8,16 @@
 #     maturin develop --release  # optimized build (recommended for perft)
 #     maturin build --release    # produce a wheel in target/wheels/
 #
-# Then: `import mce`. Run the tests with `pytest tests/`.
+# Then: `import mcr`. Run the tests with `pytest tests/`.
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "mce"
+name = "mcr"
 version = "0.0.0"
-description = "Fast Rust-backed chess move generation and rules (pyo3 bindings for the mce engine)."
+description = "Fast Rust-backed chess move generation and rules (pyo3 bindings for the mcr engine)."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT OR Apache-2.0" }
@@ -32,7 +32,7 @@ classifiers = [
 test = ["pytest>=7"]
 
 [tool.maturin]
-# The crate already sets `[lib] crate-type = ["cdylib"]` and `name = "mce"`;
+# The crate already sets `[lib] crate-type = ["cdylib"]` and `name = "mcr"`;
 # this builds the abi3 wheel so one artifact covers CPython 3.8+.
 bindings = "pyo3"
 strip = true

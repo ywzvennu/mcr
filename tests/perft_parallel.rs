@@ -9,7 +9,7 @@
 //! file is gated on `parallel`, so a default `cargo test` compiles it away.
 #![cfg(feature = "parallel")]
 
-use mce::{
+use mcr::{
     perft, perft_parallel, perft_variant, perft_variant_parallel, Atomic, Chess, Crazyhouse,
     Position,
 };

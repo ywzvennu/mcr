@@ -48,7 +48,7 @@ use crate::{FenError, Move, Position, SanError};
 /// helpers [`Epd::id`], [`Epd::best_moves`], and [`Epd::avoid_moves`].
 ///
 /// ```
-/// use mce::Epd;
+/// use mcr::Epd;
 /// let epd = Epd::parse(
 ///     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - bm e4; id \"start\";",
 /// )

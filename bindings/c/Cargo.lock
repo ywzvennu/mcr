@@ -3,12 +3,12 @@
 version = 4
 
 [[package]]
-name = "mce"
+name = "mcr"
 version = "0.3.0"
 
 [[package]]
-name = "mce-c"
+name = "mcr-c"
 version = "0.0.0"
 dependencies = [
- "mce",
+ "mcr",
 ]

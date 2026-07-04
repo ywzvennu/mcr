@@ -10,7 +10,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use mce::{
+use mcr::{
     Antichess, Atomic, Chess960, Crazyhouse, Horde, KingOfTheHill, Position, RacingKings,
     ThreeCheck, VariantPosition,
 };
@@ -54,43 +54,43 @@ fuzz_target!(|data: &[u8]| {
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::AtomicRules>::from_fen(f)
+        VariantPosition::<mcr::AtomicRules>::from_fen(f)
             .ok()
             .map(|p: Atomic| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::AntichessRules>::from_fen(f)
+        VariantPosition::<mcr::AntichessRules>::from_fen(f)
             .ok()
             .map(|p: Antichess| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::KingOfTheHillRules>::from_fen(f)
+        VariantPosition::<mcr::KingOfTheHillRules>::from_fen(f)
             .ok()
             .map(|p: KingOfTheHill| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::ThreeCheckRules>::from_fen(f)
+        VariantPosition::<mcr::ThreeCheckRules>::from_fen(f)
             .ok()
             .map(|p: ThreeCheck| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::RacingKingsRules>::from_fen(f)
+        VariantPosition::<mcr::RacingKingsRules>::from_fen(f)
             .ok()
             .map(|p: RacingKings| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::HordeRules>::from_fen(f)
+        VariantPosition::<mcr::HordeRules>::from_fen(f)
             .ok()
             .map(|p: Horde| (p.clone(), p.to_fen(), p.zobrist().get()))
     });
 
     check_roundtrip(fen, |f| {
-        VariantPosition::<mce::CrazyhouseRules>::from_fen(f)
+        VariantPosition::<mcr::CrazyhouseRules>::from_fen(f)
             .ok()
             .map(|p: Crazyhouse| (p.clone(), p.to_fen(), p.zobrist().get()))
     });

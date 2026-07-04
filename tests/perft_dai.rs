@@ -16,7 +16,7 @@
 //! rule layer plus Dai's five extra short-range movers, its five-rank promotion
 //! zone and its no-Kirin/Phoenix-promotion rule all modelled):
 //!
-//! * **perft(1) = 71** — mce's legal-move set is **node-for-node identical** to
+//! * **perft(1) = 71** — mcr's legal-move set is **node-for-node identical** to
 //!   HaChu's (same 71 moves; this pinned down the Kirin/Phoenix chirality, HaChu
 //!   placing the Kirin on the King's left).
 //! * **perft(2) = 5041** — **exact node-for-node** match with HaChu: every one of
@@ -33,15 +33,15 @@
 //!   HaChu leaf-for-leaf (89 White replies after `1. g5g6 a11a10`). The few
 //!   unreachable nodes are HaChu 0.23 segfaulting on specific positions (its
 //!   `usermove` path is fragile on the 15x15 board), documented, not weakened.
-//! * **perft(4) = 25400968** is an mce regression pin only: a node-by-node HaChu
+//! * **perft(4) = 25400968** is an mcr regression pin only: a node-by-node HaChu
 //!   cross-check at depth 4 is intractable, so it is not oracle-validated.
 //!
-//! These tests pin the mce move generator against regressions and assert the
+//! These tests pin the mcr move generator against regressions and assert the
 //! documented per-piece movement of the Dai-specific pieces.
 
-use mce::geometry::{perft, Dai, Dai15x15, Square};
+use mcr::geometry::{perft, Dai, Dai15x15, Square};
 
-/// The Dai start position round-trips through mce's FEN I/O in the `***`-dialect.
+/// The Dai start position round-trips through mcr's FEN I/O in the `***`-dialect.
 #[test]
 fn startpos_round_trips() {
     let pos = Dai::startpos();
@@ -63,7 +63,7 @@ fn startpos_perft_regression() {
     assert_eq!(perft::<Dai15x15, _>(&pos, 3), 357836);
 }
 
-/// A deeper mce-only regression pin (perft(4) = 25400968). Not oracle-validated (a
+/// A deeper mcr-only regression pin (perft(4) = 25400968). Not oracle-validated (a
 /// depth-4 HaChu cross-check is intractable) and ~25M nodes, so it is `#[ignore]`d
 /// to keep the default (debug) suite fast; run it explicitly, ideally in release:
 /// `cargo test --release --test perft_dai -- --ignored`.
@@ -226,7 +226,7 @@ fn attackers_and_pins_consistency() {
         .expect("valid Dai FEN");
     let king = Square::<Dai15x15>::from_file_rank(7, 1).unwrap();
     // The King is not in check (the pawn blocks the Ox at range one).
-    assert!(!pos.is_attacked(king, mce::Color::Black));
+    assert!(!pos.is_attacked(king, mcr::Color::Black));
     // Every legal move is self-consistent: replaying it never leaves our King
     // attacked (a base sanity net on the new-piece attacker projection).
     for m in pos.legal_moves().iter() {
@@ -236,7 +236,7 @@ fn attackers_and_pins_consistency() {
             for f in 0..15 {
                 for r in 0..15 {
                     let sq = Square::<Dai15x15>::from_file_rank(f, r).unwrap();
-                    if after.board().kings_of(mce::Color::White).contains(sq) {
+                    if after.board().kings_of(mcr::Color::White).contains(sq) {
                         it = Some(sq);
                     }
                 }
@@ -245,7 +245,7 @@ fn attackers_and_pins_consistency() {
         };
         if let Some(k) = k {
             assert!(
-                !after.is_attacked(k, mce::Color::Black),
+                !after.is_attacked(k, mcr::Color::Black),
                 "move {} left the White King in check",
                 m.to_uci::<Dai15x15>()
             );

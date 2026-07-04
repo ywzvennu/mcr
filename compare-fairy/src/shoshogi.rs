@@ -1,11 +1,11 @@
 //! Sho Shogi (old 9x9 Shogi **without drops**) differential perft + timing
 //! against Fairy-Stockfish (issue #267).
 //!
-//! Sho Shogi runs on mce's **generic** `u128` engine
-//! (`mce::geometry::ShoShogi`, a `GenericPosition<Shogi9x9, ShoShogiRules>`), like
+//! Sho Shogi runs on mcr's **generic** `u128` engine
+//! (`mcr::geometry::ShoShogi`, a `GenericPosition<Shogi9x9, ShoShogiRules>`), like
 //! Shogi / Chak, so it has its own corpus and comparison loop here. The FSF side
 //! selects `UCI_Variant shoshogi`, sets the FEN, runs `go perft`, asserts the node
-//! counts match, and reports mce-vs-FSF throughput. The corpus exercises the full
+//! counts match, and reports mcr-vs-FSF throughput. The corpus exercises the full
 //! Shogi army and its `+`-promotions, the **Drunk Elephant** (seven-direction
 //! step), its promotion to a **Crown Prince** (a second royal), and the
 //! **count-thresholded** two-royal rule (with both royals a side is never in
@@ -19,10 +19,10 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF share the Shogi letters — `l n s g k r b p` and the `+`-prefixed
+//! mcr and FSF share the Shogi letters — `l n s g k r b p` and the `+`-prefixed
 //! promoted forms `+P +L +N +S +R +B` — but spell the two extra pieces
 //! differently. FSF uses `e`/`E` for the Drunk Elephant and `+e`/`+E` for the
-//! Crown Prince (a promoted Drunk Elephant); mce, the single-`*` overflow alphabet
+//! Crown Prince (a promoted Drunk Elephant); mcr, the single-`*` overflow alphabet
 //! being exhausted, uses the **doubled** overflow prefix `**` — `**e`/`**E` for the
 //! Drunk Elephant and `**c`/`**C` for the Crown Prince. [`to_fsf_dialect`] walks
 //! the placement field and rewrites `**e → e` and `**c → +E` (case-preserving),
@@ -34,11 +34,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, ShoShogi, Shogi9x9};
+use mcr::geometry::{perft as gperft, ShoShogi, Shogi9x9};
 
 use crate::uci::Engine;
 
-/// One Sho Shogi corpus position. The FEN is mce's dialect; the FSF side
+/// One Sho Shogi corpus position. The FEN is mcr's dialect; the FSF side
 /// translates it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -79,7 +79,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrites an mce-dialect Sho Shogi FEN to FSF's dialect: the doubled-overflow
+/// Rewrites an mcr-dialect Sho Shogi FEN to FSF's dialect: the doubled-overflow
 /// Drunk Elephant `**e → e` and Crown Prince `**c → +E` (case-preserving); every
 /// shared Shogi letter, `+`-token, digit and `/` passes through. Only the
 /// placement field is rewritten; the side-to-move / clock fields are left intact.
@@ -128,17 +128,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -151,15 +151,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Sho Shogi corpus through mce and FSF. Returns the number of mismatches
+/// Run the Sho Shogi corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all matched, or FSF lacks `shoshogi` and the suite is skipped). Prints a
 /// table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -177,7 +177,7 @@ UCI_Variant shoshogi (issue #267):"
 
     let head = format!(
         "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -196,10 +196,10 @@ UCI_Variant shoshogi (issue #267):"
                     "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -211,16 +211,16 @@ UCI_Variant shoshogi (issue #267):"
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "shoshogi OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "shoshogi OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -233,20 +233,20 @@ UCI_Variant shoshogi (issue #267):"
         eprintln!("ERROR: {mismatches} Sho Shogi parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH shoshogi/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH shoshogi/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Sho Shogi position through mce's generic perft and FSF's `go perft`.
+/// Run one Sho Shogi position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = ShoShogi::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Shogi9x9, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = ShoShogi::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Shogi9x9, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     engine.set_variant("shoshogi", false)?;
     engine.set_position(&to_fsf_dialect(case.fen))?;
@@ -256,10 +256,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }

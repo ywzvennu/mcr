@@ -10,7 +10,7 @@
 //! The cheap depths run in CI; the deep depths are `#[ignore]`d and meant to be
 //! run with `cargo test --release -- --ignored`.
 
-use mce::{perft_variant, Chess960};
+use mcr::{perft_variant, Chess960};
 
 /// One reference position: its EPD/FEN and the `(depth, node-count)` pairs.
 struct PerftCase {

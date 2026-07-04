@@ -1,18 +1,18 @@
 //! Knightmate differential perft + timing against Fairy-Stockfish (issue #224).
 //!
-//! Knightmate runs on mce's **generic** engine (`mce::geometry::Knightmate`, a
+//! Knightmate runs on mcr's **generic** engine (`mcr::geometry::Knightmate`, a
 //! `GenericPosition<Chess8x8, KnightmateRules>`), like the other fairy variants, so
 //! it has its own corpus and comparison loop here. `knightmate` is an FSF
 //! **built-in** (it appears in the `UCI_Variant` combo with no `variants.ini`), so
 //! the suite selects `UCI_Variant knightmate` directly — no ini load — sets the
-//! FEN, runs `go perft`, asserts the node counts match, and reports mce-vs-FSF
+//! FEN, runs `go perft`, asserts the node counts match, and reports mcr-vs-FSF
 //! throughput.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same Knightmate position with **different Commoner
+//! mcr and FSF render the same Knightmate position with **different Commoner
 //! tokens**. FSF spells the non-royal Commoner (the Mann replacing the opening
-//! knights) `m`/`M`; mce spells it with its `*`-prefixed overflow token `*u`/`*U`
+//! knights) `m`/`M`; mcr spells it with its `*`-prefixed overflow token `*u`/`*U`
 //! (the Commoner shares the Advisor's recycled base letter `u`, as in Synochess and
 //! Shinobi). The royal Knight keeps the king's letter `k`/`K` in **both** engines,
 //! and every other piece is a standard chess letter, so [`to_fsf_dialect`] simply
@@ -24,11 +24,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Knightmate};
+use mcr::geometry::{perft as gperft, Chess8x8, Knightmate};
 
 use crate::uci::Engine;
 
-/// One Knightmate corpus position. The FEN is mce's dialect; the FSF side
+/// One Knightmate corpus position. The FEN is mcr's dialect; the FSF side
 /// translates it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -63,10 +63,10 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Translates an mce-dialect Knightmate FEN to FSF's dialect by collapsing the
+/// Translates an mcr-dialect Knightmate FEN to FSF's dialect by collapsing the
 /// Commoner's overflow token `*U`/`*u` to FSF's single letter `M`/`m`. The royal
 /// Knight (`k`/`K`) and the standard army carry no remapped token, so the swap is
-/// safe over the whole FEN. No other mce token starts with `*`, so a plain sequence
+/// safe over the whole FEN. No other mcr token starts with `*`, so a plain sequence
 /// replace is unambiguous.
 pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     fen.replace("*U", "M").replace("*u", "m")
@@ -77,17 +77,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -100,15 +100,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Knightmate corpus through mce and FSF. Returns the number of mismatches
+/// Run the Knightmate corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all matched, or the suite was skipped). Skips gracefully when the loaded
 /// FSF binary does not advertise the `knightmate` built-in.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -122,7 +122,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
 
     let head = format!(
         "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -141,10 +141,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -156,16 +156,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "knightmate OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "knightmate OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -178,20 +178,20 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Knightmate parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH knightmate/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH knightmate/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Knightmate position through mce's generic perft and FSF's `go perft`.
+/// Run one Knightmate position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Knightmate::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Knightmate::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = to_fsf_dialect(case.fen);
     engine.set_variant("knightmate", false)?;
@@ -202,10 +202,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }

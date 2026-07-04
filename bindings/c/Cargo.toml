@@ -1,37 +1,37 @@
-# mce-c — C ABI (FFI) bindings for the mce chess engine.
+# mcr-c — C ABI (FFI) bindings for the mcr chess rules library.
 #
-# This is a separate, nested crate. It is NOT part of the published `mce`
+# This is a separate, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build`/`cargo
-# test`; it depends on `mce` by path and re-exports a flat C ABI over an
+# test`; it depends on `mcr` by path and re-exports a flat C ABI over an
 # opaque handle.
 #
 # UNSAFE SCOPE: a C FFI boundary inherently needs `unsafe` (extern "C" plus raw
 # pointer / C-string handling). That unsafe lives ONLY here, each block carrying
-# a `// SAFETY:` comment, and is kept minimal and contained. The core `mce`
+# a `// SAFETY:` comment, and is kept minimal and contained. The core `mcr`
 # library stays unsafe-free (`unsafe_code = "deny"`); this crate does not change
 # that.
 #
 # Build the libraries:        cargo build              (in this directory)
-# Regenerate the header:      cbindgen --config cbindgen.toml --crate mce-c --output include/mce.h
+# Regenerate the header:      cbindgen --config cbindgen.toml --crate mcr-c --output include/mcr.h
 # Smoke-test (needs a C cc):  ./build_test.sh
 
 [package]
-name = "mce-c"
+name = "mcr-c"
 version = "0.0.0"
 edition = "2021"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "C ABI (FFI) bindings for the mce chess engine."
+description = "C ABI (FFI) bindings for the mcr chess rules library."
 
 [lib]
-name = "mce"
+name = "mcr"
 # A static archive for static linking and a shared library for dynamic linking.
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-# Path dependency on the parent mce crate. This binding is a CONSUMER of mce; it
-# is never a dependency of mce, so the mce package stays clean.
-mce = { path = "../.." }
+# Path dependency on the parent mcr crate. This binding is a CONSUMER of mcr; it
+# is never a dependency of mcr, so the mcr package stays clean.
+mcr = { path = "../.." }
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

@@ -4,7 +4,7 @@
 //! (issue #196) but drops the river, advisors, and elephants. Validated
 //! move-for-move against Fairy-Stockfish `UCI_Variant minixiangqi`.
 //!
-//! Minixiangqi is played on a 7-files (a..g) by 7-ranks (1..7) board — mce's
+//! Minixiangqi is played on a 7-files (a..g) by 7-ranks (1..7) board — mcr's
 //! [`Minixiangqi7x7`] geometry — with pieces on the cells. Each general lives in
 //! a 3x3 **palace** (files c..e, the near three ranks). There is **no river**, so
 //! soldiers may step sideways from the start.
@@ -13,7 +13,7 @@
 //!
 //! * **General / King** ([`WideRole::King`], FSF `k`): one orthogonal step,
 //!   **confined to the palace**. Plus the **flying-general** rule (below).
-//! * **Horse** ([`WideRole::Horse`], mce `j`, FSF `n`): a knight leap **hobbled**
+//! * **Horse** ([`WideRole::Horse`], mcr `j`, FSF `n`): a knight leap **hobbled**
 //!   if the orthogonally-adjacent leg square is occupied. Reuses
 //!   [`attacks::horse_attacks`] — the *same* primitive as Xiangqi.
 //! * **Chariot / Rook** ([`WideRole::Rook`], `r`): a plain rook.
@@ -21,7 +21,7 @@
 //!   squares, captures only by jumping exactly one screen — the **same** cannon
 //!   primitive as Xiangqi and Shako ([`attacks::cannon_quiet_moves`] /
 //!   [`attacks::cannon_capture_targets`]), confirmed identical against FSF.
-//! * **Soldier / Pawn** ([`WideRole::Soldier`], mce `z`, FSF `p`): one step
+//! * **Soldier / Pawn** ([`WideRole::Soldier`], mcr `z`, FSF `p`): one step
 //!   forward **plus** one step sideways. Minixiangqi has **no river**, so the
 //!   sideways step is available everywhere (unlike Xiangqi, where it unlocks only
 //!   after crossing). Never backward, no double-step, no promotion.
@@ -34,14 +34,14 @@
 //!
 //! ## Confirmed starting FEN
 //!
-//! From FSF's `minixiangqi` variant (`startFen`); mce and FSF agree on the
-//! position but spell the Horse and Soldier differently (mce avoids `n`/`p`,
+//! From FSF's `minixiangqi` variant (`startFen`); mcr and FSF agree on the
+//! position but spell the Horse and Soldier differently (mcr avoids `n`/`p`,
 //! already taken by the Knight / Pawn), so the `compare-fairy` harness rewrites
 //! them when driving FSF:
 //!
 //! ```text
 //! FSF dialect: rcnkncr/p1ppp1p/7/7/7/P1PPP1P/RCNKNCR w - - 0 1
-//! mce dialect: rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1
+//! mcr dialect: rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1
 //! ```
 
 use crate::geometry::position::{
@@ -63,7 +63,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct MinixiangqiRules;
 
-/// The confirmed Minixiangqi starting placement in the mce dialect (horse `j`,
+/// The confirmed Minixiangqi starting placement in the mcr dialect (horse `j`,
 /// soldier `z`), the position byte-identical to FSF's
 /// `rcnkncr/p1ppp1p/7/7/7/P1PPP1P/RCNKNCR`.
 const MINIXIANGQI_START_PLACEMENT: &str = "rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR";
@@ -294,7 +294,7 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
 /// Minixiangqi as a [`GenericPosition`] over the 7x7 [`Minixiangqi7x7`] geometry.
 ///
 /// Construct the starting position with
-/// [`Minixiangqi::startpos`](GenericPosition::startpos) or parse a FEN (mce
+/// [`Minixiangqi::startpos`](GenericPosition::startpos) or parse a FEN (mcr
 /// dialect) with [`Minixiangqi::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the piece movements, the palace confinement, and the
 /// flying-general rule.

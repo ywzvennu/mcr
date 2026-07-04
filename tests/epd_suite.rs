@@ -1,7 +1,7 @@
 //! EPD / perft test-suite runner over a pinned corpus (issue #356).
 //!
-//! The EPD parsers landed in #317 (`mce::Epd` for standard chess and
-//! `mce::geometry::WideEpd` for the fairy/wide layer) but were never wired into a
+//! The EPD parsers landed in #317 (`mcr::Epd` for standard chess and
+//! `mcr::geometry::WideEpd` for the fairy/wide layer) but were never wired into a
 //! *test harness*. This file is that harness: it reads the pinned corpus
 //! [`CORPUS`] (`tests/epd_suite_corpus.epd`), and for every record checks two
 //! kinds of assertion against the live engine.
@@ -11,7 +11,7 @@
 //! Each non-blank, non-`#` line is `<variant> <EPD>`. The first whitespace token
 //! is a variant tag the runner maps to an engine:
 //!
-//! * `standard` — the concrete 8x8 engine (`mce::Epd` + `mce::perft`).
+//! * `standard` — the concrete 8x8 engine (`mcr::Epd` + `mcr::perft`).
 //! * anything else — a [`WideVariantId`] name/alias, driving the wide layer
 //!   (`WideEpd` + `AnyWideVariant::perft`).
 //!
@@ -21,13 +21,13 @@
 //! ## Opcode conventions
 //!
 //! * **perft suite** — `Dn <count>` (e.g. `D1 20; D2 400; D3 8902`), the classic
-//!   CPW perft-suite opcode also documented by [`mce::Epd`]. For each `Dn` the
+//!   CPW perft-suite opcode also documented by [`mcr::Epd`]. For each `Dn` the
 //!   runner builds the position, runs `perft(n)`, and asserts the node count
 //!   equals the pinned `<count>`.
 //! * **best/avoid-move suite** — `bm <SAN>...` / `am <SAN>...`. Each operand is
 //!   resolved through the variant's own SAN parser and must (a) resolve to a
 //!   legal move and (b) be present in `legal_moves()`. `am` moves are validated
-//!   the same way (legal-but-flagged): mce is a move-generation library, not a
+//!   the same way (legal-but-flagged): mcr is a move-generation library, not a
 //!   search engine, so the suite verifies legality + parse + presence, not which
 //!   move an engine would choose.
 //!
@@ -35,8 +35,8 @@
 //! the crate's `tests/perft_*.rs` suites (the standard-chess counts are the
 //! published CPW / Kiwipete numbers).
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{Epd, Position};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::{Epd, Position};
 
 /// The pinned corpus, compiled into the test binary so the suite is hermetic.
 const CORPUS: &str = include_str!("epd_suite_corpus.epd");
@@ -84,7 +84,7 @@ fn check_standard(epd: &str, label: &str) -> Counts {
                 .first()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(|| panic!("[{label}] {opcode} needs a numeric operand"));
-            let got = mce::perft(pos, depth);
+            let got = mcr::perft(pos, depth);
             assert_eq!(
                 got, expected,
                 "[{label}] perft({depth}): pinned {expected}, got {got}"
@@ -115,7 +115,7 @@ fn check_wide(tag: &str, epd: &str, label: &str) -> Counts {
     let variant: WideVariantId = tag
         .parse()
         .unwrap_or_else(|e| panic!("[{label}] unknown variant tag {tag:?}: {e}"));
-    let record = mce::geometry::WideEpd::parse(variant, epd)
+    let record = mcr::geometry::WideEpd::parse(variant, epd)
         .unwrap_or_else(|e| panic!("[{label}] EPD parse failed: {e}"));
     let pos: &AnyWideVariant = record.position();
     let legal = pos.legal_moves();

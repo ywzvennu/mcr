@@ -33,8 +33,8 @@
 //! lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[] w - - 1+1 0 1
 //! ```
 //!
-//! mce uses the same board placement and an empty `[]` holdings bracket and omits
-//! the `1+1` check-counter field (a single check is terminal, so mce keeps no
+//! mcr uses the same board placement and an empty `[]` holdings bracket and omits
+//! the `1+1` check-counter field (a single check is terminal, so mcr keeps no
 //! counter); FSF defaults the field to `1+1` when it is absent, so the two see the
 //! byte-identical position.
 

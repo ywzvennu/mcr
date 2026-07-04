@@ -2,7 +2,7 @@
 //! Capablanca-board variant with the king on the e-file and its own castle files.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Embassy::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Embassy::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant embassy`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` differential fuzzer re-runs the
 //! head-to-head on demand (`--difffuzz --variant embassy`); this test pins the
@@ -12,16 +12,16 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkcabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKCABNR w KQkq - 0 1
-//! mce dialect: rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1
+//! mcr dialect: rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce). The
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr). The
 //! deep layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_embassy -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Embassy};
+use mcr::geometry::{perft as gperft, Cap10x8, Embassy};
 
-/// The Embassy starting FEN (mce dialect), confirmed against FSF's
+/// The Embassy starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant embassy`.
 const STARTPOS: &str = "rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1";
 

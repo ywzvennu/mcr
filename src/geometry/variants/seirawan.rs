@@ -6,8 +6,8 @@
 //! Seirawan is standard 8x8 chess plus two extra pieces held **in reserve** off
 //! the board, one of each per side:
 //!
-//! * **Hawk** ([`WideRole::Hawk`], Bishop + Knight) — FSF / mce letter `H`/`h`.
-//! * **Elephant** ([`WideRole::Elephant`], Rook + Knight) — FSF / mce letter
+//! * **Hawk** ([`WideRole::Hawk`], Bishop + Knight) — FSF / mcr letter `H`/`h`.
+//! * **Elephant** ([`WideRole::Elephant`], Rook + Knight) — FSF / mcr letter
 //!   `E`/`e`.
 //!
 //! Their movement is already the [`WideVariant`] default (`bishop | knight` and
@@ -36,7 +36,7 @@
 //! rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[HEhe] w KQBCDFGkqbcdfg - 0 1
 //! ```
 //!
-//! mce uses the **same dialect** FSF does for S-Chess (`H` Hawk, `E` Elephant),
+//! mcr uses the **same dialect** FSF does for S-Chess (`H` Hawk, `E` Elephant),
 //! so the FEN is byte-identical — no rewrite is needed in `compare-fairy/`.
 //!
 //! The two FEN extensions over plain chess:

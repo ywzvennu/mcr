@@ -4,8 +4,8 @@
 //! tools also spend time in single-shot operations: generating the legal move
 //! list once, making one move, parsing and serializing FENs, and (for tooling)
 //! producing SAN and Zobrist keys. This module measures the throughput of each
-//! over a fixed sample of positions, comparing mce against shakmaty where the
-//! operation is comparable and reporting mce-only figures (SAN, Zobrist) where
+//! over a fixed sample of positions, comparing mcr against shakmaty where the
+//! operation is comparable and reporting mcr-only figures (SAN, Zobrist) where
 //! shakmaty's surface differs enough that a head-to-head would be apples to
 //! oranges.
 //!
@@ -21,7 +21,7 @@ use std::time::Instant;
 use shakmaty::fen::Fen;
 use shakmaty::{CastlingMode, Chess as ShChess, EnPassantMode, Position as ShPosition};
 
-use mce::{AnyVariant, Position, VariantId};
+use mcr::{AnyVariant, Position, VariantId};
 
 use crate::stats::{summarize, TimeStats};
 
@@ -31,24 +31,24 @@ const BATCHES: usize = 9;
 const INNER: usize = 40;
 
 /// One micro-benchmark result: a name, the per-second throughput for each engine
-/// (shakmaty optional when the op is mce-only), and the mce sample spread.
+/// (shakmaty optional when the op is mcr-only), and the mcr sample spread.
 pub struct MicroResult {
     /// Operation name, e.g. `"legal_moves"`.
     pub name: &'static str,
-    /// mce throughput in operations per second (median-based).
-    pub mce_ops: f64,
-    /// shakmaty throughput in ops/sec, or `None` for mce-only operations.
+    /// mcr throughput in operations per second (median-based).
+    pub mcr_ops: f64,
+    /// shakmaty throughput in ops/sec, or `None` for mcr-only operations.
     pub shak_ops: Option<f64>,
-    /// mce timing spread (coefficient of variation).
-    pub mce_cv: f64,
+    /// mcr timing spread (coefficient of variation).
+    pub mcr_cv: f64,
 }
 
 impl MicroResult {
-    /// mce/shakmaty ops-per-second ratio (>1 means mce does more ops/sec), or
-    /// `None` for mce-only operations.
+    /// mcr/shakmaty ops-per-second ratio (>1 means mcr does more ops/sec), or
+    /// `None` for mcr-only operations.
     pub fn ratio(&self) -> Option<f64> {
         self.shak_ops
-            .map(|s| if s > 0.0 { self.mce_ops / s } else { f64::NAN })
+            .map(|s| if s > 0.0 { self.mcr_ops / s } else { f64::NAN })
     }
 }
 
@@ -79,7 +79,7 @@ fn ops_per_sec(stats: &TimeStats, ops_per_batch: u64) -> f64 {
 pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
     // Pre-parse the sample once into each engine's position type. Only keep FENs
     // both engines accept so every op runs on the same set.
-    let mut mce_pos: Vec<Position> = Vec::new();
+    let mut mcr_pos: Vec<Position> = Vec::new();
     let mut shak_pos: Vec<ShChess> = Vec::new();
     let mut fens: Vec<String> = Vec::new();
     for f in sample_fens {
@@ -92,21 +92,21 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         else {
             continue;
         };
-        mce_pos.push(m);
+        mcr_pos.push(m);
         shak_pos.push(s);
         fens.push(f.clone());
     }
-    assert!(!mce_pos.is_empty(), "no shared standard sample positions");
-    let n = mce_pos.len() as u64;
+    assert!(!mcr_pos.is_empty(), "no shared standard sample positions");
+    let n = mcr_pos.len() as u64;
     let ops_per_batch = n * INNER as u64;
 
     let mut out = Vec::new();
 
     // ---- legal_moves(): move generation throughput ------------------------
     {
-        let mce_t = time_throughput(ops_per_batch, || {
+        let mcr_t = time_throughput(ops_per_batch, || {
             for _ in 0..INNER {
-                for p in &mce_pos {
+                for p in &mcr_pos {
                     black_box(p.legal_moves().len());
                 }
             }
@@ -120,23 +120,23 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         });
         out.push(MicroResult {
             name: "legal_moves",
-            mce_ops: ops_per_sec(&mce_t, ops_per_batch),
+            mcr_ops: ops_per_sec(&mcr_t, ops_per_batch),
             shak_ops: Some(ops_per_sec(&shak_t, ops_per_batch)),
-            mce_cv: mce_t.cv(),
+            mcr_cv: mcr_t.cv(),
         });
     }
 
     // ---- play(): make-move throughput (first legal move of each position) --
     {
         // Pre-pick the first legal move per position for each engine.
-        let mce_moves: Vec<_> = mce_pos.iter().map(|p| p.legal_moves()[0]).collect();
+        let mcr_moves: Vec<_> = mcr_pos.iter().map(|p| p.legal_moves()[0]).collect();
         let shak_moves: Vec<_> = shak_pos
             .iter()
             .map(|p| p.legal_moves()[0].clone())
             .collect();
-        let mce_t = time_throughput(ops_per_batch, || {
+        let mcr_t = time_throughput(ops_per_batch, || {
             for _ in 0..INNER {
-                for (p, mv) in mce_pos.iter().zip(&mce_moves) {
+                for (p, mv) in mcr_pos.iter().zip(&mcr_moves) {
                     let mut q = p.clone();
                     q.play_unchecked(mv);
                     black_box(q.turn());
@@ -154,34 +154,34 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         });
         out.push(MicroResult {
             name: "play",
-            mce_ops: ops_per_sec(&mce_t, ops_per_batch),
+            mcr_ops: ops_per_sec(&mcr_t, ops_per_batch),
             shak_ops: Some(ops_per_sec(&shak_t, ops_per_batch)),
-            mce_cv: mce_t.cv(),
+            mcr_cv: mcr_t.cv(),
         });
     }
 
     // ---- make_unmake(): zero-copy down-and-up-a-ply cost -------------------
     {
-        // One "op" here is a full ply descent and ascent: mce makes a move in
+        // One "op" here is a full ply descent and ascent: mcr makes a move in
         // place on a single owned position and then unmakes it (no clone), while
         // shakmaty — which has no unmake — clones the position and plays the move
         // on the clone (the clone is its "ascent": it is dropped). This is the
         // make/unmake vs copy-make comparison for one search ply.
         //
-        // For mce's compact `Position` (a handful of bitboards plus a few scalar
+        // For mcr's compact `Position` (a handful of bitboards plus a few scalar
         // fields, ~72 bytes) a clone is a cheap memcpy, so copy-make stays
         // competitive: make/unmake pays the board edits twice (down then up) where
         // copy-make pays one memcpy plus one make. The numbers below report that
         // honestly rather than assume a win; perft is therefore left on copy-make.
-        let mut mce_owned: Vec<Position> = mce_pos.clone();
-        let mce_moves: Vec<_> = mce_owned.iter().map(|p| p.legal_moves()[0]).collect();
+        let mut mcr_owned: Vec<Position> = mcr_pos.clone();
+        let mcr_moves: Vec<_> = mcr_owned.iter().map(|p| p.legal_moves()[0]).collect();
         let shak_moves: Vec<_> = shak_pos
             .iter()
             .map(|p| p.legal_moves()[0].clone())
             .collect();
-        let mce_t = time_throughput(ops_per_batch, || {
+        let mcr_t = time_throughput(ops_per_batch, || {
             for _ in 0..INNER {
-                for (p, mv) in mce_owned.iter_mut().zip(&mce_moves) {
+                for (p, mv) in mcr_owned.iter_mut().zip(&mcr_moves) {
                     let undo = p.make(mv);
                     black_box(p.turn());
                     p.unmake(mv, undo);
@@ -199,15 +199,15 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         });
         out.push(MicroResult {
             name: "make_unmake",
-            mce_ops: ops_per_sec(&mce_t, ops_per_batch),
+            mcr_ops: ops_per_sec(&mcr_t, ops_per_batch),
             shak_ops: Some(ops_per_sec(&shak_t, ops_per_batch)),
-            mce_cv: mce_t.cv(),
+            mcr_cv: mcr_t.cv(),
         });
     }
 
     // ---- FEN parse + serialize round-trip throughput ----------------------
     {
-        let mce_t = time_throughput(ops_per_batch, || {
+        let mcr_t = time_throughput(ops_per_batch, || {
             for _ in 0..INNER {
                 for f in &fens {
                     let p = Position::from_fen(black_box(f)).unwrap();
@@ -228,23 +228,23 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
         });
         out.push(MicroResult {
             name: "fen_roundtrip",
-            mce_ops: ops_per_sec(&mce_t, ops_per_batch),
+            mcr_ops: ops_per_sec(&mcr_t, ops_per_batch),
             shak_ops: Some(ops_per_sec(&shak_t, ops_per_batch)),
-            mce_cv: mce_t.cv(),
+            mcr_cv: mcr_t.cv(),
         });
     }
 
-    // ---- SAN serialization (mce-only): SAN of every legal move ------------
+    // ---- SAN serialization (mcr-only): SAN of every legal move ------------
     {
         // ops/batch here is the total number of moves SAN'd, not positions.
-        let total_moves: u64 = mce_pos
+        let total_moves: u64 = mcr_pos
             .iter()
             .map(|p| p.legal_moves().len() as u64)
             .sum::<u64>()
             * INNER as u64;
         let san_t = time_throughput(total_moves, || {
             for _ in 0..INNER {
-                for p in &mce_pos {
+                for p in &mcr_pos {
                     for mv in p.legal_moves() {
                         black_box(p.san(&mv));
                     }
@@ -252,14 +252,14 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
             }
         });
         out.push(MicroResult {
-            name: "san (mce-only)",
-            mce_ops: ops_per_sec(&san_t, total_moves),
+            name: "san (mcr-only)",
+            mcr_ops: ops_per_sec(&san_t, total_moves),
             shak_ops: None,
-            mce_cv: san_t.cv(),
+            mcr_cv: san_t.cv(),
         });
     }
 
-    // ---- Zobrist hashing (mce-only): key of each position -----------------
+    // ---- Zobrist hashing (mcr-only): key of each position -----------------
     {
         // Use AnyVariant zobrist so this exercises the public runtime path.
         let any: Vec<AnyVariant> = fens
@@ -274,10 +274,10 @@ pub fn run(sample_fens: &[String]) -> Vec<MicroResult> {
             }
         });
         out.push(MicroResult {
-            name: "zobrist (mce-only)",
-            mce_ops: ops_per_sec(&zob_t, ops_per_batch),
+            name: "zobrist (mcr-only)",
+            mcr_ops: ops_per_sec(&zob_t, ops_per_batch),
             shak_ops: None,
-            mce_cv: zob_t.cv(),
+            mcr_cv: zob_t.cv(),
         });
     }
 

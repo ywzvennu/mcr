@@ -4,7 +4,7 @@
 //! leapers and an **augmented Knight** (Knight + Wazir) to a Grand-style army.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Opulent::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Opulent::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant opulent`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/opulent.rs`); this test pins the
@@ -16,33 +16,33 @@
 //!
 //! ```text
 //! FSF dialect: rw6wr/clbnqknbla/pppppppppp/10/10/10/10/PPPPPPPPPP/CLBNQKNBLA/RW6WR w - - 0 1
-//! mce dialect: r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1
+//! mcr dialect: r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1
 //! ```
 //!
 //! The dialects differ only in the fairy letters: FSF's chancellor `c`/`C`
-//! (Rook+Knight) is mce's [`WideRole::Elephant`](mce::geometry::WideRole::Elephant)
-//! `e`/`E`; FSF's lion `l`/`L` (Ferz+Dabbaba+Threeleaper) is mce's
-//! [`WideRole::OpulentLion`](mce::geometry::WideRole::OpulentLion) second-bank token
+//! (Rook+Knight) is mcr's [`WideRole::Elephant`](mcr::geometry::WideRole::Elephant)
+//! `e`/`E`; FSF's lion `l`/`L` (Ferz+Dabbaba+Threeleaper) is mcr's
+//! [`WideRole::OpulentLion`](mcr::geometry::WideRole::OpulentLion) second-bank token
 //! `**y`/`**Y`; FSF's knight `n`/`N` — an **augmented** Knight+Wazir, not the plain
-//! knight — is mce's [`WideRole::OpulentKnight`](mce::geometry::WideRole::OpulentKnight)
-//! `**z`/`**Z`; FSF's wizard `w`/`W` (Camel+Ferz) is mce's
-//! [`WideRole::Wizard`](mce::geometry::WideRole::Wizard) `**w`/`**W`; the archbishop
-//! `a`/`A` (Bishop+Knight, mce [`WideRole::Hawk`](mce::geometry::WideRole::Hawk)) is
+//! knight — is mcr's [`WideRole::OpulentKnight`](mcr::geometry::WideRole::OpulentKnight)
+//! `**z`/`**Z`; FSF's wizard `w`/`W` (Camel+Ferz) is mcr's
+//! [`WideRole::Wizard`](mcr::geometry::WideRole::Wizard) `**w`/`**W`; the archbishop
+//! `a`/`A` (Bishop+Knight, mcr [`WideRole::Hawk`](mcr::geometry::WideRole::Hawk)) is
 //! spelled identically in both.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_opulent -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Grand10x10, Opulent};
+use mcr::geometry::{perft as gperft, Grand10x10, Opulent};
 
-/// The Opulent starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Opulent starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant opulent`.
 const STARTPOS: &str =
     "r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1";
 
 /// A quiet midgame, white to move: each side has advanced its e-pawn (white to e4,
 /// black to e6 in `a..j` files) and traded no material. Reached from the startpos by
-/// `e3e5 e8e6` and confirmed move-for-move by FSF (mce dialect: chancellor `e`, lion
+/// `e3e5 e8e6` and confirmed move-for-move by FSF (mcr dialect: chancellor `e`, lion
 /// `**y`, wizard `**w`, augmented knight `**z`).
 const MID: &str =
     "r**w6**wr/e**yb**zqk**zb**ya/pppp1ppppp/10/4p5/4P5/10/PPPP1PPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 2";

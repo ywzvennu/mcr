@@ -1,4 +1,4 @@
-//! `mce convert` — convert between FEN and PGN on stdin/stdout.
+//! `mcr convert` — convert between FEN and PGN on stdin/stdout.
 //!
 //! Supported directions (`--from <fmt> --to <fmt>`), reading stdin and writing
 //! stdout:
@@ -17,11 +17,11 @@ use std::io::Read;
 
 use clap::{Args, ValueEnum};
 
-use mce::Pgn;
+use mcr::Pgn;
 
 use crate::util::{self, CliError, CliResult};
 
-/// The input/output formats `mce convert` understands.
+/// The input/output formats `mcr convert` understands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Format {
     /// FEN (a single position).
@@ -32,7 +32,7 @@ pub enum Format {
     Summary,
 }
 
-/// Arguments for `mce convert`.
+/// Arguments for `mcr convert`.
 #[derive(Debug, Args)]
 pub struct ConvertArgs {
     /// Input format on stdin.
@@ -99,8 +99,8 @@ fn fen_to_summary(input: &str, variant: Option<&str>) -> CliResult {
     let count = pos.legal_moves().len();
     let outcome = match pos.outcome() {
         None => "in progress".to_owned(),
-        Some(mce::Outcome::Decisive { winner }) => format!("{} wins", util::side_name(winner)),
-        Some(mce::Outcome::Draw) => "draw".to_owned(),
+        Some(mcr::Outcome::Decisive { winner }) => format!("{} wins", util::side_name(winner)),
+        Some(mcr::Outcome::Draw) => "draw".to_owned(),
     };
 
     println!(

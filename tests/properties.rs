@@ -57,8 +57,8 @@
 //! because both sides carry the *same* incremental key — the bug only affects
 //! incremental-vs-from-scratch, not make-vs-unmake.)
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{
+use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::{
     perft_variant, Antichess, AnyVariant, Atomic, Bitboard, Chess, Chess960, Crazyhouse, Horde,
     KingOfTheHill, Position, RacingKings, Square, ThreeCheck, Variant, VariantId, VariantPosition,
 };

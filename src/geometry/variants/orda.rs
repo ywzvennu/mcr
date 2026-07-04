@@ -12,13 +12,13 @@
 //! * **Black = Orda.** A Mongolian cavalry army whose distinctive pieces every
 //!   **move like a knight** but **capture along a slider line** — confirmed
 //!   square-for-square against FSF:
-//!   * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mce `f`) — moves like a
+//!   * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mcr `f`) — moves like a
 //!     knight to an empty square; captures like a **rook**.
-//!   * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mce `w`) — a **King +
+//!   * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mcr `w`) — a **King +
 //!     Knight** leaper (sixteen squares); moves and captures alike.
-//!   * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mce `y`) — moves like a
+//!   * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mcr `y`) — moves like a
 //!     knight to an empty square; captures like a **bishop**.
-//!   * **Yurt** ([`WideRole::Silver`], FSF `silver` `y`, mce `s`) — a **silver
+//!   * **Yurt** ([`WideRole::Silver`], FSF `silver` `y`, mcr `s`) — a **silver
 //!     general**: the four diagonals plus one straight-forward step (its forward
 //!     is toward White, so its attack set is color-directional).
 //!   * **King** ([`WideRole::King`], `k`) — a standard king (one).
@@ -40,7 +40,7 @@
 //! adjudicates it on the **losing** side's turn: a node where the side to move's
 //! opponent already stands on its goal rank is terminal (no children), exactly as
 //! the [`WideVariant::has_flag_win`] / [`WideVariant::flag_rank`] hooks express
-//! (the engine's shared `flag_win_reached` test). This is what makes mce's perft
+//! (the engine's shared `flag_win_reached` test). This is what makes mcr's perft
 //! match FSF's `go perft` at a flag node.
 //!
 //! ## Confirmed starting FEN
@@ -51,7 +51,7 @@
 //! lhaykahl/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1
 //! ```
 //!
-//! with FSF's Orda letters `l h a y k` (Lancer, Kheshig, Archer, Yurt, King). mce
+//! with FSF's Orda letters `l h a y k` (Lancer, Kheshig, Archer, Yurt, King). mcr
 //! reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the Orda pieces take distinct
 //! letters — Lancer `f`, Kheshig `w`, Archer `y`, Yurt `s` (the existing Silver):
 //!
@@ -84,7 +84,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct OrdaRules;
 
-/// The confirmed Orda starting placement in mce's role letters: White standard
+/// The confirmed Orda starting placement in mcr's role letters: White standard
 /// (`RNBQKBNR`/`PPPPPPPP` on ranks 1-2), Black `f w y s k y w f` on the back rank
 /// (Lancer, Kheshig, Archer, Yurt, King, Archer, Kheshig, Lancer) with its pawns
 /// **one rank advanced** on the 6th rank (the 7th rank is empty) — the Orda

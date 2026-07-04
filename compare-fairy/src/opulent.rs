@@ -1,11 +1,11 @@
 //! Opulent chess (10x10) differential perft + timing against Fairy-Stockfish
 //! (issue #375).
 //!
-//! Opulent runs on mce's **generic** `u128` engine (`mce::geometry::Opulent`, a
+//! Opulent runs on mcr's **generic** `u128` engine (`mcr::geometry::Opulent`, a
 //! `GenericPosition<Grand10x10, OpulentRules>`), like Grand, so it has its own
 //! corpus and comparison loop here (mirroring `grand.rs`). The FSF side selects
 //! `UCI_Variant opulent`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput.
+//! match, and reports mcr-vs-FSF throughput.
 //!
 //! **FSF must be built with large-board support** (`make ... largeboards=yes`):
 //! the default FSF build omits the 10x10 `opulent` variant. When the running binary
@@ -14,7 +14,7 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF agree on the position but spell the fairy pieces differently. mce
+//! mcr and FSF agree on the position but spell the fairy pieces differently. mcr
 //! uses its second-bank overflow tokens `**w`/`**W` (Wizard = Camel + Ferz),
 //! `**y`/`**Y` (Lion = Ferz + Dabbaba + Threeleaper) and `**z`/`**Z` (augmented
 //! Knight = Knight + Wazir), plus its Elephant `e`/`E` for the Rook+Knight Chancellor;
@@ -27,11 +27,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Grand10x10, Opulent};
+use mcr::geometry::{perft as gperft, Grand10x10, Opulent};
 
 use crate::uci::Engine;
 
-/// One Opulent corpus position, in the **mce dialect** (chancellor `e`, wizard
+/// One Opulent corpus position, in the **mcr dialect** (chancellor `e`, wizard
 /// `**w`, lion `**y`, knight `**z`).
 struct Case {
     label: &'static str,
@@ -61,7 +61,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrite an mce-dialect Opulent FEN into the FSF dialect: in the *placement*
+/// Rewrite an mcr-dialect Opulent FEN into the FSF dialect: in the *placement*
 /// field, the Wizard `**w`/`**W` becomes `w`/`W`, the Lion `**y`/`**Y` becomes
 /// `l`/`L`, the augmented Knight `**z`/`**Z` becomes `n`/`N`, and the Chancellor
 /// `e`/`E` becomes `c`/`C`. The Archbishop `a`/`A` and every other letter and field
@@ -110,17 +110,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -133,15 +133,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Opulent corpus through mce and FSF. Returns the number of mismatches
+/// Run the Opulent corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched, or FSF lacks `opulent` and the suite is skipped).
 /// Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -158,7 +158,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
 
     let head = format!(
         "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -177,10 +177,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<12} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -192,16 +192,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "opulent OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "opulent OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -214,10 +214,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Opulent parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH opulent/{} depth {}: mce={} fsf={}  mce FEN: {}  FSF FEN: {}",
+                "  MISMATCH opulent/{} depth {}: mcr={} fsf={}  mcr FEN: {}  FSF FEN: {}",
                 r.label,
                 r.depth,
-                r.mce_nodes,
+                r.mcr_nodes,
                 r.fsf_nodes,
                 r.fen,
                 fen_to_fsf(r.fen),
@@ -227,12 +227,12 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     mismatches
 }
 
-/// Run one Opulent position through mce's generic perft and FSF's `go perft`.
+/// Run one Opulent position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Opulent::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Grand10x10, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Opulent::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Grand10x10, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("opulent", false)?;
@@ -243,10 +243,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -273,14 +273,14 @@ mod tests {
         }
     }
 
-    /// The mce -> FSF dialect rewrite maps the Wizard `**w`, Lion `**y`, augmented
+    /// The mcr -> FSF dialect rewrite maps the Wizard `**w`, Lion `**y`, augmented
     /// Knight `**z`, and Chancellor `e` letters and leaves the Archbishop `a` and
     /// every other field intact.
     #[test]
     fn fen_dialect_rewrites_fairy_letters() {
-        let mce = "r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1";
+        let mcr = "r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1";
         let fsf = "rw6wr/clbnqknbla/pppppppppp/10/10/10/10/PPPPPPPPPP/CLBNQKNBLA/RW6WR w - - 0 1";
-        assert_eq!(fen_to_fsf(mce), fsf);
+        assert_eq!(fen_to_fsf(mcr), fsf);
         // Trailing fields (including an `e3`-shaped en-passant token) are untouched:
         // only placement letters map.
         let out = fen_to_fsf("k9/10/10/10/10/10/10/10/10/K9 b - e3 1 9");

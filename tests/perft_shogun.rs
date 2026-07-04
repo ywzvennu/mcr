@@ -4,9 +4,9 @@
 //! over the standard chess army.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Shogun::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Shogun::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! shogun`, with FSF's `variants.ini` loaded) running `go perft` on the
-//! byte-identical position — the FSF divide matches mce's move-for-move, including
+//! byte-identical position — the FSF divide matches mcr's move-for-move, including
 //! the optional `+` promotions on a move starting or ending in the far three-rank
 //! zone, the promotion cap (one Centaur / Archbishop / Chancellor / Queen apiece),
 //! the crazyhouse hand fed by captures (a captured promoted piece banked as its
@@ -23,8 +23,8 @@
 //! rnb+fkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB+FKBNR[] w KQkq - 0 1
 //! ```
 //!
-//! where `+f` / `+F` is a **promoted Fers** that moves as a Queen. mce represents
-//! it with the [`Queen`](mce::geometry::WideRole::Queen) token, so its canonical
+//! where `+f` / `+F` is a **promoted Fers** that moves as a Queen. mcr represents
+//! it with the [`Queen`](mcr::geometry::WideRole::Queen) token, so its canonical
 //! start FEN is exactly the standard chess array with an empty holdings bracket:
 //!
 //! ```text
@@ -55,9 +55,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shogun -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Shogun};
+use mcr::geometry::{perft as gperft, Chess8x8, Shogun};
 
-/// The Shogun starting FEN in mce's dialect, confirmed against FSF's
+/// The Shogun starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant shogun` / `position startpos`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1";
 
@@ -69,13 +69,13 @@ const POS_A: &str = "r3k3/8/4N3/8/8/8/8/3RK3[NPbp] w - - 0 1";
 /// The promotion cap: a White Centaur (promoted Knight) on a1 already fills the
 /// `g:1` cap, while a White Knight sits on e6 inside the promotion zone. Because
 /// the cap is reached, that Knight's zone moves offer **only** the non-promoting
-/// form — no second Centaur. mce writes the Centaur with its Kheshig token `W`. A
+/// form — no second Centaur. mcr writes the Centaur with its Kheshig token `W`. A
 /// companion Knight rides each hand to keep the drop region live.
 const POS_B: &str = "6k1/8/4N3/8/8/8/8/W5K1[Nn] w - - 0 1";
 
 /// Captures feeding the hand: a natural-game midgame after `1.e4 e5 2.d4 d5` with
 /// the centre pawns in mutual contact and a Pawn already in each hand. The d-file
-/// "queens" are the start array's promoted Fers (mce `q`), so a queen capture banks
+/// "queens" are the start array's promoted Fers (mcr `q`), so a queen capture banks
 /// a Met (fers) — exercising the crazyhouse hand together with the live drops.
 const POS_C: &str = "rnbqkbnr/ppp2ppp/8/3pp3/3PP3/8/PPP2PPP/RNBQKBNR[Pp] w KQkq - 0 4";
 
