@@ -6,7 +6,7 @@
 //! so the harness can skip gracefully and print install instructions.
 //!
 //! Resolution order:
-//! 1. `$MCE_FSF_BIN` (or `$FAIRY_STOCKFISH`) pointing at an executable;
+//! 1. `$MCR_FSF_BIN` (or `$FAIRY_STOCKFISH`) pointing at an executable;
 //! 2. a `fairy-stockfish` / `fairystockfish` on `PATH`;
 //! 3. a previously built binary under the crate's `build/` dir;
 //! 4. (only with `--build`) shallow-fetch of a **pinned** FSF commit (see
@@ -46,11 +46,11 @@ const FSF_REPO: &str = "https://github.com/fairy-stockfish/Fairy-Stockfish";
 /// # Why pin
 ///
 /// FSF is this crate's live differential oracle. Cloning `master --depth 1`
-/// tracks a moving target: the same unmodified mce main can pass one day and, on
-/// the next rebuild, disagree — not because mce changed, but because upstream FSF
+/// tracks a moving target: the same unmodified mcr main can pass one day and, on
+/// the next rebuild, disagree — not because mcr changed, but because upstream FSF
 /// did. Pinning makes the oracle reproducible: the same commit gives the same
 /// verdict for everyone, forever, and any real change of verdict is then a change
-/// in *mce*, which is what we want to catch.
+/// in *mcr*, which is what we want to catch.
 ///
 /// # Why this commit
 ///
@@ -60,12 +60,12 @@ const FSF_REPO: &str = "https://github.com/fairy-stockfish/Fairy-Stockfish";
 /// (`fb78cb5`, the `020726 LB` build) is a pure GitHub-Actions dependabot bump
 /// (`.github/workflows/*.yml` only — verified `git diff --name-only 1b5bdd4
 /// fb78cb5` lists no `src/` or `variants.ini` file), so it is byte-for-byte
-/// identical in chess behaviour. This commit's variant rules match mce's
+/// identical in chess behaviour. This commit's variant rules match mcr's
 /// validated perft pins, and the full differential-fuzz sweep (seeds 1–3,
 /// 8 games × 60 plies, every variant) reports **0 divergences** against it once
-/// the two documented non-mce/known cases are accounted for: the Empire FSF
+/// the two documented non-mcr/known cases are accounted for: the Empire FSF
 /// castle artifact (skipped node — see `difffuzz::is_empire_no_queenside_castle_artifact`,
-/// mce is correct) and the Tori pheasant pin bug held back for follow-up (see
+/// mcr is correct) and the Tori pheasant pin bug held back for follow-up (see
 /// `difffuzz::HELD_BACK`). Health check for a fresh build: xiangqi `perft 3`
 /// = 79666.
 ///
@@ -94,7 +94,7 @@ fn prebuilt_candidates() -> Vec<PathBuf> {
 /// binary, or `Err` with a human-readable reason it could not be found.
 pub fn locate(allow_build: bool) -> Result<Located, String> {
     // 1. Environment override.
-    for var in ["MCE_FSF_BIN", "FAIRY_STOCKFISH"] {
+    for var in ["MCR_FSF_BIN", "FAIRY_STOCKFISH"] {
         if let Ok(p) = std::env::var(var) {
             if !p.is_empty() && is_executable(Path::new(&p)) {
                 return Ok(Located {
@@ -131,7 +131,7 @@ pub fn locate(allow_build: bool) -> Result<Located, String> {
     }
 
     Err(
-        "no fairy-stockfish binary found (set $MCE_FSF_BIN, put it on PATH, or pass --build)"
+        "no fairy-stockfish binary found (set $MCR_FSF_BIN, put it on PATH, or pass --build)"
             .to_string(),
     )
 }
@@ -243,8 +243,8 @@ pub const INSTALL_HELP: &str = "\
 Fairy-Stockfish was not found. To run the comparison, provide its UCI binary by
 ONE of:
 
-  * Set MCE_FSF_BIN to an existing fairy-stockfish executable:
-        MCE_FSF_BIN=/path/to/fairy-stockfish cargo run --release
+  * Set MCR_FSF_BIN to an existing fairy-stockfish executable:
+        MCR_FSF_BIN=/path/to/fairy-stockfish cargo run --release
 
   * Put `fairy-stockfish` (or `fairystockfish`) on your PATH.
 
@@ -258,5 +258,5 @@ ONE of:
         cd Fairy-Stockfish
         git checkout 1b5bdd40499bd5c7417bdc532d52fef8847bdf3f
         cd src && make -j build ARCH=x86-64 largeboards=yes
-        MCE_FSF_BIN=$PWD/stockfish cargo run --release
+        MCR_FSF_BIN=$PWD/stockfish cargo run --release
 ";

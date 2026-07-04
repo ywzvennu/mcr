@@ -201,7 +201,7 @@ impl Position {
     /// does not end the game on its own.
     ///
     /// ```
-    /// use mce::{Outcome, Color, Position};
+    /// use mcr::{Outcome, Color, Position};
     /// // Fool's mate: 1.f3 e5 2.g4 Qh4#, white to move and mated.
     /// let pos =
     ///     Position::from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3")
@@ -275,7 +275,7 @@ pub fn is_repetition(history: &[Zobrist], key: Zobrist, threshold: usize) -> boo
 /// validates legality and records the key of the resulting position.
 ///
 /// ```
-/// use mce::{Game, Outcome};
+/// use mcr::{Game, Outcome};
 /// let mut game = Game::from_startpos();
 /// // Shuffle knights back and forth; the start position recurs.
 /// for uci in ["g1f3", "g8f6", "f3g1", "f6g8"] {

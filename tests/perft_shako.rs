@@ -4,7 +4,7 @@
 //! cannon-attack primitive future Xiangqi/Janggi inherit.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Shako::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Shako::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant shako`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/shako.rs`); this test pins the
@@ -16,23 +16,23 @@
 //!
 //! ```text
 //! FSF dialect: c8c/ernbqkbnre/pppppppppp/10/10/10/10/PPPPPPPPPP/ERNBQKBNRE/C8C w KQkq - 0 1
-//! mce dialect: c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1
+//! mcr dialect: c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1
 //! ```
 //!
 //! The two differ only in the elephant's letter: FSF spells the Fers-Alfil
-//! elephant `e`, but mce already uses `e` for the Rook+Knight Elephant (the
+//! elephant `e`, but mcr already uses `e` for the Rook+Knight Elephant (the
 //! Capablanca/Grand marshal), so the Shako elephant takes the free letter `v`
-//! ([`WideRole::FersAlfil`](mce::geometry::WideRole::FersAlfil)). The cannon is
-//! `c`/`C` ([`WideRole::Cannon`](mce::geometry::WideRole::Cannon)) in both. The
+//! ([`WideRole::FersAlfil`](mcr::geometry::WideRole::FersAlfil)). The cannon is
+//! `c`/`C` ([`WideRole::Cannon`](mcr::geometry::WideRole::Cannon)) in both. The
 //! cannons sit in the four corners; the king is on the f-file (file 5) with the
 //! castling rooks on the b/i files, all on rank 2 (white) / rank 9 (black).
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shako -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Grand10x10, Shako};
+use mcr::geometry::{perft as gperft, Grand10x10, Shako};
 
-/// The Shako starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Shako starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant shako`.
 const STARTPOS: &str =
     "c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1";
@@ -64,8 +64,8 @@ const CANNON_CHECK_FILE: &str =
 /// castles are legal. Exercises the rank-2 [`castle_rank`] / [`castle_dest_files`]
 /// geometry. FSF-confirmed.
 ///
-/// [`castle_rank`]: mce::geometry::WideVariant::castle_rank
-/// [`castle_dest_files`]: mce::geometry::WideVariant::castle_dest_files
+/// [`castle_rank`]: mcr::geometry::WideVariant::castle_rank
+/// [`castle_dest_files`]: mcr::geometry::WideVariant::castle_dest_files
 const CASTLING: &str = "c8c/vr3k2rv/pppppppppp/10/10/10/10/PPPPPPPPPP/VR3K2RV/C8C w KQkq - 0 1";
 
 /// A promotion position, white to move: a white pawn on b9 promotes on b10 to any
@@ -77,7 +77,7 @@ const PROMO: &str = "5k4/1P8/10/10/10/10/10/10/10/5K3C w - - 0 1";
 /// Cannon-aware castling king-walk regression (issue #335), white to move. The
 /// white king is home on f2 and the queenside castle f2 -> d2 must walk across
 /// e2, which is attacked by the black cannon on e5 **over the white knight on e3
-/// as its screen**. FSF forbids that castle; mce used to allow it because its
+/// as its screen**. FSF forbids that castle; mcr used to allow it because its
 /// king-walk danger map was built by *forward*-projecting each enemy piece, and a
 /// cannon's forward projection lands its over-screen capture on the first
 /// *occupied* square beyond the screen (here e1, not the empty transit square e2).
@@ -164,7 +164,7 @@ fn promotion_cheap() {
 
 #[test]
 fn cannon_castle_king_walk_335() {
-    // FSF shako `go perft`: 67 / 4160 / 268485. mce previously reported 68 at
+    // FSF shako `go perft`: 67 / 4160 / 268485. mcr previously reported 68 at
     // depth 1 (a spurious `f2d2` castle across the cannon-attacked e2 transit
     // square).
     check(CANNON_CASTLE_335, &[(1, 67), (2, 4160), (3, 268485)]);

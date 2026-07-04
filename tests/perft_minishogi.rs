@@ -4,7 +4,7 @@
 //! machinery with one of every piece per side and **no Knight or Lance**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Minishogi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Minishogi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant minishogi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/minishogi.rs`); this test pins the
@@ -18,7 +18,7 @@
 //! rbsgk/4p/5/P4/KGSBR[-] w - - 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket (its hand is
+//! mcr renders the same position with an empty `[]` holdings bracket (its hand is
 //! empty at the start). The piece letters coincide with FSF's — `s g k r b p`
 //! and the `+`-prefixed promoted forms `+P +S +R +B` — so no FEN dialect rewrite
 //! is needed. The FSF-confirmed startpos perft sequence is
@@ -34,14 +34,14 @@
 //! ## Note on *uchifuzume* (no pawn-drop mate)
 //!
 //! As with Shogi (#190), **FSF's `minishogi` perft does not enforce uchifuzume**
-//! — it lists a pawn drop even when it gives mate — so mce, validated
+//! — it lists a pawn drop even when it gives mate — so mcr, validated
 //! node-for-node against FSF, does not filter it either. The `nifu` case pins the
 //! **nifu** filter (no second unpromoted pawn on a file); a Tokin does not count.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_minishogi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Minishogi, Minishogi5x5};
+use mcr::geometry::{perft as gperft, Minishogi, Minishogi5x5};
 
 /// The Minishogi starting FEN, confirmed against Fairy-Stockfish's `UCI_Variant
 /// minishogi`. The hand is empty (`[]`).

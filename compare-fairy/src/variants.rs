@@ -1,14 +1,14 @@
-//! Variant name + FEN-dialect mapping between mce and Fairy-Stockfish (FSF).
+//! Variant name + FEN-dialect mapping between mcr and Fairy-Stockfish (FSF).
 //!
-//! mce and FSF agree on the *positions* but spell them slightly differently.
-//! This module maps the mce [`VariantId`] to FSF's `UCI_Variant` name and the
-//! `UCI_Chess960` flag, and rewrites an mce FEN into the dialect FSF parses so
+//! mcr and FSF agree on the *positions* but spell them slightly differently.
+//! This module maps the mcr [`VariantId`] to FSF's `UCI_Variant` name and the
+//! `UCI_Chess960` flag, and rewrites an mcr FEN into the dialect FSF parses so
 //! the two engines run the byte-identical position.
 //!
 //! Reconciled dialect differences:
 //!
 //! * **three-check** — both engines use Lichess *remaining-checks* `W+B`
-//!   semantics, but place the field differently. mce appends it after the
+//!   semantics, but place the field differently. mcr appends it after the
 //!   fullmove number (`… 0 1 3+3`); FSF expects it as the field right after en
 //!   passant (`… - 3+3 0 1`). We relocate the token.
 //! * **chess960** — FSF needs `UCI_Variant fischerandom` and `UCI_Chess960
@@ -19,9 +19,9 @@
 //! * **atomic / king-of-the-hill / racing-kings / antichess / horde /
 //!   standard** — identical FEN; only the variant name differs.
 
-use mce::VariantId;
+use mcr::VariantId;
 
-/// The FSF-side description of an mce variant: the `UCI_Variant` name and
+/// The FSF-side description of an mcr variant: the `UCI_Variant` name and
 /// whether `UCI_Chess960` must be set.
 #[derive(Debug, Clone, Copy)]
 pub struct FsfVariant {
@@ -31,10 +31,10 @@ pub struct FsfVariant {
     pub chess960: bool,
 }
 
-/// Map an mce [`VariantId`] to its FSF `UCI_Variant` name + Chess960 flag.
+/// Map an mcr [`VariantId`] to its FSF `UCI_Variant` name + Chess960 flag.
 ///
 /// Returns `None` for variants FSF does not share (there are none in the
-/// current mce set, but the signature keeps the door open).
+/// current mcr set, but the signature keeps the door open).
 pub fn to_fsf(id: VariantId) -> Option<FsfVariant> {
     let v = match id {
         VariantId::Standard => FsfVariant {
@@ -79,7 +79,7 @@ pub fn to_fsf(id: VariantId) -> Option<FsfVariant> {
     Some(v)
 }
 
-/// Rewrite an mce-dialect FEN into the FSF dialect for `id`.
+/// Rewrite an mcr-dialect FEN into the FSF dialect for `id`.
 ///
 /// All variants except three-check pass through unchanged. For three-check the
 /// trailing `W+B` remaining-checks token is moved to the FSF position (right
@@ -93,7 +93,7 @@ pub fn fen_to_fsf(id: VariantId, fen: &str) -> String {
 
 /// Move the Lichess trailing `W+B` check field into FSF's after-en-passant slot.
 ///
-/// mce:  `<board> <stm> <castle> <ep> <half> <full> <W+B>`
+/// mcr:  `<board> <stm> <castle> <ep> <half> <full> <W+B>`
 /// FSF:  `<board> <stm> <castle> <ep> <W+B> <half> <full>`
 ///
 /// If the input does not carry a trailing `W+B` token (already FSF-shaped, or no
@@ -136,8 +136,8 @@ mod tests {
 
     #[test]
     fn three_check_token_relocates() {
-        let mce = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 3+3";
-        let fsf = three_check_fen_to_fsf(mce);
+        let mcr = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 3+3";
+        let fsf = three_check_fen_to_fsf(mcr);
         assert_eq!(
             fsf,
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 3+3 0 1"
@@ -146,8 +146,8 @@ mod tests {
 
     #[test]
     fn three_check_nondefault_counter_relocates() {
-        let mce = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 9 1+2";
-        let fsf = three_check_fen_to_fsf(mce);
+        let mcr = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 9 1+2";
+        let fsf = three_check_fen_to_fsf(mcr);
         assert_eq!(
             fsf,
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 1+2 5 9"

@@ -9,7 +9,7 @@
 //! truncates that node).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Xiangfu` perft and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Xiangfu` perft and by Fairy-Stockfish (FSF, `UCI_Variant
 //! xiangfu`, loaded from a `variants.ini` defining the pychess `[xiangfu]` variant)
 //! running `go perft` on the byte-identical position. The `compare-fairy/` harness
 //! re-runs that head-to-head on demand (`compare-fairy/src/xiangfu.rs`); this test
@@ -25,7 +25,7 @@
 //! ```
 //!
 //! with FSF's letters `r b m c w n` (Chariot, Bishop, Mahout, Cannon, Crossbow,
-//! Horse) and the promoted commoner `+g` (Champion). mce reuses `r`/`b`/`c`
+//! Horse) and the promoted commoner `+g` (Champion). mcr reuses `r`/`b`/`c`
 //! (Rook / Bishop / Cannon) and spells the Horse `j`, the Crossbow `=c`
 //! (BishopCannon), the Mahout `=m`, and the Champion `=k`; its canonical start FEN
 //! is
@@ -40,9 +40,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_xiangfu -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Shogi9x9, Xiangfu};
+use mcr::geometry::{perft as gperft, Shogi9x9, Xiangfu};
 
-/// The Xiang Fu starting FEN in mce's dialect, confirmed against FSF's
+/// The Xiang Fu starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant xiangfu` / `position startpos`.
 const STARTPOS: &str = "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - - 0 1";
 
@@ -52,7 +52,7 @@ const STARTPOS: &str = "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - 
 /// asymmetric tempo. (FSF `2rbm4/2cwn4/2+g1+g4/9/9/9/2N1+G1+G2/5WC2/4MBR2 b`.)
 const MIDGAME_A: &str = "2rb=m4/2c=cj4/2=k1=k4/9/9/9/2J1=K1=K2/5=CC2/4=MBR2[] b - - 2 1";
 
-/// A drops position: each side holds a captured **Pupil** in hand (mce `*U`/`*u`,
+/// A drops position: each side holds a captured **Pupil** in hand (mcr `*U`/`*u`,
 /// FSF `G`/`g`), exercising the captures-to-hand drop generation onto the first two
 /// ranks under the pseudo-royal legality filter. (FSF
 /// `2rbm4/2cwn4/2+g1+g4/9/9/9/4+G1+G2/4NWC2/4MBR2[Gg] w`.)
@@ -70,7 +70,7 @@ const DUPLE: &str = "2rb=m4/2c=cj4/2=k6/4=k4/9/4=K4/6=K2/4J=CC2/4=MBR2[] w - - 3
 /// Every number here also matched FSF `xiangfu` `go perft` on the same FEN.
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Xiangfu::from_fen(fen).expect("valid Xiang Fu FEN");
-    // The FEN round-trips through mce's overflow-token + hand I/O.
+    // The FEN round-trips through mcr's overflow-token + hand I/O.
     assert_eq!(pos.to_fen(), fen, "Xiang Fu FEN round-trips: {fen}");
     for &(depth, expected) in cases {
         let got = gperft::<Shogi9x9, _>(&pos, depth);

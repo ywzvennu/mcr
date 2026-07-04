@@ -1,4 +1,4 @@
-//! `mce perft` — walk the legal-move tree to a fixed depth and count leaf nodes.
+//! `mcr perft` — walk the legal-move tree to a fixed depth and count leaf nodes.
 //!
 //! Perft is the standard correctness/speed check for a move generator: the node
 //! count for a position and depth is a fixed number every correct engine must
@@ -10,7 +10,7 @@ use clap::Args;
 
 use crate::util::{self, CliResult};
 
-/// Arguments for `mce perft <FEN|startpos> <depth>`.
+/// Arguments for `mcr perft <FEN|startpos> <depth>`.
 #[derive(Debug, Args)]
 pub struct PerftArgs {
     /// Start position: a six-field FEN, or `startpos` for the standard opening.
@@ -46,10 +46,10 @@ pub fn run(args: PerftArgs) -> CliResult {
 
 /// Standard-chess perft, with full access to `perft` / `perft_divide` / the
 /// optional `perft_parallel`.
-fn run_standard(pos: &mce::Position, depth: u32, divide: bool, parallel: bool) {
+fn run_standard(pos: &mcr::Position, depth: u32, divide: bool, parallel: bool) {
     if divide {
         let mut total = 0;
-        for (mv, count) in mce::perft_divide(pos, depth) {
+        for (mv, count) in mcr::perft_divide(pos, depth) {
             println!("{}: {count}", mv.to_uci());
             total += count;
         }
@@ -64,11 +64,11 @@ fn run_standard(pos: &mce::Position, depth: u32, divide: bool, parallel: bool) {
 
 /// Runs the whole-tree count, choosing the parallel counter when asked for and
 /// available.
-fn total_perft(pos: &mce::Position, depth: u32, parallel: bool) -> u64 {
+fn total_perft(pos: &mcr::Position, depth: u32, parallel: bool) -> u64 {
     if parallel {
         #[cfg(feature = "parallel")]
         {
-            return mce::perft_parallel(pos, depth);
+            return mcr::perft_parallel(pos, depth);
         }
         #[cfg(not(feature = "parallel"))]
         {
@@ -78,14 +78,14 @@ fn total_perft(pos: &mce::Position, depth: u32, parallel: bool) -> u64 {
             );
         }
     }
-    mce::perft(pos, depth)
+    mcr::perft(pos, depth)
 }
 
 /// Variant perft. `AnyVariant` exposes a whole-tree `perft` but no divide, so the
 /// per-root-move breakdown is built here by playing each root move and counting
 /// one ply shallower. There is no parallel entry point on `AnyVariant`, so
 /// `--parallel` is a no-op (noted) here.
-fn run_variant(pos: &mce::AnyVariant, depth: u32, divide: bool, parallel: bool) {
+fn run_variant(pos: &mcr::AnyVariant, depth: u32, divide: bool, parallel: bool) {
     if parallel {
         eprintln!("note: --parallel has no effect for variants; using the serial counter");
     }

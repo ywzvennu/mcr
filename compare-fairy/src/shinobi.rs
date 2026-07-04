@@ -1,31 +1,31 @@
 //! Shinobi differential perft + timing against Fairy-Stockfish (issue #213).
 //!
-//! Shinobi runs on mce's **generic** engine (`mce::geometry::Shinobi`, a
+//! Shinobi runs on mcr's **generic** engine (`mcr::geometry::Shinobi`, a
 //! `GenericPosition<Chess8x8, ShinobiRules>`), like the other fairy variants, so
 //! it has its own corpus and comparison loop here. The FSF side selects
 //! `UCI_Variant shinobi`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput.
+//! match, and reports mcr-vs-FSF throughput.
 //!
 //! ## Not a built-in: variants.ini
 //!
 //! Unlike the other variants here, `shinobi` is **not** an FSF built-in — it is
 //! defined in FSF's `variants.ini`. The suite `load`s a `variants.ini` resolved
-//! from `$MCE_FSF_VARIANTS_INI` before checking the variant (mirroring the
+//! from `$MCR_FSF_VARIANTS_INI` before checking the variant (mirroring the
 //! Synochess / Orda suites), after which `has_variant("shinobi")` is true. If the
 //! env var is unset or the binary still lacks `shinobi`, the block skips
 //! gracefully.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same Shinobi position with **different clan-piece
+//! mcr and FSF render the same Shinobi position with **different clan-piece
 //! tokens**. FSF's `shinobi` uses `c d h j` (Commoner, Bers, Shogi Knight,
-//! Archbishop). mce reuses `c`/`h` for its Cannon / Hoplite roles, so the Commoner
+//! Archbishop). mcr reuses `c`/`h` for its Cannon / Hoplite roles, so the Commoner
 //! and Shogi Knight are **overflow** roles spelled with the `*` prefix and a
 //! recycled base letter: Commoner `*u` (recycling the Advisor's `u`), Shogi Knight
 //! `*n` (recycling the Knight's `n`); the Archbishop is the Hawk `a` (= B+N). The
 //! Bers `d` (= Spartan General, Rook + Ferz), the Fers `m` (= Met), the Lance `l`,
 //! and every standard piece already share FSF's letters. [`to_fsf_dialect`] maps
-//! mce's `*u → c`, `*n → h`, `a → j` over the whole FEN (board and the `[..]` hand
+//! mcr's `*u → c`, `*n → h`, `a → j` over the whole FEN (board and the `[..]` hand
 //! bracket). The standard Black army and the structural fields carry none of the
 //! remapped tokens, so the swap is unambiguous. The comparison asserts only node
 //! counts, so the move-string dialect never matters.
@@ -35,11 +35,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Shinobi};
+use mcr::geometry::{perft as gperft, Chess8x8, Shinobi};
 
 use crate::uci::Engine;
 
-/// One Shinobi corpus position. The FEN is mce's dialect; the FSF side translates
+/// One Shinobi corpus position. The FEN is mcr's dialect; the FSF side translates
 /// it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -78,10 +78,10 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Translates an mce-dialect Shinobi FEN to FSF's dialect by mapping the clan
+/// Translates an mcr-dialect Shinobi FEN to FSF's dialect by mapping the clan
 /// piece tokens to FSF's letters: Commoner `*U`/`*u → C`/`c`, Shogi Knight
 /// `*N`/`*n → H`/`h`, Archbishop `A`/`a → J`/`j`. The Commoner and Shogi Knight
-/// are mce **overflow** roles, written with the `*` prefix and a recycled base
+/// are mcr **overflow** roles, written with the `*` prefix and a recycled base
 /// letter (`u` / `n`); FSF spells them as single letters, so the `*`-prefixed
 /// two-char tokens are rewritten first, then the single-letter Archbishop. Bers
 /// `d`/`D`, Fers `m`/`M`, Lance `l`/`L`, King `k`/`K` and the standard army carry
@@ -122,17 +122,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -145,15 +145,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Shinobi corpus through mce and FSF. Returns the number of mismatches
+/// Run the Shinobi corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched). Prints a table and a one-line summary. If the FSF
 /// binary does not advertise the `shinobi` variant (no `variants.ini` loaded), the
 /// whole block is skipped (returns 0) rather than reporting spurious mismatches.
@@ -162,11 +162,11 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     println!("Shinobi — generic engine vs FSF UCI_Variant shinobi (issue #213):");
 
     // Shinobi is an INI variant (not an FSF built-in): load FSF's variants.ini
-    // from `$MCE_FSF_VARIANTS_INI` before checking for the variant, mirroring the
+    // from `$MCR_FSF_VARIANTS_INI` before checking for the variant, mirroring the
     // Synochess suite. Skip gracefully if it is unset or still lacks `shinobi`.
-    let ini = std::env::var("MCE_FSF_VARIANTS_INI").unwrap_or_default();
+    let ini = std::env::var("MCR_FSF_VARIANTS_INI").unwrap_or_default();
     if ini.is_empty() {
-        println!("  SKIP: set $MCE_FSF_VARIANTS_INI to an FSF variants.ini defining `shinobi`.");
+        println!("  SKIP: set $MCR_FSF_VARIANTS_INI to an FSF variants.ini defining `shinobi`.");
         return 0;
     }
     if let Err(e) = engine.load_variants(&ini) {
@@ -179,7 +179,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
     let head = format!(
         "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -198,10 +198,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -214,16 +214,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
 
     // Node-weighted aggregate throughput.
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "shinobi OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "shinobi OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -236,21 +236,21 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Shinobi parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH shinobi/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH shinobi/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Shinobi position through mce's generic perft and FSF's `go perft`.
+/// Run one Shinobi position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    // mce side: the generic Shinobi position (mce dialect).
-    let pos = Shinobi::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side: the generic Shinobi position (mcr dialect).
+    let pos = Shinobi::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: translate the clan piece letters to FSF's dialect.
     let fsf_fen = to_fsf_dialect(case.fen);
@@ -262,10 +262,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -302,13 +302,13 @@ mod tests {
         }
     }
 
-    /// The dialect swap rewrites mce's overflow clan tokens (`*u`/`*n`) and the
+    /// The dialect swap rewrites mcr's overflow clan tokens (`*u`/`*n`) and the
     /// Archbishop (`a`) to FSF's single letters, and leaves the standard army, the
     /// shared clan letters (`d m l`), and the structural fields untouched.
     #[test]
     fn dialect_swap_maps_clan_letters() {
-        let mce = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/L*N1*UK1*NL[L*NMMDA] w kq - 0 1";
-        let fsf = to_fsf_dialect(mce);
+        let mcr = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/L*N1*UK1*NL[L*NMMDA] w kq - 0 1";
+        let fsf = to_fsf_dialect(mcr);
         assert_eq!(
             fsf,
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/LH1CK1HL[LHMMDJ] w kq - 0 1"

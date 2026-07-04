@@ -5,7 +5,7 @@
 //! promotion zone).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Micro::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Micro::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant micro`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. This test pins the FSF-confirmed numbers so a
 //! regression is caught even without FSF present.
@@ -18,7 +18,7 @@
 //! kb+r+l/p3/4/3P/+L+RBK[] w - - 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket (its hand is
+//! mcr renders the same position with an empty `[]` holdings bracket (its hand is
 //! empty at the start). The piece letters coincide with FSF's — `k b r l p` and
 //! the `+`-prefixed promoted forms `+R +L +P` — so no FEN dialect rewrite is
 //! needed. The FSF-confirmed startpos perft sequence is
@@ -41,12 +41,12 @@
 //! case, with every base role in each hand, pins the drop-heavy move set.
 //!
 //! As with Shogi (#190), FSF's `micro` perft does **not** enforce *uchifuzume*, so
-//! mce does not filter a mating pawn drop either.
+//! mcr does not filter a mating pawn drop either.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_micro -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Micro, Micro4x5};
+use mcr::geometry::{perft as gperft, Micro, Micro4x5};
 
 /// The Micro Shogi starting FEN, confirmed against Fairy-Stockfish's
 /// `UCI_Variant micro`. The Rook and Lance start pre-promoted; the hand is empty.

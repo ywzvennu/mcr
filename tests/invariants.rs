@@ -24,20 +24,20 @@
 //! # Invariants checked
 //!
 //! 1. **make/unmake round-trip (byte-for-byte).** For every legal move at every
-//!    visited node, [`apply_with_undo`](mce::geometry::GenericPosition::apply_with_undo)
-//!    reaches exactly the [`play`](mce::geometry::GenericPosition::play) successor,
-//!    and the matching [`undo`](mce::geometry::GenericPosition::undo) restores the
+//!    visited node, [`apply_with_undo`](mcr::geometry::GenericPosition::apply_with_undo)
+//!    reaches exactly the [`play`](mcr::geometry::GenericPosition::play) successor,
+//!    and the matching [`undo`](mcr::geometry::GenericPosition::undo) restores the
 //!    prior position **byte-for-byte** — the [`Board`], the whole
 //!    [`GenericState`] (side, castling, en passant, gating reserves/eligibility,
 //!    Duck, placement pocket, both clocks, the Janggi consecutive-pass counter,
 //!    and the Alice plane mask), and the position **hash**. Equality is asserted
 //!    over the public `board() == board()`, `state() == state()`, and
-//!    `zobrist() == zobrist()`; the from-scratch [`zobrist`](mce::geometry::GenericPosition::zobrist)
+//!    `zobrist() == zobrist()`; the from-scratch [`zobrist`](mcr::geometry::GenericPosition::zobrist)
 //!    folds in the crazyhouse promoted mask, so the triple is a complete
 //!    byte-for-byte check.
 //!
 //! 2. **FEN round-trip.** For every reachable position, `to_fen` is a fixed point:
-//!    `parse(fen(p)).fen() == fen(p)`, in the mce FEN dialect (overflow letters,
+//!    `parse(fen(p)).fen() == fen(p)`, in the mcr FEN dialect (overflow letters,
 //!    hand `[..]` brackets, gating, `~` promotion marks). For every variant whose
 //!    FEN is **lossless** (all but Alice — see below) the re-parse also reproduces
 //!    the position **hash** (`zobrist(parse(fen(p))) == zobrist(p)`), the strict
@@ -67,7 +67,7 @@
 //! # The Alice FEN caveat (documented, not a bug)
 //!
 //! Alice chess plays over two mirror boards; a piece's plane rides in the
-//! [`GenericState::board_b`](mce::geometry::GenericState) mask, and mce
+//! [`GenericState::board_b`](mcr::geometry::GenericState) mask, and mcr
 //! deliberately reuses the **standard** FEN, which cannot express plane
 //! membership — a re-parse returns every piece to plane A (documented in
 //! `src/geometry/variants/alice.rs`). So Alice's FEN is lossy for any position with
@@ -78,7 +78,7 @@
 
 use std::collections::BTreeSet;
 
-use mce::geometry::{
+use mcr::geometry::{
     Alice, Almost, Amazon, AnyWideVariant, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
     Capahouse, Chak, Chennis, Chigorin, Dobutsu, Dragon, Duck, Embassy, Empire, FogOfWar,
     GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus,

@@ -2,7 +2,7 @@
 //! with the Queen replaced by an Amazon (Queen + Knight).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Amazon::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Amazon::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant amazon`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` differential fuzzer re-runs the head-to-head on demand
 //! (`--difffuzz --variant amazon`); this test pins the FSF-confirmed numbers so a
@@ -12,18 +12,18 @@
 //!
 //! ```text
 //! FSF dialect: rnbakbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBAKBNR w KQkq - 0 1
-//! mce dialect: rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1
+//! mcr dialect: rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1
 //! ```
 //!
 //! The two are the same position; the amazon is `a` in FSF and the second-bank
-//! overflow `**a` (the [`WideRole::Angel`] Queen + Knight compound) in mce.
+//! overflow `**a` (the [`WideRole::Angel`] Queen + Knight compound) in mcr.
 //!
 //! The deep layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_amazon -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Amazon, Chess8x8};
+use mcr::geometry::{perft as gperft, Amazon, Chess8x8};
 
-/// The Amazon Chess starting FEN (mce dialect), confirmed against FSF's
+/// The Amazon Chess starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant amazon`.
 const STARTPOS: &str = "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1";
 

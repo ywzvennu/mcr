@@ -1,20 +1,20 @@
-//! # mce-c — C ABI bindings for the `mce` chess engine
+//! # mcr-c — C ABI bindings for the `mcr` chess rules library
 //!
-//! A flat `extern "C"` surface over an **opaque handle** ([`McePosition`]) that
-//! wraps an [`mce::AnyVariant`]. It lets C / C++ tools and GUIs embed the
+//! A flat `extern "C"` surface over an **opaque handle** ([`McrPosition`]) that
+//! wraps an [`mcr::AnyVariant`]. It lets C / C++ tools and GUIs embed the
 //! engine's rules and move generation without naming any Rust type.
 //!
 //! ## Ownership / memory rules
 //!
-//! - A `McePosition*` returned by [`mce_position_new_from_fen`] or
-//!   [`mce_position_startpos`] is **owned by the caller**. The caller must
-//!   release it with exactly one call to [`mce_position_free`]. Passing the same
+//! - A `McrPosition*` returned by [`mcr_position_new_from_fen`] or
+//!   [`mcr_position_startpos`] is **owned by the caller**. The caller must
+//!   release it with exactly one call to [`mcr_position_free`]. Passing the same
 //!   pointer to `free` twice, or freeing a pointer not produced by this library,
-//!   is undefined behavior. `mce_position_free(NULL)` is a documented no-op.
+//!   is undefined behavior. `mcr_position_free(NULL)` is a documented no-op.
 //! - All other functions **borrow** the handle and never take ownership; the
 //!   caller keeps it alive for the duration of the call and frees it later.
 //!   Positions are *immutable* once built except through
-//!   [`mce_position_play_uci`], which mutates the handle in place (it advances
+//!   [`mcr_position_play_uci`], which mutates the handle in place (it advances
 //!   the position by one ply).
 //! - `const char*` inputs (`fen`, `variant`, `uci`) must be valid,
 //!   NUL-terminated C strings; they are only read, never retained or freed by
@@ -22,8 +22,8 @@
 //!
 //! ## Buffer / output-string contract
 //!
-//! The string-producing functions ([`mce_position_to_fen`],
-//! [`mce_position_legal_moves`]) follow one uniform two-call contract:
+//! The string-producing functions ([`mcr_position_to_fen`],
+//! [`mcr_position_legal_moves`]) follow one uniform two-call contract:
 //!
 //! - They write into a caller-provided `char* buf` of `size_t buflen` bytes and
 //!   **return the number of bytes the full string needs *including* the NUL
@@ -39,9 +39,9 @@
 //! Typical usage from C:
 //!
 //! ```c
-//! size_t need = mce_position_to_fen(pos, NULL, 0);
+//! size_t need = mcr_position_to_fen(pos, NULL, 0);
 //! char *buf = malloc(need);
-//! mce_position_to_fen(pos, buf, need);
+//! mcr_position_to_fen(pos, buf, need);
 //! ```
 //!
 //! ## Panic safety
@@ -53,31 +53,31 @@
 
 // This is the FFI boundary crate: `unsafe` is unavoidable here (extern "C" and
 // raw pointers). It is allowed locally and confined to this crate; every block
-// carries a `// SAFETY:` comment. The core `mce` crate stays unsafe-free.
+// carries a `// SAFETY:` comment. The core `mcr` crate stays unsafe-free.
 #![allow(clippy::missing_safety_doc)]
 
 use std::ffi::{c_char, c_int, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
-use mce::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
-use mce::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
+use mcr::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
+use mcr::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
 
 /// Opaque handle to a chess position of a runtime-chosen variant.
 ///
-/// C code only ever holds a `McePosition*`; the layout is private. Create one
-/// with [`mce_position_startpos`] / [`mce_position_new_from_fen`] and release it
-/// with [`mce_position_free`].
-pub struct McePosition {
+/// C code only ever holds a `McrPosition*`; the layout is private. Create one
+/// with [`mcr_position_startpos`] / [`mcr_position_new_from_fen`] and release it
+/// with [`mcr_position_free`].
+pub struct McrPosition {
     inner: AnyVariant,
 }
 
-/// Game-outcome codes returned by [`mce_position_outcome`].
+/// Game-outcome codes returned by [`mcr_position_outcome`].
 ///
 /// Kept as plain `int` values so the header exposes a stable C enum.
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MceOutcome {
+pub enum McrOutcome {
     /// The game is still in progress (no result yet).
     Ongoing = 0,
     /// The game ended in a draw (stalemate, insufficient material, repetition,
@@ -89,17 +89,17 @@ pub enum MceOutcome {
     BlackWins = 3,
 }
 
-/// Consolidated game-status codes returned by [`mce_position_status`] /
-/// [`mce_fairy_position_status`].
+/// Consolidated game-status codes returned by [`mcr_position_status`] /
+/// [`mcr_fairy_position_status`].
 ///
 /// This mirrors the engine's `GameStatus` (issue #372): it folds *why* a game
 /// ended together with the shape of the ending into one label, so a caller can
 /// distinguish a checkmate from a stalemate from a variant-specific win/draw
 /// without a second query. The winning side (for a decisive status) is read
-/// from [`mce_position_outcome`].
+/// from [`mcr_position_outcome`].
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MceStatus {
+pub enum McrStatus {
     /// The game is still in progress (no terminal rule applies).
     Ongoing = 0,
     /// The side to move is checkmated (in check with no legal move).
@@ -114,33 +114,33 @@ pub enum MceStatus {
     Draw = 4,
 }
 
-/// Folds a standard `(end_reason, outcome)` pair into an [`MceStatus`], matching
+/// Folds a standard `(end_reason, outcome)` pair into an [`McrStatus`], matching
 /// the engine's `GameStatus::from_parts` shape on the 8x8 surface.
-fn standard_status(reason: Option<EndReason>, outcome: Option<Outcome>) -> MceStatus {
+fn standard_status(reason: Option<EndReason>, outcome: Option<Outcome>) -> McrStatus {
     match (reason, outcome) {
-        (Some(EndReason::Checkmate), Some(Outcome::Decisive { .. })) => MceStatus::Checkmate,
-        (Some(EndReason::Stalemate), Some(Outcome::Draw)) => MceStatus::Stalemate,
-        (Some(_), Some(Outcome::Decisive { .. })) => MceStatus::VariantWin,
-        (Some(_), Some(Outcome::Draw)) => MceStatus::Draw,
-        _ => MceStatus::Ongoing,
+        (Some(EndReason::Checkmate), Some(Outcome::Decisive { .. })) => McrStatus::Checkmate,
+        (Some(EndReason::Stalemate), Some(Outcome::Draw)) => McrStatus::Stalemate,
+        (Some(_), Some(Outcome::Decisive { .. })) => McrStatus::VariantWin,
+        (Some(_), Some(Outcome::Draw)) => McrStatus::Draw,
+        _ => McrStatus::Ongoing,
     }
 }
 
-/// Folds a fairy `(end_reason, outcome)` pair into an [`MceStatus`], the
+/// Folds a fairy `(end_reason, outcome)` pair into an [`McrStatus`], the
 /// geometry-layer analogue of [`standard_status`].
-fn fairy_status(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) -> MceStatus {
+fn fairy_status(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) -> McrStatus {
     match (reason, outcome) {
         (Some(WideEndReason::Checkmate), Some(WideOutcome::Decisive { .. })) => {
-            MceStatus::Checkmate
+            McrStatus::Checkmate
         }
-        (Some(WideEndReason::Stalemate), Some(WideOutcome::Draw)) => MceStatus::Stalemate,
-        (Some(_), Some(WideOutcome::Decisive { .. })) => MceStatus::VariantWin,
-        (Some(_), Some(WideOutcome::Draw)) => MceStatus::Draw,
-        _ => MceStatus::Ongoing,
+        (Some(WideEndReason::Stalemate), Some(WideOutcome::Draw)) => McrStatus::Stalemate,
+        (Some(_), Some(WideOutcome::Decisive { .. })) => McrStatus::VariantWin,
+        (Some(_), Some(WideOutcome::Draw)) => McrStatus::Draw,
+        _ => McrStatus::Ongoing,
     }
 }
 
-/// Reaches the standard-chess core [`mce::Position`] inside an [`AnyVariant`].
+/// Reaches the standard-chess core [`mcr::Position`] inside an [`AnyVariant`].
 ///
 /// Every `AnyVariant` arm wraps a `VariantPosition<V>` whose `.core()` exposes
 /// the underlying 8x8 [`Position`], where the attack-query primitives live. This
@@ -169,7 +169,7 @@ fn parse_color(name: &str) -> Option<Color> {
     }
 }
 
-/// Resolve a borrowed `*const McePosition` to a shared reference, or return
+/// Resolve a borrowed `*const McrPosition` to a shared reference, or return
 /// `$err` if it is NULL.
 macro_rules! pos_ref {
     ($ptr:expr, $err:expr) => {{
@@ -178,7 +178,7 @@ macro_rules! pos_ref {
         }
         // SAFETY: `$ptr` is non-null (checked just above). Per this crate's
         // ownership contract the caller passes a pointer previously returned by
-        // a constructor and not yet freed, so it points to a live `McePosition`
+        // a constructor and not yet freed, so it points to a live `McrPosition`
         // that outlives this borrow. We only take a shared (`&`) reference.
         unsafe { &*$ptr }
     }};
@@ -208,22 +208,22 @@ macro_rules! cstr {
 /// `variant` accepts the canonical names and aliases of [`VariantId::from_str`]
 /// (e.g. `"chess"`, `"atomic"`, `"crazyhouse"`, `"koth"`, `"960"`).
 ///
-/// Returns a fresh owned `McePosition*`, or **NULL** if either string is NULL /
+/// Returns a fresh owned `McrPosition*`, or **NULL** if either string is NULL /
 /// not valid UTF-8, the variant name is unknown, or the FEN does not parse.
 ///
-/// The returned pointer must be released with [`mce_position_free`].
+/// The returned pointer must be released with [`mcr_position_free`].
 #[no_mangle]
-pub extern "C" fn mce_position_new_from_fen(
+pub extern "C" fn mcr_position_new_from_fen(
     fen: *const c_char,
     variant: *const c_char,
-) -> *mut McePosition {
+) -> *mut McrPosition {
     let fen = cstr!(fen, ptr::null_mut());
     let variant = cstr!(variant, ptr::null_mut());
     // catch_unwind guards the engine call so a panic becomes a NULL return.
     let result = catch_unwind(|| {
         let id: VariantId = variant.parse().ok()?;
         let inner = AnyVariant::from_fen(id, fen).ok()?;
-        Some(Box::new(McePosition { inner }))
+        Some(Box::new(McrPosition { inner }))
     });
     match result {
         Ok(Some(boxed)) => Box::into_raw(boxed),
@@ -233,15 +233,15 @@ pub extern "C" fn mce_position_new_from_fen(
 
 /// Creates the starting position of the named `variant`.
 ///
-/// `variant` accepts the same names as [`mce_position_new_from_fen`]. Returns a
-/// fresh owned `McePosition*`, or **NULL** if `variant` is NULL / not valid
-/// UTF-8 / an unknown variant. Release it with [`mce_position_free`].
+/// `variant` accepts the same names as [`mcr_position_new_from_fen`]. Returns a
+/// fresh owned `McrPosition*`, or **NULL** if `variant` is NULL / not valid
+/// UTF-8 / an unknown variant. Release it with [`mcr_position_free`].
 #[no_mangle]
-pub extern "C" fn mce_position_startpos(variant: *const c_char) -> *mut McePosition {
+pub extern "C" fn mcr_position_startpos(variant: *const c_char) -> *mut McrPosition {
     let variant = cstr!(variant, ptr::null_mut());
     let result = catch_unwind(|| {
         let id: VariantId = variant.parse().ok()?;
-        Some(Box::new(McePosition {
+        Some(Box::new(McrPosition {
             inner: AnyVariant::startpos(id),
         }))
     });
@@ -253,10 +253,10 @@ pub extern "C" fn mce_position_startpos(variant: *const c_char) -> *mut McePosit
 
 /// Releases a position created by this library.
 ///
-/// `mce_position_free(NULL)` is a no-op. Calling it twice on the same non-NULL
+/// `mcr_position_free(NULL)` is a no-op. Calling it twice on the same non-NULL
 /// pointer, or on a pointer this library did not produce, is undefined behavior.
 #[no_mangle]
-pub extern "C" fn mce_position_free(pos: *mut McePosition) {
+pub extern "C" fn mcr_position_free(pos: *mut McrPosition) {
     if pos.is_null() {
         return;
     }
@@ -272,8 +272,8 @@ pub extern "C" fn mce_position_free(pos: *mut McePosition) {
 /// (including the NUL terminator). See the crate-level buffer contract. Returns
 /// `0` if `pos` is NULL.
 #[no_mangle]
-pub extern "C" fn mce_position_to_fen(
-    pos: *const McePosition,
+pub extern "C" fn mcr_position_to_fen(
+    pos: *const McrPosition,
     buf: *mut c_char,
     buflen: usize,
 ) -> usize {
@@ -291,8 +291,8 @@ pub extern "C" fn mce_position_to_fen(
 /// buffer contract. An empty move list yields the empty string (`needed == 1`,
 /// just the NUL). Returns `0` if `pos` is NULL.
 #[no_mangle]
-pub extern "C" fn mce_position_legal_moves(
-    pos: *const McePosition,
+pub extern "C" fn mcr_position_legal_moves(
+    pos: *const McrPosition,
     buf: *mut c_char,
     buflen: usize,
 ) -> usize {
@@ -316,13 +316,13 @@ pub extern "C" fn mce_position_legal_moves(
 /// malformed or illegal in this position. On any nonzero return the position is
 /// left unchanged.
 #[no_mangle]
-pub extern "C" fn mce_position_play_uci(pos: *mut McePosition, uci: *const c_char) -> c_int {
+pub extern "C" fn mcr_position_play_uci(pos: *mut McrPosition, uci: *const c_char) -> c_int {
     if pos.is_null() {
         return 1;
     }
     let uci = cstr!(uci, 1);
     // SAFETY: `pos` is non-null (checked) and, per the ownership contract,
-    // points to a live, caller-owned `McePosition`. This is the only API that
+    // points to a live, caller-owned `McrPosition`. This is the only API that
     // mutates the handle, so an exclusive (`&mut`) borrow does not alias any
     // other live reference for the duration of this call.
     let pos = unsafe { &mut *pos };
@@ -344,7 +344,7 @@ pub extern "C" fn mce_position_play_uci(pos: *mut McePosition, uci: *const c_cha
 /// Returns `1` if the side to move is in check, `0` if not. Returns `0` if `pos`
 /// is NULL or the underlying call panics.
 #[no_mangle]
-pub extern "C" fn mce_position_is_check(pos: *const McePosition) -> c_int {
+pub extern "C" fn mcr_position_is_check(pos: *const McrPosition) -> c_int {
     let pos = pos_ref!(pos, 0);
     match catch_unwind(AssertUnwindSafe(|| pos.inner.is_check())) {
         Ok(true) => 1,
@@ -352,24 +352,24 @@ pub extern "C" fn mce_position_is_check(pos: *const McePosition) -> c_int {
     }
 }
 
-/// Returns the game outcome as an [`MceOutcome`] code (an `int`).
+/// Returns the game outcome as an [`McrOutcome`] code (an `int`).
 ///
-/// `MCE_OUTCOME_ONGOING` (0) means the game is not over. Otherwise the value is
+/// `MCR_OUTCOME_ONGOING` (0) means the game is not over. Otherwise the value is
 /// `DRAW`, `WHITE_WINS`, or `BLACK_WINS`. Returns `ONGOING` if `pos` is NULL or
 /// the call panics (treat a NULL handle as a programming error on the caller's
 /// side; this never crashes).
 #[no_mangle]
-pub extern "C" fn mce_position_outcome(pos: *const McePosition) -> MceOutcome {
-    let pos = pos_ref!(pos, MceOutcome::Ongoing);
+pub extern "C" fn mcr_position_outcome(pos: *const McrPosition) -> McrOutcome {
+    let pos = pos_ref!(pos, McrOutcome::Ongoing);
     match catch_unwind(AssertUnwindSafe(|| pos.inner.outcome())) {
         Ok(Some(Outcome::Decisive {
             winner: Color::White,
-        })) => MceOutcome::WhiteWins,
+        })) => McrOutcome::WhiteWins,
         Ok(Some(Outcome::Decisive {
             winner: Color::Black,
-        })) => MceOutcome::BlackWins,
-        Ok(Some(Outcome::Draw)) => MceOutcome::Draw,
-        _ => MceOutcome::Ongoing,
+        })) => McrOutcome::BlackWins,
+        Ok(Some(Outcome::Draw)) => McrOutcome::Draw,
+        _ => McrOutcome::Ongoing,
     }
 }
 
@@ -378,23 +378,23 @@ pub extern "C" fn mce_position_outcome(pos: *const McePosition) -> MceOutcome {
 ///
 /// Note that `depth == 0` legitimately returns `1`.
 #[no_mangle]
-pub extern "C" fn mce_perft(pos: *const McePosition, depth: u32) -> u64 {
+pub extern "C" fn mcr_perft(pos: *const McrPosition, depth: u32) -> u64 {
     let pos = pos_ref!(pos, 0);
     // A panic (or a NULL handle, handled above) yields 0, the documented error.
     catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
 }
 
-/// Returns the consolidated game status as an [`MceStatus`] code (an `int`),
+/// Returns the consolidated game status as an [`McrStatus`] code (an `int`),
 /// distinguishing checkmate / stalemate / a variant-specific win / a draw. See
-/// [`MceStatus`]. Returns `ONGOING` if `pos` is NULL or the call panics.
+/// [`McrStatus`]. Returns `ONGOING` if `pos` is NULL or the call panics.
 #[no_mangle]
-pub extern "C" fn mce_position_status(pos: *const McePosition) -> MceStatus {
-    let pos = pos_ref!(pos, MceStatus::Ongoing);
+pub extern "C" fn mcr_position_status(pos: *const McrPosition) -> McrStatus {
+    let pos = pos_ref!(pos, McrStatus::Ongoing);
     match catch_unwind(AssertUnwindSafe(|| {
         standard_status(pos.inner.end_reason(), pos.inner.outcome())
     })) {
         Ok(s) => s,
-        Err(_) => MceStatus::Ongoing,
+        Err(_) => McrStatus::Ongoing,
     }
 }
 
@@ -409,8 +409,8 @@ pub extern "C" fn mce_position_status(pos: *const McePosition) -> MceStatus {
 /// `-1` if `pos` is NULL, either string is NULL / not valid UTF-8, `square` is
 /// not a valid algebraic square, or `side` is not `"white"`/`"black"`.
 #[no_mangle]
-pub extern "C" fn mce_position_is_attacked(
-    pos: *const McePosition,
+pub extern "C" fn mcr_position_is_attacked(
+    pos: *const McrPosition,
     square: *const c_char,
     side: *const c_char,
 ) -> c_int {
@@ -435,8 +435,8 @@ pub extern "C" fn mce_position_is_attacked(
 /// empty set yields the empty string (`needed == 1`). Returns `0` on error
 /// (NULL handle/string, bad UTF-8, bad square, or bad colour).
 #[no_mangle]
-pub extern "C" fn mce_position_attackers(
-    pos: *const McePosition,
+pub extern "C" fn mcr_position_attackers(
+    pos: *const McrPosition,
     square: *const c_char,
     side: *const c_char,
     buf: *mut c_char,
@@ -469,8 +469,8 @@ pub extern "C" fn mce_position_attackers(
 /// yields the empty string (`needed == 1`). Returns `0` on error (NULL
 /// handle/string, bad UTF-8, or a bad square).
 #[no_mangle]
-pub extern "C" fn mce_position_attacks_from(
-    pos: *const McePosition,
+pub extern "C" fn mcr_position_attacks_from(
+    pos: *const McrPosition,
     square: *const c_char,
     buf: *mut c_char,
     buflen: usize,
@@ -497,7 +497,7 @@ pub extern "C" fn mce_position_attacks_from(
 /// attacks (`0` for an empty square). Returns `-1` if `pos` or `square` is NULL
 /// / not valid UTF-8, or `square` is not a valid algebraic square.
 #[no_mangle]
-pub extern "C" fn mce_position_mobility(pos: *const McePosition, square: *const c_char) -> c_int {
+pub extern "C" fn mcr_position_mobility(pos: *const McrPosition, square: *const c_char) -> c_int {
     let pos = pos_ref!(pos, -1);
     let square = cstr!(square, -1);
     let result = catch_unwind(AssertUnwindSafe(|| {
@@ -521,11 +521,11 @@ pub extern "C" fn mce_position_mobility(pos: *const McePosition, square: *const 
 
 /// Opaque handle to a fairy-variant chess position chosen at runtime.
 ///
-/// C code only ever holds a `MceFairyPosition*`; the layout is private. Create
-/// one with [`mce_fairy_position_startpos`] /
-/// [`mce_fairy_position_new_from_fen`] and release it with
-/// [`mce_fairy_position_free`].
-pub struct MceFairyPosition {
+/// C code only ever holds a `McrFairyPosition*`; the layout is private. Create
+/// one with [`mcr_fairy_position_startpos`] /
+/// [`mcr_fairy_position_new_from_fen`] and release it with
+/// [`mcr_fairy_position_free`].
+pub struct McrFairyPosition {
     inner: AnyWideVariant,
 }
 
@@ -535,20 +535,20 @@ pub struct MceFairyPosition {
 /// [`WideVariantId::from_str`] (e.g. `"xiangqi"`, `"shogi"`, `"janggi"`,
 /// `"orda"`, `"cchess"`).
 ///
-/// Returns a fresh owned `MceFairyPosition*`, or **NULL** if either string is
+/// Returns a fresh owned `McrFairyPosition*`, or **NULL** if either string is
 /// NULL / not valid UTF-8, the variant name is unknown, or the FEN does not
-/// parse. Release it with [`mce_fairy_position_free`].
+/// parse. Release it with [`mcr_fairy_position_free`].
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_new_from_fen(
+pub extern "C" fn mcr_fairy_position_new_from_fen(
     fen: *const c_char,
     variant: *const c_char,
-) -> *mut MceFairyPosition {
+) -> *mut McrFairyPosition {
     let fen = cstr!(fen, ptr::null_mut());
     let variant = cstr!(variant, ptr::null_mut());
     let result = catch_unwind(|| {
         let id: WideVariantId = variant.parse().ok()?;
         let inner = AnyWideVariant::from_fen(id, fen).ok()?;
-        Some(Box::new(MceFairyPosition { inner }))
+        Some(Box::new(McrFairyPosition { inner }))
     });
     match result {
         Ok(Some(boxed)) => Box::into_raw(boxed),
@@ -558,16 +558,16 @@ pub extern "C" fn mce_fairy_position_new_from_fen(
 
 /// Creates the starting position of the named fairy `variant`.
 ///
-/// `variant` accepts the same names as [`mce_fairy_position_new_from_fen`].
-/// Returns a fresh owned `MceFairyPosition*`, or **NULL** if `variant` is NULL /
+/// `variant` accepts the same names as [`mcr_fairy_position_new_from_fen`].
+/// Returns a fresh owned `McrFairyPosition*`, or **NULL** if `variant` is NULL /
 /// not valid UTF-8 / an unknown variant. Release it with
-/// [`mce_fairy_position_free`].
+/// [`mcr_fairy_position_free`].
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_startpos(variant: *const c_char) -> *mut MceFairyPosition {
+pub extern "C" fn mcr_fairy_position_startpos(variant: *const c_char) -> *mut McrFairyPosition {
     let variant = cstr!(variant, ptr::null_mut());
     let result = catch_unwind(|| {
         let id: WideVariantId = variant.parse().ok()?;
-        Some(Box::new(MceFairyPosition {
+        Some(Box::new(McrFairyPosition {
             inner: AnyWideVariant::startpos(id),
         }))
     });
@@ -579,11 +579,11 @@ pub extern "C" fn mce_fairy_position_startpos(variant: *const c_char) -> *mut Mc
 
 /// Releases a fairy position created by this library.
 ///
-/// `mce_fairy_position_free(NULL)` is a no-op. Calling it twice on the same
+/// `mcr_fairy_position_free(NULL)` is a no-op. Calling it twice on the same
 /// non-NULL pointer, or on a pointer this library did not produce, is undefined
 /// behavior.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_free(pos: *mut MceFairyPosition) {
+pub extern "C" fn mcr_fairy_position_free(pos: *mut McrFairyPosition) {
     if pos.is_null() {
         return;
     }
@@ -599,8 +599,8 @@ pub extern "C" fn mce_fairy_position_free(pos: *mut MceFairyPosition) {
 /// the NUL terminator). See the crate-level buffer contract. Returns `0` if
 /// `pos` is NULL.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_to_fen(
-    pos: *const MceFairyPosition,
+pub extern "C" fn mcr_fairy_position_to_fen(
+    pos: *const McrFairyPosition,
     buf: *mut c_char,
     buflen: usize,
 ) -> usize {
@@ -618,8 +618,8 @@ pub extern "C" fn mce_fairy_position_to_fen(
 /// move list yields the empty string (`needed == 1`). Returns `0` if `pos` is
 /// NULL.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_legal_moves(
-    pos: *const MceFairyPosition,
+pub extern "C" fn mcr_fairy_position_legal_moves(
+    pos: *const McrFairyPosition,
     buf: *mut c_char,
     buflen: usize,
 ) -> usize {
@@ -642,8 +642,8 @@ pub extern "C" fn mce_fairy_position_legal_moves(
 /// UTF-8, `2` if the move is malformed or illegal. On any nonzero return the
 /// position is left unchanged.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_play_uci(
-    pos: *mut MceFairyPosition,
+pub extern "C" fn mcr_fairy_position_play_uci(
+    pos: *mut McrFairyPosition,
     uci: *const c_char,
 ) -> c_int {
     if pos.is_null() {
@@ -651,7 +651,7 @@ pub extern "C" fn mce_fairy_position_play_uci(
     }
     let uci = cstr!(uci, 1);
     // SAFETY: `pos` is non-null (checked) and, per the ownership contract,
-    // points to a live, caller-owned `MceFairyPosition`. This is the only API
+    // points to a live, caller-owned `McrFairyPosition`. This is the only API
     // that mutates the handle, so an exclusive (`&mut`) borrow does not alias any
     // other live reference for the duration of this call.
     let pos = unsafe { &mut *pos };
@@ -673,7 +673,7 @@ pub extern "C" fn mce_fairy_position_play_uci(
 /// Returns `1` if the side to move is in check, `0` if not. Returns `0` if `pos`
 /// is NULL or the underlying call panics.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_is_check(pos: *const MceFairyPosition) -> c_int {
+pub extern "C" fn mcr_fairy_position_is_check(pos: *const McrFairyPosition) -> c_int {
     let pos = pos_ref!(pos, 0);
     match catch_unwind(AssertUnwindSafe(|| pos.inner.is_check())) {
         Ok(true) => 1,
@@ -681,21 +681,21 @@ pub extern "C" fn mce_fairy_position_is_check(pos: *const MceFairyPosition) -> c
     }
 }
 
-/// Returns the fairy game outcome as an [`MceOutcome`] code (an `int`), with the
-/// same encoding as [`mce_position_outcome`]. Returns `ONGOING` if `pos` is NULL
+/// Returns the fairy game outcome as an [`McrOutcome`] code (an `int`), with the
+/// same encoding as [`mcr_position_outcome`]. Returns `ONGOING` if `pos` is NULL
 /// or the call panics.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_outcome(pos: *const MceFairyPosition) -> MceOutcome {
-    let pos = pos_ref!(pos, MceOutcome::Ongoing);
+pub extern "C" fn mcr_fairy_position_outcome(pos: *const McrFairyPosition) -> McrOutcome {
+    let pos = pos_ref!(pos, McrOutcome::Ongoing);
     match catch_unwind(AssertUnwindSafe(|| pos.inner.outcome())) {
-        Ok(Some(mce::geometry::WideOutcome::Decisive {
+        Ok(Some(mcr::geometry::WideOutcome::Decisive {
             winner: Color::White,
-        })) => MceOutcome::WhiteWins,
-        Ok(Some(mce::geometry::WideOutcome::Decisive {
+        })) => McrOutcome::WhiteWins,
+        Ok(Some(mcr::geometry::WideOutcome::Decisive {
             winner: Color::Black,
-        })) => MceOutcome::BlackWins,
-        Ok(Some(mce::geometry::WideOutcome::Draw)) => MceOutcome::Draw,
-        _ => MceOutcome::Ongoing,
+        })) => McrOutcome::BlackWins,
+        Ok(Some(mcr::geometry::WideOutcome::Draw)) => McrOutcome::Draw,
+        _ => McrOutcome::Ongoing,
     }
 }
 
@@ -703,22 +703,22 @@ pub extern "C" fn mce_fairy_position_outcome(pos: *const MceFairyPosition) -> Mc
 /// position (a perft). Returns `0` if `pos` is NULL or the computation panics.
 /// `depth == 0` legitimately returns `1`.
 #[no_mangle]
-pub extern "C" fn mce_fairy_perft(pos: *const MceFairyPosition, depth: u32) -> u64 {
+pub extern "C" fn mcr_fairy_perft(pos: *const McrFairyPosition, depth: u32) -> u64 {
     let pos = pos_ref!(pos, 0);
     catch_unwind(AssertUnwindSafe(|| pos.inner.perft(depth))).unwrap_or_default()
 }
 
-/// Returns the consolidated fairy game status as an [`MceStatus`] code, with the
-/// same encoding as [`mce_position_status`]. Returns `ONGOING` if `pos` is NULL
+/// Returns the consolidated fairy game status as an [`McrStatus`] code, with the
+/// same encoding as [`mcr_position_status`]. Returns `ONGOING` if `pos` is NULL
 /// or the call panics.
 #[no_mangle]
-pub extern "C" fn mce_fairy_position_status(pos: *const MceFairyPosition) -> MceStatus {
-    let pos = pos_ref!(pos, MceStatus::Ongoing);
+pub extern "C" fn mcr_fairy_position_status(pos: *const McrFairyPosition) -> McrStatus {
+    let pos = pos_ref!(pos, McrStatus::Ongoing);
     match catch_unwind(AssertUnwindSafe(|| {
         fairy_status(pos.inner.end_reason(), pos.inner.outcome())
     })) {
         Ok(s) => s,
-        Err(_) => MceStatus::Ongoing,
+        Err(_) => McrStatus::Ongoing,
     }
 }
 
@@ -758,32 +758,32 @@ mod tests {
     #[test]
     fn startpos_legal_move_count_and_perft() {
         let v = cs("chess");
-        let pos = mce_position_startpos(v.as_ptr());
+        let pos = mcr_position_startpos(v.as_ptr());
         assert!(!pos.is_null());
 
         // Two-call buffer contract for legal moves.
-        let need = mce_position_legal_moves(pos, ptr::null_mut(), 0);
+        let need = mcr_position_legal_moves(pos, ptr::null_mut(), 0);
         let mut buf = vec![0u8; need];
-        let got = mce_position_legal_moves(pos, buf.as_mut_ptr().cast(), buf.len());
+        let got = mcr_position_legal_moves(pos, buf.as_mut_ptr().cast(), buf.len());
         assert_eq!(got, need);
         let s = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
         assert_eq!(s.split_whitespace().count(), 20);
 
-        assert_eq!(mce_perft(pos, 1), 20);
-        assert_eq!(mce_perft(pos, 2), 400);
-        assert_eq!(mce_perft(pos, 0), 1);
+        assert_eq!(mcr_perft(pos, 1), 20);
+        assert_eq!(mcr_perft(pos, 2), 400);
+        assert_eq!(mcr_perft(pos, 0), 1);
 
-        mce_position_free(pos);
+        mcr_position_free(pos);
     }
 
     #[test]
     fn fen_roundtrip_and_play() {
         let v = cs("chess");
-        let pos = mce_position_startpos(v.as_ptr());
+        let pos = mcr_position_startpos(v.as_ptr());
 
-        let need = mce_position_to_fen(pos, ptr::null_mut(), 0);
+        let need = mcr_position_to_fen(pos, ptr::null_mut(), 0);
         let mut buf = vec![0u8; need];
-        mce_position_to_fen(pos, buf.as_mut_ptr().cast(), buf.len());
+        mcr_position_to_fen(pos, buf.as_mut_ptr().cast(), buf.len());
         let fen = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
         assert_eq!(
             fen,
@@ -791,21 +791,21 @@ mod tests {
         );
 
         let mv = cs("e2e4");
-        assert_eq!(mce_position_play_uci(pos, mv.as_ptr()), 0);
+        assert_eq!(mcr_position_play_uci(pos, mv.as_ptr()), 0);
         let bad = cs("e2e5");
-        assert_eq!(mce_position_play_uci(pos, bad.as_ptr()), 2);
+        assert_eq!(mcr_position_play_uci(pos, bad.as_ptr()), 2);
         let garbage = cs("zzzz");
-        assert_eq!(mce_position_play_uci(pos, garbage.as_ptr()), 2);
+        assert_eq!(mcr_position_play_uci(pos, garbage.as_ptr()), 2);
 
-        mce_position_free(pos);
+        mcr_position_free(pos);
     }
 
     #[test]
     fn truncation_is_safe_and_nul_terminated() {
         let v = cs("chess");
-        let pos = mce_position_startpos(v.as_ptr());
+        let pos = mcr_position_startpos(v.as_ptr());
         let mut small = [0xAAu8; 4];
-        let need = mce_position_to_fen(pos, small.as_mut_ptr().cast(), small.len());
+        let need = mcr_position_to_fen(pos, small.as_mut_ptr().cast(), small.len());
         assert!(need > small.len());
         // Always NUL-terminated within the buffer.
         assert!(small.contains(&0));
@@ -814,7 +814,7 @@ mod tests {
             .to_str()
             .unwrap();
         assert_eq!(s, "rnb"); // first 3 chars + NUL
-        mce_position_free(pos);
+        mcr_position_free(pos);
     }
 
     #[test]
@@ -822,42 +822,42 @@ mod tests {
         // Fool's mate: 1. f3 e5 2. g4 Qh4#
         let v = cs("chess");
         let fen = cs("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq g3 0 2");
-        let pos = mce_position_new_from_fen(fen.as_ptr(), v.as_ptr());
+        let pos = mcr_position_new_from_fen(fen.as_ptr(), v.as_ptr());
         assert!(!pos.is_null());
-        assert_eq!(mce_position_outcome(pos), MceOutcome::Ongoing);
+        assert_eq!(mcr_position_outcome(pos), McrOutcome::Ongoing);
 
         let mate = cs("d8h4");
-        assert_eq!(mce_position_play_uci(pos, mate.as_ptr()), 0);
-        assert_eq!(mce_position_is_check(pos), 1);
-        assert_eq!(mce_position_outcome(pos), MceOutcome::BlackWins);
-        mce_position_free(pos);
+        assert_eq!(mcr_position_play_uci(pos, mate.as_ptr()), 0);
+        assert_eq!(mcr_position_is_check(pos), 1);
+        assert_eq!(mcr_position_outcome(pos), McrOutcome::BlackWins);
+        mcr_position_free(pos);
     }
 
     #[test]
     fn null_and_bad_inputs_are_rejected() {
-        assert!(mce_position_startpos(ptr::null()).is_null());
+        assert!(mcr_position_startpos(ptr::null()).is_null());
         let bad = cs("notavariant");
-        assert!(mce_position_startpos(bad.as_ptr()).is_null());
+        assert!(mcr_position_startpos(bad.as_ptr()).is_null());
 
         let v = cs("chess");
         let badfen = cs("not a fen");
-        assert!(mce_position_new_from_fen(badfen.as_ptr(), v.as_ptr()).is_null());
+        assert!(mcr_position_new_from_fen(badfen.as_ptr(), v.as_ptr()).is_null());
 
         // NULL handle: documented safe error values, no crash.
-        assert_eq!(mce_perft(ptr::null(), 1), 0);
-        assert_eq!(mce_position_to_fen(ptr::null(), ptr::null_mut(), 0), 0);
-        assert_eq!(mce_position_is_check(ptr::null()), 0);
-        assert_eq!(mce_position_outcome(ptr::null()), MceOutcome::Ongoing);
-        assert_eq!(mce_position_play_uci(ptr::null_mut(), v.as_ptr()), 1);
-        mce_position_free(ptr::null_mut()); // no-op
+        assert_eq!(mcr_perft(ptr::null(), 1), 0);
+        assert_eq!(mcr_position_to_fen(ptr::null(), ptr::null_mut(), 0), 0);
+        assert_eq!(mcr_position_is_check(ptr::null()), 0);
+        assert_eq!(mcr_position_outcome(ptr::null()), McrOutcome::Ongoing);
+        assert_eq!(mcr_position_play_uci(ptr::null_mut(), v.as_ptr()), 1);
+        mcr_position_free(ptr::null_mut()); // no-op
     }
 
     #[test]
     fn variant_startpos_counts() {
         let v = cs("atomic");
-        let pos = mce_position_startpos(v.as_ptr());
-        assert_eq!(mce_perft(pos, 1), 20);
-        mce_position_free(pos);
+        let pos = mcr_position_startpos(v.as_ptr());
+        assert_eq!(mcr_perft(pos, 1), 20);
+        mcr_position_free(pos);
     }
 
     fn read_str(f: impl Fn(*mut c_char, usize) -> usize) -> String {
@@ -875,30 +875,30 @@ mod tests {
     #[test]
     fn status_reports_checkmate_stalemate_and_ongoing() {
         let v = cs("chess");
-        let start = mce_position_startpos(v.as_ptr());
-        assert_eq!(mce_position_status(start), MceStatus::Ongoing);
-        mce_position_free(start);
+        let start = mcr_position_startpos(v.as_ptr());
+        assert_eq!(mcr_position_status(start), McrStatus::Ongoing);
+        mcr_position_free(start);
 
         // Fool's mate -> checkmate, Black wins.
         let mate_fen = cs("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
-        let mate = mce_position_new_from_fen(mate_fen.as_ptr(), v.as_ptr());
-        assert_eq!(mce_position_status(mate), MceStatus::Checkmate);
-        assert_eq!(mce_position_outcome(mate), MceOutcome::BlackWins);
-        mce_position_free(mate);
+        let mate = mcr_position_new_from_fen(mate_fen.as_ptr(), v.as_ptr());
+        assert_eq!(mcr_position_status(mate), McrStatus::Checkmate);
+        assert_eq!(mcr_position_outcome(mate), McrOutcome::BlackWins);
+        mcr_position_free(mate);
 
         // Classic stalemate -> draw.
         let stale_fen = cs("k7/2K5/1Q6/8/8/8/8/8 b - - 0 1");
-        let stale = mce_position_new_from_fen(stale_fen.as_ptr(), v.as_ptr());
-        assert_eq!(mce_position_status(stale), MceStatus::Stalemate);
-        mce_position_free(stale);
+        let stale = mcr_position_new_from_fen(stale_fen.as_ptr(), v.as_ptr());
+        assert_eq!(mcr_position_status(stale), McrStatus::Stalemate);
+        mcr_position_free(stale);
 
-        assert_eq!(mce_position_status(ptr::null()), MceStatus::Ongoing);
+        assert_eq!(mcr_position_status(ptr::null()), McrStatus::Ongoing);
     }
 
     #[test]
     fn analysis_is_attacked_attackers_and_mobility() {
         let v = cs("chess");
-        let pos = mce_position_startpos(v.as_ptr());
+        let pos = mcr_position_startpos(v.as_ptr());
         let white = cs("white");
         let black = cs("black");
 
@@ -906,53 +906,53 @@ mod tests {
         let f3 = cs("f3");
         let e4 = cs("e4");
         assert_eq!(
-            mce_position_is_attacked(pos, f3.as_ptr(), white.as_ptr()),
+            mcr_position_is_attacked(pos, f3.as_ptr(), white.as_ptr()),
             1
         );
         assert_eq!(
-            mce_position_is_attacked(pos, e4.as_ptr(), white.as_ptr()),
+            mcr_position_is_attacked(pos, e4.as_ptr(), white.as_ptr()),
             0
         );
 
         // Attackers of f3 by White: the g1 knight and the e2/g2 pawns.
         let attackers =
-            read_str(|b, n| mce_position_attackers(pos, f3.as_ptr(), white.as_ptr(), b, n));
+            read_str(|b, n| mcr_position_attackers(pos, f3.as_ptr(), white.as_ptr(), b, n));
         let set: std::collections::HashSet<&str> = attackers.split_whitespace().collect();
         assert_eq!(set, ["g1", "e2", "g2"].into_iter().collect());
 
         // The g1 knight attacks e2, f3 and h3 (e2 is a friendly pawn it
         // defends; the attack set counts it) from the start position.
         let g1 = cs("g1");
-        let from = read_str(|b, n| mce_position_attacks_from(pos, g1.as_ptr(), b, n));
+        let from = read_str(|b, n| mcr_position_attacks_from(pos, g1.as_ptr(), b, n));
         let fromset: std::collections::HashSet<&str> = from.split_whitespace().collect();
         assert_eq!(fromset, ["e2", "f3", "h3"].into_iter().collect());
-        assert_eq!(mce_position_mobility(pos, g1.as_ptr()), 3);
+        assert_eq!(mcr_position_mobility(pos, g1.as_ptr()), 3);
 
         // An empty square has no attacks and zero mobility.
-        assert_eq!(mce_position_mobility(pos, e4.as_ptr()), 0);
+        assert_eq!(mcr_position_mobility(pos, e4.as_ptr()), 0);
 
         // Error paths: bad square / colour / NULL handle.
         let bad = cs("z9");
         assert_eq!(
-            mce_position_is_attacked(pos, bad.as_ptr(), white.as_ptr()),
+            mcr_position_is_attacked(pos, bad.as_ptr(), white.as_ptr()),
             -1
         );
         let badcolor = cs("purple");
         assert_eq!(
-            mce_position_is_attacked(pos, f3.as_ptr(), badcolor.as_ptr()),
+            mcr_position_is_attacked(pos, f3.as_ptr(), badcolor.as_ptr()),
             -1
         );
         assert_eq!(
-            mce_position_is_attacked(ptr::null(), f3.as_ptr(), white.as_ptr()),
+            mcr_position_is_attacked(ptr::null(), f3.as_ptr(), white.as_ptr()),
             -1
         );
-        assert_eq!(mce_position_mobility(ptr::null(), g1.as_ptr()), -1);
+        assert_eq!(mcr_position_mobility(ptr::null(), g1.as_ptr()), -1);
         assert_eq!(
-            mce_position_attackers(ptr::null(), f3.as_ptr(), black.as_ptr(), ptr::null_mut(), 0),
+            mcr_position_attackers(ptr::null(), f3.as_ptr(), black.as_ptr(), ptr::null_mut(), 0),
             0
         );
 
-        mce_position_free(pos);
+        mcr_position_free(pos);
     }
 
     #[test]
@@ -960,89 +960,89 @@ mod tests {
         // Construct a fairy variant by name and run perft — the acceptance gate.
         // FSF-confirmed Xiangqi startpos counts (tests/perft_xiangqi.rs).
         let v = cs("xiangqi");
-        let pos = mce_fairy_position_startpos(v.as_ptr());
+        let pos = mcr_fairy_position_startpos(v.as_ptr());
         assert!(!pos.is_null());
 
-        let need = mce_fairy_position_legal_moves(pos, ptr::null_mut(), 0);
+        let need = mcr_fairy_position_legal_moves(pos, ptr::null_mut(), 0);
         let mut buf = vec![0u8; need];
-        let got = mce_fairy_position_legal_moves(pos, buf.as_mut_ptr().cast(), buf.len());
+        let got = mcr_fairy_position_legal_moves(pos, buf.as_mut_ptr().cast(), buf.len());
         assert_eq!(got, need);
         let s = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
         assert_eq!(s.split_whitespace().count(), 44);
 
-        assert_eq!(mce_fairy_perft(pos, 0), 1);
-        assert_eq!(mce_fairy_perft(pos, 1), 44);
-        assert_eq!(mce_fairy_perft(pos, 2), 1920);
-        assert_eq!(mce_fairy_perft(pos, 3), 79666);
-        assert_eq!(mce_fairy_position_is_check(pos), 0);
-        assert_eq!(mce_fairy_position_outcome(pos), MceOutcome::Ongoing);
-        assert_eq!(mce_fairy_position_status(pos), MceStatus::Ongoing);
-        assert_eq!(mce_fairy_position_status(ptr::null()), MceStatus::Ongoing);
+        assert_eq!(mcr_fairy_perft(pos, 0), 1);
+        assert_eq!(mcr_fairy_perft(pos, 1), 44);
+        assert_eq!(mcr_fairy_perft(pos, 2), 1920);
+        assert_eq!(mcr_fairy_perft(pos, 3), 79666);
+        assert_eq!(mcr_fairy_position_is_check(pos), 0);
+        assert_eq!(mcr_fairy_position_outcome(pos), McrOutcome::Ongoing);
+        assert_eq!(mcr_fairy_position_status(pos), McrStatus::Ongoing);
+        assert_eq!(mcr_fairy_position_status(ptr::null()), McrStatus::Ongoing);
 
-        mce_fairy_position_free(pos);
+        mcr_fairy_position_free(pos);
 
         // A second geometry (9x9 Shogi).
         let s = cs("shogi");
-        let shogi = mce_fairy_position_startpos(s.as_ptr());
-        assert_eq!(mce_fairy_perft(shogi, 1), 30);
-        assert_eq!(mce_fairy_perft(shogi, 2), 900);
-        mce_fairy_position_free(shogi);
+        let shogi = mcr_fairy_position_startpos(s.as_ptr());
+        assert_eq!(mcr_fairy_perft(shogi, 1), 30);
+        assert_eq!(mcr_fairy_perft(shogi, 2), 900);
+        mcr_fairy_position_free(shogi);
     }
 
     #[test]
     fn fairy_fen_roundtrip_and_play() {
         let v = cs("xiangqi");
-        let pos = mce_fairy_position_startpos(v.as_ptr());
+        let pos = mcr_fairy_position_startpos(v.as_ptr());
 
-        let need = mce_fairy_position_to_fen(pos, ptr::null_mut(), 0);
+        let need = mcr_fairy_position_to_fen(pos, ptr::null_mut(), 0);
         let mut buf = vec![0u8; need];
-        mce_fairy_position_to_fen(pos, buf.as_mut_ptr().cast(), buf.len());
+        mcr_fairy_position_to_fen(pos, buf.as_mut_ptr().cast(), buf.len());
         let fen = CStr::from_bytes_until_nul(&buf).unwrap().to_str().unwrap();
 
         // Re-parse the startpos FEN under the variant.
         let fenc = cs(fen);
-        let reparsed = mce_fairy_position_new_from_fen(fenc.as_ptr(), v.as_ptr());
+        let reparsed = mcr_fairy_position_new_from_fen(fenc.as_ptr(), v.as_ptr());
         assert!(!reparsed.is_null());
-        mce_fairy_position_free(reparsed);
+        mcr_fairy_position_free(reparsed);
 
         // A bad move is rejected with code 2 and leaves the position unchanged.
         let bad = cs("a0a9");
-        assert_eq!(mce_fairy_position_play_uci(pos, bad.as_ptr()), 2);
+        assert_eq!(mcr_fairy_position_play_uci(pos, bad.as_ptr()), 2);
         let garbage = cs("zzzz");
-        assert_eq!(mce_fairy_position_play_uci(pos, garbage.as_ptr()), 2);
+        assert_eq!(mcr_fairy_position_play_uci(pos, garbage.as_ptr()), 2);
 
         // Alias resolution: "cchess" -> xiangqi (same startpos FEN).
         let alias = cs("cchess");
-        let aliased = mce_fairy_position_startpos(alias.as_ptr());
-        let need2 = mce_fairy_position_to_fen(aliased, ptr::null_mut(), 0);
+        let aliased = mcr_fairy_position_startpos(alias.as_ptr());
+        let need2 = mcr_fairy_position_to_fen(aliased, ptr::null_mut(), 0);
         let mut buf2 = vec![0u8; need2];
-        mce_fairy_position_to_fen(aliased, buf2.as_mut_ptr().cast(), buf2.len());
+        mcr_fairy_position_to_fen(aliased, buf2.as_mut_ptr().cast(), buf2.len());
         let fen2 = CStr::from_bytes_until_nul(&buf2).unwrap().to_str().unwrap();
         assert_eq!(fen, fen2);
-        mce_fairy_position_free(aliased);
+        mcr_fairy_position_free(aliased);
 
-        mce_fairy_position_free(pos);
+        mcr_fairy_position_free(pos);
     }
 
     #[test]
     fn fairy_null_and_bad_inputs_are_rejected() {
-        assert!(mce_fairy_position_startpos(ptr::null()).is_null());
+        assert!(mcr_fairy_position_startpos(ptr::null()).is_null());
         let bad = cs("notafairyvariant");
-        assert!(mce_fairy_position_startpos(bad.as_ptr()).is_null());
+        assert!(mcr_fairy_position_startpos(bad.as_ptr()).is_null());
 
         let v = cs("xiangqi");
         let badfen = cs("not a fen");
-        assert!(mce_fairy_position_new_from_fen(badfen.as_ptr(), v.as_ptr()).is_null());
+        assert!(mcr_fairy_position_new_from_fen(badfen.as_ptr(), v.as_ptr()).is_null());
 
         // NULL handle: documented safe error values, no crash.
-        assert_eq!(mce_fairy_perft(ptr::null(), 1), 0);
+        assert_eq!(mcr_fairy_perft(ptr::null(), 1), 0);
         assert_eq!(
-            mce_fairy_position_to_fen(ptr::null(), ptr::null_mut(), 0),
+            mcr_fairy_position_to_fen(ptr::null(), ptr::null_mut(), 0),
             0
         );
-        assert_eq!(mce_fairy_position_is_check(ptr::null()), 0);
-        assert_eq!(mce_fairy_position_outcome(ptr::null()), MceOutcome::Ongoing);
-        assert_eq!(mce_fairy_position_play_uci(ptr::null_mut(), v.as_ptr()), 1);
-        mce_fairy_position_free(ptr::null_mut()); // no-op
+        assert_eq!(mcr_fairy_position_is_check(ptr::null()), 0);
+        assert_eq!(mcr_fairy_position_outcome(ptr::null()), McrOutcome::Ongoing);
+        assert_eq!(mcr_fairy_position_play_uci(ptr::null_mut(), v.as_ptr()), 1);
+        mcr_fairy_position_free(ptr::null_mut()); // no-op
     }
 }

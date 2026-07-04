@@ -56,7 +56,7 @@
 //!
 //! As in Shogi (#190), **FSF's `gorogoroplus` perft does not enforce
 //! *uchifuzume*** (the no-pawn-drop-mate rule): a mating pawn drop is listed as a
-//! legal move. Since this variant is validated node-for-node against FSF, mce
+//! legal move. Since this variant is validated node-for-node against FSF, mcr
 //! matches FSF and does **not** apply the uchifuzume filter
 //! (`pawn_drop_mate_forbidden` stays `false`).
 //!
@@ -68,7 +68,7 @@
 //! sgkgs/5/1ppp1/1PPP1/5/SGKGS[LNln] w 0 1
 //! ```
 //!
-//! mce uses the same board placement and the same `[LNln]` holdings bracket — a
+//! mcr uses the same board placement and the same `[LNln]` holdings bracket — a
 //! Lance and a Knight in each side's hand. The `compare-fairy/` harness
 //! reconciles the rendering when driving FSF.
 

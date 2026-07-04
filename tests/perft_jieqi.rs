@@ -6,7 +6,7 @@
 //! meaningful for a full-information position, which is exactly standard Xiangqi.
 //! Correctness therefore splits into a deterministic core (validated here + vs FSF
 //! `UCI_Variant xiangqi`) and a stochastic reveal layer (validated by the seeded
-//! unit/property tests in `mce::geometry::variants::jieqi`).
+//! unit/property tests in `mcr::geometry::variants::jieqi`).
 //!
 //! ## Why these numbers are FSF-confirmed
 //!
@@ -15,23 +15,23 @@
 //! piece on square *s* therefore both *moves as* and *reveals to* the Xiangqi piece
 //! native to *s*, so the **entire Jieqi game tree from the all-dark startpos is
 //! bit-identical to standard Xiangqi**. Every `(depth, nodes)` pair below is thus
-//! the canonical Xiangqi count, produced identically by `mce::geometry::Jieqi`,
-//! `mce::geometry::Xiangqi`, and Fairy-Stockfish `go perft` (see
+//! the canonical Xiangqi count, produced identically by `mcr::geometry::Jieqi`,
+//! `mcr::geometry::Xiangqi`, and Fairy-Stockfish `go perft` (see
 //! `tests/perft_xiangqi.rs` and `compare-fairy/src/jieqi.rs`). This pins the dark
 //! movement **and** the reveal transition against FSF without FSF present.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_jieqi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Jieqi, Xiangqi, Xiangqi9x10};
+use mcr::geometry::{perft as gperft, Jieqi, Xiangqi, Xiangqi9x10};
 
-/// The all-dark Jieqi starting FEN (mce dialect): the two Generals face-up,
+/// The all-dark Jieqi starting FEN (mcr dialect): the two Generals face-up,
 /// every other piece a face-down `=D`/`=d`.
 const ALL_DARK_STARTPOS: &str =
     "=d=d=d=dk=d=d=d=d/9/1=d5=d1/=d1=d1=d1=d1=d/9/9/=D1=D1=D1=D1=D/1=D5=D1/9/=D=D=D=DK=D=D=D=D w - - 0 1";
 
 /// The same position spelled as standard Xiangqi (the identity-reveal equivalent):
-/// FSF's Xiangqi startpos in the mce dialect.
+/// FSF's Xiangqi startpos in the mcr dialect.
 const XIANGQI_STARTPOS: &str =
     "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1";
 
@@ -126,7 +126,7 @@ fn revealed_middlegame_deep() {
 /// positions, not just the all-dark start.
 #[test]
 fn lockstep_with_xiangqi_through_reveals() {
-    let sorted = |mut v: Vec<mce::geometry::WideMove>| {
+    let sorted = |mut v: Vec<mcr::geometry::WideMove>| {
         v.sort();
         v
     };

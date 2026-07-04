@@ -5,7 +5,7 @@
 //! Phase 3). Validated move-for-move against Fairy-Stockfish `UCI_Variant
 //! xiangqi`.
 //!
-//! Xiangqi is played on a 9-files (a..i) by 10-ranks (1..10) board — mce's
+//! Xiangqi is played on a 9-files (a..i) by 10-ranks (1..10) board — mcr's
 //! [`Xiangqi9x10`] `u128` geometry — with pieces on the cells. The two armies face
 //! across a central **river** (between ranks 5 and 6); each general lives in a 3x3
 //! **palace** (files d..f, the near three ranks).
@@ -14,13 +14,13 @@
 //!
 //! * **General / King** ([`WideRole::King`], FSF `k`): one orthogonal step,
 //!   **confined to the palace**. Plus the **flying-general** rule (below).
-//! * **Advisor / Guard** ([`WideRole::Advisor`], mce `u`, FSF `a`): one diagonal
+//! * **Advisor / Guard** ([`WideRole::Advisor`], mcr `u`, FSF `a`): one diagonal
 //!   step, **confined to the palace**.
-//! * **Elephant / Minister** ([`WideRole::XiangqiElephant`], mce `o`, FSF `b`):
+//! * **Elephant / Minister** ([`WideRole::XiangqiElephant`], mcr `o`, FSF `b`):
 //!   a two-square diagonal jump, **blocked by a piece on the intervening "eye"**,
 //!   and **may not cross the river** (stays on its own half). Uses
 //!   [`attacks::elephant_attacks_blockable`].
-//! * **Horse** ([`WideRole::Horse`], mce `j`, FSF `n`): a knight leap **hobbled**
+//! * **Horse** ([`WideRole::Horse`], mcr `j`, FSF `n`): a knight leap **hobbled**
 //!   if the orthogonally-adjacent leg square is occupied. Uses
 //!   [`attacks::horse_attacks`].
 //! * **Chariot / Rook** ([`WideRole::Rook`], `r`): a plain rook.
@@ -28,7 +28,7 @@
 //!   captures only by jumping exactly one screen — the **same** primitive as the
 //!   Shako cannon ([`attacks::cannon_quiet_moves`] / [`attacks::cannon_capture_targets`]),
 //!   confirmed identical against FSF.
-//! * **Soldier / Pawn** ([`WideRole::Soldier`], mce `z`, FSF `p`): one step
+//! * **Soldier / Pawn** ([`WideRole::Soldier`], mcr `z`, FSF `p`): one step
 //!   forward; **after crossing the river** also one step sideways. Never backward,
 //!   no double-step, no promotion.
 //!
@@ -42,14 +42,14 @@
 //!
 //! ## Confirmed starting FEN
 //!
-//! From FSF's `xiangqi_variant()` (`startFen`); mce and FSF agree on the position
-//! but spell four pieces differently (mce avoids the letters `a n b p`, already
+//! From FSF's `xiangqi_variant()` (`startFen`); mcr and FSF agree on the position
+//! but spell four pieces differently (mcr avoids the letters `a n b p`, already
 //! taken by the Hawk / Knight / Bishop / Pawn), so the `compare-fairy` harness
 //! rewrites them when driving FSF:
 //!
 //! ```text
 //! FSF dialect: rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1
-//! mce dialect: rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1
+//! mcr dialect: rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1
 //! ```
 
 use crate::geometry::position::{
@@ -70,7 +70,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct XiangqiRules;
 
-/// The confirmed Xiangqi starting placement in the mce dialect (advisor `u`,
+/// The confirmed Xiangqi starting placement in the mcr dialect (advisor `u`,
 /// horse `j`, elephant `o`, soldier `z`), the position byte-identical to FSF's
 /// `rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR`.
 const XIANGQI_START_PLACEMENT: &str = "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR";
@@ -403,7 +403,7 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
 /// geometry.
 ///
 /// Construct the starting position with
-/// [`Xiangqi::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Xiangqi::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Xiangqi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the palace / river confinement, and the
 /// flying-general rule.

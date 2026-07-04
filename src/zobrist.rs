@@ -50,7 +50,7 @@ use crate::{Color, Piece, Position, Role, Square};
 /// implementation renders it as a zero-padded 16-digit hexadecimal number.
 ///
 /// ```
-/// use mce::Position;
+/// use mcr::Position;
 /// let key = Position::startpos().zobrist();
 /// assert_eq!(key, Position::startpos().zobrist());
 /// assert_eq!(format!("{key}").len(), 16);
@@ -246,7 +246,7 @@ impl Position {
     /// micro-bench. (See issue #115.)
     ///
     /// ```
-    /// use mce::Position;
+    /// use mcr::Position;
     /// let start = Position::startpos();
     /// // 1.Nf3 Nf6 2.Ng1 Ng8 returns to the starting position.
     /// let mut pos = start.clone();

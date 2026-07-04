@@ -3,7 +3,7 @@
 //! Chess960-style castling on arbitrary king/rook start files.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Caparandom::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Caparandom::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant caparandom`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position (its chancellor `e`/`E` spelled `c`/`C` in the FSF
 //! dialect). The `compare-fairy/` differential fuzzer re-runs the head-to-head on
@@ -14,17 +14,17 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR w JAja - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1
 //! ```
 //!
 //! The castling field uses **file letters** (`JAja`) — the a-file (`A`/`a`) and
 //! j-file (`J`/`j`) castling rooks — the Shredder form FSF emits for `caparandom`
-//! and mce's [`Caparandom`] matches.
+//! and mcr's [`Caparandom`] matches.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_caparandom -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Caparandom, WideMoveKind};
+use mcr::geometry::{perft as gperft, Cap10x8, Caparandom, WideMoveKind};
 
 /// Asserts the generic Caparandom perft equals each pinned `(depth, nodes)` count.
 /// Every number here also matched FSF `caparandom` `go perft` on the same position.
@@ -43,7 +43,7 @@ fn check(fen: &str, cases: &[(u32, u64)]) {
 
 // -- Startpos (the canonical Capablanca array; `JAja` file-letter rights) --------
 
-/// The FSF-confirmed Caparandom startpos (mce dialect, chancellor `e`).
+/// The FSF-confirmed Caparandom startpos (mcr dialect, chancellor `e`).
 const STARTPOS: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1";
 
 #[test]
@@ -135,7 +135,7 @@ fn adjacent_rook_offers_only_kingside_castle() {
         .into_iter()
         .find(|m| m.kind() == WideMoveKind::CastleKingside)
         .expect("a kingside castle");
-    // king c1 -> i1 (file 8); the move renders king-to-destination in mce's dialect.
+    // king c1 -> i1 (file 8); the move renders king-to-destination in mcr's dialect.
     assert_eq!(mv.to_uci::<Cap10x8>(), "c1i1");
     let after = pos.play(&mv);
     // Resulting rank 1: rook b1 stays, king i1, rook h1 -> `1R5RK1`.

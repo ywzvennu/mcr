@@ -49,8 +49,8 @@
 //! ## Confirmed starting FEN
 //!
 //! Pinned against Fairy-Stockfish's `UCI_Variant shatranj` / `position
-//! startpos`. mce and FSF render the same position with different piece letters:
-//! FSF uses `b` for the Alfil and `q` for the Ferz, but mce reuses `b`/`q` for
+//! startpos`. mcr and FSF render the same position with different piece letters:
+//! FSF uses `b` for the Alfil and `q` for the Ferz, but mcr reuses `b`/`q` for
 //! its Bishop/Queen, so the Shatranj pieces take distinct tokens — the Ferz reuses
 //! the Makruk Met `m`, and the Alfil, landing past the exhausted single-letter
 //! alphabet, takes the `*`-prefixed overflow token `*x` (the
@@ -60,7 +60,7 @@
 //!
 //! ```text
 //! FSF dialect: rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w - - 0 1
-//! mce dialect: rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - 0 1
+//! mcr dialect: rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - 0 1
 //! ```
 //!
 //! The king sits on file 3 and the Ferz beside it on file 4 (both colours), with
@@ -86,7 +86,7 @@ use crate::Color;
 pub struct ShatranjRules;
 
 /// The confirmed Shatranj starting FEN placement, validated against
-/// Fairy-Stockfish `UCI_Variant shatranj` (mce dialect — see the [module
+/// Fairy-Stockfish `UCI_Variant shatranj` (mcr dialect — see the [module
 /// docs](self)).
 const SHATRANJ_START_PLACEMENT: &str = "rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR";
 
@@ -173,7 +173,7 @@ impl WideVariant<Chess8x8> for ShatranjRules {
 /// Shatranj (medieval chess) as a [`GenericPosition`] over the 8x8 geometry.
 ///
 /// Construct the starting position with
-/// [`Shatranj::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Shatranj::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Shatranj::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the pieces, the no-castling / single-step-pawn rules, and the
 /// baring / stalemate-loss terminal rules.
@@ -185,7 +185,7 @@ mod tests {
     use crate::geometry::perft as gperft;
     use crate::geometry::position::WideOutcome;
 
-    /// The canonical start FEN round-trips through the mce dialect.
+    /// The canonical start FEN round-trips through the mcr dialect.
     #[test]
     fn startpos_round_trips() {
         let pos = Shatranj::startpos();

@@ -3,7 +3,7 @@
 //! side's fixed pocket and droppable onto the player's own back rank.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Dragon::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Dragon::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant dragon`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/dragon.rs`); this test pins the FSF-confirmed numbers so a
@@ -15,18 +15,18 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Dd] w KQkq - 0 1
-//! mce dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1
+//! mcr dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1
 //! ```
 //!
-//! The `[Aa]` is the fixed Dragon pocket (one Dragon per side). mce spells the
+//! The `[Aa]` is the fixed Dragon pocket (one Dragon per side). mcr spells the
 //! Dragon `a`/`A` (its census/Capablanca/Seirawan letter) where FSF uses `D`/`d`,
-//! so the shown FEN is the **mce dialect** and the `compare-fairy/` harness
+//! so the shown FEN is the **mcr dialect** and the `compare-fairy/` harness
 //! rewrites the one Dragon letter when driving FSF.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_dragon -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Dragon};
+use mcr::geometry::{perft as gperft, Chess8x8, Dragon};
 
 /// The Dragon starting FEN, confirmed against FSF `UCI_Variant dragon`. At the
 /// start the back rank is full, so the Dragon cannot yet be dropped — the early
@@ -48,7 +48,7 @@ const DRAGON_ON_BOARD: &str = "rnbqkbnr/pppppppp/8/8/3A4/8/PPPPPPPP/RNBQKBNR[] w
 /// promotion targets — alongside the back-rank drops. Pinned against FSF.
 const DRAGON_PROMOTION: &str = "r3k3/1P6/8/8/8/8/6p1/4K3[Aa] w - - 0 1";
 
-/// `(depth, nodes)` rows confirmed identical between mce and FSF.
+/// `(depth, nodes)` rows confirmed identical between mcr and FSF.
 struct Perft {
     fen: &'static str,
     rows: &'static [(u32, u64)],
@@ -161,7 +161,7 @@ fn dragon_drops_only_onto_empty_back_rank() {
     assert_eq!(drops, 4, "one Dragon drop per empty back-rank square");
 }
 
-/// The canonical start FEN round-trips through the mce dialect (the Dragon pocket
+/// The canonical start FEN round-trips through the mcr dialect (the Dragon pocket
 /// renders as `[Aa]`).
 #[test]
 fn startpos_fen_round_trips() {

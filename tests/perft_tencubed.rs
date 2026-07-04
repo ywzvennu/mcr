@@ -4,7 +4,7 @@
 //! leapers to the Grand army.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Tencubed::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Tencubed::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant tencubed`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/tencubed.rs`); this test pins the
@@ -16,31 +16,31 @@
 //!
 //! ```text
 //! FSF dialect: 2cwamwc2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2CWAMWC2 w - - 0 1
-//! mce dialect: 2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1
+//! mcr dialect: 2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1
 //! ```
 //!
 //! The dialects differ only in the fairy letters: FSF's marshal `m`/`M`
-//! (Rook+Knight) is mce's [`WideRole::Elephant`](mce::geometry::WideRole::Elephant)
-//! `e`/`E`; FSF's champion `c`/`C` (Wazir+Alfil+Dabbaba) is mce's
-//! [`WideRole::TencubedChampion`](mce::geometry::WideRole::TencubedChampion) second-bank
-//! token `**x`/`**X`; FSF's wizard `w`/`W` (Camel+Ferz) is mce's
-//! [`WideRole::Wizard`](mce::geometry::WideRole::Wizard) `**w`/`**W`; the archbishop
-//! `a`/`A` (Bishop+Knight, mce [`WideRole::Hawk`](mce::geometry::WideRole::Hawk)) is
+//! (Rook+Knight) is mcr's [`WideRole::Elephant`](mcr::geometry::WideRole::Elephant)
+//! `e`/`E`; FSF's champion `c`/`C` (Wazir+Alfil+Dabbaba) is mcr's
+//! [`WideRole::TencubedChampion`](mcr::geometry::WideRole::TencubedChampion) second-bank
+//! token `**x`/`**X`; FSF's wizard `w`/`W` (Camel+Ferz) is mcr's
+//! [`WideRole::Wizard`](mcr::geometry::WideRole::Wizard) `**w`/`**W`; the archbishop
+//! `a`/`A` (Bishop+Knight, mcr [`WideRole::Hawk`](mcr::geometry::WideRole::Hawk)) is
 //! spelled identically in both.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_tencubed -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Grand10x10, Tencubed};
+use mcr::geometry::{perft as gperft, Grand10x10, Tencubed};
 
-/// The Ten-Cubed starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Ten-Cubed starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant tencubed`.
 const STARTPOS: &str =
     "2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1";
 
 /// A quiet midgame, white to move: each side has advanced its e-pawn (white to e4,
 /// black to e6 in `a..j` files) and traded no material. Reached from the startpos by
-/// `e3e5 e8e6` and confirmed move-for-move by FSF (mce dialect, marshal `e`, champion
+/// `e3e5 e8e6` and confirmed move-for-move by FSF (mcr dialect, marshal `e`, champion
 /// `**x`, wizard `**w`).
 const MID: &str =
     "2**x**wae**w**x2/1rnbqkbnr1/pppp1ppppp/10/4p5/4P5/10/PPPP1PPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 2";

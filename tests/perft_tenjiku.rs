@@ -10,14 +10,14 @@
 //! the entire `BW*BH` board array, so there is no EDGE-sentinel border for its
 //! 0x88-style neighbour scans (its own burn code even comments "assumes 32x16
 //! board"), and a padded 32x32 rebuild crashes identically. This is a genuine HaChu
-//! limitation, not an mce difference — so a live node-by-node HaChu perft (as was
+//! limitation, not an mcr difference — so a live node-by-node HaChu perft (as was
 //! run for Chu/Dai) is unavailable here.
 //!
-//! Instead, mce's Tenjiku start position is validated **directly against HaChu's own
+//! Instead, mcr's Tenjiku start position is validated **directly against HaChu's own
 //! source tables** — `variant.c`'s `tenjikuPieces` / `tenArray` / `tenIDs`, and the
 //! `GenNonCapts` non-capture move semantics — reconciled move-for-move:
 //!
-//! * **perft(1) = 72** — every one of mce's 72 start-position moves corresponds to a
+//! * **perft(1) = 72** — every one of mcr's 72 start-position moves corresponds to a
 //!   HaChu-table move node-for-node: the 14 unblocked Pawn pushes; the two advanced
 //!   Dragon Kings' 17 moves each (34; each includes the file-4 / file-11 capture of
 //!   the opposing Dragon King, the sole captures reachable at the start); the rank-4
@@ -25,7 +25,7 @@
 //!   forward-diagonal 2-jumps (6); and the 18 short down/sideways moves of the
 //!   back-three ranks into the four empty rank-2 squares (a HaChu array asymmetry
 //!   faithfully reproduced). This pinned down the exact start placement.
-//! * **perft(2) = 5662** and **perft(3) = 424195** are mce regression pins (the
+//! * **perft(2) = 5662** and **perft(3) = 424195** are mcr regression pins (the
 //!   jitto pass is emitted once per side, as HaChu tracks a single null move). They are
 //!   *faithful to the true Tenjiku rules at these depths* — the documented-unmodelled
 //!   powers (the Generals' jump-capture, the Fire Demon's area burn) are provably
@@ -37,9 +37,9 @@
 //! docs): the Fire Demon's multi-square burn, and the jump-capture of the four
 //! General pieces.
 
-use mce::geometry::{perft, Square, Tenjiku, Tenjiku16x16};
+use mcr::geometry::{perft, Square, Tenjiku, Tenjiku16x16};
 
-/// The Tenjiku start position round-trips through mce's FEN I/O (the `****`-dialect
+/// The Tenjiku start position round-trips through mcr's FEN I/O (the `****`-dialect
 /// fifth-tier tokens for the new pieces).
 #[test]
 fn startpos_round_trips() {
@@ -62,7 +62,7 @@ fn startpos_round_trips() {
 
 /// Start-position perft. perft(1) = 72 is validated node-for-node against HaChu's
 /// source tables (HaChu crashes on `variant tenjiku`, so a live oracle is
-/// unavailable); perft(2) / perft(3) are mce regression pins, faithful to Tenjiku's
+/// unavailable); perft(2) / perft(3) are mcr regression pins, faithful to Tenjiku's
 /// rules at these depths (no special power is reachable this shallow).
 #[test]
 fn startpos_perft_regression() {
@@ -203,21 +203,21 @@ fn attackers_and_pins_consistency() {
     let pos = Tenjiku::from_fen("15k/16/16/16/16/16/16/16/16/16/7r8/16/7P8/16/7K8/16 w - - 0 1")
         .expect("valid Tenjiku FEN");
     let king = Square::<Tenjiku16x16>::from_file_rank(7, 1).unwrap();
-    assert!(!pos.is_attacked(king, mce::Color::Black));
+    assert!(!pos.is_attacked(king, mcr::Color::Black));
     for m in pos.legal_moves().iter() {
         let after = pos.play(m);
         let mut k = None;
         for f in 0..16 {
             for r in 0..16 {
                 let sq = Square::<Tenjiku16x16>::from_file_rank(f, r).unwrap();
-                if after.board().kings_of(mce::Color::White).contains(sq) {
+                if after.board().kings_of(mcr::Color::White).contains(sq) {
                     k = Some(sq);
                 }
             }
         }
         if let Some(k) = k {
             assert!(
-                !after.is_attacked(k, mce::Color::Black),
+                !after.is_attacked(k, mcr::Color::Black),
                 "move {} left the White King in check",
                 m.to_uci::<Tenjiku16x16>()
             );

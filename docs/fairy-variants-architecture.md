@@ -1,4 +1,4 @@
-# Architecture: Fairy / pychess-class Variants in `mce`
+# Architecture: Fairy / pychess-class Variants in `mcr`
 
 Status: design (no implementation in this PR). Drives the Milestone 10 issues.
 
@@ -7,7 +7,7 @@ powered by [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish)
 
 ## 0. Summary and recommendation
 
-`mce` today is a specialised 8x8 engine: a single `u64` `Bitboard`, a `Square(u8)`
+`mcr` today is a specialised 8x8 engine: a single `u64` `Bitboard`, a `Square(u8)`
 indexed `0..64`, a `Board { by_color[2], by_role[6] }`, hyperbola-quintessence (or
 optional magic) sliders, a packed `Move(u16)`, and a pin/check-mask fast-legality
 generator that beats shakmaty. Every square index in that path is `& 7` / `>> 3`;
@@ -39,7 +39,7 @@ trait, with the bitboard backing type chosen per geometry as an associated type:
   hooks — see §4.
 - Correctness and perf are pinned against **Fairy-Stockfish** via a GPL-fenced,
   subprocess-only `compare-fairy/` crate that shells out to the FSF UCI binary's
-  `go perft` (§6). No GPL code is linked into `mce`.
+  `go perft` (§6). No GPL code is linked into `mcr`.
 
 The single architectural bet: **one `u128` generic board for everything larger than
 8x8, monomorphised per geometry, with the 8x8 `u64` path frozen and specialised.**
@@ -174,7 +174,7 @@ board appears (e.g. 11x11 = 121 still fits u128; 12x12 = 144 would not).
 **(c) Mailbox / `[Piece; N]` (REJECTED as primary, used as a side table).**
 Mailbox loses move generation: slider attacks become per-square ray walks instead of
 one branchless bitboard identity, and the king-danger / pin-mask machinery that makes
-`mce` fast has no bitboard to operate on. Mailbox is, however, the natural backing for
+`mcr` fast has no bitboard to operate on. Mailbox is, however, the natural backing for
 the **piece-on-square lookup** every variant needs (e.g. "what is on the screen square
 for a cannon capture") and may be carried as a redundant `[Option<Piece>; N]` side
 table alongside the bitboards, exactly as many bitboard engines do. It is **not** the
@@ -419,23 +419,23 @@ out of scope for Milestone 10.
 
 ## 6. Reference and benchmarking — Fairy-Stockfish as oracle
 
-`mce` is permissively licensed (MIT OR Apache-2.0) and clean-room; Fairy-Stockfish is
+`mcr` is permissively licensed (MIT OR Apache-2.0) and clean-room; Fairy-Stockfish is
 GPL. **No FSF/Stockfish source is read, copied, or linked.** FSF is used only as a
 black-box oracle over a process boundary.
 
 ### `compare-fairy/` crate (GPL-fenced, subprocess-only)
 
-- A **separate workspace crate**, not a dependency of `mce` proper, so the GPL fence
-  is structural: `mce` never links FSF. The crate spawns the `fairy-stockfish` UCI
+- A **separate workspace crate**, not a dependency of `mcr` proper, so the GPL fence
+  is structural: `mcr` never links FSF. The crate spawns the `fairy-stockfish` UCI
   binary as a subprocess, sends `setoption name UCI_Variant value <variant>`,
   `position fen <fen>`, `go perft <depth>`, and parses the per-move divide and total
   from stdout.
 - It drives **differential perft**: for a corpus of positions per variant, compare
-  `mce`'s `perft` / `perft_divide` against FSF's node counts at increasing depth.
+  `mcr`'s `perft` / `perft_divide` against FSF's node counts at increasing depth.
   Any mismatch is a movegen bug, localised by the divide. This is the same role
   shakmaty-derived perft suites play for the 8x8 engine today, now with FSF as the
   authority for fairy rules.
-- It also drives **perf comparison**: time `mce`'s perft vs FSF's `go perft` on the
+- It also drives **perf comparison**: time `mcr`'s perft vs FSF's `go perft` on the
   same positions/depths to confirm the "beat FSF" target per variant.
 
 ### FSF build / availability feasibility
@@ -448,7 +448,7 @@ black-box oracle over a process boundary.
 - Feasibility: building or downloading a `fairy-stockfish` binary in CI is
   straightforward; the crate locates it via an env var / config path and **skips
   gracefully** (test marked ignored) when the binary is absent, so `cargo test` for
-  `mce` itself is never blocked by FSF availability. The default `mce` build and test
+  `mcr` itself is never blocked by FSF availability. The default `mcr` build and test
   remain wholly independent of FSF.
 
 ### 8x8 non-regression gate

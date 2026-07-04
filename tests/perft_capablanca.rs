@@ -3,7 +3,7 @@
 //! [`Cap10x8`] path end-to-end.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Capablanca::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Capablanca::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant capablanca`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/capablanca.rs`); this test pins the
@@ -16,22 +16,22 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR w KQkq - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce, mce's
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr, mcr's
 //! letter for the rook-knight compound [`WideRole::Elephant`]). The archbishop is
 //! `a` ([`WideRole::Hawk`]) in both.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_capablanca -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Cap10x8, Capablanca, Square, WideMoveKind, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
-/// The Capablanca starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Capablanca starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant capablanca`.
 const STARTPOS: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1";
 

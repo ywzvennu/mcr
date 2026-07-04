@@ -95,7 +95,7 @@ use super::super::Washogi11x11;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct WashogiRules;
 
-/// The Wa Shogi starting placement (the hand is empty at the start), in mce's
+/// The Wa Shogi starting placement (the hand is empty at the start), in mcr's
 /// overflow spelling. White's ranks 1-3 hold the army; Black's ranks 9-11 are the
 /// 180° reflection. Reading the back rank a..k: Oxcart, Blind Dog, Strutting Crow,
 /// Flying Goose, Violent Wolf, Crane King, Violent Stag, Flying Cock, Swooping Owl,

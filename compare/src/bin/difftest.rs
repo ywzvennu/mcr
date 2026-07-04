@@ -1,8 +1,8 @@
-//! Differential fuzzing harness: mce vs the reference engine (shakmaty).
+//! Differential fuzzing harness: mcr vs the reference engine (shakmaty).
 //!
 //! Issue #109. This is the strongest ongoing correctness net for the engine: a
 //! fully *seeded* loop that, for every variant, generates random legal positions
-//! and asserts that mce and shakmaty agree on four independent properties of each
+//! and asserts that mcr and shakmaty agree on four independent properties of each
 //! position:
 //!
 //! 1. **the legal-move SET** — compared as sorted UCI strings (so a missing,
@@ -10,10 +10,10 @@
 //! 2. **shallow perft** — node counts at a fixed small depth must match exactly;
 //! 3. **check / terminal status** — `is_check()` and the single-position game
 //!    result (decisive winner / draw / ongoing) must agree;
-//! 4. **FEN round-trip** — mce's `to_fen()` must re-parse to the same FEN, and
+//! 4. **FEN round-trip** — mcr's `to_fen()` must re-parse to the same FEN, and
 //!    must agree with shakmaty's serialization of the same position.
 //!
-//! Everything is driven by the seeded [`mce_compare::gen`] generator (splitmix64
+//! Everything is driven by the seeded [`mcr_compare::gen`] generator (splitmix64
 //! from a fixed per-variant seed), so a run is byte-for-byte reproducible across
 //! machines: the same `--count` always checks the same positions. On ANY
 //! divergence the harness prints the exact FEN plus the differing data needed to
@@ -46,12 +46,12 @@
 //!
 //! Like the rest of `compare/`, this binary links GPL-3.0+ shakmaty for
 //! cross-checking only. It is never published or distributed and is not part of
-//! the `mce` library, which remains shakmaty-free and clean-room MIT OR
+//! the `mcr` library, which remains shakmaty-free and clean-room MIT OR
 //! Apache-2.0.
 //!
 //! ## Why some generated positions are skipped (counted, never silent)
 //!
-//! shakmaty refuses a handful of positions mce accepts (e.g. a variant-terminal
+//! shakmaty refuses a handful of positions mcr accepts (e.g. a variant-terminal
 //! position, or an over-material crazyhouse pocket). The generator already avoids
 //! snapshotting terminal positions, but any position shakmaty rejects on parse is
 //! recorded as a skip rather than a divergence — a surprise is surfaced, never
@@ -59,9 +59,9 @@
 
 use std::process::ExitCode;
 
-use mce_compare::gen::{self, GenPos};
-use mce_compare::runtime::{McePos, ShakPos};
-use mce_compare::VARIANTS;
+use mcr_compare::gen::{self, GenPos};
+use mcr_compare::runtime::{McrPos, ShakPos};
+use mcr_compare::VARIANTS;
 
 /// Per-variant position target for the default run. The seeded generator plays
 /// enough games to yield at least this many *distinct* positions per variant
@@ -111,7 +111,7 @@ fn parse_args() -> Opts {
             }
             "--help" | "-h" => {
                 println!("usage: difftest [--full] [--count N] [--depth D] [--all]");
-                println!("  differential fuzz: mce vs shakmaty over seeded random positions");
+                println!("  differential fuzz: mcr vs shakmaty over seeded random positions");
                 println!("  --full       large per-variant budget ({FULL_COUNT})");
                 println!(
                     "  --count N    per-variant distinct-position target (default {DEFAULT_COUNT})"
@@ -143,7 +143,7 @@ enum Check {
     /// A perft mismatch reconciled as the documented terminal divergence: a
     /// variant terminal (king on the hill, third check, completed race, an
     /// exploded king in atomic, a captured side in antichess) is reachable within
-    /// the shallow perft tree, so shakmaty prunes the decided line while mce keeps
+    /// the shallow perft tree, so shakmaty prunes the decided line while mcr keeps
     /// counting. Not a bug — counted and skipped, exactly as the perft-parity
     /// harness does. See `terminal_divergent`.
     SkippedTerminalDivergence,
@@ -182,12 +182,12 @@ struct Tally {
 fn main() -> ExitCode {
     let opts = parse_args();
 
-    println!("mce vs shakmaty — differential fuzz (issue #109)");
+    println!("mcr vs shakmaty — differential fuzz (issue #109)");
     #[cfg(feature = "magic")]
-    println!("mce slider backend: magic bitboards (--features magic)");
+    println!("mcr slider backend: magic bitboards (--features magic)");
     #[cfg(not(feature = "magic"))]
-    println!("mce slider backend: hyperbola-quintessence (default)");
-    println!("engines: mce (path) vs shakmaty 0.27");
+    println!("mcr slider backend: hyperbola-quintessence (default)");
+    println!("engines: mcr (path) vs shakmaty 0.27");
     println!(
         "budget: up to {} distinct positions / variant, shallow perft depth {}",
         opts.count, opts.depth
@@ -252,10 +252,10 @@ fn main() -> ExitCode {
     if total.divergences == 0 {
         println!(
             "OK: {} positions checked across {} variants — \
-mce agrees with shakmaty on legal moves, perft (d{}), check/terminal status, \
+mcr agrees with shakmaty on legal moves, perft (d{}), check/terminal status, \
 and FEN round-trip. {} skipped (shakmaty rejected the FEN); {} perft mismatches \
 reconciled as the documented variant-terminal divergence (a terminal fires inside \
-the perft tree — shakmaty prunes, mce counts on).",
+the perft tree — shakmaty prunes, mcr counts on).",
             total.checked,
             VARIANTS.len(),
             opts.depth,
@@ -293,11 +293,11 @@ fn generate_for(variant: &'static str, target: usize) -> Vec<GenPos> {
 /// (counted, not failed), [`Check::Agree`] when every property matches, or
 /// [`Check::Divergence`] with a complete, copy-pasteable reproducer otherwise.
 fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
-    let Some(m) = McePos::parse(variant, fen) else {
-        // The generator only emits mce-parseable FENs, so this is unreachable in
+    let Some(m) = McrPos::parse(variant, fen) else {
+        // The generator only emits mcr-parseable FENs, so this is unreachable in
         // practice; treat a parse failure as a divergence to surface any drift.
         return Check::Divergence(format!(
-            "  fen:    {fen}\n  mce failed to parse its own generated FEN"
+            "  fen:    {fen}\n  mcr failed to parse its own generated FEN"
         ));
     };
     let Some(s) = ShakPos::parse(variant, fen) else {
@@ -310,12 +310,12 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
     let m_moves = m.legal_ucis();
     let s_moves = s.legal_ucis();
     if m_moves != s_moves {
-        let only_mce: Vec<&String> = m_moves.iter().filter(|u| !s_moves.contains(*u)).collect();
+        let only_mcr: Vec<&String> = m_moves.iter().filter(|u| !s_moves.contains(*u)).collect();
         let only_shak: Vec<&String> = s_moves.iter().filter(|u| !m_moves.contains(*u)).collect();
         diffs.push(format!(
-            "  legal moves differ:\n    only in mce ({}): {:?}\n    only in shakmaty ({}): {:?}",
-            only_mce.len(),
-            only_mce,
+            "  legal moves differ:\n    only in mcr ({}): {:?}\n    only in shakmaty ({}): {:?}",
+            only_mcr.len(),
+            only_mcr,
             only_shak.len(),
             only_shak,
         ));
@@ -323,7 +323,7 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
 
     // 2. shallow perft. A mismatch in a terminal-divergent variant where a
     // variant terminal is actually reachable within `depth` plies is the
-    // documented incomparable case (shakmaty prunes the decided line, mce counts
+    // documented incomparable case (shakmaty prunes the decided line, mcr counts
     // on); we reconcile it as a counted skip rather than a divergence — but only
     // after confirming a terminal is reachable, so a real movegen bug still fails.
     // The root position itself is non-terminal (the generator never snapshots a
@@ -337,7 +337,7 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
             terminal_skip = true;
         } else {
             diffs.push(format!(
-                "  perft(d{depth}) differ: mce={m_perft} shakmaty={s_perft}"
+                "  perft(d{depth}) differ: mcr={m_perft} shakmaty={s_perft}"
             ));
         }
     }
@@ -345,7 +345,7 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
     // 3. check status + single-position terminal status.
     if m.is_check() != s.is_check() {
         diffs.push(format!(
-            "  is_check differ: mce={} shakmaty={}",
+            "  is_check differ: mcr={} shakmaty={}",
             m.is_check(),
             s.is_check()
         ));
@@ -353,15 +353,15 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
     let (m_term, s_term) = (m.term_status(), s.term_status());
     if m_term != s_term {
         diffs.push(format!(
-            "  terminal status differ: mce={m_term:?} shakmaty={s_term:?}"
+            "  terminal status differ: mcr={m_term:?} shakmaty={s_term:?}"
         ));
     }
 
-    // 4. FEN round-trip (mce self-consistency + agreement with shakmaty).
+    // 4. FEN round-trip (mcr self-consistency + agreement with shakmaty).
     match m.fen_roundtrip(variant) {
-        None => diffs.push("  mce FEN round-trip failed: to_fen() did not re-parse".to_string()),
+        None => diffs.push("  mcr FEN round-trip failed: to_fen() did not re-parse".to_string()),
         Some(rt) if rt != m.to_fen() => diffs.push(format!(
-            "  mce FEN round-trip changed the position:\n    before: {}\n    after:  {rt}",
+            "  mcr FEN round-trip changed the position:\n    before: {}\n    after:  {rt}",
             m.to_fen()
         )),
         Some(_) => {}
@@ -370,7 +370,7 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
     let (m_fen, s_fen) = (m.to_fen(), s.to_fen());
     if !fens_equivalent(&m_fen, &s_fen) {
         diffs.push(format!(
-            "  serialized FEN differ:\n    mce:      {m_fen}\n    shakmaty: {s_fen}"
+            "  serialized FEN differ:\n    mcr:      {m_fen}\n    shakmaty: {s_fen}"
         ));
     }
 
@@ -392,23 +392,23 @@ fn check_position(variant: &str, fen: &str, depth: u32) -> Check {
 /// Compare two FENs for equivalence on the fields both engines agree to model,
 /// modulo a few *cosmetic notation* differences that are not positional bugs.
 ///
-/// The load-bearing FEN correctness check is mce's own `to_fen → from_fen`
+/// The load-bearing FEN correctness check is mcr's own `to_fen → from_fen`
 /// round-trip (asserted separately). This cross-engine comparison is a second,
-/// looser net: it confirms mce and shakmaty serialize the *same position* while
+/// looser net: it confirms mcr and shakmaty serialize the *same position* while
 /// tolerating the known places where the two crates spell the same fact
 /// differently:
 ///
 /// * **placement / crazyhouse pocket** — we strip a trailing `[...]` pocket so an
 ///   empty `[]` vs an omitted pocket is not a difference; pocket *contents* are
 ///   already validated through the drop moves in the legal-move set.
-/// * **castling rights** — chess960 has two equivalent encodings: mce emits
+/// * **castling rights** — chess960 has two equivalent encodings: mcr emits
 ///   Shredder file-letters (`GBgb`) while shakmaty in `CastlingMode::Chess960`
 ///   emits X-FEN shorthand (`KQkq`) for a standard-arrangement back rank. These
 ///   denote the *same* rights, so we compare only **which sides still hold a
 ///   castling right** (white-has-any / black-has-any by letter case), not the
 ///   exact letters. Whether each specific castle is *legal* is independently and
 ///   exactly checked through the legal-move set.
-/// * **en-passant square** — mce writes the X-FEN ep square whenever a pawn just
+/// * **en-passant square** — mcr writes the X-FEN ep square whenever a pawn just
 ///   double-pushed; shakmaty (`EnPassantMode::Legal`) writes it only when a legal
 ///   ep capture exists. We require agreement only when *both* name a square (a
 ///   `-` vs a square is the documented ep-mode convention difference); the

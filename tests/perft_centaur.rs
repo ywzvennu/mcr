@@ -1,10 +1,10 @@
 //! Centaur Chess (10x8 / `u128`) perft validation on the generic engine
 //! (issue #403) — the Capablanca board and castling, but with the
 //! Archbishop/Chancellor compounds replaced by two **Centaurs** (King + Knight,
-//! mce [`WideRole::Kheshig`]).
+//! mcr [`WideRole::Kheshig`]).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Centaur::perft` and by Fairy-Stockfish (FSF, the INI
+//! `mcr::geometry::Centaur::perft` and by Fairy-Stockfish (FSF, the INI
 //! `centaur` variant — a `capablanca` descendant with the compounds removed and
 //! `centaur = c`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
@@ -19,19 +19,19 @@
 //!
 //! ```text
 //! FSF dialect: rcnbqkbncr/pppppppppp/10/10/10/10/PPPPPPPPPP/RCNBQKBNCR w KQkq - 0 1
-//! mce dialect: rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1
+//! mcr dialect: rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the centaur's letter (`c` in FSF, `w` in mce, the Orda
+//! The two differ only in the centaur's letter (`c` in FSF, `w` in mcr, the Orda
 //! [`WideRole::Kheshig`] letter).
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_centaur -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Centaur, Square, WideMoveKind, WidePiece, WideRole};
-use mce::Color;
+use mcr::geometry::{perft as gperft, Cap10x8, Centaur, Square, WideMoveKind, WidePiece, WideRole};
+use mcr::Color;
 
-/// The Centaur Chess starting FEN (mce dialect), confirmed against
+/// The Centaur Chess starting FEN (mcr dialect), confirmed against
 /// Fairy-Stockfish's INI `centaur` variant.
 const STARTPOS: &str = "rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1";
 

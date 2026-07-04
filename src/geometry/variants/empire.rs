@@ -16,15 +16,15 @@
 //!   short fixed pattern** — the long-range mirror of the Orda cavalry
 //!   (knight-move / slider-capture). Confirmed square-for-square against FSF (its
 //!   `customPiece` Betza strings `mQc?` — *move* Queen, *capture* `?`):
-//!   * **Eagle** ([`WideRole::Eagle`], FSF `e:mQcN`, mce `*e`) — moves like a
+//!   * **Eagle** ([`WideRole::Eagle`], FSF `e:mQcN`, mcr `*e`) — moves like a
 //!     Queen; **captures like a Knight** (the eight 2-1 leaps).
-//!   * **Cardinal** ([`WideRole::Cardinal`], FSF `c:mQcB`, mce `*c`) — moves like a
+//!   * **Cardinal** ([`WideRole::Cardinal`], FSF `c:mQcB`, mcr `*c`) — moves like a
 //!     Queen; **captures like a Bishop** (a diagonal slide).
-//!   * **Tower** ([`WideRole::Tower`], FSF `t:mQcR`, mce `*t`) — moves like a
+//!   * **Tower** ([`WideRole::Tower`], FSF `t:mQcR`, mcr `*t`) — moves like a
 //!     Queen; **captures like a Rook** (an orthogonal slide).
-//!   * **Duke** ([`WideRole::Duke`], FSF `d:mQcK`, mce `*d`) — moves like a Queen;
+//!   * **Duke** ([`WideRole::Duke`], FSF `d:mQcK`, mcr `*d`) — moves like a Queen;
 //!     **captures like a King** (the eight one-step squares).
-//!   * **Soldier** ([`WideRole::Soldier`], FSF `s`, mce `z`) — steps one square
+//!   * **Soldier** ([`WideRole::Soldier`], FSF `s`, mcr `z`) — steps one square
 //!     **forward or sideways** (toward Black, never backward, never diagonal, no
 //!     promotion). Identical to the Synochess / Xiangqi soldier mover, colour
 //!     White (so its forward is toward rank 8). The two Empire soldiers begin on
@@ -63,16 +63,16 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppp/8/8/8/PPPSSPPP/8/TECDKCET w kq - 0 1
-//! mce dialect: rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T w kq - 0 1
+//! mcr dialect: rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T w kq - 0 1
 //! ```
 //!
 //! Black is ordinary chess on ranks 7-8. White's Empire back rank (rank 1) is
 //! `T E C D K C E T` (Tower, Eagle, Cardinal, Duke, King, Cardinal, Eagle, Tower)
 //! and its pawn shield on rank 3 is `PPP S S PPP` (six pawns plus two Soldiers on
-//! the d/e files); rank 2 is **empty** — the Empire asymmetry. mce spells the four
+//! the d/e files); rank 2 is **empty** — the Empire asymmetry. mcr spells the four
 //! Empire pieces with `*`-prefixed overflow tokens (`*t *e *c *d`, recycling the
 //! FSF mnemonics) and the Soldier as `z`; the two FENs are the same position, and
-//! the `compare-fairy/` harness rewrites mce's tokens (`*e → e`, `*c → c`,
+//! the `compare-fairy/` harness rewrites mcr's tokens (`*e → e`, `*c → c`,
 //! `*t → t`, `*d → d`, `z → s`) when driving FSF. Only Black has castling rights
 //! (`kq`).
 
@@ -85,7 +85,7 @@ use crate::geometry::{
 };
 use crate::Color;
 
-/// The confirmed Empire starting placement, mce dialect (see the [module
+/// The confirmed Empire starting placement, mcr dialect (see the [module
 /// docs](self)): Black standard chess on ranks 7-8, White's Empire back rank
 /// `*T *E *C *D K *C *E *T` on rank 1, a `PPP *Z *Z PPP` pawn-and-Soldier shield
 /// on rank 3, and an empty rank 2.
@@ -350,7 +350,7 @@ impl WideVariant<Chess8x8> for EmpireRules {
 /// Empire as a [`GenericPosition`] over the 8x8 [`Chess8x8`] geometry.
 ///
 /// Construct the starting position (standard Black vs the White Empire army) with
-/// [`Empire::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Empire::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Empire::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the Queen-only promotion, and the
 /// flag-win / king-faceoff rules.

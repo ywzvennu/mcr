@@ -5,7 +5,7 @@
 //! move it makes**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Kyotoshogi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Kyotoshogi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant kyotoshogi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/kyotoshogi.rs`); this test pins the
@@ -19,7 +19,7 @@
 //! p+nks+l/5/5/5/+LSK+NP[-] w 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket (its hand is
+//! mcr renders the same position with an empty `[]` holdings bracket (its hand is
 //! empty at the start) and the shared `+`-prefixed promoted-token board FEN. The
 //! FSF-confirmed startpos perft sequence is `12, 137, 1636, 18268, 225903,
 //! 2829234`.
@@ -38,7 +38,7 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_kyotoshogi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Kyotoshogi, Minishogi5x5};
+use mcr::geometry::{perft as gperft, Kyotoshogi, Minishogi5x5};
 
 /// The Kyoto Shogi starting FEN, confirmed against Fairy-Stockfish's `UCI_Variant
 /// kyotoshogi`. The hand is empty (`[]`); the `+`-prefixed back-rank tokens are

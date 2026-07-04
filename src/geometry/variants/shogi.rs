@@ -60,7 +60,7 @@
 //! lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[-] w - - 0 1
 //! ```
 //!
-//! mce uses the same board placement and an empty `[]` holdings bracket (its hand
+//! mcr uses the same board placement and an empty `[]` holdings bracket (its hand
 //! is empty at the start); the `compare-fairy/` harness reconciles the empty-hand
 //! rendering when driving FSF.
 
@@ -297,7 +297,7 @@ impl WideVariant<Shogi9x9> for ShogiRules {
     // generation does not enforce it** — its `go perft` lists a mating pawn drop
     // as a legal move (confirmed: a pawn drop that is checkmate appears in FSF's
     // perft divide). Since this variant is validated *node-for-node against FSF
-    // perft*, mce matches FSF and therefore does **not** apply the uchifuzume
+    // perft*, mcr matches FSF and therefore does **not** apply the uchifuzume
     // filter (`pawn_drop_mate_forbidden` stays at its `false` default). The engine
     // has the machinery (the hook + the mate test) should a strict-rules mode ever
     // be wanted, but enabling it here would diverge from FSF by exactly the count

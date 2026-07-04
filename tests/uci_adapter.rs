@@ -1,26 +1,26 @@
-//! Integration tests for the `mce-uci` binary: drive it over stdin/stdout the
+//! Integration tests for the `mcr-uci` binary: drive it over stdin/stdout the
 //! way an external UCI perft harness would, and check the handshake and the
 //! Fairy-Stockfish-shaped `go perft` output.
 
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-/// Feeds `input` to a fresh `mce-uci` process and returns its stdout.
+/// Feeds `input` to a fresh `mcr-uci` process and returns its stdout.
 fn run(input: &str) -> String {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_mce-uci"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_mcr-uci"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .expect("spawn mce-uci");
+        .expect("spawn mcr-uci");
     child
         .stdin
         .take()
         .expect("child stdin")
         .write_all(input.as_bytes())
         .expect("write stdin");
-    let out = child.wait_with_output().expect("wait mce-uci");
-    assert!(out.status.success(), "mce-uci exited with {:?}", out.status);
+    let out = child.wait_with_output().expect("wait mcr-uci");
+    assert!(out.status.success(), "mcr-uci exited with {:?}", out.status);
     String::from_utf8(out.stdout).expect("utf8 stdout")
 }
 
@@ -38,7 +38,7 @@ fn nodes_searched(text: &str) -> u64 {
 #[test]
 fn handshake_lists_variants_and_answers_ready() {
     let out = run("uci\nisready\nquit\n");
-    assert!(out.contains("id name mce-uci"));
+    assert!(out.contains("id name mcr-uci"));
     assert!(out.contains("uciok"));
     assert!(out.contains("readyok"));
     // The combo option enumerates variants from both families.

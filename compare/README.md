@@ -1,35 +1,35 @@
-# mce-compare — perft benchmark (mce vs shakmaty)
+# mcr-compare — perft benchmark (mcr vs shakmaty)
 
-A reusable benchmark that compares the `mce` chess engine's perft
+A reusable benchmark that compares the `mcr` chess rules library's perft
 (move-generation) throughput against [`shakmaty`](https://crates.io/crates/shakmaty)
 for standard chess and all eight supported variants.
 
 ## ⚠️ Licensing isolation (important)
 
-`shakmaty` is licensed **GPL-3.0+**. This `mce-compare` crate links it **for
-benchmarking only**. To keep the `mce` library clean-room and free of any
+`shakmaty` is licensed **GPL-3.0+**. This `mcr-compare` crate links it **for
+benchmarking only**. To keep the `mcr` library clean-room and free of any
 copyleft obligation:
 
 - This crate is a **separate, nested crate** (`compare/`), not part of the
-  published `mce` package and not in any workspace — the same arrangement as the
+  published `mcr` package and not in any workspace — the same arrangement as the
   `fuzz/` crate.
 - It is marked `publish = false`. It is **never published or distributed**.
-- The `mce` library **does not depend on shakmaty** — not as a dependency and
+- The `mcr` library **does not depend on shakmaty** — not as a dependency and
   not as a dev-dependency. You can confirm this:
 
   ```sh
-  cargo tree -e normal -p mce        # shows no shakmaty
+  cargo tree -e normal -p mcr        # shows no shakmaty
   cargo publish --dry-run            # packages zero compare/ files
   ```
 
 Because this crate is never distributed, linking GPL-3.0+ `shakmaty` here
-imposes **no licensing obligation** on the `mce` library, which remains
+imposes **no licensing obligation** on the `mcr` library, which remains
 **MIT OR Apache-2.0**. (This crate's own manifest is marked
 `GPL-3.0-or-later` to honour shakmaty's terms for the benchmark binary itself.)
 
 ## What it does
 
-The suite measures mce against shakmaty over **hundreds of positions** drawn
+The suite measures mcr against shakmaty over **hundreds of positions** drawn
 from three pools, then runs a parity cross-check over all of them, deep-perft
 timing over a graded subset, and non-perft micro-benchmarks.
 
@@ -44,7 +44,7 @@ timing over a graded subset, and non-perft micro-benchmarks.
    facts; the loader is our own code. The file is embedded with `include_str!`.
    A few source lines describe positions one engine rejects; the loader/parity
    pass skips and **counts** those, so every retained line is a position both
-   engines accept. mce is checked against **both** the published reference count
+   engines accept. mcr is checked against **both** the published reference count
    and shakmaty.
 3. **Seeded generated baskets** — for each variant, a fixed-seed PRNG
    (`splitmix64`) plays random legal games and snapshots FENs at a spread of
@@ -58,32 +58,32 @@ timing over a graded subset, and non-perft micro-benchmarks.
 ### Parity (cheap, over EVERYTHING)
 
 Every position in every pool is run through both engines at a **shallow** perft
-depth and the node counts are asserted equal; for EPD positions mce is also
+depth and the node counts are asserted equal; for EPD positions mcr is also
 checked against the published reference. This is a broad, independent
-re-validation of mce's move generation — hundreds of positions and tens of
+re-validation of mcr's move generation — hundreds of positions and tens of
 millions of nodes. Any mismatch **fails loudly and exits non-zero**.
 
 ### Timing (expensive, over a graded subset)
 
 The curated basket plus a per-variant sample of generated positions are timed at
 deeper depths using an **interleaved A/B/A/B…** schedule (each iteration times
-one mce and one shakmaty run, alternating which goes first) so slow thermal/clock
+one mcr and one shakmaty run, alternating which goes first) so slow thermal/clock
 drift is shared evenly between the engines. Each engine is warmed up and sampled
-many times; the report shows the **median** throughput, **mce/shakmaty ratio**,
+many times; the report shows the **median** throughput, **mcr/shakmaty ratio**,
 and a spread (IQR + coefficient of variation).
 
 ### Micro-benchmarks (non-perft hot paths)
 
 Over a standard-chess sample the suite also times `legal_moves()` generation,
-`play()` make-move, and FEN parse+serialize throughput (mce vs shakmaty), plus
-mce-only **SAN** and **Zobrist** throughput.
+`play()` make-move, and FEN parse+serialize throughput (mcr vs shakmaty), plus
+mcr-only **SAN** and **Zobrist** throughput.
 
 ### Parity caveats (koth / three-check / racing / atomic / antichess / crazyhouse)
 
 For the variants with a *path-dependent terminal* (a king on the hill, the third
 check, a completed king race, an atomic king explosion, an antichess side with
 no pieces), shakmaty stops expanding a line the instant the terminal fires while
-mce's `perft_variant` keeps counting. The curated basket avoids depths where the
+mcr's `perft_variant` keeps counting. The curated basket avoids depths where the
 terminal fires; the **generated** positions are screened — when a deep count
 diverges, the suite confirms a terminal is actually reachable inside the perft
 tree and records the position as an **incomparable skip** (counted, never
@@ -96,11 +96,11 @@ rejects is likewise counted as a skip.
 Comprehensive report (run in `--release`):
 
 ```sh
-cargo run --release -p mce-compare                     # default (HQ sliders)
-cargo run --release --features magic --bin mce-compare # magic-bitboard sliders
-cargo run --release --bin mce-compare -- --csv         # + machine-readable CSV
-cargo run --release --bin mce-compare -- --json        # + machine-readable JSON
-cargo run --release --bin mce-compare -- --full        # deeper timing + parity
+cargo run --release -p mcr-compare                     # default (HQ sliders)
+cargo run --release --features magic --bin mcr-compare # magic-bitboard sliders
+cargo run --release --bin mcr-compare -- --csv         # + machine-readable CSV
+cargo run --release --bin mcr-compare -- --json        # + machine-readable JSON
+cargo run --release --bin mcr-compare -- --full        # deeper timing + parity
 ```
 
 The **default** run cross-checks ~1,050 positions and finishes in a few minutes
@@ -111,7 +111,7 @@ correspondingly longer.
 Rigorous criterion benches (one representative position per variant):
 
 ```sh
-cargo bench -p mce-compare
+cargo bench -p mcr-compare
 ```
 
 The binary prints, in order: a **per-variant parity table** (positions + nodes

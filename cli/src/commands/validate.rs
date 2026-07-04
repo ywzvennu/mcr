@@ -1,4 +1,4 @@
-//! `mce validate` — parse and validate a FEN.
+//! `mcr validate` — parse and validate a FEN.
 //!
 //! Exits 0 with an `ok:` line when the FEN parses (and, for the chosen variant,
 //! is a legal position the library accepts); exits nonzero with an error message
@@ -8,7 +8,7 @@ use clap::Args;
 
 use crate::util::{self, CliResult};
 
-/// Arguments for `mce validate <FEN>`.
+/// Arguments for `mcr validate <FEN>`.
 #[derive(Debug, Args)]
 pub struct ValidateArgs {
     /// FEN to validate, or `startpos`.

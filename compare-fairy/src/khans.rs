@@ -1,10 +1,10 @@
 //! Khan's Chess differential perft + timing against Fairy-Stockfish (issue #272).
 //!
-//! Khan's Chess runs on mce's **generic** engine (`mce::geometry::Khans`, a
+//! Khan's Chess runs on mcr's **generic** engine (`mcr::geometry::Khans`, a
 //! `GenericPosition<Chess8x8, KhansRules>`), like the other fairy variants, so it
 //! has its own corpus and comparison loop here. The FSF side selects
 //! `UCI_Variant khans`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput.
+//! match, and reports mcr-vs-FSF throughput.
 //!
 //! ## Khan's Chess is an INI variant
 //!
@@ -12,18 +12,18 @@
 //! binary. The harness therefore loads the INI
 //! (`setoption name VariantPath value <variants.ini>`) before checking
 //! [`Engine::has_variant`](crate::uci::Engine::has_variant); the INI path is
-//! resolved from `$MCE_FSF_VARIANTS_INI`, then a `variants.ini` sitting beside the
+//! resolved from `$MCR_FSF_VARIANTS_INI`, then a `variants.ini` sitting beside the
 //! FSF binary, then the harness build dir. If none is found (or the loaded INI
 //! still lacks `khans`), the whole block is skipped cleanly.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same Khan's Chess position with **different Khan-piece
+//! mcr and FSF render the same Khan's Chess position with **different Khan-piece
 //! letters**. FSF's `khans` uses `l h a t k s` (Lancer = kniroo, Kheshig = centaur,
-//! Archer = knibis, Khan = `mNcK`, King, soldier = `mfhNcfW`); mce reuses `l`/`h`/`a`
+//! Archer = knibis, Khan = `mNcK`, King, soldier = `mfhNcfW`); mcr reuses `l`/`h`/`a`
 //! for its Lance / Hoplite / Hawk, so the shared Orda pieces take the letters Lancer
 //! `f`, Kheshig `w`, Archer `y`, and the two new Khan pieces take overflow-3 tokens
-//! `=t` (Khan) / `=s` (soldier). [`to_fsf_dialect`] maps mce's letters back to FSF's
+//! `=t` (Khan) / `=s` (soldier). [`to_fsf_dialect`] maps mcr's letters back to FSF's
 //! over the placement field: it drops the `=` prefix of each overflow-3 token
 //! (whose recycled base is already FSF's own letter `t` / `s`) and rewrites the
 //! shared `f`/`w`/`y`. The comparison asserts only node counts, so the move-string
@@ -35,11 +35,11 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Chess8x8, Khans};
+use mcr::geometry::{perft as gperft, Chess8x8, Khans};
 
 use crate::uci::Engine;
 
-/// One Khan's Chess corpus position. The FEN is mce's dialect; the FSF side
+/// One Khan's Chess corpus position. The FEN is mcr's dialect; the FSF side
 /// translates it via [`to_fsf_dialect`].
 struct Case {
     label: &'static str,
@@ -90,7 +90,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Translates an mce-dialect Khan's Chess FEN to FSF's dialect over the placement
+/// Translates an mcr-dialect Khan's Chess FEN to FSF's dialect over the placement
 /// field. Each overflow-3 token `=t` / `=s` (Khan / soldier) drops its `=` prefix —
 /// the recycled base letter is already FSF's own `t` / `s` — and the shared Orda
 /// letters map Lancer `f→l`, Kheshig `w→h`, Archer `y→a` (both cases). The King
@@ -129,11 +129,11 @@ pub(crate) fn to_fsf_dialect(fen: &str) -> String {
     }
 }
 
-/// Resolve the FSF `variants.ini` path: `$MCE_FSF_VARIANTS_INI`, then a sibling
+/// Resolve the FSF `variants.ini` path: `$MCR_FSF_VARIANTS_INI`, then a sibling
 /// `variants.ini` beside the FSF binary (the upstream layout `…/src/stockfish` +
 /// `…/src/variants.ini`), then the harness build dir's checkout.
 fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("MCE_FSF_VARIANTS_INI") {
+    if let Ok(p) = std::env::var("MCR_FSF_VARIANTS_INI") {
         let path = PathBuf::from(p);
         if path.is_file() {
             return Some(path);
@@ -161,17 +161,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -184,15 +184,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Khan's Chess corpus through mce and FSF. Returns the number of
+/// Run the Khan's Chess corpus through mcr and FSF. Returns the number of
 /// mismatches (0 = all matched). Loads FSF's `variants.ini` first (Khan's Chess is
 /// an INI variant); if the INI cannot be found or still lacks `khans`, the block is
 /// skipped (returns 0) rather than reporting spurious mismatches.
@@ -210,7 +210,7 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
             }
             None => {
                 println!(
-                    "  (skipped: no variants.ini found; set $MCE_FSF_VARIANTS_INI to FSF's \
+                    "  (skipped: no variants.ini found; set $MCR_FSF_VARIANTS_INI to FSF's \
                      variants.ini to enable the Khan's Chess comparison)"
                 );
                 return 0;
@@ -227,7 +227,7 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
 
     let head = format!(
         "{:<14} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -246,10 +246,10 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
                     "{:<14} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -261,16 +261,16 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "khans OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "khans OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -283,20 +283,20 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Khan's Chess parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH khans/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH khans/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Khan's Chess position through mce's generic perft and FSF's `go perft`.
+/// Run one Khan's Chess position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Khans::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Khans::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = to_fsf_dialect(case.fen);
     engine.set_variant("khans", false)?;
@@ -307,10 +307,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -320,7 +320,7 @@ mod tests {
     use super::*;
 
     /// The corpus FENs all parse on the generic Khan's Chess engine, round-trip
-    /// through mce's FEN I/O, and the pinned shallow counts match the FSF-confirmed
+    /// through mcr's FEN I/O, and the pinned shallow counts match the FSF-confirmed
     /// numbers in `tests/perft_khans.rs` (this runs without FSF present).
     #[test]
     fn corpus_fens_parse_and_match_pinned_shallow_counts() {
@@ -350,17 +350,17 @@ mod tests {
         }
     }
 
-    /// The dialect swap maps mce's Khan letters to FSF's and leaves the structural
+    /// The dialect swap maps mcr's Khan letters to FSF's and leaves the structural
     /// fields untouched.
     #[test]
     fn dialect_swap_maps_khan_letters() {
-        let mce = "fwy=tkywf/=s=s=s=s=s=s=s=s/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
-        let fsf = to_fsf_dialect(mce);
+        let mcr = "fwy=tkywf/=s=s=s=s=s=s=s=s/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
+        let fsf = to_fsf_dialect(mcr);
         assert_eq!(
             fsf,
             "lhatkahl/ssssssss/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1"
         );
-        // A White Khan (mce `=T`) maps to FSF's `T`; a White soldier `=S` to `S`.
+        // A White Khan (mcr `=T`) maps to FSF's `T`; a White soldier `=S` to `S`.
         assert_eq!(to_fsf_dialect("4=T3"), "4T3");
         assert_eq!(to_fsf_dialect("4=S3"), "4S3");
         // The standard White army and the clock fields are unchanged.

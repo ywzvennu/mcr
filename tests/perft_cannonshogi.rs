@@ -8,27 +8,27 @@
 //! with the cannon pseudo-legal + per-move-verify king-safety path.
 //!
 //! Every count below was produced by Fairy-Stockfish (`go perft <d>` with
-//! `VariantPath` pointing at the bundled `variants.ini`) and re-verified by mce.
-//! The mce dialect differs from FSF only in the cannon piece letters (Cannon `c`;
+//! `VariantPath` pointing at the bundled `variants.ini`) and re-verified by mcr.
+//! The mcr dialect differs from FSF only in the cannon piece letters (Cannon `c`;
 //! the three new movers `=a` / `=c` / `=i`; the promoted forms `=u` / `=w` / `=f` /
 //! `=e`); see `compare-fairy/src/cannonshogi.rs` for the round-trip harness.
 
-use mce::geometry::{perft as gperft, CannonShogi, Shogi9x9};
+use mcr::geometry::{perft as gperft, CannonShogi, Shogi9x9};
 
-/// The confirmed Cannon Shogi start (FSF `position startpos`), mce dialect, empty
+/// The confirmed Cannon Shogi start (FSF `position startpos`), mcr dialect, empty
 /// hand. FSF: `lnsgkgsnl/1rci1uab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1BAU1ICR1/LNSGKGSNL[-] w 0 1`.
 const STARTPOS: &str =
     "lnsgkgsnl/1r=c=i1c=ab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1B=AC1=I=CR1/LNSGKGSNL[] w - - 0 1";
 
 /// A midgame reached from the start (FSF `moves d2d7 c7c6 d7d9+ b8b9`): White has a
-/// promoted Cannon (`+U`, mce `=U`) on the board and a Gold in hand, Black to move.
+/// promoted Cannon (`+U`, mcr `=U`) on the board and a Gold in hand, Black to move.
 /// Exercises a promoted cannon, a hand drop, and an over-screen cannon capture.
 const MIDGAME_PROMOTED: &str =
     "lns=Ukgsnl/1r=c=i1c=ab1/p3p1p1p/2p6/9/9/P1P1P1P1P/1B=A2=I=CR1/LNSGKGSNL[G] b - - 0 2";
 
 /// A sparse drop-heavy lab: lone kings with both hands full of every cannon-type
 /// piece (and a Rook / Bishop). Stresses drop generation and the cannon hop sets on
-/// an open board. FSF `4k4/9/9/9/9/9/9/9/4K4[RBUACIrbuaci] w - - 0 1`, mce dialect.
+/// an open board. FSF `4k4/9/9/9/9/9/9/9/4K4[RBUACIrbuaci] w - - 0 1`, mcr dialect.
 const DROP_LAB: &str = "4k4/9/9/9/9/9/9/9/4K4[RBC=A=C=Irbc=a=c=i] w - - 0 1";
 
 fn check(fen: &str, cases: &[(u32, u64)]) {

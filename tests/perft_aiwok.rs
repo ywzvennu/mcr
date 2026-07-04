@@ -4,7 +4,7 @@
 //! Knight + Ferz super-piece (FSF `AIWOK`, Betza `RNF`). The node counts below are
 //! pinned **and cross-checked against Fairy-Stockfish** (FSF, `UCI_Variant
 //! ai-wok`): every `(depth, nodes)` pair here was produced identically by
-//! `mce::geometry::Aiwok::perft` and by FSF's `go perft` on the byte-identical
+//! `mcr::geometry::Aiwok::perft` and by FSF's `go perft` on the byte-identical
 //! FEN. The `compare-fairy/` harness re-runs that head-to-head on demand (its
 //! `--difffuzz --variant ai-wok` mode); this test pins the confirmed numbers so a
 //! regression is caught without FSF present.
@@ -12,9 +12,9 @@
 //! Confirmed Ai-Wok starting FEN (from FSF `position startpos`):
 //!   `rnsaksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKASNR w - - 0 1`
 //!
-//! where FSF's `a` / `A` is the Ai-Wok. mce has no dedicated Ai-Wok role (the wire
+//! where FSF's `a` / `A` is the Ai-Wok. mcr has no dedicated Ai-Wok role (the wire
 //! format caps a role index at 7 bits and the table is full), so it fields the
-//! movement-identical Rook + Knight + Ferz [`mce::geometry::WideRole::Ship`], whose
+//! movement-identical Rook + Knight + Ferz [`mcr::geometry::WideRole::Ship`], whose
 //! FEN token is the second-bank overflow `**s` / `**S`; the two describe the
 //! byte-identical board.
 //!
@@ -22,12 +22,12 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_aiwok -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Aiwok, Bitboard, Chess8x8, Square, WideMoveKind, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
-/// The Ai-Wok starting FEN in mce's dialect (the Ai-Wok spelled `**s` / `**S`),
+/// The Ai-Wok starting FEN in mcr's dialect (the Ai-Wok spelled `**s` / `**S`),
 /// the byte-identical board to FSF's `rnsaksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKASNR
 /// w - - 0 1`.
 const STARTPOS: &str = "rns**sksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSK**SSNR w - - 0 1";
@@ -75,7 +75,7 @@ fn mid_cheap() {
 
 // -- Rule-level self-checks (independent of FSF) ----------------------------
 
-/// The starting array round-trips through FEN and matches the confirmed mce-dialect
+/// The starting array round-trips through FEN and matches the confirmed mcr-dialect
 /// string; the opening move count is 26 (FSF-confirmed perft(1)).
 #[test]
 fn startpos_fen_round_trips() {

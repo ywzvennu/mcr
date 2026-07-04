@@ -6,9 +6,9 @@
 //! Every rule is standard chess — the 8x8 board, standard pawns (double step, en
 //! passant), standard castling — except the piece on the queen's square (d-file):
 //!
-//! * **Chancellor** (Rook + Knight) — mce's [`WideRole::Elephant`], whose default
+//! * **Chancellor** (Rook + Knight) — mcr's [`WideRole::Elephant`], whose default
 //!   movement (`rook | knight`) is already the chancellor's. FEN letter `e`/`E` in
-//!   the mce dialect (Fairy-Stockfish spells the chancellor `c`/`C`, a dialect
+//!   the mcr dialect (Fairy-Stockfish spells the chancellor `c`/`C`, a dialect
 //!   difference the `compare-fairy/` harness reconciles, exactly as for
 //!   Capablanca).
 //!
@@ -22,11 +22,11 @@
 //!
 //! ```text
 //! FSF dialect: rnbckbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBCKBNR w KQkq - 0 1
-//! mce dialect: rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1
+//! mcr dialect: rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1
 //! ```
 //!
 //! The two strings differ only in the chancellor's letter (`c` in FSF, `e` in
-//! mce). Every other piece, castling, the double pawn step, and en passant are
+//! mcr). Every other piece, castling, the double pawn step, and en passant are
 //! standard chess.
 
 use crate::geometry::position::{
@@ -35,7 +35,7 @@ use crate::geometry::position::{
 use crate::geometry::{Board, Chess8x8, Geometry, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
-/// The confirmed Almost Chess starting placement in the mce dialect (chancellor =
+/// The confirmed Almost Chess starting placement in the mcr dialect (chancellor =
 /// `e`/`E`), byte-for-byte equivalent to Fairy-Stockfish's
 /// `rnbckbnr/.../RNBCKBNR` modulo the chancellor's letter.
 const ALMOST_START_PLACEMENT: &str = "rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR";

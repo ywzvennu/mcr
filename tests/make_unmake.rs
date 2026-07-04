@@ -14,7 +14,7 @@
 //! captures (antichess), check counters (three-check), and arbitrary-geometry
 //! castling (chess960).
 
-use mce::{
+use mcr::{
     perft, Antichess, Atomic, Chess, Chess960, Crazyhouse, Horde, KingOfTheHill, Position,
     RacingKings, ThreeCheck, Variant, VariantPosition,
 };

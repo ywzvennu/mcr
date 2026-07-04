@@ -80,7 +80,7 @@ jobs:
   # runtime/build dependency graph stays advisory-free and license-compatible
   # (permissive only — no copyleft) and is sourced only from crates.io. The
   # config lives in `deny.toml` at the repo root. The GPL-fenced compare-fairy /
-  # compare and fuzz crates are non-workspace and absent from mce's dependency
+  # compare and fuzz crates are non-workspace and absent from mcr's dependency
   # graph, so they are out of scope here. A single deny check is cheap (no
   # compile), so it runs on every push and PR rather than being schedule-gated.
   cargo-deny:
@@ -218,7 +218,7 @@ jobs:
   # tests — the FSF-free parts: FEN-dialect round-trips, divide-line parsing, and
   # pinned shallow perft counts. None of these spawn Fairy-Stockfish (FSF is only
   # ever driven by the differential binary, not the unit tests), so with no
-  # `MCE_FSF_BIN` set they run fully and deterministically. Kept cheap (debug
+  # `MCR_FSF_BIN` set they run fully and deterministically. Kept cheap (debug
   # build, no FSF) so it can stay on every PR and prevent the rot recurring.
   compare-fairy-unit:
     name: compare-fairy (unit)
@@ -234,7 +234,7 @@ jobs:
         with:
           workspaces: compare-fairy
 
-      # No MCE_FSF_BIN is exported, so every test here is FSF-free by
+      # No MCR_FSF_BIN is exported, so every test here is FSF-free by
       # construction; the differential binary that drives FSF is exercised by the
       # gated `fairy-differential` job below.
       - name: compare-fairy unit tests (FSF-free)
@@ -242,7 +242,7 @@ jobs:
 
   # Build + smoke-test the three consumer bindings (wasm / C / Python) and catch
   # drift. Like `compare-fairy-unit`, these crates live OUTSIDE the workspace
-  # (path deps on mce, `publish = false`, `exclude`d from the published package),
+  # (path deps on mcr, `publish = false`, `exclude`d from the published package),
   # so the root `cargo build`/`cargo test` never touches them and they could rot
   # silently. This job is the guard against that.
   #
@@ -263,7 +263,7 @@ jobs:
       - name: Install Rust toolchain (+ wasm32 target)
         uses: dtolnay/rust-toolchain@stable
         with:
-          # wasm32-unknown-unknown is the mce-wasm build/test target; the C and
+          # wasm32-unknown-unknown is the mcr-wasm build/test target; the C and
           # Python bindings build for the host.
           targets: wasm32-unknown-unknown
 
@@ -277,7 +277,7 @@ jobs:
             bindings/c
             bindings/python
 
-      # Pinned to the version used to (re)generate the committed include/mce.h so
+      # Pinned to the version used to (re)generate the committed include/mcr.h so
       # the drift diff below compares like-for-like; a formatting change in a newer
       # cbindgen would otherwise show as spurious drift. Bump this in lockstep when
       # the header is regenerated with a newer cbindgen.
@@ -291,17 +291,17 @@ jobs:
 
       # -- C binding: header-drift check, then build + run the C smoke test ------
       # Regenerate the header into a temp file and diff it against the committed
-      # include/mce.h. `diff` exits non-zero on ANY difference, failing the job:
+      # include/mcr.h. `diff` exits non-zero on ANY difference, failing the job:
       # this is the guard that the checked-in header cannot drift from the FFI
-      # surface in src/lib.rs. build_test.sh then builds libmce.a and compiles +
+      # surface in src/lib.rs. build_test.sh then builds libmcr.a and compiles +
       # runs test.c against it.
       - name: C — cbindgen header-drift check
         working-directory: bindings/c
         run: |
-          cbindgen --config cbindgen.toml --crate mce-c --output "$RUNNER_TEMP/mce.h"
-          if ! diff -u include/mce.h "$RUNNER_TEMP/mce.h"; then
-            echo "::error::bindings/c/include/mce.h is out of date." \
-              "Regenerate it: cbindgen --config cbindgen.toml --crate mce-c --output include/mce.h"
+          cbindgen --config cbindgen.toml --crate mcr-c --output "$RUNNER_TEMP/mcr.h"
+          if ! diff -u include/mcr.h "$RUNNER_TEMP/mcr.h"; then
+            echo "::error::bindings/c/include/mcr.h is out of date." \
+              "Regenerate it: cbindgen --config cbindgen.toml --crate mcr-c --output include/mcr.h"
             exit 1
           fi
 
@@ -318,7 +318,7 @@ jobs:
       # -- Python binding: build the pyo3 extension and run pytest ---------------
       # `pip install` uses maturin (the build backend declared in pyproject.toml)
       # under build isolation to compile the abi3 extension and install it plus the
-      # `[test]` extra (pytest); then the smoke tests import `mce` and run.
+      # `[test]` extra (pytest); then the smoke tests import `mcr` and run.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -333,7 +333,7 @@ jobs:
   # `workflow_dispatch` only (never per-PR), because it builds Fairy-Stockfish
   # from source (~2 min, GPL-3.0+) and runs the slow deep `--ignored` perft
   # sweep. FSF is GPL: it is built and driven purely AS A SUBPROCESS over a
-  # process boundary (the clean-room `mce` library never links or vendors it),
+  # process boundary (the clean-room `mcr` library never links or vendors it),
   # and the binary is never committed or cached into the repo.
   fairy-differential:
     name: fairy-differential (FSF + deep perft)
@@ -358,11 +358,11 @@ jobs:
 
       - name: Export FSF environment
         run: |
-          echo "MCE_FSF_BIN=$GITHUB_WORKSPACE/fsf/src/stockfish" >> "$GITHUB_ENV"
-          echo "MCE_FSF_VARIANTS_INI=$GITHUB_WORKSPACE/fsf/src/variants.ini" >> "$GITHUB_ENV"
+          echo "MCR_FSF_BIN=$GITHUB_WORKSPACE/fsf/src/stockfish" >> "$GITHUB_ENV"
+          echo "MCR_FSF_VARIANTS_INI=$GITHUB_WORKSPACE/fsf/src/variants.ini" >> "$GITHUB_ENV"
 
-      # Full differential: asserts mce's perft node counts equal FSF's across the
-      # shared variants. With MCE_FSF_BIN set the harness runs (rather than
+      # Full differential: asserts mcr's perft node counts equal FSF's across the
+      # shared variants. With MCR_FSF_BIN set the harness runs (rather than
       # skipping) and exits non-zero on any divergence.
       - name: compare-fairy differential vs FSF
         run: cargo run --release --manifest-path compare-fairy/Cargo.toml
@@ -372,7 +372,7 @@ jobs:
       # Spartan promotion set, the Shako/Synochess cannon-aware castling king-walk).
       # Where the corpus differential above pins a fixed basket of positions, this
       # plays seeded random *legal* games from each variant's start and cross-checks
-      # mce's perft(1)/perft(2)+divide against FSF node-by-node, so a regression on a
+      # mcr's perft(1)/perft(2)+divide against FSF node-by-node, so a regression on a
       # reachable-but-un-pinned position surfaces here. Bounded games/plies keep each
       # game deterministic from its seed. This job is GATED (schedule /
       # workflow_dispatch only), so it does not spend per-PR CI minutes and can afford
@@ -385,12 +385,12 @@ jobs:
       # base seed **rotates with `github.run_number`** (`run_number*3 + {0,1,2}`), so
       # successive scheduled runs walk different random trajectories and accumulate
       # coverage over time while any single run stays fully reproducible from its
-      # printed seeds. MCE_FSF_BIN/MCE_FSF_VARIANTS_INI are already exported above, so
+      # printed seeds. MCR_FSF_BIN/MCR_FSF_VARIANTS_INI are already exported above, so
       # the harness runs (rather than skipping); `main` exits non-zero on any
       # divergence and the default `bash -e` shell propagates that out of the loop, so
       # a divergence on ANY seed fails the job. Four variants (Janggi, Sittuyin,
       # Synochess, Empire) are held back from this deep sweep — each hits a documented
-      # FSF *oracle* limitation, not an mce bug, whose false divergences scale with
+      # FSF *oracle* limitation, not an mcr bug, whose false divergences scale with
       # games/plies (see `difffuzz.rs::HELD_BACK`). They stay covered by the
       # fixed-corpus differential above, their `perft_*` tests, and the explicit
       # proven-clean fuzz step below.
@@ -405,11 +405,11 @@ jobs:
 
       # Four variants are held back from the rotating sweep above (see
       # `difffuzz.rs::HELD_BACK`): each hits a documented FSF *oracle* limitation, not
-      # an mce bug — Janggi's illegal in-check pass, Sittuyin's suppressed
+      # an mcr bug — Janggi's illegal in-check pass, Sittuyin's suppressed
       # discovered-check promotion, and Synochess's / Empire's dropped
       # enemy-king-keyed castle (queenside and kingside respectively) — whose false
       # divergences scale with games/plies and cannot be reconstructed by a fixed
-      # mce-side discount. To keep the fuzz coverage the previous gate gave them, still
+      # mcr-side discount. To keep the fuzz coverage the previous gate gave them, still
       # run each explicitly at the fixed depth where it is divergence-free (3 seeds ×
       # 8 games × 60 plies), reachable because `--variant` bypasses the hold-back. A
       # divergence here still fails the job. (They are additionally pinned by the
@@ -434,7 +434,7 @@ jobs:
   # items, signature changes, etc.). Gated to pull_request / manual so it is
   # PR-oriented and does not burn schedule minutes.
   #
-  # IMPORTANT — currently INFORMATIONAL ONLY. `mce` is `version = "0.3.0"` but
+  # IMPORTANT — currently INFORMATIONAL ONLY. `mcr` is `version = "0.3.0"` but
   # `publish = false` and is not yet on crates.io (see #250), and the repo has no
   # release tags, so there is no baseline to diff against. cargo-semver-checks
   # auto-detects the crates.io baseline and will report "no baseline" here; we

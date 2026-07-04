@@ -62,7 +62,7 @@ enum Stage {
 /// set equals [`Position::legal_moves`].
 ///
 /// ```
-/// use mce::Position;
+/// use mcr::Position;
 /// use std::collections::BTreeSet;
 ///
 /// let pos = Position::startpos();
@@ -213,7 +213,7 @@ impl Position {
     /// [`MoveGenerator`] for the full contract.
     ///
     /// ```
-    /// use mce::Position;
+    /// use mcr::Position;
     ///
     /// let pos = Position::startpos();
     /// // No legal captures from the start, so the first move is a quiet.

@@ -6,7 +6,7 @@
 //! panic. When a move *does* parse it must be one the position considers legal,
 //! and re-serializing it with `to_uci` must round-trip back to the same move.
 //! Independently, every generated legal move must render to a UCI string that
-//! parses back to itself — pinning the [`WideMove`](mce::geometry::WideMove)
+//! parses back to itself — pinning the [`WideMove`](mcr::geometry::WideMove)
 //! UCI parser and renderer (#238) against each other across all geometries.
 //!
 //! Seed corpus: UCI tokens from the parent crate's `tests/` move walks (e.g.
@@ -17,7 +17,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 #[derive(Arbitrary, Debug)]
 struct Input<'a> {

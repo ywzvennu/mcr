@@ -1,11 +1,11 @@
-//! WebAssembly bindings for the [`mce`] chess engine.
+//! WebAssembly bindings for the [`mcr`] chess rules library.
 //!
-//! This crate is a thin `wasm-bindgen` shim over the mce public API. It exposes
+//! This crate is a thin `wasm-bindgen` shim over the mcr public API. It exposes
 //! a single JS-facing [`Game`] class that drives any of the supported variants
-//! (standard chess, Chess960, and the major variants) through mce's runtime
+//! (standard chess, Chess960, and the major variants) through mcr's runtime
 //! [`AnyVariant`] dispatch, plus the standard-chess SAN helpers.
 //!
-//! No mce call can panic across the JS boundary: every fallible entry point
+//! No mcr call can panic across the JS boundary: every fallible entry point
 //! returns a `Result<_, JsError>`, which `wasm-bindgen` turns into a thrown JS
 //! exception, and the infallible queries borrow already-validated state.
 
@@ -13,11 +13,11 @@
 // crate's stricter pub/idiom lints would only produce noise here.
 #![allow(clippy::needless_pass_by_value)]
 
-use mce::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
-use mce::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
+use mcr::geometry::{AnyWideVariant, WideEndReason, WideOutcome, WideVariantId};
+use mcr::{AnyVariant, Color, EndReason, Outcome, Position, Square, VariantId};
 use wasm_bindgen::prelude::*;
 
-/// Map a value that implements [`core::fmt::Display`] (every mce error type does)
+/// Map a value that implements [`core::fmt::Display`] (every mcr error type does)
 /// into a JS exception carrying its message.
 fn js_err(e: impl core::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
@@ -84,7 +84,7 @@ fn wide_status_str(reason: Option<WideEndReason>, outcome: Option<WideOutcome>) 
     }
 }
 
-/// Stable lowercase string for a colour, matching mce's own `Display`.
+/// Stable lowercase string for a colour, matching mcr's own `Display`.
 fn color_str(c: Color) -> String {
     match c {
         Color::White => "white",
@@ -106,7 +106,7 @@ pub struct GameOutcome {
     pub reason: Option<String>,
 }
 
-/// The lowercase machine label for an [`EndReason`] (mce does not expose a
+/// The lowercase machine label for an [`EndReason`] (mcr does not expose a
 /// `Display` for it, so spell it out here — kept in lockstep with the enum).
 fn end_reason_str(r: EndReason) -> &'static str {
     match r {
@@ -142,7 +142,7 @@ pub struct Game {
 #[wasm_bindgen]
 impl Game {
     /// Start position for a variant. With no argument (or `"standard"`/`"chess"`)
-    /// this is the standard chess start position. Accepts any name mce's
+    /// this is the standard chess start position. Accepts any name mcr's
     /// `VariantId` parser understands (`"atomic"`, `"koth"`, `"3check"`, `"zh"`,
     /// …); unknown names throw.
     #[wasm_bindgen(js_name = startpos)]
@@ -378,7 +378,7 @@ fn wide_end_reason_str(r: WideEndReason) -> &'static str {
 }
 
 /// A fairy-chess game on the geometry layer: xiangqi, shogi, janggi, orda, and
-/// the rest of the wide variants, reached through mce's runtime
+/// the rest of the wide variants, reached through mcr's runtime
 /// [`AnyWideVariant`] dispatch.
 ///
 /// This mirrors [`Game`] (construct, FEN I/O, legal moves, perft, play) for the

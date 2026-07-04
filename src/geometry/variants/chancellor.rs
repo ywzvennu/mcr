@@ -7,9 +7,9 @@
 //! Chancellor chess is played on nine files (a..i) by nine ranks (1..9). Beyond
 //! the standard chess army each side adds one compound piece:
 //!
-//! * **Chancellor** (Rook + Knight) — mce's [`WideRole::Elephant`], whose default
+//! * **Chancellor** (Rook + Knight) — mcr's [`WideRole::Elephant`], whose default
 //!   movement (`rook | knight`) is already the chancellor's. FEN letter `e`/`E` in
-//!   the mce dialect (Fairy-Stockfish spells the chancellor `c`/`C`, a dialect
+//!   the mcr dialect (Fairy-Stockfish spells the chancellor `c`/`C`, a dialect
 //!   difference the `compare-fairy/` harness reconciles, exactly as for
 //!   Capablanca / Grand).
 //!
@@ -38,11 +38,11 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkcnbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKCNBR w KQkq - 0 1
-//! mce dialect: rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1
+//! mcr dialect: rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1
 //! ```
 //!
 //! The two strings differ only in the chancellor's letter (`c` in FSF, `e` in
-//! mce). Back rank, a-file to i-file: Rook, Knight, Bishop, Queen, King,
+//! mcr). Back rank, a-file to i-file: Rook, Knight, Bishop, Queen, King,
 //! **Chancellor**, Knight, Bishop, Rook. The king stands on the e-file (file 4);
 //! the chancellor beside it on the f-file (file 5); the castling rooks are the
 //! a-file (file 0) and i-file (file 8) rooks.
@@ -64,7 +64,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ChancellorRules;
 
-/// The confirmed Chancellor starting placement in the mce dialect (chancellor =
+/// The confirmed Chancellor starting placement in the mcr dialect (chancellor =
 /// `e`/`E`), byte-for-byte equivalent to Fairy-Stockfish's
 /// `rnbqkcnbr/.../RNBQKCNBR` modulo the chancellor's letter.
 const CHANCELLOR_START_PLACEMENT: &str = "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR";

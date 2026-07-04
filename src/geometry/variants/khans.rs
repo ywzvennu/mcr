@@ -12,19 +12,19 @@
 //! * **Black = Khan.** An Orda-family army whose pieces every **move like a
 //!   knight** (or part of one) but **capture** differently — confirmed
 //!   square-for-square against FSF:
-//!   * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mce `f`) — moves like a
+//!   * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mcr `f`) — moves like a
 //!     knight to an empty square; captures like a **rook**. (Shared with Orda.)
-//!   * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mce `w`) — a **King +
+//!   * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mcr `w`) — a **King +
 //!     Knight** leaper (sixteen squares); moves and captures alike. (Shared with
 //!     Orda.)
-//!   * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mce `y`) — moves like a
+//!   * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mcr `y`) — moves like a
 //!     knight to an empty square; captures like a **bishop**. (Shared with Orda.)
-//!   * **Khan** ([`WideRole::Khan`], FSF `t` = `mNcK`, mce `=t`) — **moves** like a
+//!   * **Khan** ([`WideRole::Khan`], FSF `t` = `mNcK`, mcr `=t`) — **moves** like a
 //!     knight to an empty square but **captures** like a **king** (one step to any
 //!     of the eight adjacent squares). The Khan replaces the Orda Yurt on the back
 //!     rank (the d8 square) and is the soldier's promotion target.
 //!   * **King** ([`WideRole::King`], `k`) — a standard king (one).
-//!   * **Khan soldiers** ([`WideRole::KhanSoldier`], FSF `s` = `mfhNcfW`, mce `=s`)
+//!   * **Khan soldiers** ([`WideRole::KhanSoldier`], FSF `s` = `mfhNcfW`, mcr `=s`)
 //!     — eight of them on the 7th rank. Each **moves** like a *forward* half-knight
 //!     (the four knight leaps with a forward component, to an empty square) and
 //!     **captures** one square straight forward (a forward Wazir step). It never
@@ -64,7 +64,7 @@
 //! ```
 //!
 //! with FSF's letters `l h a t k s` (Lancer, Kheshig, Archer, Khan, King, soldier).
-//! mce reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the shared Orda pieces take
+//! mcr reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the shared Orda pieces take
 //! the distinct letters Lancer `f`, Kheshig `w`, Archer `y`, and the two new Khan
 //! pieces take overflow-3 tokens `=t` (Khan) / `=s` (soldier):
 //!
@@ -93,7 +93,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct KhansRules;
 
-/// The confirmed Khan's Chess starting placement in mce's role letters: White
+/// The confirmed Khan's Chess starting placement in mcr's role letters: White
 /// standard (`RNBQKBNR`/`PPPPPPPP` on ranks 1-2), Black `f w y =t k y w f` on the
 /// back rank (Lancer, Kheshig, Archer, Khan, King, Archer, Kheshig, Lancer) with
 /// eight Khan soldiers (`=s`) on the 7th rank.

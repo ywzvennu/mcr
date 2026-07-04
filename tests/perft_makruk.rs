@@ -2,7 +2,7 @@
 //!
 //! The node counts below are pinned **and cross-checked against
 //! Fairy-Stockfish** (FSF, `UCI_Variant makruk`): every `(depth, nodes)` pair
-//! here was produced identically by `mce::geometry::Makruk::perft` and by FSF's
+//! here was produced identically by `mcr::geometry::Makruk::perft` and by FSF's
 //! `go perft` on the byte-identical FEN. The `compare-fairy/` harness re-runs
 //! that head-to-head on demand (see `compare-fairy/src/main.rs --makruk`); this
 //! test pins the confirmed numbers so a regression is caught without FSF
@@ -15,10 +15,10 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_makruk -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Bitboard, Chess8x8, Geometry, Makruk, Square, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
 /// The Makruk starting FEN, confirmed byte-for-byte against Fairy-Stockfish's
 /// `UCI_Variant makruk` / `position startpos`.
@@ -180,7 +180,7 @@ fn pawn_has_no_double_push_or_en_passant() {
     let has_double = pos
         .legal_moves()
         .into_iter()
-        .any(|m| matches!(m.kind(), mce::geometry::WideMoveKind::DoublePawnPush));
+        .any(|m| matches!(m.kind(), mcr::geometry::WideMoveKind::DoublePawnPush));
     assert!(!has_double, "Makruk pawns never double-push");
 
     // After a pawn single-step, the resulting position has no ep square.
@@ -227,7 +227,7 @@ fn attacks_stay_on_board() {
         let sq = Square::<Chess8x8>::new(index);
         for color in Color::ALL {
             for role in [WideRole::Met, WideRole::Silver] {
-                let att = <mce::geometry::MakrukRules as mce::geometry::WideVariant<Chess8x8>>::role_attacks(
+                let att = <mcr::geometry::MakrukRules as mcr::geometry::WideVariant<Chess8x8>>::role_attacks(
                     role, color, sq, Bitboard::EMPTY,
                 );
                 assert_eq!(

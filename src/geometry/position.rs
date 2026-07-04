@@ -6140,7 +6140,7 @@ fn parse_holdings(holdings: &str) -> Result<([bool; 2], [bool; 2]), WideFenError
 
 /// Parses a placement-phase `[..]` holdings string into a [`GenericPlacement`]
 /// pocket. Uppercase letters tally white's undeployed pieces, lowercase black's,
-/// each letter the role's FEN character (mce dialect — the Met is `m`, the Silver
+/// each letter the role's FEN character (mcr dialect — the Met is `m`, the Silver
 /// `s`). Any letter that is not a known role is rejected.
 fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenError> {
     let mut pocket = GenericPlacement::NONE;

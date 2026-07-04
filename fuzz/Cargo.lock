@@ -85,16 +85,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "mce"
-version = "0.0.0"
+name = "mcr"
+version = "0.3.0"
 
 [[package]]
-name = "mce-fuzz"
+name = "mcr-fuzz"
 version = "0.0.0"
 dependencies = [
  "arbitrary",
  "libfuzzer-sys",
- "mce",
+ "mcr",
 ]
 
 [[package]]

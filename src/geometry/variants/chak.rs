@@ -49,12 +49,12 @@
 //!
 //! ```text
 //! FSF dialect: rvsqkjsvr/4o4/p1p1p1p1p/9/9/9/P1P1P1P1P/4O4/RVSJKQSVR w - - 0 1
-//! mce dialect: rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1
+//! mcr dialect: rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1
 //! ```
 //!
 //! The back ranks are **asymmetric**: White's rank 1 is `R V S J K Q S V R` and
 //! Black's rank 9 is `r v s q k j s v r` — the Jaguar and Quetzal sit on opposite
-//! sides of the King for the two armies. mce spells the six new pieces with
+//! sides of the King for the two armies. mcr spells the six new pieces with
 //! `*`-prefixed overflow tokens and the `compare-fairy/` harness rewrites them
 //! (`*s → s`, `*q → q`, `*w → w`, `*l → d`, `*p → p`, `*o → o`) plus the reused
 //! Vulture (`n → v`) and Jaguar (`w → j`) when driving FSF.
@@ -73,7 +73,7 @@ use super::super::Shogi9x9;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ChakRules;
 
-/// The confirmed Chak starting placement (mce dialect; see the [module docs](self)).
+/// The confirmed Chak starting placement (mcr dialect; see the [module docs](self)).
 const CHAK_PLACEMENT: &str =
     "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR";
 
@@ -416,7 +416,7 @@ impl WideVariant<Shogi9x9> for ChakRules {
 /// geometry.
 ///
 /// Construct the starting position with
-/// [`Chak::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect) with
+/// [`Chak::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect) with
 /// [`Chak::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the piece movements, the King/Lord promotion, the region confinement, and the
 /// temple-square win.
@@ -426,7 +426,7 @@ pub type Chak = GenericPosition<Shogi9x9, ChakRules>;
 mod tests {
     use super::*;
 
-    /// The canonical start FEN round-trips through mce's FEN I/O.
+    /// The canonical start FEN round-trips through mcr's FEN I/O.
     #[test]
     fn startpos_round_trips() {
         let pos = Chak::startpos();

@@ -45,7 +45,7 @@ impl Rank {
     /// Returns the rank with the given zero-based index, or `None` if `index >= 8`.
     ///
     /// ```
-    /// use mce::Rank;
+    /// use mcr::Rank;
     /// assert_eq!(Rank::new(0), Some(Rank::First));
     /// assert_eq!(Rank::new(7), Some(Rank::Eighth));
     /// assert_eq!(Rank::new(8), None);
@@ -83,7 +83,7 @@ impl Rank {
     /// Parses a rank from its digit character, accepting `'1'`..=`'8'`.
     ///
     /// ```
-    /// use mce::Rank;
+    /// use mcr::Rank;
     /// assert_eq!(Rank::from_char('4'), Some(Rank::Fourth));
     /// assert_eq!(Rank::from_char('9'), None);
     /// assert_eq!(Rank::from_char('0'), None);

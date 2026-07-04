@@ -17,7 +17,7 @@
 //!   generic reader already accepts both Shredder file letters and `KQkq`
 //!   (outermost-rook X-FEN), so arbitrary shuffled rook files parse unchanged.
 //! * The starting position is a representative shuffle. To match FSF's own
-//!   `caparandom` `startpos`, mce uses the canonical Capablanca array — the arms
+//!   `caparandom` `startpos`, mcr uses the canonical Capablanca array — the arms
 //!   are identical, so the only visible difference from `capablanca` is the
 //!   `JAja` castling field.
 //!
@@ -25,7 +25,7 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR w JAja - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1
 //! ```
 //!
 //! (perft(2) = 784, identical to Capablanca — the two share the startpos array and

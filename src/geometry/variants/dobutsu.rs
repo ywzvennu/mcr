@@ -58,7 +58,7 @@
 //! [`flag_win_requires_safe`](WideVariant::flag_win_requires_safe) condition; FSF
 //! adjudicates it on the **loser's** turn, so a node where the side to move's
 //! opponent already stands safely on its goal rank is terminal (no children),
-//! which is what makes mce's perft match FSF's `go perft` at a try node.
+//! which is what makes mcr's perft match FSF's `go perft` at a try node.
 //!
 //! ## Confirmed starting FEN
 //!
@@ -68,7 +68,7 @@
 //! gle/1c1/1C1/ELG[-] w 0 1
 //! ```
 //!
-//! with FSF's letters `g l e c` (Giraffe, Lion, Elephant, Chick). mce reuses the
+//! with FSF's letters `g l e c` (Giraffe, Lion, Elephant, Chick). mcr reuses the
 //! Lion as a King (`k`), the Chick as a Pawn (`p`), the Elephant as a Met (`m`),
 //! and the Giraffe as the Wazir overflow role (`*j`):
 //!
@@ -77,7 +77,7 @@
 //! ```
 //!
 //! The two FENs are the same position; the `compare-fairy/` harness translates the
-//! mce letters (and the empty `[]` holdings bracket) when driving FSF.
+//! mcr letters (and the empty `[]` holdings bracket) when driving FSF.
 
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
@@ -97,7 +97,7 @@ use super::super::Dobutsu3x4;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct DobutsuRules;
 
-/// The confirmed Dobutsu starting placement in mce's role letters: the empty hand
+/// The confirmed Dobutsu starting placement in mcr's role letters: the empty hand
 /// is carried by the `[]` bracket parsed separately. White's back rank is Elephant
 /// (Met `m`), Lion (King `k`), Giraffe (Wazir `*j`); its Chick (Pawn `p`) sits on
 /// b2. Black mirrors it. Matches FSF's `gle/1c1/1C1/ELG`.

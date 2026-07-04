@@ -11,14 +11,14 @@
 //! exactly two pieces redefined into **move≠capture** roles:
 //!
 //! * **Knight-Bishop** ([`WideRole::KnightBishop`], FSF `KNIBIS` `n`, Betza
-//!   `mNcB`, mce overflow `*h`) — **moves like a knight** (the eight 2-1 leaps) to
+//!   `mNcB`, mcr overflow `*h`) — **moves like a knight** (the eight 2-1 leaps) to
 //!   an empty square but **captures like a bishop** (a diagonal slide). Its quiet
 //!   knight jumps are non-capturing; its only attacking / checking / capturing
 //!   squares are the bishop diagonals. This is the same *move-knight /
 //!   capture-slider* shape as the Orda Archer, but a **distinct** role (different
 //!   army, FEN token, and promotion semantics).
 //! * **Bishop-Knight** ([`WideRole::BishopKnight`], FSF `BISKNI` `b`, Betza
-//!   `mBcN`, mce overflow `*b`) — the **inverse**: **moves like a bishop** (a
+//!   `mBcN`, mcr overflow `*b`) — the **inverse**: **moves like a bishop** (a
 //!   diagonal slide) to an empty square but **captures like a knight** (a 2-1
 //!   leap). Its quiet bishop slides are non-capturing; its only attacking /
 //!   checking / capturing squares are the knight leaps.
@@ -44,15 +44,15 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-//! mce dialect: r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1
+//! mcr dialect: r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1
 //! ```
 //!
-//! In FSF the back rank's `n` / `b` are the redefined pieces. mce already names
+//! In FSF the back rank's `n` / `b` are the redefined pieces. mcr already names
 //! `n` the standard Knight and `b` the standard Bishop, so the Hoppel-Poppel
 //! pieces take **overflow tokens** `*h` (Knight-Bishop) and `*b` (Bishop-Knight):
 //! the standard back rank `r n b q k b n r` becomes `r *h *b q k *b *h r`, with
 //! standard pawns / king / rooks / queen. The two FENs are the same position; the
-//! `compare-fairy/` harness rewrites mce's `*h → n`, `*b → b` when driving FSF.
+//! `compare-fairy/` harness rewrites mcr's `*h → n`, `*b → b` when driving FSF.
 //! Both sides have full castling rights (`KQkq`).
 //!
 //! ## Insufficient material — deliberately **default-off** (#350)
@@ -88,7 +88,7 @@ use crate::geometry::{
 };
 use crate::Color;
 
-/// The confirmed Hoppel-Poppel starting placement in mce's role letters: standard
+/// The confirmed Hoppel-Poppel starting placement in mcr's role letters: standard
 /// chess with the two knights replaced by the Knight-Bishop (`*h`) and the two
 /// bishops by the Bishop-Knight (`*b`), so each back rank is
 /// `r *h *b q k *b *h r` and the pawns / king / rooks / queen are standard.
@@ -222,7 +222,7 @@ impl WideVariant<Chess8x8> for HoppelPoppelRules {
 ///
 /// Construct the starting position (standard chess with the Knight-Bishop and
 /// Bishop-Knight in place of the knights and bishops) with
-/// [`HoppelPoppel::startpos`](GenericPosition::startpos) or parse a FEN (mce
+/// [`HoppelPoppel::startpos`](GenericPosition::startpos) or parse a FEN (mcr
 /// dialect) with [`HoppelPoppel::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the move≠capture pieces and the `q r b n` promotion.
 pub type HoppelPoppel = GenericPosition<Chess8x8, HoppelPoppelRules>;

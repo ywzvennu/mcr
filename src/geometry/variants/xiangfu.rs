@@ -50,17 +50,17 @@
 //!
 //! ## Confirmed starting FEN
 //!
-//! From the pychess `[xiangfu]` `startFen`. FSF and mce describe the same position
-//! but spell the new movers differently (mce avoids the bare letters `k`/`m`,
+//! From the pychess `[xiangfu]` `startFen`. FSF and mcr describe the same position
+//! but spell the new movers differently (mcr avoids the bare letters `k`/`m`,
 //! already the King / Met, by spelling the Champion `=k` and the Mahout `=m`, and
 //! spells the Horse `j` and the Crossbow `=c`):
 //!
 //! ```text
 //! FSF dialect: 2rbm4/2cwn4/2+g1+g4/9/9/9/4+G1+G2/4NWC2/4MBR2[] w - 0 1
-//! mce dialect: 2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - - 0 1
+//! mcr dialect: 2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - - 0 1
 //! ```
 //!
-//! The `compare-fairy` harness rewrites mce's tokens (`=k → +g`, `=m → m`,
+//! The `compare-fairy` harness rewrites mcr's tokens (`=k → +g`, `=m → m`,
 //! `j → n`, `=c → w`; the hand Pupil `*u → g`) when driving FSF.
 
 use crate::geometry::position::{
@@ -69,7 +69,7 @@ use crate::geometry::position::{
 use crate::geometry::{attacks, Bitboard, Board, Shogi9x9, Square, WideRole, WideVariant};
 use crate::Color;
 
-/// The confirmed Xiang Fu starting placement in the mce dialect (Champion `=k`,
+/// The confirmed Xiang Fu starting placement in the mcr dialect (Champion `=k`,
 /// Mahout `=m`, Horse `j`, Crossbow `=c`), the position byte-identical to FSF's
 /// `2rbm4/2cwn4/2+g1+g4/9/9/9/4+G1+G2/4NWC2/4MBR2`.
 const XIANGFU_PLACEMENT: &str = "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2";
@@ -265,7 +265,7 @@ impl WideVariant<Shogi9x9> for XiangfuRules {
 /// [`Shogi9x9`] geometry.
 ///
 /// Construct the starting position with
-/// [`Xiangfu::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Xiangfu::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Xiangfu::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the ring confinement, the captures-to-hand
 /// drops, and the pseudo-royal duple-check Champions.
@@ -275,7 +275,7 @@ pub type Xiangfu = GenericPosition<Shogi9x9, XiangfuRules>;
 mod tests {
     use super::*;
 
-    /// The canonical start FEN round-trips through the mce dialect.
+    /// The canonical start FEN round-trips through the mcr dialect.
     #[test]
     fn startpos_round_trips() {
         let pos = Xiangfu::startpos();

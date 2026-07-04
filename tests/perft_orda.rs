@@ -4,9 +4,9 @@
 //! **flag-win (campmate)** terminal rule.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Orda` perft and by Fairy-Stockfish (FSF, `UCI_Variant orda`)
+//! `mcr::geometry::Orda` perft and by Fairy-Stockfish (FSF, `UCI_Variant orda`)
 //! running `go perft` on the byte-identical position — the FSF divide matches
-//! mce's move-for-move, including each Orda piece's knight-move / slider-capture
+//! mcr's move-for-move, including each Orda piece's knight-move / slider-capture
 //! split (the Lancer captures like a rook, the Archer like a bishop, both *move*
 //! like a knight), the Kheshig (King + Knight) leaper, the Yurt (silver general),
 //! q/Kheshig promotion for both colours, and the flag win (a king on its goal rank
@@ -22,7 +22,7 @@
 //! lhaykahl/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1
 //! ```
 //!
-//! with FSF's Orda letters `l h a y k` (Lancer, Kheshig, Archer, Yurt, King). mce
+//! with FSF's Orda letters `l h a y k` (Lancer, Kheshig, Archer, Yurt, King). mcr
 //! reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the Orda pieces take distinct
 //! letters — Lancer `f`, Kheshig `w`, Archer `y`, Yurt `s` (the existing Silver) —
 //! and its canonical start FEN is
@@ -51,9 +51,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_orda -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Orda};
+use mcr::geometry::{perft as gperft, Chess8x8, Orda};
 
-/// The Orda starting FEN in mce's dialect, confirmed against FSF's
+/// The Orda starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant orda` / `position startpos`.
 const STARTPOS: &str = "fwyskywf/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
 
@@ -165,7 +165,7 @@ fn flag_race_cheap() {
     );
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

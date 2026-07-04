@@ -9,7 +9,7 @@
 //!
 //! The node counts below are pinned **and cross-checked against Fairy-Stockfish**
 //! (FSF, `UCI_Variant makpong`): every `(depth, nodes)` pair here was produced
-//! identically by `mce::geometry::Makpong::perft` and by FSF's `go perft` on the
+//! identically by `mcr::geometry::Makpong::perft` and by FSF's `go perft` on the
 //! byte-identical FEN. The `compare-fairy/` harness re-runs that head-to-head on
 //! demand (see `compare-fairy/src/main.rs --makpong`); this test pins the
 //! confirmed numbers so a regression is caught without FSF present.
@@ -22,9 +22,9 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_makpong -- --include-ignored`.
 //!
-//! [`king_may_only_capture_checker`]: mce::geometry::WideVariant::king_may_only_capture_checker
+//! [`king_may_only_capture_checker`]: mcr::geometry::WideVariant::king_may_only_capture_checker
 
-use mce::geometry::{perft as gperft, Chess8x8, Makpong, Makruk};
+use mcr::geometry::{perft as gperft, Chess8x8, Makpong, Makruk};
 
 /// The Makpong starting FEN, confirmed byte-for-byte against Fairy-Stockfish's
 /// `UCI_Variant makpong` / `position startpos`. It equals Makruk's start array.
@@ -131,7 +131,7 @@ fn king_may_not_flee_check() {
 
     // No Makpong move starts from the king square here — the rook checker on d4
     // is not on a square the king can reach, so the king cannot legally move.
-    let king_sq = mp.board().king_of(mce::Color::White).expect("a king");
+    let king_sq = mp.board().king_of(mcr::Color::White).expect("a king");
     let mp_king_moves = mp
         .legal_moves()
         .into_iter()
@@ -155,7 +155,7 @@ fn king_may_not_flee_check() {
 fn king_may_capture_the_lone_checker() {
     let mp = Makpong::from_fen(CHECK_PAWN).expect("valid");
     assert!(mp.is_check());
-    let king_sq = mp.board().king_of(mce::Color::White).expect("a king");
+    let king_sq = mp.board().king_of(mcr::Color::White).expect("a king");
     let king_dests: Vec<_> = mp
         .legal_moves()
         .into_iter()
@@ -168,7 +168,7 @@ fn king_may_capture_the_lone_checker() {
         1,
         "only the capture-the-checker king move"
     );
-    let c2 = mce::geometry::Square::<Chess8x8>::from_file_rank(2, 1).unwrap();
+    let c2 = mcr::geometry::Square::<Chess8x8>::from_file_rank(2, 1).unwrap();
     assert_eq!(
         king_dests[0], c2,
         "the king captures the lone checker on c2"

@@ -2,8 +2,8 @@
 //!
 //! The node counts below are pinned **and cross-checked against
 //! Fairy-Stockfish** (FSF, `UCI_Variant shatar`): every `(depth, nodes)` pair
-//! here was produced identically by `mce::geometry::Shatar::perft` and by FSF's
-//! `go perft` on the byte-identical FEN (FSF spells the Bers `j`; mce spells it
+//! here was produced identically by `mcr::geometry::Shatar::perft` and by FSF's
+//! `go perft` on the byte-identical FEN (FSF spells the Bers `j`; mcr spells it
 //! `d`, the [`WideRole::General`] letter, since `j` already names the Xiangqi
 //! Horse). The `compare-fairy/` harness re-runs that head-to-head on demand (see
 //! `compare-fairy/src/main.rs`); this test pins the confirmed numbers so a
@@ -11,18 +11,18 @@
 //!
 //! Confirmed Shatar starting FEN (from FSF `position startpos`):
 //!   FSF: `rnbjkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBJKBNR w - - 0 1`
-//!   mce: `rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1`
+//!   mcr: `rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1`
 //!
 //! The cheap layers run as ordinary tests; the deep layers are `#[ignore]`d so
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shatar -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Bitboard, Chess8x8, Geometry, Shatar, Square, WideOutcome, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
-/// The Shatar starting FEN (mce dialect), confirmed byte-for-byte against
+/// The Shatar starting FEN (mcr dialect), confirmed byte-for-byte against
 /// Fairy-Stockfish's `UCI_Variant shatar` / `position startpos`. The centre
 /// pawns start pre-advanced (no double step in Shatar).
 const STARTPOS: &str = "rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1";
@@ -184,7 +184,7 @@ fn pawn_has_no_double_push_or_en_passant() {
     let has_double = pos
         .legal_moves()
         .into_iter()
-        .any(|m| matches!(m.kind(), mce::geometry::WideMoveKind::DoublePawnPush));
+        .any(|m| matches!(m.kind(), mcr::geometry::WideMoveKind::DoublePawnPush));
     assert!(!has_double, "Shatar pawns never double-push");
 
     // After a pawn single-step from the second rank, the result has no ep square.
@@ -257,7 +257,7 @@ fn attacks_stay_on_board() {
         let sq = Square::<Chess8x8>::new(index);
         for color in Color::ALL {
             let att =
-                <mce::geometry::ShatarRules as mce::geometry::WideVariant<Chess8x8>>::role_attacks(
+                <mcr::geometry::ShatarRules as mcr::geometry::WideVariant<Chess8x8>>::role_attacks(
                     WideRole::General,
                     color,
                     sq,

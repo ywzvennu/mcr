@@ -4,8 +4,8 @@
 //! independent brute-force perft cross-check in `tests/perft_washogi.rs` and the
 //! attacker-consistency playouts in `tests/attackers_consistency.rs`.
 
-use mce::geometry::{Washogi, Washogi11x11, WideRole};
-use mce::Color;
+use mcr::geometry::{Washogi, Washogi11x11, WideRole};
+use mcr::Color;
 
 const STARTPOS: &str = "**f**j**h**l**nk**o**k**g**m**d/1**v3**q3**t1/\
 **b**b**b**r**b**b**b**u**b**b**b/11/11/11/11/11/\

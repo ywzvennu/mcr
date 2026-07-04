@@ -4,10 +4,10 @@
 //! Jieqi is **not** an FSF variant: its stochastic hidden-identity reveal cannot be
 //! expressed in an FSF variant config, and `go perft` is only meaningful for a
 //! full-information position — which is exactly standard **Xiangqi**. The reveal
-//! model wired into mce's make-move path is the *identity* baseline (a face-down
+//! model wired into mcr's make-move path is the *identity* baseline (a face-down
 //! piece reveals as the Xiangqi piece native to its home square), under which the
 //! whole Jieqi game tree is bit-identical to Xiangqi. So this harness validates the
-//! Jieqi engine by running its perft on the **mce side** and comparing against FSF
+//! Jieqi engine by running its perft on the **mcr side** and comparing against FSF
 //! `UCI_Variant xiangqi` perft on the **identity-reveal Xiangqi equivalent** of the
 //! same position (every `=d`/`=D` face-down piece rewritten to the Xiangqi piece
 //! native to its square). A match confirms the dark movement *and* the reveal
@@ -15,7 +15,7 @@
 //!
 //! The stochastic reveal-from-pool (a random unrevealed identity) is validated
 //! separately by the seeded unit/property tests in
-//! `mce::geometry::variants::jieqi`; it has no FSF analogue and is not perft-able.
+//! `mcr::geometry::variants::jieqi`; it has no FSF analogue and is not perft-able.
 //!
 //! **FSF must be built with large-board support** (`largeboards=yes`) for the 9x10
 //! `xiangqi` variant; without it this loop skips.
@@ -25,27 +25,27 @@
 
 use std::time::Instant;
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, variants::jieqi::home_role, Geometry, Jieqi, Square, Xiangqi9x10,
 };
 
 use crate::uci::Engine;
 use crate::xiangqi::fen_to_fsf;
 
-/// One Jieqi corpus position (mce dialect; face-down pieces as `=d`/`=D`).
+/// One Jieqi corpus position (mcr dialect; face-down pieces as `=d`/`=D`).
 struct Case {
     label: &'static str,
     fen: String,
     depth: u32,
 }
 
-/// Rewrite a Jieqi FEN (mce dialect) into its **identity-reveal Xiangqi
-/// equivalent** in the mce Xiangqi dialect: every `=d`/`=D` face-down piece is
+/// Rewrite a Jieqi FEN (mcr dialect) into its **identity-reveal Xiangqi
+/// equivalent** in the mcr Xiangqi dialect: every `=d`/`=D` face-down piece is
 /// replaced by the Xiangqi piece native to its square (`home_role`), with the case
 /// (colour) preserved; concrete pieces and empty runs pass through. Returns an
 /// error if a face-down piece sits off a home square (no `home_role`), which never
 /// happens in a legal Jieqi position (a dark piece reveals the instant it moves).
-fn jieqi_to_xiangqi_mce(fen: &str) -> Result<String, String> {
+fn jieqi_to_xiangqi_mcr(fen: &str) -> Result<String, String> {
     let (placement, rest) = fen.split_once(' ').ok_or("Jieqi FEN has no fields")?;
     let mut out = String::new();
     for (ri, rank_str) in placement.split('/').enumerate() {
@@ -147,17 +147,17 @@ struct Row {
     jieqi_fen: String,
     xiangqi_fen: String,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -170,15 +170,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Jieqi corpus: mce Jieqi perft vs FSF `UCI_Variant xiangqi` perft on the
+/// Run the Jieqi corpus: mcr Jieqi perft vs FSF `UCI_Variant xiangqi` perft on the
 /// identity-reveal Xiangqi equivalent. Returns the number of mismatches (0 = all
 /// matched, or FSF lacks `xiangqi` and the suite is skipped).
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -197,7 +197,7 @@ UCI_Variant xiangqi on the identity-reveal equivalent (issue #278):"
 
     let head = format!(
         "{:<22} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -217,10 +217,10 @@ UCI_Variant xiangqi on the identity-reveal equivalent (issue #278):"
                     "{:<22} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -232,16 +232,16 @@ UCI_Variant xiangqi on the identity-reveal equivalent (issue #278):"
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "jieqi OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "jieqi OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -254,24 +254,24 @@ UCI_Variant xiangqi on the identity-reveal equivalent (issue #278):"
         eprintln!("ERROR: {mismatches} Jieqi parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH jieqi/{} depth {}: mce={} fsf={}  Jieqi FEN: {}  FSF xiangqi FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.jieqi_fen, r.xiangqi_fen,
+                "  MISMATCH jieqi/{} depth {}: mcr={} fsf={}  Jieqi FEN: {}  FSF xiangqi FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.jieqi_fen, r.xiangqi_fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Jieqi position through mce's Jieqi perft and FSF's `xiangqi go perft` on
+/// Run one Jieqi position through mcr's Jieqi perft and FSF's `xiangqi go perft` on
 /// the identity-reveal equivalent.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Jieqi::from_fen(&case.fen).map_err(|e| format!("mce rejected Jieqi FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Jieqi::from_fen(&case.fen).map_err(|e| format!("mcr rejected Jieqi FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
-    let xiangqi_mce = jieqi_to_xiangqi_mce(&case.fen)?;
-    let fsf_fen = fen_to_fsf(&xiangqi_mce);
+    let xiangqi_mcr = jieqi_to_xiangqi_mcr(&case.fen)?;
+    let fsf_fen = fen_to_fsf(&xiangqi_mcr);
     engine.set_variant("xiangqi", false)?;
     engine.set_position(&fsf_fen)?;
     let fsf = engine.go_perft(depth, false)?;
@@ -279,12 +279,12 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
     Ok(Row {
         label: case.label,
         jieqi_fen: case.fen.clone(),
-        xiangqi_fen: xiangqi_mce,
+        xiangqi_fen: xiangqi_mcr,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -299,13 +299,13 @@ mod tests {
     fn conversion_maps_dark_to_home_role() {
         let all_dark =
             "=d=d=d=dk=d=d=d=d/9/1=d5=d1/=d1=d1=d1=d1=d/9/9/=D1=D1=D1=D1=D/1=D5=D1/9/=D=D=D=DK=D=D=D=D w - - 0 1";
-        let mce = jieqi_to_xiangqi_mce(all_dark).expect("converts");
+        let mcr = jieqi_to_xiangqi_mcr(all_dark).expect("converts");
         assert_eq!(
-            mce,
+            mcr,
             "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1"
         );
         assert_eq!(
-            fen_to_fsf(&mce),
+            fen_to_fsf(&mcr),
             "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
         );
     }
@@ -316,19 +316,19 @@ mod tests {
     fn corpus_parses_and_converts() {
         for case in corpus() {
             Jieqi::from_fen(&case.fen).expect("Jieqi FEN parses");
-            let mce = jieqi_to_xiangqi_mce(&case.fen).expect("converts to Xiangqi");
-            mce::geometry::Xiangqi::from_fen(&mce).expect("Xiangqi equivalent parses");
+            let mcr = jieqi_to_xiangqi_mcr(&case.fen).expect("converts to Xiangqi");
+            mcr::geometry::Xiangqi::from_fen(&mcr).expect("Xiangqi equivalent parses");
         }
     }
 
-    /// mce's own cross-check (no FSF): Jieqi perft equals the Xiangqi perft of the
+    /// mcr's own cross-check (no FSF): Jieqi perft equals the Xiangqi perft of the
     /// converted equivalent for every corpus case, at the corpus depth.
     #[test]
     fn jieqi_perft_equals_xiangqi_equivalent() {
         for case in corpus() {
             let jq = Jieqi::from_fen(&case.fen).expect("Jieqi parses");
-            let mce = jieqi_to_xiangqi_mce(&case.fen).expect("converts");
-            let xq = mce::geometry::Xiangqi::from_fen(&mce).expect("Xiangqi parses");
+            let mcr = jieqi_to_xiangqi_mcr(&case.fen).expect("converts");
+            let xq = mcr::geometry::Xiangqi::from_fen(&mcr).expect("Xiangqi parses");
             assert_eq!(
                 gperft::<Xiangqi9x10, _>(&jq, case.depth),
                 gperft::<Xiangqi9x10, _>(&xq, case.depth),

@@ -409,7 +409,7 @@ impl MoveSink for FilterSink<'_> {
 /// A full standard-chess game position.
 ///
 /// ```
-/// use mce::Position;
+/// use mcr::Position;
 /// let pos = Position::startpos();
 /// assert_eq!(pos.legal_moves().len(), 20);
 /// assert_eq!(pos.to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -3099,7 +3099,7 @@ fn parse_castling(field: &str, board: &Board) -> Result<CastlingRights, FenError
 /// generation against known reference counts.
 ///
 /// ```
-/// use mce::{perft, Position};
+/// use mcr::{perft, Position};
 /// assert_eq!(perft(&Position::startpos(), 1), 20);
 /// assert_eq!(perft(&Position::startpos(), 2), 400);
 /// ```
@@ -3187,7 +3187,7 @@ pub fn perft_divide(position: &Position, depth: u32) -> Vec<(Move, u64)> {
 /// `1`, depth 1 is the bulk leaf count.
 ///
 /// ```
-/// use mce::{perft, perft_parallel, Position};
+/// use mcr::{perft, perft_parallel, Position};
 /// let pos = Position::startpos();
 /// assert_eq!(perft_parallel(&pos, 4), perft(&pos, 4));
 /// ```

@@ -69,7 +69,7 @@ impl Bitboard {
     /// Returns the bitboard containing only the given square.
     ///
     /// ```
-    /// use mce::{Bitboard, Square};
+    /// use mcr::{Bitboard, Square};
     /// assert_eq!(Bitboard::from_square(Square::A1), Bitboard(1));
     /// ```
     #[must_use]
@@ -135,7 +135,7 @@ impl Bitboard {
     /// the set is empty.
     ///
     /// ```
-    /// use mce::{Bitboard, Square};
+    /// use mcr::{Bitboard, Square};
     /// let bb = Bitboard::from_square(Square::C1) | Bitboard::from_square(Square::A1);
     /// assert_eq!(bb.lsb(), Some(Square::A1));
     /// assert_eq!(Bitboard::EMPTY.lsb(), None);
@@ -155,7 +155,7 @@ impl Bitboard {
     /// is empty.
     ///
     /// ```
-    /// use mce::{Bitboard, Square};
+    /// use mcr::{Bitboard, Square};
     /// let mut bb = Bitboard::from_square(Square::A1) | Bitboard::from_square(Square::C1);
     /// assert_eq!(bb.pop_lsb(), Some(Square::A1));
     /// assert_eq!(bb.pop_lsb(), Some(Square::C1));

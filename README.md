@@ -1,6 +1,6 @@
-# mce — Modular Chess Engine
+# mcr — Modular Chess Rules
 
-`mce` is a permissively licensed (MIT OR Apache-2.0), clean-room chess
+`mcr` is a permissively licensed (MIT OR Apache-2.0), clean-room chess
 move-generation and rules library written in Rust. It is an original
 implementation built from public chess algorithms and specifications, and it
 carries no copyleft obligation — making it safe to use in permissive,
@@ -62,7 +62,7 @@ suite under [`tests/`](tests).
 > **[docs/perf-variants.md](docs/perf-variants.md)**.
 
 The variants below ride the parallel **generic geometry layer**
-([`mce::geometry`]): `GenericPosition<G, V>` over a compile-time
+([`mcr::geometry`]): `GenericPosition<G, V>` over a compile-time
 [`Geometry`]-parametrised `Bitboard<G>` / `Square<G>`,
 with a per-variant [`WideVariant`] rule layer. They
 are selectable at runtime through `AnyWideVariant` / `WideVariantId`. See
@@ -73,7 +73,7 @@ the complete, drift-checked list of all 60+ variants is in
 [docs/variants.md](docs/variants.md).
 
 The **Validation** column records how each variant's move generation is pinned.
-"perft vs FSF" means mce's perft node counts were checked **node-for-node**
+"perft vs FSF" means mcr's perft node counts were checked **node-for-node**
 against Fairy-Stockfish `go perft` on byte-identical positions (the
 `compare-fairy/` harness, below); the test suite then pins those FSF-confirmed
 numbers so regressions are caught even without FSF present. The few variants
@@ -165,7 +165,7 @@ correctness story is what is documented.
 
 ### Ataxx (standalone module)
 
-[`mce::ataxx`] is **not** a chess variant and shares none of the engine's
+[`mcr::ataxx`] is **not** a chess variant and shares none of the engine's
 machinery — no pieces, king, attacks, or [`Geometry`]
 type. It is a self-contained 7x7 stones game built on a single `u64`, with its
 own square / move / position / FEN / perft. Its perft node counts are validated
@@ -176,7 +176,7 @@ node-for-node against Fairy-Stockfish `UCI_Variant ataxx`.
 The fairy variants are pinned against
 [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish) (FSF) as a
 black-box **perft oracle**. For each variant, a corpus of positions is run
-through both engines at increasing depth and mce's node counts are asserted
+through both engines at increasing depth and mcr's node counts are asserted
 **equal to FSF's**, node for node; on a mismatch the per-move `divide` localises
 the diverging move. The deterministic, full-information variants are validated
 this way directly; the imperfect-information and stochastic specials use the
@@ -192,13 +192,13 @@ counts from stdout.
 
 **The GPL fence.** Fairy-Stockfish is GPL-3.0-or-later. `compare-fairy/` is a
 **separate, non-workspace crate** (`publish = false`, like `compare/` and
-`fuzz/`); it is **not in mce's dependency graph**, and no FSF source or binary is
+`fuzz/`); it is **not in mcr's dependency graph**, and no FSF source or binary is
 read, copied, vendored, or linked. The licensing never crosses the process
-boundary, so the `mce` library itself stays clean-room MIT OR Apache-2.0. Verify
+boundary, so the `mcr` library itself stays clean-room MIT OR Apache-2.0. Verify
 with:
 
 ```sh
-cargo tree -e normal -p mce   # no FSF, no compare-fairy
+cargo tree -e normal -p mcr   # no FSF, no compare-fairy
 cargo package --list          # zero compare-fairy/ files
 ```
 
@@ -207,7 +207,7 @@ so it never blocks CI):
 
 ```sh
 # Point the harness at a fairy-stockfish binary and run every shared variant:
-MCE_FSF_BIN=/path/to/fairy-stockfish cargo run --release --manifest-path compare-fairy/Cargo.toml
+MCR_FSF_BIN=/path/to/fairy-stockfish cargo run --release --manifest-path compare-fairy/Cargo.toml
 
 # Or let it clone + build FSF into a git-ignored build/ dir (needs git, make, C++):
 cargo run --release --manifest-path compare-fairy/Cargo.toml -- --build
@@ -217,13 +217,13 @@ cargo run --release --manifest-path compare-fairy/Cargo.toml -- --build
 
 ```toml
 [dependencies]
-mce = "0.3"
+mcr = "0.3"
 ```
 
 Parse a FEN, generate legal moves, play one, and read the outcome:
 
 ```rust
-use mce::{Color, Outcome, Position};
+use mcr::{Color, Outcome, Position};
 
 // Fool's mate, one move from the end: Black plays Qh4#.
 let pos = Position::from_fen(
@@ -242,7 +242,7 @@ assert_eq!(after.outcome(), Some(Outcome::Decisive { winner: Color::Black }));
 Choose a variant at runtime through `AnyVariant` and `VariantId`:
 
 ```rust
-use mce::{AnyVariant, VariantId};
+use mcr::{AnyVariant, VariantId};
 
 // Pick a variant from a name, then use the same move-gen / play surface.
 let id: VariantId = "atomic".parse().unwrap();
@@ -256,10 +256,10 @@ assert!(after.outcome().is_none());
 ```
 
 Drive a fairy variant on a non-8x8 board through the parallel `AnyWideVariant`
-surface (same shape, under `mce::geometry`):
+surface (same shape, under `mcr::geometry`):
 
 ```rust
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 let id: WideVariantId = "shogi".parse().unwrap();
 let pos = AnyWideVariant::startpos(id);
@@ -328,7 +328,7 @@ Licensed under either of
 
 at your option.
 
-Because `mce` is a clean-room implementation, it carries no copyleft obligation
+Because `mcr` is a clean-room implementation, it carries no copyleft obligation
 from upstream chess engines. You may use it freely in permissive, proprietary,
 or any other projects.
 

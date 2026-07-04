@@ -36,8 +36,8 @@
 //! rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w DEde - 1+1 0 1
 //! ```
 //!
-//! mce uses the same board placement and `DEde` leap-rights field and omits the
-//! `1+1` check-counter field (a single check is terminal, so mce keeps no
+//! mcr uses the same board placement and `DEde` leap-rights field and omits the
+//! `1+1` check-counter field (a single check is terminal, so mcr keeps no
 //! counter); FSF defaults the field to `1+1` when it is absent, so the two see the
 //! byte-identical position.
 

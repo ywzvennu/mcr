@@ -14,31 +14,31 @@
 //! full move set — igui, double capture, jitto pass — and Chu's exact
 //! promote-on-entry rule both modelled, issue #400):
 //!
-//! * **perft(1) = 36** — mce's legal-move set is **byte-identical** to HaChu's.
+//! * **perft(1) = 36** — mcr's legal-move set is **byte-identical** to HaChu's.
 //! * **perft(2) = 1296** — **exact** match with HaChu (verified node-for-node).
-//! * **perft(3)**: mce = **48319**, HaChu = **48317**. The two differ at exactly
+//! * **perft(3)**: mcr = **48319**, HaChu = **48317**. The two differ at exactly
 //!   **one** node — after `1. f3f5 d8d7`, where a Black Go-Between sits at
-//!   *anti-diagonal* distance two (d7) from the White Lion on f5. mce generates the
+//!   *anti-diagonal* distance two (d7) from the White Lion on f5. mcr generates the
 //!   two legal captures of it (the jump and the two-step area move); HaChu 0.23
 //!   generates **neither**. This is a **HaChu bug**: its Lion captures a
 //!   distance-two enemy on the a1–l12 diagonal (and its reflection) but not on the
 //!   opposite diagonal — demonstrated in isolation via `setboard` (a lone Lion
-//!   captures an enemy at `+2,+2` / `-2,-2` but not at `-2,+2` / `+2,-2`). mce is
+//!   captures an enemy at `+2,+2` / `-2,-2` but not at `-2,+2` / `+2,-2`). mcr is
 //!   correct; every *other* node of the depth-3 tree matches HaChu exactly.
-//! * **perft(4) = 1802285** is an mce regression pin only: a node-by-node HaChu
+//! * **perft(4) = 1802285** is an mcr regression pin only: a node-by-node HaChu
 //!   cross-check at depth 4 (~1.8M nodes, one subprocess per node) is intractable,
 //!   so it is not oracle-validated.
 //!
 //! HaChu does **not** enforce the Chu lion-trading restrictions in its move
 //! generation (its `setboard` dumps let a Lion capture a *protected* enemy Lion),
-//! so — matching the oracle — mce does not either.
+//! so — matching the oracle — mcr does not either.
 //!
-//! These tests pin the mce move generator against regressions and assert the
+//! These tests pin the mcr move generator against regressions and assert the
 //! documented per-piece movement.
 
-use mce::geometry::{perft, Chu, Chu12x12, Square};
+use mcr::geometry::{perft, Chu, Chu12x12, Square};
 
-/// The Chu start position round-trips through mce's FEN I/O in the `***`-dialect.
+/// The Chu start position round-trips through mcr's FEN I/O in the `***`-dialect.
 #[test]
 fn startpos_round_trips() {
     let pos = Chu::startpos();
@@ -51,9 +51,9 @@ fn startpos_round_trips() {
 /// Start-position perft. Depths 1 and 2 are **HaChu-validated** node-for-node
 /// (perft(1) = 36 is a byte-identical move-set match; perft(2) = 1296 matches
 /// exactly). perft(3) = 48319 matches HaChu at every node **except one**, where
-/// HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mce is
+/// HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mcr is
 /// correct — see the module docs), so HaChu's tree gives 48317. perft(4) is an
-/// mce-only regression pin (depth-4 HaChu cross-check is intractable).
+/// mcr-only regression pin (depth-4 HaChu cross-check is intractable).
 #[test]
 fn startpos_perft_regression() {
     let pos = Chu::startpos();
@@ -122,7 +122,7 @@ fn lion_double_capture() {
 
 /// The Lion captures a distance-two enemy on **either** diagonal — the jump and the
 /// two-step area move. (HaChu 0.23 has a bug here: it misses the anti-diagonal
-/// capture; mce is correct and symmetric.)
+/// capture; mcr is correct and symmetric.)
 #[test]
 fn lion_captures_both_diagonals_at_distance_two() {
     // Anti-diagonal (-2,+2): enemy on d8 relative to the Lion on f6.

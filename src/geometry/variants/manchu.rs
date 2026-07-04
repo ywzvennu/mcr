@@ -49,13 +49,13 @@
 //!
 //! ```text
 //! FSF dialect: rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/9/9/M1BAKAB2 w - - 0 1
-//! mce dialect: rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1
+//! mcr dialect: rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1
 //! ```
 //!
-//! The two describe the same position; mce spells the Xiangqi pieces `u j o z`
+//! The two describe the same position; mcr spells the Xiangqi pieces `u j o z`
 //! (the FSF letters `a n b p` already name the Hawk / Knight / Bishop / Pawn) and
 //! the Banner as the overflow token `*M` (FSF's `m`, distinct from the bare Met
-//! `m` by the `*` prefix). The `compare-fairy` harness rewrites mce's tokens
+//! `m` by the `*` prefix). The `compare-fairy` harness rewrites mcr's tokens
 //! (`u → a`, `j → n`, `o → b`, `z → p`, `*m → m`) when driving FSF.
 
 use crate::geometry::position::{
@@ -67,7 +67,7 @@ use crate::geometry::{
 };
 use crate::Color;
 
-/// The confirmed Manchu starting placement in the mce dialect: a full Black
+/// The confirmed Manchu starting placement in the mcr dialect: a full Black
 /// Xiangqi army, and a White side whose rook/cannon/horse cluster is the single
 /// Banner `*M` on a1 (the position byte-identical to FSF's
 /// `rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/9/9/M1BAKAB2`).
@@ -255,7 +255,7 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
 ///
 /// Construct the starting position (a full Black Xiangqi army against White's
 /// single Banner super-piece) with
-/// [`Manchu::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Manchu::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Manchu::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the Banner movement (Rook + Cannon + Horse) and the reused
 /// Xiangqi palace / river / flying-general rules.
@@ -265,7 +265,7 @@ pub type Manchu = GenericPosition<Xiangqi9x10, ManchuRules>;
 mod tests {
     use super::*;
 
-    /// The canonical start FEN round-trips through the mce dialect.
+    /// The canonical start FEN round-trips through the mcr dialect.
     #[test]
     fn startpos_round_trips() {
         let pos = Manchu::startpos();

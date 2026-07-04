@@ -15,7 +15,7 @@
 //! forced-capture rule and the inverted win/no-move terminations (their deepest
 //! plies reach `perft = 0`, i.e. a finished game).
 
-use mce::{perft_variant, Antichess};
+use mcr::{perft_variant, Antichess};
 
 /// The antichess starting position (standard placement, no castling rights).
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1";

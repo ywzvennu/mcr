@@ -59,7 +59,7 @@ use super::super::Dai15x15;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct DaiRules;
 
-/// The Dai Shogi starting placement (mce dialect). White (uppercase) holds ranks
+/// The Dai Shogi starting placement (mcr dialect). White (uppercase) holds ranks
 /// 1–6; Black is the 180° rotation on ranks 10–15. Reading White's back rank a..o:
 /// Lance, Knight, Stone General, Iron General, Copper, Silver, Gold, King, Gold,
 /// Silver, Copper, Iron General, Stone General, Knight, Lance — the King on the
@@ -611,7 +611,7 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// Dai Shogi (large shogi, 15x15) as a [`GenericPosition`] over [`Dai15x15`].
 ///
 /// Construct the starting position with
-/// [`Dai::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect) with
+/// [`Dai::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect) with
 /// [`Dai::from_fen`](GenericPosition::from_fen). See the [module docs](self) for the
 /// army, the two-royal rule, the five-rank promotion zone, and the validation
 /// status.

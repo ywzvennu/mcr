@@ -3,8 +3,8 @@
 //!
 //! Bughouse is a 2-board team game, but a single board is full-information and
 //! deterministic — crazyhouse with the hand fed externally (FSF `twoBoards`) — so
-//! FSF's `UCI_Variant bughouse` `go perft` is meaningful for it. mce runs the
-//! single board on its **generic** engine (`mce::geometry::Bughouse`, a
+//! FSF's `UCI_Variant bughouse` `go perft` is meaningful for it. mcr runs the
+//! single board on its **generic** engine (`mcr::geometry::Bughouse`, a
 //! `GenericPosition<Chess8x8, BughouseRules>`); this module drives FSF over the
 //! byte-identical position and asserts node counts match. The one single-board
 //! rule that separates Bughouse from Crazyhouse — a capture does **not** bank into
@@ -14,7 +14,7 @@
 //! ## FEN dialect
 //!
 //! Bughouse uses only **standard chess pieces** (`K Q R B N P`), whose letters are
-//! identical in mce and FSF, and FSF accepts the crazyhouse hand bracket in any
+//! identical in mcr and FSF, and FSF accepts the crazyhouse hand bracket in any
 //! order (and the empty `[]` present or omitted), so the FEN is passed to FSF
 //! **unchanged**. The comparison asserts only node counts.
 //!
@@ -23,7 +23,7 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Bughouse, Chess8x8};
+use mcr::geometry::{perft as gperft, Bughouse, Chess8x8};
 
 use crate::uci::Engine;
 
@@ -71,17 +71,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -94,22 +94,22 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Bughouse corpus through mce and FSF. Returns the number of mismatches
+/// Run the Bughouse corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched). Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
     println!();
     println!("Bughouse (single board) — generic engine vs FSF UCI_Variant bughouse (issue #279):");
     let head = format!(
         "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -128,10 +128,10 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
                     "{:<16} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -144,16 +144,16 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
     }
 
     // Node-weighted aggregate throughput.
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "bughouse OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "bughouse OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -166,21 +166,21 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
         eprintln!("ERROR: {mismatches} Bughouse parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH bughouse/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH bughouse/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Bughouse position through mce's generic perft and FSF's `go perft`.
+/// Run one Bughouse position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    // mce side: the generic single-board Bughouse position.
-    let pos = Bughouse::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Chess8x8, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side: the generic single-board Bughouse position.
+    let pos = Bughouse::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: standard piece letters are shared and the hand bracket is accepted
     // verbatim, so the FEN is passed through unchanged.
@@ -192,10 +192,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }

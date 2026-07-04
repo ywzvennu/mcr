@@ -35,7 +35,7 @@
 //! same moves as the engine there. Those special mechanics are validated
 //! separately by the hand-constructed unit tests in `tests/alice_rules.rs`.
 
-use mce::geometry::{perft as gperft, Alice, Chess8x8};
+use mcr::geometry::{perft as gperft, Alice, Chess8x8};
 
 /// The Alice starting FEN — the standard chess array (all pieces begin on board
 /// A; the `board_b` plane mask is empty, so the standard FEN reconstructs it).

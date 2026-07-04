@@ -21,7 +21,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use mce::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
 
 /// A fuzzed game: a variant selector, an optional FEN seed, and a list of move
 /// selectors. Each selector is reduced modulo the number of legal moves to

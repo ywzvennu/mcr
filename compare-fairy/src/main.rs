@@ -1,22 +1,22 @@
 //! Fairy-Stockfish perft comparison harness (issue #158).
 //!
-//! Differential perft + head-to-head timing of mce against Fairy-Stockfish (FSF)
+//! Differential perft + head-to-head timing of mcr against Fairy-Stockfish (FSF)
 //! on the variants both engines share — atomic, king-of-the-hill, three-check,
 //! antichess (FSF: giveaway), racing-kings, horde, crazyhouse, chess960, and
 //! standard. For each shared position the two engines run perft to the same
-//! depth; the node counts are asserted equal, and the throughput (mce Mn/s vs
+//! depth; the node counts are asserted equal, and the throughput (mcr Mn/s vs
 //! FSF Mn/s) is reported. A mismatch prints the FEN + depth to reproduce.
 //!
 //! GPL FENCE: FSF is GPL-3.0+. This harness NEVER links FSF; it drives an
 //! externally provided `fairy-stockfish` UCI binary purely as a subprocess (see
-//! `uci.rs`). The mce library does not depend on FSF. This crate is
+//! `uci.rs`). The mcr library does not depend on FSF. This crate is
 //! `publish = false` and the FSF binary is never committed.
 //!
 //! ```text
 //! cargo run --release                # locate FSF (env / PATH / prebuilt), compare
 //! cargo run --release -- --build     # also clone + build FSF if not found
 //! cargo run --release -- --full      # one ply deeper
-//! cargo run --release --features magic   # mce magic-bitboard sliders
+//! cargo run --release --features magic   # mcr magic-bitboard sliders
 //! ```
 //!
 //! If no FSF binary can be obtained, the harness SKIPS gracefully with install
@@ -83,7 +83,7 @@ mod xiangqi;
 
 use std::time::Instant;
 
-use mce::{AnyVariant, VariantId};
+use mcr::{AnyVariant, VariantId};
 
 use corpus::{Case, CASES, VARIANTS};
 use locate::Source;
@@ -111,17 +111,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -134,8 +134,8 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
@@ -150,7 +150,7 @@ fn main() {
     // Tenjiku) that FSF does not, so this mode locates/drives HaChu on its own
     // and never touches the FSF path below.
     if opts.hachu {
-        println!("mce vs HaChu — large-shogi differential oracle (issue #379)");
+        println!("mcr vs HaChu — large-shogi differential oracle (issue #379)");
         let mismatches = hachu::run(opts.build_hachu);
         if mismatches > 0 {
             std::process::exit(1);
@@ -158,11 +158,11 @@ fn main() {
         return;
     }
 
-    println!("mce vs Fairy-Stockfish — perft comparison harness (issue #158)");
+    println!("mcr vs Fairy-Stockfish — perft comparison harness (issue #158)");
     #[cfg(feature = "magic")]
-    println!("mce slider backend: magic bitboards (--features magic)");
+    println!("mcr slider backend: magic bitboards (--features magic)");
     #[cfg(not(feature = "magic"))]
-    println!("mce slider backend: hyperbola-quintessence (default)");
+    println!("mcr slider backend: hyperbola-quintessence (default)");
 
     // ---- locate (or build) the FSF binary ---------------------------------
     let located = match locate::locate(opts.build) {
@@ -252,7 +252,7 @@ fn main() {
     let cambodian_mismatches = cambodian::run(&mut engine, opts.full);
     // ASEAN is a FSF built-in (no variants.ini needed), like makruk; it is
     // Makruk with the symmetric FIDE start array and FIDE-style last-rank,
-    // four-target promotion, on the same generic engine. Its mce FEN dialect
+    // four-target promotion, on the same generic engine. Its mcr FEN dialect
     // (`s`/`m`) is rewritten to FSF's `b`/`q` inside asean::run.
     let asean_mismatches = asean::run(&mut engine, opts.full);
     let capablanca_mismatches = capablanca::run(&mut engine, opts.full);
@@ -262,7 +262,7 @@ fn main() {
     let grand_mismatches = grand::run(&mut engine, opts.full);
     let grandhouse_mismatches = grandhouse::run(&mut engine, opts.full);
     // Ten-Cubed and Opulent are FSF built-ins (no variants.ini needed) on the same
-    // 10x10 Grand geometry; their mce dialects (`**w`/`**x` and `**w`/`**y`/`**z`
+    // 10x10 Grand geometry; their mcr dialects (`**w`/`**x` and `**w`/`**y`/`**z`
     // second-bank leaper tokens, plus Elephant `e`) are rewritten to FSF's letters
     // inside each module's run (issue #375).
     let tencubed_mismatches = tencubed::run(&mut engine, opts.full);
@@ -270,7 +270,7 @@ fn main() {
     let duck_mismatches = duck::run(&mut engine, opts.full);
     // Dragon is a FSF built-in (no variants.ini needed): standard chess plus a
     // Bishop+Knight Dragon in each fixed pocket, droppable onto the back rank. Its
-    // mce dialect (`a`/`A`) is rewritten to FSF's `d`/`D` inside dragon::run.
+    // mcr dialect (`a`/`A`) is rewritten to FSF's `d`/`D` inside dragon::run.
     let dragon_mismatches = dragon::run(&mut engine, opts.full);
     // Fog of War is an INI variant FSF lacks entirely: fogofwar::run bundles its
     // own variants.ini definition (inheriting built-in chess) and loads it via
@@ -287,16 +287,16 @@ fn main() {
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
-    // Shatranj is a FSF built-in (no variants.ini needed), like makruk; its mce
+    // Shatranj is a FSF built-in (no variants.ini needed), like makruk; its mcr
     // dialect (`*x`/`m`) is rewritten to FSF's `b`/`q` inside shatranj::run.
     let shatranj_mismatches = shatranj::run(&mut engine, opts.full);
     // Courier is a FSF built-in (needs a `largeboards=yes` build for the 12-wide
-    // board); its mce dialect (`*x`/`*u`/`*j`/`m`) is rewritten to FSF's
+    // board); its mcr dialect (`*x`/`*u`/`*j`/`m`) is rewritten to FSF's
     // `e`/`m`/`w`/`f` inside courier::run.
     let courier_mismatches = courier::run(&mut engine, opts.full);
     let shinobi_mismatches = shinobi::run(&mut engine, opts.full);
     // Shogun is an INI variant (like Shinobi): shogun::run loads FSF's
-    // variants.ini (resolved from `$MCE_FSF_VARIANTS_INI`) before driving
+    // variants.ini (resolved from `$MCR_FSF_VARIANTS_INI`) before driving
     // `UCI_Variant shogun`.
     let shogun_mismatches = shogun::run(&mut engine, opts.full);
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
@@ -352,7 +352,7 @@ fn main() {
     // reveal Xiangqi equivalent of each Jieqi position.
     let jieqi_mismatches = jieqi::run(&mut engine, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
-    // variant, so mce drives its standalone `mce::ataxx` module, not AnyVariant.
+    // variant, so mcr drives its standalone `mcr::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
 
     engine.quit();
@@ -454,13 +454,13 @@ fn parse_args() -> Opts {
                 println!(
                     "  --build-hachu : clone + build HaChu if no binary is found (implies --hachu)"
                 );
-                println!("  env MCE_HACHU_BIN=<path> selects an existing HaChu binary");
+                println!("  env MCR_HACHU_BIN=<path> selects an existing HaChu binary");
                 println!("  --difffuzz : seeded random-game perft(1..2)+divide fuzzer vs FSF (issue #239)");
                 println!("  --seed N   : fuzzer base seed (decimal or 0x-hex; default 0x239)");
                 println!("  --games K  : random games per variant (default 3)");
                 println!("  --plies P  : max plies per game (default 30)");
-                println!("  --variant X: fuzz only mce variant X (e.g. xiangqi, orda)");
-                println!("  env MCE_FSF_BIN=<path> selects an existing FSF binary");
+                println!("  --variant X: fuzz only mcr variant X (e.g. xiangqi, orda)");
+                println!("  env MCR_FSF_BIN=<path> selects an existing FSF binary");
                 std::process::exit(0);
             }
             other => eprintln!("warning: ignoring unknown argument {other:?}"),
@@ -497,12 +497,12 @@ fn parse_seed(s: &str) -> Option<u64> {
 fn run_case(engine: &mut uci::Engine, case: &Case, full: bool) -> Result<Row, String> {
     let depth = if full { case.depth + 1 } else { case.depth };
 
-    // mce side.
-    let mce_pos =
-        AnyVariant::from_fen(case.id, case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = mce_pos.perft(depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    // mcr side.
+    let mcr_pos =
+        AnyVariant::from_fen(case.id, case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = mcr_pos.perft(depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side.
     let fsf = variants::to_fsf(case.id).ok_or("variant not shared with FSF")?;
@@ -516,10 +516,10 @@ fn run_case(engine: &mut uci::Engine, case: &Case, full: bool) -> Result<Row, St
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf_res.nodes,
-        matched: mce_nodes == fsf_res.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf_res.nodes,
+        mcr_secs,
         fsf_secs: fsf_res.elapsed.as_secs_f64(),
     })
 }
@@ -528,14 +528,14 @@ fn run_case(engine: &mut uci::Engine, case: &Case, full: bool) -> Result<Row, St
 /// diverging move, and print the reproduction recipe.
 fn report_mismatch(engine: &mut uci::Engine, row: &Row) {
     eprintln!(
-        "*** PARITY MISMATCH {}/{} depth {}: mce={} fsf={} ***",
+        "*** PARITY MISMATCH {}/{} depth {}: mcr={} fsf={} ***",
         row.id.as_str(),
         row.label,
         row.depth,
-        row.mce_nodes,
+        row.mcr_nodes,
         row.fsf_nodes,
     );
-    eprintln!("    mce FEN : {}", row.fen);
+    eprintln!("    mcr FEN : {}", row.fen);
     let fsf_fen = variants::fen_to_fsf(row.id, row.fen);
     eprintln!("    FSF FEN : {fsf_fen}");
     eprintln!(
@@ -546,7 +546,7 @@ fn report_mismatch(engine: &mut uci::Engine, row: &Row) {
         row.depth,
     );
 
-    // FSF divide (mce divide is not part of the public API; FSF's localises the
+    // FSF divide (mcr divide is not part of the public API; FSF's localises the
     // diverging first move, which is enough to start debugging).
     if let Some(fsf) = variants::to_fsf(row.id) {
         if engine.set_variant(fsf.uci_variant, fsf.chess960).is_ok()
@@ -569,12 +569,12 @@ fn print_table(rows: &[Row]) {
         "variant",
         "position",
         "depth",
-        "mce nodes",
+        "mcr nodes",
         "fsf nodes",
         "match",
-        "mce Mn/s",
+        "mcr Mn/s",
         "fsf Mn/s",
-        "mce/fsf",
+        "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -584,10 +584,10 @@ fn print_table(rows: &[Row]) {
             r.id.as_str(),
             r.label,
             r.depth,
-            r.mce_nodes,
+            r.mcr_nodes,
             r.fsf_nodes,
             if r.matched { "ok" } else { "MISMATCH" },
-            r.mce_mnps(),
+            r.mcr_mnps(),
             r.fsf_mnps(),
             r.speedup(),
         );
@@ -599,31 +599,31 @@ fn print_summary(rows: &[Row], mismatches: usize, skipped: usize) {
     println!("per-variant parity + node-weighted throughput:");
     let head = format!(
         "{:<16} {:>5} {:>16} {:>10} {:>10} {:>9}",
-        "variant", "pos", "nodes verified", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "variant", "pos", "nodes verified", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
 
-    let (mut g_nodes, mut g_mce_s, mut g_fsf_s) = (0u64, 0.0f64, 0.0f64);
+    let (mut g_nodes, mut g_mcr_s, mut g_fsf_s) = (0u64, 0.0f64, 0.0f64);
     for &id in VARIANTS {
         let group: Vec<&Row> = rows.iter().filter(|r| r.id == id).collect();
         if group.is_empty() {
             continue;
         }
-        let nodes: u64 = group.iter().map(|r| r.mce_nodes).sum();
-        let mce_s: f64 = group.iter().map(|r| r.mce_secs).sum();
+        let nodes: u64 = group.iter().map(|r| r.mcr_nodes).sum();
+        let mcr_s: f64 = group.iter().map(|r| r.mcr_secs).sum();
         let fsf_s: f64 = group.iter().map(|r| r.fsf_secs).sum();
         let all_ok = group.iter().all(|r| r.matched);
         g_nodes += nodes;
-        g_mce_s += mce_s;
+        g_mcr_s += mcr_s;
         g_fsf_s += fsf_s;
         println!(
             "{:<16} {:>5} {:>16} {:>10.1} {:>10.1} {:>8.2}x {}",
             id.as_str(),
             group.len(),
             nodes,
-            if mce_s > 0.0 {
-                nodes as f64 / mce_s / 1e6
+            if mcr_s > 0.0 {
+                nodes as f64 / mcr_s / 1e6
             } else {
                 0.0
             },
@@ -632,7 +632,7 @@ fn print_summary(rows: &[Row], mismatches: usize, skipped: usize) {
             } else {
                 0.0
             },
-            if mce_s > 0.0 { fsf_s / mce_s } else { 0.0 },
+            if mcr_s > 0.0 { fsf_s / mcr_s } else { 0.0 },
             if all_ok { "" } else { "<- MISMATCH" },
         );
     }
@@ -642,8 +642,8 @@ fn print_summary(rows: &[Row], mismatches: usize, skipped: usize) {
         "OVERALL",
         rows.len(),
         g_nodes,
-        if g_mce_s > 0.0 {
-            g_nodes as f64 / g_mce_s / 1e6
+        if g_mcr_s > 0.0 {
+            g_nodes as f64 / g_mcr_s / 1e6
         } else {
             0.0
         },
@@ -652,8 +652,8 @@ fn print_summary(rows: &[Row], mismatches: usize, skipped: usize) {
         } else {
             0.0
         },
-        if g_mce_s > 0.0 {
-            g_fsf_s / g_mce_s
+        if g_mcr_s > 0.0 {
+            g_fsf_s / g_mcr_s
         } else {
             0.0
         },

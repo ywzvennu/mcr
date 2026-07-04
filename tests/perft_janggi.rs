@@ -6,7 +6,7 @@
 //! soldier**, and a legal **pass** move.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Janggi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Janggi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! janggi`, built `largeboards=yes`) running `go perft` on the byte-identical
 //! position. The `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/janggi.rs`); this test pins the FSF-confirmed numbers so a
@@ -18,12 +18,12 @@
 //!
 //! ```text
 //! FSF dialect: rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1
-//! mce dialect: rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1
+//! mcr dialect: rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1
 //! ```
 //!
-//! The two describe the same position; mce spells four pieces differently because
+//! The two describe the same position; mcr spells four pieces differently because
 //! the FSF letters `a n b p` already name the Hawk / Knight / Bishop / Pawn in
-//! mce's [`WideRole`](mce::geometry::WideRole), so the Guard is `u`, the Horse
+//! mcr's [`WideRole`](mcr::geometry::WideRole), so the Guard is `u`, the Horse
 //! `j`, the Elephant `x` (the Xiangqi elephant already took `o`), and the Soldier
 //! `z`. The chariots (`r`) and cannons (`c`) match. The generals start on the
 //! palace **centre** (e2 / e9), the guards/elephants/horses/chariots on the back
@@ -32,50 +32,50 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_janggi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Janggi, Xiangqi9x10};
+use mcr::geometry::{perft as gperft, Janggi, Xiangqi9x10};
 
-/// The Janggi starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Janggi starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant janggi`.
 const STARTPOS: &str = "rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1";
 
 /// **Screen-cannon** corpus, white to move: a-file cannon jumps a horse-screen and
 /// captures the rook beyond (allowed); c-file cannon's only screen is another
 /// **cannon** (forbidden — no vertical move); g-file cannon has a horse-screen but
-/// the target g8 is a **cannon** (forbidden capture). FSF-confirmed (mce dialect
+/// the target g8 is a **cannon** (forbidden capture). FSF-confirmed (mcr dialect
 /// of FSF's `9/1k7/r1r3c2/9/9/9/N1C3N2/9/4K4/C1C3C2`).
 const SCREEN_CANNON: &str = "9/1k7/r1r3c2/9/9/9/J1C3J2/9/4K4/C1C3C2 w - - 0 1";
 
 /// **Cannon palace-diagonal jump**, white to move: a cannon on d1 jumps the
 /// (non-cannon) horse-screen on the palace centre e2 to the opposite corner f3,
-/// capturing the chariot there. FSF-confirmed (mce dialect of FSF's
+/// capturing the chariot there. FSF-confirmed (mcr dialect of FSF's
 /// `9/1k7/9/9/9/9/9/3K1r3/4N4/3C5`).
 const CANNON_PALACE_DIAG: &str = "9/1k7/9/9/9/9/9/3K1r3/4J4/3C5 w - - 0 1";
 
 /// **Palace diagonals** for general, guard, and chariot at once, white to move:
 /// the general d1, guard d3, and chariot f1 all reach the palace centre e2 along
-/// the diagonal. FSF-confirmed (mce dialect of FSF's
+/// the diagonal. FSF-confirmed (mcr dialect of FSF's
 /// `9/4k4/9/9/9/9/9/3A5/9/3K1R3`).
 const PALACE_DIAG: &str = "9/4k4/9/9/9/9/9/3U5/9/3K1R3 w - - 0 1";
 
 /// **Long blockable elephant**, white to move: the elephant e5 has its two up-leaps
 /// blocked (a soldier on e6) and its two left-leaps blocked (a soldier on d5),
-/// leaving the four right/down leaps open. FSF-confirmed (mce dialect of FSF's
+/// leaving the four right/down leaps open. FSF-confirmed (mcr dialect of FSF's
 /// `9/4k4/9/9/4P4/3PB4/9/9/9/1K7`).
 const LONG_ELEPHANT: &str = "9/4k4/9/9/4Z4/3ZX4/9/9/9/1K7 w - - 0 1";
 
 /// **Sideways + forward-diagonal soldier**, white to move: an open soldier e5 steps
 /// forward or sideways, and a soldier on the black palace corner d8 steps forward,
 /// sideways, and along the forward palace diagonal into the centre e9.
-/// FSF-confirmed (mce dialect of FSF's `5k3/9/3P5/9/9/4P4/9/9/9/1K7`).
+/// FSF-confirmed (mcr dialect of FSF's `5k3/9/3P5/9/9/4P4/9/9/9/1K7`).
 const SOLDIER_SIDE_DIAG: &str = "5k3/9/3Z5/9/9/4Z4/9/9/9/1K7 w - - 0 1";
 
 /// **Pass legal**, white to move and **not** in check: the legal pass `e2e2`
-/// appears among the moves and is counted in perft. FSF-confirmed (mce dialect of
+/// appears among the moves and is counted in perft. FSF-confirmed (mcr dialect of
 /// FSF's `9/1k7/9/9/9/9/4p4/9/4K4/9`).
 const PASS_LEGAL: &str = "9/1k7/9/9/9/9/4z4/9/4K4/9 w - - 0 1";
 
 /// **No pass while in check**, white to move and in check from a black soldier on
-/// e3: no pass is offered; every move is a check evasion. FSF-confirmed (mce
+/// e3: no pass is offered; every move is a check evasion. FSF-confirmed (mcr
 /// dialect of FSF's `9/1k7/9/9/9/9/9/4p4/4K4/9`).
 const IN_CHECK_NO_PASS: &str = "9/1k7/9/9/9/9/9/4z4/4K4/9 w - - 0 1";
 
@@ -160,7 +160,7 @@ fn no_pass_while_in_check_perft() {
     assert_eq!(perft(IN_CHECK_NO_PASS, 3), 50);
 }
 
-// ---- Startpos round-trips through the mce FEN I/O ------------------------------
+// ---- Startpos round-trips through the mcr FEN I/O ------------------------------
 
 #[test]
 fn startpos_fen_round_trips() {

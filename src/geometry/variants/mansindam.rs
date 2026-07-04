@@ -16,7 +16,7 @@
 //!
 //! ## Pieces (confirmed against FSF; promoted forms in parentheses)
 //!
-//! | piece (hanja) | moves like | mce role | promotes to |
+//! | piece (hanja) | moves like | mcr role | promotes to |
 //! |---------------|-----------|----------|-------------|
 //! | Pawn 步 (P)   | one step straight forward (Shogi pawn) | [`WideRole::Pawn`] | Guard |
 //! | Knight 騎 (N) | a chess Knight                          | [`WideRole::Knight`] | Centaur |
@@ -30,7 +30,7 @@
 //!
 //! The promoted forms (none promote again; each reverts to its base in hand):
 //!
-//! | promoted (hanja) | moves like | mce role |
+//! | promoted (hanja) | moves like | mcr role |
 //! |------------------|-----------|----------|
 //! | Guard 哨 (G)   | a King (eight one-steps, non-royal) | [`WideRole::Commoner`] (`*u`) |
 //! | Centaur 衛 (E) | King + Knight                        | [`WideRole::Kheshig`] (`w`) |
@@ -63,7 +63,7 @@
 //! ```
 //!
 //! with FSF's letters `a` (Angel/amazon), `c` (Cardinal/archbishop) and `m`
-//! (Marshal/chancellor). mce reuses `a` (Hawk = Cardinal) and `e` (Elephant =
+//! (Marshal/chancellor). mcr reuses `a` (Hawk = Cardinal) and `e` (Elephant =
 //! Marshal) and spells the Angel with the second-bank overflow token `**a`, so its
 //! canonical start FEN is
 //!
@@ -90,7 +90,7 @@ use super::super::Shogi9x9;
 pub struct MansindamRules;
 
 /// The confirmed Mansindam starting placement (the hand is empty at the start).
-/// In mce dialect: the Cardinal is the Hawk `a`/`A`, the Marshal the Elephant
+/// In mcr dialect: the Cardinal is the Hawk `a`/`A`, the Marshal the Elephant
 /// `e`/`E`, and the Angel the second-bank overflow `**a`/`**A`.
 const MANSINDAM_PLACEMENT: &str = "rnb**akqane/9/ppppppppp/9/9/9/PPPPPPPPP/9/ENAQK**ABNR";
 

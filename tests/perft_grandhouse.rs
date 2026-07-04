@@ -2,7 +2,7 @@
 //! — **Grand chess plus crazyhouse drops**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Grandhouse::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Grandhouse::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant grandhouse`, the `[grandhouse:grand]` `variants.ini` entry, built
 //! `largeboards=yes`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` harness re-runs that head-to-head on demand
@@ -15,17 +15,17 @@
 //!
 //! ```text
 //! FSF dialect: r8r/1nbqkcabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKCABN1/R8R[] w - - 0 1
-//! mce dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1
+//! mcr dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1
 //! ```
 //!
-//! The two differ only in the marshal's letter (`c` in FSF, `e` in mce); the
+//! The two differ only in the marshal's letter (`c` in FSF, `e` in mcr); the
 //! trailing `[]` is the empty crazyhouse hand and there is no castling (`-`). The
 //! deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_grandhouse -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Grand10x10, Grandhouse, WideMoveKind, WideRole};
+use mcr::geometry::{perft as gperft, Grand10x10, Grandhouse, WideMoveKind, WideRole};
 
-/// The Grandhouse starting FEN (mce dialect, marshal `e`), confirmed against FSF.
+/// The Grandhouse starting FEN (mcr dialect, marshal `e`), confirmed against FSF.
 const STARTPOS: &str =
     "r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1";
 

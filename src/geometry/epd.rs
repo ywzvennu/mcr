@@ -22,7 +22,7 @@
 //!   [`WideEpd::to_epd`] without losing operations it does not interpret.
 //!
 //! ```
-//! use mce::geometry::{WideEpd, WideVariantId};
+//! use mcr::geometry::{WideEpd, WideVariantId};
 //!
 //! let epd = WideEpd::parse(
 //!     WideVariantId::Makruk,

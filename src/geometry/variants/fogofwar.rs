@@ -48,7 +48,7 @@
 //! concern, never encoded in the position).
 //!
 //! [`royal_squares`]: WideVariant::royal_squares
-//! [`tests/perft_fogofwar.rs`]: https://github.com/ywzvennu/mce/blob/main/tests/perft_fogofwar.rs
+//! [`tests/perft_fogofwar.rs`]: https://github.com/ywzvennu/mcr/blob/main/tests/perft_fogofwar.rs
 
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,

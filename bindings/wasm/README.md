@@ -1,13 +1,13 @@
-# mce-wasm — WebAssembly bindings + browser demo
+# mcr-wasm — WebAssembly bindings + browser demo
 
-A `wasm-bindgen` shim over the [`mce`](../../) chess engine's public API, plus a
+A `wasm-bindgen` shim over the [`mcr`](../../) chess rules library's public API, plus a
 tiny dependency-free browser demo. This is a **separate nested crate**
-(`publish = false`, path-dependency on `mce`); it is not part of the `mce`
+(`publish = false`, path-dependency on `mcr`); it is not part of the `mcr`
 package, the workspace, or the parent crate's `cargo build`/`cargo test`.
 
 ## JS API
 
-A single `Game` class (backed by mce's runtime `AnyVariant` dispatch):
+A single `Game` class (backed by mcr's runtime `AnyVariant` dispatch):
 
 | Method | Returns | Notes |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ JS exception** on bad input — nothing panics across the boundary.
 ### End-to-end example (Node or browser)
 
 ```js
-import { Game } from "./pkg/mce_wasm.js";
+import { Game } from "./pkg/mcr_wasm.js";
 
 const g = Game.fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 console.log(g.legalMoves().slice(0, 3)); // ["a2a3", "a2a4", "b2b3"]
@@ -62,7 +62,7 @@ cargo install wasm-pack            # one-time, if not already installed
 wasm-pack build bindings/wasm --target web
 ```
 
-This writes `bindings/wasm/pkg/` (`mce_wasm.js` + `mce_wasm_bg.wasm`), which the
+This writes `bindings/wasm/pkg/` (`mcr_wasm.js` + `mcr_wasm_bg.wasm`), which the
 demo's `main.js` imports. `pkg/` is gitignored.
 
 ### Without `wasm-pack` (raw module)
@@ -72,7 +72,7 @@ rustup target add wasm32-unknown-unknown
 cargo build --manifest-path bindings/wasm/Cargo.toml --target wasm32-unknown-unknown
 ```
 
-This produces `bindings/wasm/target/wasm32-unknown-unknown/debug/mce_wasm.wasm`
+This produces `bindings/wasm/target/wasm32-unknown-unknown/debug/mcr_wasm.wasm`
 (no JS glue — use `wasm-pack`, or run `wasm-bindgen` yourself, to get the shim).
 
 ## Run the demo

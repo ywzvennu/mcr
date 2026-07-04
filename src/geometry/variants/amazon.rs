@@ -6,10 +6,10 @@
 //! Every rule is standard chess — the 8x8 board, standard pawns (double step, en
 //! passant), standard castling — except the piece on the queen's square (d-file):
 //!
-//! * **Amazon** (Queen + Knight) — mce's [`WideRole::Angel`]. Its movement is the
+//! * **Amazon** (Queen + Knight) — mcr's [`WideRole::Angel`]. Its movement is the
 //!   union of a queen's slides and a knight's leaps; it is a genuinely-new mover on
 //!   the 8x8 path (the trait default has no Amazon), so this variant supplies its
-//!   [`role_attacks`](WideVariant::role_attacks). FEN token `**a`/`**A` in the mce
+//!   [`role_attacks`](WideVariant::role_attacks). FEN token `**a`/`**A` in the mcr
 //!   dialect (the second-bank overflow token the Angel shares with Mansindam;
 //!   Fairy-Stockfish spells the amazon `a`/`A`, a dialect difference the
 //!   `compare-fairy/` harness reconciles).
@@ -24,11 +24,11 @@
 //!
 //! ```text
 //! FSF dialect: rnbakbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBAKBNR w KQkq - 0 1
-//! mce dialect: rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1
+//! mcr dialect: rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1
 //! ```
 //!
 //! The two strings are the same position; the amazon is `a`/`A` in FSF and the
-//! second-bank overflow `**a`/`**A` in mce. Every other piece, castling, the
+//! second-bank overflow `**a`/`**A` in mcr. Every other piece, castling, the
 //! double pawn step, and en passant are standard chess.
 
 use crate::geometry::position::{
@@ -40,7 +40,7 @@ use crate::geometry::{
 };
 use crate::Color;
 
-/// The confirmed Amazon Chess starting placement in the mce dialect (amazon =
+/// The confirmed Amazon Chess starting placement in the mcr dialect (amazon =
 /// `**a`/`**A`): standard chess with the queen replaced by the Amazon.
 const AMAZON_START_PLACEMENT: &str = "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR";
 

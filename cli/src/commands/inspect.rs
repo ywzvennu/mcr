@@ -1,4 +1,4 @@
-//! `mce inspect` — dump everything the library knows about a position.
+//! `mcr inspect` — dump everything the library knows about a position.
 //!
 //! For standard chess this prints the ASCII board, side to move, castling
 //! rights, en-passant target, move clocks, checkers, every legal move in both
@@ -11,7 +11,7 @@ use clap::Args;
 
 use crate::util::{self, CliResult};
 
-/// Arguments for `mce inspect <FEN>`.
+/// Arguments for `mcr inspect <FEN>`.
 #[derive(Debug, Args)]
 pub struct InspectArgs {
     /// Position to inspect: a six-field FEN, or `startpos`.
@@ -34,7 +34,7 @@ pub fn run(args: InspectArgs) -> CliResult {
 }
 
 /// The rich standard-chess inspection (SAN + UCI moves, checkers, clocks).
-fn inspect_standard(pos: &mce::Position) {
+fn inspect_standard(pos: &mcr::Position) {
     util::print_board(pos.board());
     println!();
     println!("fen:        {}", pos.to_fen());
@@ -68,7 +68,7 @@ fn inspect_standard(pos: &mce::Position) {
 
 /// The variant inspection via `AnyVariant`: UCI moves and the variant-aware
 /// check / outcome surface. (SAN and the FEN side fields are read off the FEN.)
-fn inspect_variant(pos: &mce::AnyVariant) {
+fn inspect_variant(pos: &mcr::AnyVariant) {
     let fen = pos.to_fen();
     util::print_board_fen(&fen);
     println!();
@@ -99,9 +99,9 @@ fn inspect_variant(pos: &mce::AnyVariant) {
 }
 
 /// Renders an outcome as a short phrase.
-fn outcome_string(outcome: mce::Outcome) -> String {
+fn outcome_string(outcome: mcr::Outcome) -> String {
     match outcome {
-        mce::Outcome::Decisive { winner } => format!("{} wins", util::side_name(winner)),
-        mce::Outcome::Draw => "draw".to_owned(),
+        mcr::Outcome::Decisive { winner } => format!("{} wins", util::side_name(winner)),
+        mcr::Outcome::Draw => "draw".to_owned(),
     }
 }

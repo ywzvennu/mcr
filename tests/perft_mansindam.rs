@@ -1,5 +1,5 @@
 //! Mansindam (만신담, "Pantheon tale", 9x9) perft validation on the generic engine
-//! (issue #271) — a shogi-chess hybrid on the [`Shogi9x9`](mce::geometry::Shogi9x9)
+//! (issue #271) — a shogi-chess hybrid on the [`Shogi9x9`](mcr::geometry::Shogi9x9)
 //! geometry with the full crazyhouse **captures-to-hand and drops**, a
 //! **mandatory** far-three-ranks promotion zone (a promotable piece whose move
 //! starts *or* ends in the zone must upgrade), three new pieces (the Angel =
@@ -8,7 +8,7 @@
 //! opponent's back rank ends the game).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Mansindam` perft and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Mansindam` perft and by Fairy-Stockfish (FSF,
 //! `UCI_Variant mansindam`, from its `variants.ini`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/mansindam.rs`); this test pins the FSF-confirmed
@@ -23,7 +23,7 @@
 //! ```
 //!
 //! with FSF's letters `a` (Angel/amazon), `c` (Cardinal/archbishop) and `m`
-//! (Marshal/chancellor). mce reuses `a` (Hawk = Cardinal) and `e` (Elephant =
+//! (Marshal/chancellor). mcr reuses `a` (Hawk = Cardinal) and `e` (Elephant =
 //! Marshal) and spells the Angel with the second-bank overflow token `**a`, so its
 //! canonical start FEN (with the empty crazyhouse hand bracket) is
 //!
@@ -37,9 +37,9 @@
 //! The deep startpos layer is `#[ignore]`d so `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_mansindam -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Mansindam, Shogi9x9};
+use mcr::geometry::{perft as gperft, Mansindam, Shogi9x9};
 
-/// The Mansindam starting FEN in mce's dialect, confirmed against FSF's
+/// The Mansindam starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant mansindam` / `position startpos`.
 const STARTPOS: &str = "rnb**akqane/9/ppppppppp/9/9/9/PPPPPPPPP/9/ENAQK**ABNR[] w - - 0 1";
 
@@ -83,7 +83,7 @@ const ANGEL: &str = "1k7/9/9/9/4**A4/9/9/9/4K4[] w - - 0 1";
 const CAPTURE_SEQ: &str = "rnb**akqane/9/ppp2pppp/3pP4/9/9/PPPP1PPPP/9/ENAQK**ABNR[P] b - - 0 3";
 
 /// Asserts the generic Mansindam perft equals each pinned `(depth, nodes)` count,
-/// and that the FEN round-trips through mce's overflow-token + hand I/O. Every
+/// and that the FEN round-trips through mcr's overflow-token + hand I/O. Every
 /// number here also matched FSF mansindam `go perft` on the same FEN.
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Mansindam::from_fen(fen).expect("valid Mansindam FEN");

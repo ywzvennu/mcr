@@ -3,7 +3,7 @@
 //! Chancellor.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Janus::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Janus::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant janus`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` differential fuzzer re-runs the
 //! head-to-head on demand (`--difffuzz --variant janus`); this test pins the
@@ -13,17 +13,17 @@
 //!
 //! ```text
 //! FSF dialect: rjnbkqbnjr/pppppppppp/10/10/10/10/PPPPPPPPPP/RJNBKQBNJR w KQkq - 0 1
-//! mce dialect: ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1
+//! mcr dialect: ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the Janus's letter (`j` in FSF, `a` in mce, mce's
+//! The two differ only in the Janus's letter (`j` in FSF, `a` in mcr, mcr's
 //! [`WideRole::Hawk`] bishop-knight compound). The deep layer is `#[ignore]`d so
 //! `cargo test` stays fast — run it with
 //! `cargo test --release --test perft_janus -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Cap10x8, Janus};
+use mcr::geometry::{perft as gperft, Cap10x8, Janus};
 
-/// The Janus starting FEN (mce dialect), confirmed against FSF's
+/// The Janus starting FEN (mcr dialect), confirmed against FSF's
 /// `UCI_Variant janus`.
 const STARTPOS: &str = "ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1";
 

@@ -18,7 +18,7 @@
 //! one square to any diagonal like a Met — a Chancellor (rook + knight) with the
 //! Met's extra diagonal step. Confirmed square-for-square against Fairy-Stockfish.
 //!
-//! mce has no dedicated Ai-Wok role: the runtime board wire format packs a piece
+//! mcr has no dedicated Ai-Wok role: the runtime board wire format packs a piece
 //! as `color << 7 | role`, so a role index must fit the low 7 bits and the role
 //! table is full to that bound. The Ai-Wok is therefore fielded as the existing
 //! Rook + Knight + Ferz [`WideRole::Ship`] (introduced for Mansindam's promoted
@@ -34,7 +34,7 @@
 //! rnsaksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKASNR w - - 0 1
 //! ```
 //!
-//! where FSF's `a` / `A` is the Ai-Wok; mce spells that piece `**s` / `**S`, so
+//! where FSF's `a` / `A` is the Ai-Wok; mcr spells that piece `**s` / `**S`, so
 //! the two describe the byte-identical board.
 
 use crate::geometry::attacks::{knight_attacks, leaper_attacks, rook_attacks};

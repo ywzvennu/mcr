@@ -3,9 +3,9 @@
 //! **Commoner** (a Mann).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Knightmate::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Knightmate::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! knightmate`, an FSF built-in) running `go perft` on the byte-identical
-//! position — the FSF divide matches mce's move-for-move, including the royal
+//! position — the FSF divide matches mcr's move-for-move, including the royal
 //! Knight's leaps and check/mate, the Commoner's king-steps, standard castling for
 //! the royal Knight, and pawn promotion to a Commoner / Bishop / Rook / Queen
 //! (never a Knight). The `compare-fairy/` harness re-runs that head-to-head on
@@ -21,7 +21,7 @@
 //! ```
 //!
 //! with FSF's Commoner letter `m`/`M` on the knight files (`b` and `g`) and the
-//! royal Knight on the king square (`k`/`K`). mce uses the same board but spells
+//! royal Knight on the king square (`k`/`K`). mcr uses the same board but spells
 //! the Commoner with its overflow token `*u` / `*U`:
 //!
 //! ```text
@@ -49,9 +49,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_knightmate -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Knightmate};
+use mcr::geometry::{perft as gperft, Chess8x8, Knightmate};
 
-/// The Knightmate starting FEN in mce's dialect, confirmed against FSF's
+/// The Knightmate starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant knightmate` / `position startpos`.
 const STARTPOS: &str = "r*ubqkb*ur/pppppppp/8/8/8/8/PPPPPPPP/R*UBQKB*UR w KQkq - 0 1";
 

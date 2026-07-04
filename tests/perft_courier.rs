@@ -4,7 +4,7 @@
 //! short-range Alfil / Ferz / Wazir / Man army.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Courier::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::Courier::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! courier`, built `largeboards=yes`) running `go perft` on the byte-identical
 //! position. The `compare-fairy/` differential fuzzer re-runs that head-to-head
 //! on demand (`cargo run -- --difffuzz --variant courier`); this test pins the
@@ -24,19 +24,19 @@
 //!
 //! ```text
 //! FSF dialect: rnebmk1wbenr/1ppppp1pppp1/6f5/p5p4p/P5P4P/6F5/1PPPPP1PPPP1/RNEBMK1WBENR w - - 0 1
-//! mce dialect: rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1
+//! mcr dialect: rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1
 //! ```
 //!
-//! mce reuses `b`/`k`/`r`/`n` for the Bishop/King/Rook/Knight but spells the
+//! mcr reuses `b`/`k`/`r`/`n` for the Bishop/King/Rook/Knight but spells the
 //! Courier (Alfil) `*x`, the Man (Commoner) `*u`, the Wazir `*j`, and the Ferz
 //! (Met) `m`; the `compare-fairy` harness rewrites those to FSF's `e`/`m`/`w`/`f`.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_courier -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Courier, Courier12x8};
+use mcr::geometry::{perft as gperft, Courier, Courier12x8};
 
-/// The Courier starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Courier starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant courier`.
 const STARTPOS: &str =
     "rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1";
@@ -102,7 +102,7 @@ fn promo_cheap() {
 
 // -- Rule-level self-check (independent of FSF) -----------------------------
 
-/// The starting array round-trips through FEN in the mce dialect.
+/// The starting array round-trips through FEN in the mcr dialect.
 #[test]
 fn startpos_fen_round_trips() {
     let pos = Courier::startpos();

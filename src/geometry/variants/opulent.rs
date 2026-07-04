@@ -4,28 +4,28 @@
 //!
 //! Opulent is played on a ten-files by ten-ranks board (files a..j, ranks 1..10).
 //! Its army is the standard Rook, Bishop, Queen, and King, an **augmented knight**,
-//! and **four** extra kinds — two compounds mce already models and two genuinely-new
+//! and **four** extra kinds — two compounds mcr already models and two genuinely-new
 //! leapers:
 //!
 //! * **Knight** ([`WideRole::OpulentKnight`], Betza `NW` = Knight + Wazir) — Opulent's
 //!   knight also steps one square orthogonally, so it reaches the eight knight squares
 //!   **and** the four Wazir `(±1,0)`/`(0,±1)` one-steps (twelve targets). Distinct from
-//!   the plain [`WideRole::Knight`]; FEN token `**z`/`**Z` in the mce dialect (FSF
+//!   the plain [`WideRole::Knight`]; FEN token `**z`/`**Z` in the mcr dialect (FSF
 //!   `n`/`N`). *Two per side.* (Confirmed against FSF: the rook, bishop, and queen are
 //!   otherwise standard.)
-//! * **Chancellor** (Rook + Knight) — mce's [`WideRole::Elephant`], FEN `e`/`E` in
-//!   the mce dialect (Fairy-Stockfish spells it `c`/`C`). *One per side.*
-//! * **Archbishop** (Bishop + Knight) — mce's [`WideRole::Hawk`], FEN `a`/`A` in
-//!   both mce and FSF. *One per side.*
+//! * **Chancellor** (Rook + Knight) — mcr's [`WideRole::Elephant`], FEN `e`/`E` in
+//!   the mcr dialect (Fairy-Stockfish spells it `c`/`C`). *One per side.*
+//! * **Archbishop** (Bishop + Knight) — mcr's [`WideRole::Hawk`], FEN `a`/`A` in
+//!   both mcr and FSF. *One per side.*
 //! * **Wizard** ([`WideRole::Wizard`], Betza `CF` = Camel + Ferz) — a pure leaper to
 //!   the eight Camel `(±1,±3)`/`(±3,±1)` squares and the four Ferz `(±1,±1)`
-//!   one-steps. FEN token `**w`/`**W` in the mce dialect (FSF `w`/`W`). *Two per
+//!   one-steps. FEN token `**w`/`**W` in the mcr dialect (FSF `w`/`W`). *Two per
 //!   side.*
 //! * **Lion** ([`WideRole::OpulentLion`], Betza `FDH` = Ferz + Dabbaba +
 //!   Threeleaper) — a pure leaper to the four Ferz `(±1,±1)` diagonal one-steps, the
 //!   four Dabbaba `(±2,0)`/`(0,±2)` jumps, and the four Threeleaper `(±3,0)`/`(0,±3)`
 //!   jumps: one square diagonally, or two or three squares straight. FEN token
-//!   `**y`/`**Y` in the mce dialect (FSF `l`/`L`). *Two per side.*
+//!   `**y`/`**Y` in the mcr dialect (FSF `l`/`L`). *Two per side.*
 //!
 //! Both leapers jump over any intervening piece; their attack sets are symmetric,
 //! so [`attackers_to`](crate::geometry::GenericPosition::attackers_to) reverse-projects
@@ -52,7 +52,7 @@
 //!
 //! ```text
 //! FSF dialect: rw6wr/clbnqknbla/pppppppppp/10/10/10/10/PPPPPPPPPP/CLBNQKNBLA/RW6WR w - - 0 1
-//! mce dialect: r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1
+//! mcr dialect: r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1
 //! ```
 //!
 //! Back-two ranks (a..j): the rooks hold the corners (a/j files, rank 10 / rank 1)
@@ -83,7 +83,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct OpulentRules;
 
-/// The confirmed Opulent starting placement in the mce dialect (chancellor `e`,
+/// The confirmed Opulent starting placement in the mcr dialect (chancellor `e`,
 /// wizard `**w`, lion `**y`), byte-equivalent to Fairy-Stockfish's
 /// `RW6WR/CLBNQKNBLA/…` under the letter map.
 const OPULENT_START_PLACEMENT: &str =
@@ -293,7 +293,7 @@ impl WideVariant<Grand10x10> for OpulentRules {
 /// Opulent chess as a [`GenericPosition`] over the 10x10 [`Grand10x10`] geometry.
 ///
 /// Construct the starting position with
-/// [`Opulent::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Opulent::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Opulent::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the army (Wizard + Lion leapers), the no-castling / pawn rules, and the
 /// three-rank promote-to-captured zone.
@@ -333,7 +333,7 @@ mod tests {
         v
     }
 
-    /// The startpos round-trips through the mce dialect FEN.
+    /// The startpos round-trips through the mcr dialect FEN.
     #[test]
     fn startpos_round_trips() {
         let pos = Opulent::startpos();

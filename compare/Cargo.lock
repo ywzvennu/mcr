@@ -278,15 +278,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
-name = "mce"
-version = "0.0.0"
+name = "mcr"
+version = "0.3.0"
 
 [[package]]
-name = "mce-compare"
+name = "mcr-compare"
 version = "0.0.0"
 dependencies = [
  "criterion",
- "mce",
+ "mcr",
  "shakmaty",
 ]
 

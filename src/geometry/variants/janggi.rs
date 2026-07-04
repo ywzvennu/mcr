@@ -14,7 +14,7 @@
 //! * **General / King** ([`WideRole::King`], FSF `k`): one orthogonal step within
 //!   the palace, **plus** a one-step move along a palace diagonal line (centre ↔
 //!   corner). Starts on the palace **centre** (e2 / e9), not the back rank.
-//! * **Guard / Advisor** ([`WideRole::Advisor`], mce `u`, FSF `a`): identical
+//! * **Guard / Advisor** ([`WideRole::Advisor`], mcr `u`, FSF `a`): identical
 //!   movement to the General (palace-confined wazir + palace-diagonal step). Two
 //!   per side.
 //! * **Chariot / Rook** ([`WideRole::Rook`], `r`): a rook, **plus** — when it
@@ -27,13 +27,13 @@
 //!   Uses the [`attacks::janggi_cannon_quiet`] / [`attacks::janggi_cannon_capture`]
 //!   primitives plus the palace-diagonal jump computed here, all from the live
 //!   board via the default-off [`WideVariant::role_attacks_board`] hook.
-//! * **Horse (馬)** ([`WideRole::Horse`], mce `j`, FSF `n`): the Xiangqi hobbled
+//! * **Horse (馬)** ([`WideRole::Horse`], mcr `j`, FSF `n`): the Xiangqi hobbled
 //!   knight — reuses [`attacks::horse_attacks`].
-//! * **Elephant (象)** ([`WideRole::JanggiElephant`], mce `x`, FSF `b`): moves one
+//! * **Elephant (象)** ([`WideRole::JanggiElephant`], mcr `x`, FSF `b`): moves one
 //!   orthogonal then two diagonal squares outward (a `(±2,±3)`/`(±3,±2)` leap),
 //!   blockable at each intervening square, **not** river-bound. Uses
 //!   [`attacks::janggi_elephant_attacks`].
-//! * **Soldier (병/졸)** ([`WideRole::Soldier`], mce `z`, FSF `p`): one step
+//! * **Soldier (병/졸)** ([`WideRole::Soldier`], mcr `z`, FSF `p`): one step
 //!   forward **or sideways** (no river gate — sideways always), never backward;
 //!   plus a one-step **forward** move along a palace diagonal. No promotion.
 //!
@@ -54,12 +54,12 @@
 //!
 //! ## Confirmed starting FEN
 //!
-//! From FSF's janggi `startFen`; mce and FSF agree on the position but spell four
-//! pieces differently (mce avoids the letters `a n b p`, already taken):
+//! From FSF's janggi `startFen`; mcr and FSF agree on the position but spell four
+//! pieces differently (mcr avoids the letters `a n b p`, already taken):
 //!
 //! ```text
 //! FSF dialect: rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR w - - 0 1
-//! mce dialect: rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1
+//! mcr dialect: rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1
 //! ```
 
 use crate::geometry::position::{
@@ -72,7 +72,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct JanggiRules;
 
-/// The confirmed Janggi starting placement in the mce dialect (guard `u`, horse
+/// The confirmed Janggi starting placement in the mcr dialect (guard `u`, horse
 /// `j`, elephant `x`, soldier `z`), the position byte-identical to FSF's
 /// `rnba1abnr/4k4/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/4K4/RNBA1ABNR`.
 const JANGGI_START_PLACEMENT: &str =
@@ -477,7 +477,7 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
 /// geometry.
 ///
 /// Construct the starting position with
-/// [`Janggi::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Janggi::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Janggi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the palace diagonals, the screen-cannon,
 /// the pass move, and the bikjang facing rule.

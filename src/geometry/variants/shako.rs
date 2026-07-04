@@ -15,9 +15,9 @@
 //!   implemented as the geometry-only [`attacks::cannon_capture_targets`] (its
 //!   attack/threat set) plus [`attacks::cannon_quiet_moves`] (its non-capturing
 //!   rook-rays, wired through the [`WideVariant::quiet_only_targets`] hook).
-//! * **Elephant** (`v` in the mce dialect, `e` in FSF) — a **Fers-Alfil**
+//! * **Elephant** (`v` in the mcr dialect, `e` in FSF) — a **Fers-Alfil**
 //!   leaper: one diagonal step (Ferz) or a two-square diagonal jump over the
-//!   intervening square (Alfil). mce's [`WideRole::FersAlfil`]. Distinct from the
+//!   intervening square (Alfil). mcr's [`WideRole::FersAlfil`]. Distinct from the
 //!   Rook+Knight [`WideRole::Elephant`] (the Capablanca/Grand marshal, letter
 //!   `e`), so it takes the free letter `v`.
 //!
@@ -28,10 +28,10 @@
 //!
 //! ```text
 //! FSF dialect: c8c/ernbqkbnre/pppppppppp/10/10/10/10/PPPPPPPPPP/ERNBQKBNRE/C8C w KQkq - 0 1
-//! mce dialect: c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1
+//! mcr dialect: c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1
 //! ```
 //!
-//! The two strings differ only in the elephant's letter (`e` in FSF, `v` in mce).
+//! The two strings differ only in the elephant's letter (`e` in FSF, `v` in mcr).
 //! The **cannons** sit in the four corners (a1/j1, a10/j10). Rank 2 (white) and
 //! rank 9 (black) hold, a-file to j-file: Elephant, Rook, Knight, Bishop, Queen,
 //! King, Bishop, Knight, Rook, Elephant — so the king is on the **f-file**
@@ -69,7 +69,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ShakoRules;
 
-/// The confirmed Shako starting placement in the mce dialect (elephant = `v`/`V`),
+/// The confirmed Shako starting placement in the mcr dialect (elephant = `v`/`V`),
 /// byte-for-byte equivalent to Fairy-Stockfish's
 /// `c8c/ernbqkbnre/.../ERNBQKBNRE/C8C` modulo the elephant's letter.
 const SHAKO_START_PLACEMENT: &str =

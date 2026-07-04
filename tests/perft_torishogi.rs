@@ -7,9 +7,9 @@
 //! the `compare-fairy` harness. The cheap depths run in the default suite; the
 //! deeper ones are `#[ignore]`d and run with `--include-ignored`.
 
-use mce::geometry::{perft as gperft, Tori, Tori7x7};
+use mcr::geometry::{perft as gperft, Tori, Tori7x7};
 
-/// The confirmed Tori Shogi starting position, in mce's overflow spelling of the
+/// The confirmed Tori Shogi starting position, in mcr's overflow spelling of the
 /// FSF start `rpckcpl/3f3/sssssss/2s1S2/SSSSSSS/3F3/LPCKCPR[-] w 0 1`.
 const STARTPOS: &str =
     "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/2*y1*Y2/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[] w - - 0 1";
@@ -76,7 +76,7 @@ fn quails_cheap() {
 /// Regression for the Pheasant check-interposition drop bug (issue #239): the Tori
 /// **Pheasant** leaps two squares straight forward (a Dabbaba jump), so a check it
 /// delivers along a file **cannot be blocked** by interposing on the intervening
-/// square. mce's hand-drop check mask used `between(king, checker)` unconditionally,
+/// square. mcr's hand-drop check mask used `between(king, checker)` unconditionally,
 /// letting a held Swallow be (illegally) dropped onto that square to "block" the
 /// jump — after which the Pheasant simply captured the king. The fix gates the drop
 /// interposition on `role_is_slider`, mirroring the move generator's check mask.
@@ -99,7 +99,7 @@ w - - 0 15";
 ///
 /// Here the Black King is on f6, the Black Pheasant on f5, and the White Right
 /// Quail on f4; the Quail slides forward up the file (f4 -> f5 -> f6), so the
-/// Pheasant is the only shield. mce previously allowed the Pheasant's `f5f3` jump
+/// Pheasant is the only shield. mcr previously allowed the Pheasant's `f5f3` jump
 /// (over the Quail, off the king-to-pinner segment), leaving the king in check —
 /// perft(1) was 35 with the illegal `f5f3`. Confining a pinned piece to the
 /// king-to-pinner segment drops it; the correct count is 34. FSF (`torishogi`,

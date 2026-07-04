@@ -1,4 +1,4 @@
-//! # mce — Modular Chess Engine
+//! # mcr — Modular Chess Rules
 //!
 //! A permissively licensed (MIT OR Apache-2.0) chess **move-generation and rules**
 //! library. It is an original, clean-room implementation built from public
@@ -6,16 +6,16 @@
 //! so it carries no copyleft obligation and is safe to use in permissive and
 //! proprietary projects alike.
 //!
-//! ## What mce is (and is not)
+//! ## What mcr is (and is not)
 //!
-//! mce answers the *rules* questions about a position: what are the legal moves,
+//! mcr answers the *rules* questions about a position: what are the legal moves,
 //! what does a move lead to, is the side to move in check, is the game over and
 //! why, how many nodes does the tree hold ([`perft`]). It covers **standard
 //! chess, Chess960, and 60+ fairy variants** (Shogi, Xiangqi, Makruk, Capablanca,
 //! Chu Shogi, and more), each perft-verified against the reference engines
 //! Fairy-Stockfish and HaChu.
 //!
-//! mce is emphatically **not** an engine that *plays* chess:
+//! mcr is emphatically **not** an engine that *plays* chess:
 //!
 //! - **No search** — no alpha-beta, MCTS, or any tree search.
 //! - **No evaluation** — no heuristics, piece-square tables, or scoring. The
@@ -81,7 +81,7 @@
 //! Parse a FEN, generate legal moves, play one, and read the outcome:
 //!
 //! ```
-//! use mce::{perft, Color, Outcome, Position};
+//! use mcr::{perft, Color, Outcome, Position};
 //!
 //! // Fool's mate, one move from the end: Black plays Qh4#.
 //! let pos = Position::from_fen(
@@ -103,7 +103,7 @@
 //! Drive a concrete 8×8 variant chosen at runtime through [`AnyVariant`]:
 //!
 //! ```
-//! use mce::{AnyVariant, VariantId};
+//! use mcr::{AnyVariant, VariantId};
 //!
 //! // Pick a variant from a name, then use the same move-gen / play surface.
 //! let id: VariantId = "atomic".parse().unwrap();
@@ -120,7 +120,7 @@
 //! [`AnyWideVariant`](geometry::AnyWideVariant) surface:
 //!
 //! ```
-//! use mce::geometry::{AnyWideVariant, WideVariantId};
+//! use mcr::geometry::{AnyWideVariant, WideVariantId};
 //!
 //! // Shogi is a 9×9 board; the surface mirrors `AnyVariant`.
 //! let id: WideVariantId = "shogi".parse().unwrap();
@@ -164,9 +164,9 @@
 //! `no_std`), and the runtime-built `magic` slider table. Accordingly the
 //! `magic`, `book`, and `parallel` features imply `std`.
 //!
-//! [`docs/variants.md`]: https://github.com/ywzvennu/mce/blob/main/docs/variants.md
-//! [`docs/perf-variants.md`]: https://github.com/ywzvennu/mce/blob/main/docs/perf-variants.md
-#![doc(html_root_url = "https://docs.rs/mce")]
+//! [`docs/variants.md`]: https://github.com/ywzvennu/mcr/blob/main/docs/variants.md
+//! [`docs/perf-variants.md`]: https://github.com/ywzvennu/mcr/blob/main/docs/perf-variants.md
+#![doc(html_root_url = "https://docs.rs/mcr")]
 // The crate is `no_std` by default; the on-by-default `std` feature opts back
 // into the standard library (for `std::error::Error`, `std::fs` book loading,
 // and the magic-table runtime init). The core geometry, rules, and move

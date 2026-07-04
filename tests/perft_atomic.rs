@@ -16,7 +16,7 @@
 //! files), which is a different variant pairing than the standard-castling
 //! `Atomic` exercised here, so they are intentionally not included.
 
-use mce::{perft_variant, Atomic};
+use mcr::{perft_variant, Atomic};
 
 /// Asserts every `(depth, expected)` pair for the atomic position parsed from
 /// `fen`.

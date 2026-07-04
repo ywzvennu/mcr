@@ -20,14 +20,14 @@ API is still maturing toward 1.0.
 
 ## [0.3.0] — 2026-06-30
 
-First crates.io-ready release. `mce` is a clean-room chess **move-generation and
+First crates.io-ready release. `mcr` is a clean-room chess **move-generation and
 rules library** at Fairy-Stockfish parity — there is no search or evaluation,
 no GUI, and no network play. Highlights of the shipped surface:
 
 ### Fairy-variant geometry layer
 
 - **47 fairy / pychess-class variants** on a parallel generic geometry layer
-  (`mce::geometry`): `GenericPosition<G, V>` over a compile-time
+  (`mcr::geometry`): `GenericPosition<G, V>` over a compile-time
   `Geometry`-parametrised `Bitboard<G>` / `Square<G>`, with a per-variant
   `WideVariant` rule layer. Boards span 3×4 up to 10×10 — Xiangqi, Shogi (and
   Mini/Kyoto/Tori/Dobutsu/Gorogoro lines), Makruk, Capablanca, Grand, Shako,
@@ -110,11 +110,11 @@ no GUI, and no network play. Highlights of the shipped surface:
 ### Tooling
 
 - criterion benchmarks; cargo-fuzz targets (FEN, UCI, SAN, movegen); a
-  comprehensive mce-vs-reference comparison harness (CPU, memory, and
+  comprehensive mcr-vs-reference comparison harness (CPU, memory, and
   multi-hundred-position parity) and a Fairy-Stockfish differential harness,
   both kept in separate, non-published crates. The GPL-fenced comparison crates
   (`compare`, `compare-fairy`) and the `fuzz` targets are excluded from the
   published package.
 
-[Unreleased]: https://github.com/ywzvennu/mce/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/ywzvennu/mce/releases/tag/v0.3.0
+[Unreleased]: https://github.com/ywzvennu/mcr/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ywzvennu/mcr/releases/tag/v0.3.0

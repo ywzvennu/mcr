@@ -1,10 +1,10 @@
-# mce-wasm — WebAssembly bindings for the mce chess engine.
+# mcr-wasm — WebAssembly bindings for the mcr chess rules library.
 #
-# This is a separate, nested crate. It is NOT part of the published `mce`
+# This is a separate, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build`/`cargo
-# test`; it depends on `mce` by path. It compiles to a `cdylib` for the
+# test`; it depends on `mcr` by path. It compiles to a `cdylib` for the
 # `wasm32-unknown-unknown` target and exposes a JS-friendly surface over the
-# mce public API through `wasm-bindgen`.
+# mcr public API through `wasm-bindgen`.
 #
 # Build (preferred, produces a ready-to-import JS package in ./pkg):
 #     cargo install wasm-pack      # one-time, if not present
@@ -17,12 +17,12 @@
 # Neither `pkg/` nor `target/` is ever committed.
 
 [package]
-name = "mce-wasm"
+name = "mcr-wasm"
 version = "0.0.0"
 edition = "2021"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "WebAssembly bindings for the mce chess engine."
+description = "WebAssembly bindings for the mcr chess rules library."
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -30,7 +30,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # The core engine, by path. Default (std) build — wasm32-unknown-unknown ships
 # std, so the on-by-default `std` feature is fine and needs no change.
-mce = { path = "../.." }
+mcr = { path = "../.." }
 
 # The JS/wasm boundary. `wasm-bindgen` generates the glue and the JS shim.
 wasm-bindgen = "0.2"

@@ -1,6 +1,6 @@
-# cargo-deny configuration — supply-chain & license audit for the mce library.
+# cargo-deny configuration — supply-chain & license audit for the mcr library.
 #
-# `mce` is a clean-room, dual-licensed (MIT OR Apache-2.0) chess library with a
+# `mcr` is a clean-room, dual-licensed (MIT OR Apache-2.0) chess library with a
 # near-zero runtime dependency surface: only the optional `serde` and `rayon`
 # features pull anything in. cargo-deny audits the crate graph rooted at the
 # root manifest, which here is exactly that shipped runtime/build graph
@@ -14,7 +14,7 @@
 #
 # Scope note (GPL fence): the GPL-fenced `compare-fairy` / `compare` crates and
 # the `fuzz` crate are SEPARATE, non-workspace crates behind their own
-# Cargo.toml. They are NOT in `mce`'s dependency graph (`cargo tree` never
+# Cargo.toml. They are NOT in `mcr`'s dependency graph (`cargo tree` never
 # reaches them — they drive Fairy-Stockfish only as a subprocess), so they and
 # the GPL code they touch are correctly out of scope for this audit. The library
 # graph audited here is verified GPL-free.

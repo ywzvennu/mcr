@@ -25,7 +25,7 @@
 //! * **Commoner** ([`WideRole::Commoner`]) — the non-royal king-stepper (one step
 //!   in any of the eight directions), already used by Synochess and Shinobi. It
 //!   replaces the opening array's two knights (files `b` and `g`), may be captured
-//!   freely, and never defines check. mce spells it with the `*`-prefixed overflow
+//!   freely, and never defines check. mcr spells it with the `*`-prefixed overflow
 //!   token `*u` (the [`OVERFLOW_PREFIX`](crate::geometry::OVERFLOW_PREFIX) plus the
 //!   recycled Advisor letter `u`, the case carrying the colour); FSF spells it `m`.
 //! * **Pawn, Bishop, Rook, Queen** — ordinary chess pieces. Pawns push, capture,
@@ -49,7 +49,7 @@
 //! ```
 //!
 //! with FSF's Commoner letter `m`/`M` and the royal Knight on the king square
-//! (`k`/`K`). mce uses the same board but spells the Commoner with its overflow
+//! (`k`/`K`). mcr uses the same board but spells the Commoner with its overflow
 //! token `*u` / `*U`:
 //!
 //! ```text
@@ -69,7 +69,7 @@ use crate::geometry::{
 };
 use crate::Color;
 
-/// The confirmed Knightmate starting placement, in mce's role letters: the
+/// The confirmed Knightmate starting placement, in mcr's role letters: the
 /// standard array with the two knights replaced by Commoners (`*u` / `*U`) on the
 /// `b` and `g` files, and the royal Knight reusing the king's slot (`k` / `K`).
 const KNIGHTMATE_START_PLACEMENT: &str = "r*ubqkb*ur/pppppppp/8/8/8/8/PPPPPPPP/R*UBQKB*UR";
@@ -192,7 +192,7 @@ impl WideVariant<Chess8x8> for KnightmateRules {
 ///
 /// Construct the starting position (the standard array with the knights replaced
 /// by Commoners and a royal Knight on each king square) with
-/// [`Knightmate::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect,
+/// [`Knightmate::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect,
 /// Commoner `*u`) with [`Knightmate::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the royal Knight, the Commoners, and the promotion set.
 pub type Knightmate = GenericPosition<Chess8x8, KnightmateRules>;
@@ -203,7 +203,7 @@ mod tests {
     use crate::geometry::perft as gperft;
     use crate::geometry::position::WideOutcome;
 
-    /// The canonical start FEN round-trips in mce's dialect.
+    /// The canonical start FEN round-trips in mcr's dialect.
     #[test]
     fn startpos_round_trips() {
         let pos = Knightmate::startpos();

@@ -12,15 +12,15 @@
 //!
 //! The suite is **standard chess only**. We use it three ways:
 //!
-//! 1. **Reference parity** — mce's perft must equal the embedded reference count
+//! 1. **Reference parity** — mcr's perft must equal the embedded reference count
 //!    (an absolute check against published numbers, independent of shakmaty).
-//! 2. **Cross-engine parity** — mce's perft must equal shakmaty's (a second,
+//! 2. **Cross-engine parity** — mcr's perft must equal shakmaty's (a second,
 //!    independent agreement check).
 //! 3. **Benchmarking** — a large, varied corpus of real positions to time.
 //!
 //! A handful of source lines describe degenerate setups (e.g. a bare board with
 //! `;D1 0`) that are not legal chess positions; the loader silently skips any
-//! line mce or shakmaty refuses to parse, and the count of skipped lines is
+//! line mcr or shakmaty refuses to parse, and the count of skipped lines is
 //! reported by the caller. Every retained line is therefore a position both
 //! engines accept.
 

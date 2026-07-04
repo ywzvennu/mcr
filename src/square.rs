@@ -77,7 +77,7 @@ impl Square {
     /// Builds a square from a file and rank.
     ///
     /// ```
-    /// use mce::{File, Rank, Square};
+    /// use mcr::{File, Rank, Square};
     /// assert_eq!(Square::from_file_rank(File::E, Rank::Fourth), Square::new(28));
     /// ```
     #[must_use]
@@ -121,7 +121,7 @@ impl Square {
     /// Negative deltas move west / south.
     ///
     /// ```
-    /// use mce::Square;
+    /// use mcr::Square;
     /// // e4 one file east, one rank north is f5.
     /// assert_eq!(Square::new(28).offset(1, 1), Some(Square::new(37)));
     /// // a1 cannot move west.

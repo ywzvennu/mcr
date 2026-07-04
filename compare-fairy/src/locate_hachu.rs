@@ -5,13 +5,13 @@
 //! other large shogi) is driven purely as a SUBPROCESS oracle, exactly like
 //! Fairy-Stockfish (see `locate.rs` / `uci.rs`). This module only *finds or
 //! compiles* a `hachu` binary on the host; it never commits, vendors, or links
-//! it, and it never copies any HaChu source into mce or this crate. The compiled
+//! it, and it never copies any HaChu source into mcr or this crate. The compiled
 //! binary lives under a build dir that is git-ignored (`/compare-fairy/build`).
 //! If HaChu cannot be obtained, [`locate`] returns the reason so the harness can
 //! skip gracefully and print build instructions.
 //!
 //! Resolution order:
-//! 1. `$MCE_HACHU_BIN` pointing at an executable;
+//! 1. `$MCR_HACHU_BIN` pointing at an executable;
 //! 2. a `hachu` on `PATH`;
 //! 3. a previously built binary under the crate's `build/hachu/` dir;
 //! 4. (only with `--build-hachu`) `git clone` + `make` of upstream HaChu into
@@ -26,7 +26,7 @@ use std::process::Command;
 /// Where a usable HaChu binary came from (for the report header).
 #[derive(Debug, Clone)]
 pub enum Source {
-    /// Found via the `$MCE_HACHU_BIN` environment variable.
+    /// Found via the `$MCR_HACHU_BIN` environment variable.
     Env,
     /// Found on `PATH`.
     Path(String),
@@ -67,7 +67,7 @@ fn prebuilt_candidates() -> Vec<PathBuf> {
 /// binary, or `Err` with a human-readable reason it could not be found.
 pub fn locate(allow_build: bool) -> Result<Located, String> {
     // 1. Environment override.
-    if let Ok(p) = std::env::var("MCE_HACHU_BIN") {
+    if let Ok(p) = std::env::var("MCR_HACHU_BIN") {
         if !p.is_empty() && is_executable(Path::new(&p)) {
             return Ok(Located {
                 bin: p,
@@ -100,7 +100,7 @@ pub fn locate(allow_build: bool) -> Result<Located, String> {
     }
 
     Err(
-        "no hachu binary found (set $MCE_HACHU_BIN, put `hachu` on PATH, or pass --build-hachu)"
+        "no hachu binary found (set $MCR_HACHU_BIN, put `hachu` on PATH, or pass --build-hachu)"
             .to_string(),
     )
 }
@@ -184,8 +184,8 @@ pub const INSTALL_HELP: &str = "\
 HaChu (the large-shogi differential oracle) was not found. To run the HaChu
 comparison, provide its binary by ONE of:
 
-  * Set MCE_HACHU_BIN to an existing hachu executable:
-        MCE_HACHU_BIN=/path/to/hachu cargo run --release -- --hachu
+  * Set MCR_HACHU_BIN to an existing hachu executable:
+        MCR_HACHU_BIN=/path/to/hachu cargo run --release -- --hachu
 
   * Put `hachu` on your PATH.
 
@@ -197,7 +197,7 @@ comparison, provide its binary by ONE of:
     linked; H.G. Muller's reference engine for Chu / Dai / Tenjiku shogi):
         git clone https://github.com/ddugovic/hachu
         cd hachu && make hachu
-        MCE_HACHU_BIN=$PWD/hachu cargo run --release -- --hachu
+        MCR_HACHU_BIN=$PWD/hachu cargo run --release -- --hachu
 ";
 
 #[cfg(test)]
@@ -218,7 +218,7 @@ mod tests {
         // With no env var / PATH / prebuilt binary, locate must return a helpful
         // Err rather than panicking (mirrors FSF's graceful skip). We cannot
         // assume the host has hachu, so only assert the shape when it is absent.
-        if std::env::var_os("MCE_HACHU_BIN").is_none() && which("hachu").is_none() {
+        if std::env::var_os("MCR_HACHU_BIN").is_none() && which("hachu").is_none() {
             if let Err(reason) = locate(false) {
                 assert!(reason.contains("hachu"));
             }

@@ -327,7 +327,7 @@ pub enum GateSquare {
 /// concrete 8x8 [`crate::Move`] is untouched; this is the parallel wide move.
 ///
 /// ```
-/// use mce::geometry::{Chess8x8, Square, WideMove, WideMoveKind};
+/// use mcr::geometry::{Chess8x8, Square, WideMove, WideMoveKind};
 /// let m = WideMove::new(Square::<Chess8x8>::new(12), Square::new(28), WideMoveKind::DoublePawnPush);
 /// assert_eq!(m.to_uci::<Chess8x8>(), "e2e4");
 /// ```
@@ -860,7 +860,7 @@ impl WideMove {
     /// [`parse_uci`]: super::GenericPosition::parse_uci
     ///
     /// ```
-    /// use mce::geometry::{Cap10x8, Chess8x8, Square, WideMove, WideMoveKind, WideRole};
+    /// use mcr::geometry::{Cap10x8, Chess8x8, Square, WideMove, WideMoveKind, WideRole};
     /// let m = WideMove::new(
     ///     Square::<Chess8x8>::new(12),
     ///     Square::new(28),

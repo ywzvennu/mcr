@@ -51,7 +51,7 @@
 //! lnsgkgsnl/1rci1uab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1BAU1ICR1/LNSGKGSNL[-] w 0 1
 //! ```
 //!
-//! mce uses the same board with its own dialect for the cannon pieces — the
+//! mcr uses the same board with its own dialect for the cannon pieces — the
 //! Cannon is `c`, and the three new movers spell themselves with the second
 //! overflow prefix `=` (`=a` rook-cannon, `=c` bishop-cannon, `=i` bishop-hopper),
 //! the promoted forms `=u` / `=w` / `=f` / `=e` — and an empty `[]` holdings
@@ -74,7 +74,7 @@ pub struct CannonShogiRules;
 
 /// The confirmed Cannon Shogi starting placement (the hand is empty at the start).
 /// FSF `lnsgkgsnl/1rci1uab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1BAU1ICR1/LNSGKGSNL`, rewritten
-/// into the mce dialect: FSF `u`→Cannon `c`, `a`→`=a`, `c`→`=c`, `i`→`=i`, `p`→`p`.
+/// into the mcr dialect: FSF `u`→Cannon `c`, `a`→`=a`, `c`→`=c`, `i`→`=i`, `p`→`p`.
 const CANNONSHOGI_PLACEMENT: &str =
     "lnsgkgsnl/1r=c=i1c=ab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1B=AC1=I=CR1/LNSGKGSNL";
 

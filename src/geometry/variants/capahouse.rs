@@ -13,7 +13,7 @@
 //!
 //! * **Archbishop** (Bishop + Knight) — [`WideRole::Hawk`], FEN letter `a`.
 //! * **Chancellor** (Rook + Knight) — [`WideRole::Elephant`], FEN letter `e` in
-//!   the mce dialect (Fairy-Stockfish spells it `c`; the `compare-fairy/` harness
+//!   the mcr dialect (Fairy-Stockfish spells it `c`; the `compare-fairy/` harness
 //!   reconciles the one-letter difference).
 //! * Pawns, knights, bishops, rooks, the queen, and the king move exactly as in
 //!   Capablanca; a pawn promotes on the last rank to Queen, Rook, Bishop, Knight,
@@ -38,10 +38,10 @@
 //!
 //! ```text
 //! FSF dialect: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR[] w KQkq - 0 1
-//! mce dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1
+//! mcr dialect: rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce); the
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr); the
 //! trailing `[]` is the empty crazyhouse hand.
 
 use crate::geometry::position::{
@@ -62,7 +62,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct CapahouseRules;
 
-/// The confirmed Capahouse starting placement in the mce dialect (chancellor =
+/// The confirmed Capahouse starting placement in the mcr dialect (chancellor =
 /// `e`/`E`), identical to Capablanca's; the empty hand rides in the FEN's `[]`.
 const CAPAHOUSE_START_PLACEMENT: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR";
 

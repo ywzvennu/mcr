@@ -4,9 +4,9 @@
 //! mechanics end-to-end.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Duck::perft` and by Fairy-Stockfish (FSF, `UCI_Variant duck`)
+//! `mcr::geometry::Duck::perft` and by Fairy-Stockfish (FSF, `UCI_Variant duck`)
 //! running `go perft` on the byte-identical position (the FSF divide matches
-//! mce's move-for-move). The `compare-fairy/` harness re-runs that head-to-head
+//! mcr's move-for-move). The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/duck.rs`); this test pins the FSF-confirmed
 //! numbers so a regression is caught even without FSF present.
 //!
@@ -29,7 +29,7 @@
 //! * **Two-part ply.** Each ply is a piece move plus a Duck placement onto any
 //!   square empty after the piece move (and different from where the Duck sits).
 //!   FSF renders this as `<piecemove>,<duckfrom><duckto>` (e.g. `a2a3,a3a2`);
-//!   mce matches that string.
+//!   mcr matches that string.
 //! * **Duck blocks everything.** No piece may land on the Duck; it blocks slider
 //!   rays; knights jump over it. It is neither side's piece (never captured).
 //! * **No check.** The king is not royal: a king may move to / be left on an
@@ -40,7 +40,7 @@
 //! The deep (depth-3) layers are `#[ignore]`d so `cargo test` stays fast — run
 //! them with `cargo test --release --test perft_duck -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Duck, Square, WideMoveKind};
+use mcr::geometry::{perft as gperft, Chess8x8, Duck, Square, WideMoveKind};
 
 /// The Duck starting FEN, confirmed against Fairy-Stockfish's `UCI_Variant duck`.
 const STARTPOS: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

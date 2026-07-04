@@ -1,11 +1,11 @@
-//! `mce-uci` — a thin UCI-ish adapter that drives the mce library over the
+//! `mcr-uci` — a thin UCI-ish adapter that drives the mcr library over the
 //! stdin/stdout text protocol, the mirror image of the `compare-fairy` harness
 //! (which speaks the same protocol *to* a Fairy-Stockfish subprocess).
 //!
 //! This is a rules/movegen adapter, **not** a search engine: it deliberately
 //! implements no `go` search or evaluation. It exists so external tooling that
 //! already drives UCI perft engines (e.g. the Fairy-Stockfish `go perft`
-//! divide format) can drive mce the same way, for differential perft.
+//! divide format) can drive mcr the same way, for differential perft.
 //!
 //! Supported commands:
 //!
@@ -17,7 +17,7 @@
 //! * `isready` — replies `readyok`.
 //! * `ucinewgame` — accepted and ignored.
 //! * `position startpos [moves …]` / `position fen <FEN> [moves …]` — sets the
-//!   position from the variant's start array or an mce-dialect FEN, then applies
+//!   position from the variant's start array or an mcr-dialect FEN, then applies
 //!   the trailing UCI moves.
 //! * `d` — prints the board grid, then `Fen:`, `Key:` (the Zobrist position key),
 //!   `Side to move:`, `Checkers:`, and `Status:` — the completeness superset of
@@ -43,17 +43,17 @@
 //! surface (issues #373 / #392 / #411); there is still **no `go` search**.
 //!
 //! The adapter spans both variant families the library ships: the concrete
-//! 8x8-engine variants reached through [`mce::AnyVariant`] / [`mce::VariantId`]
+//! 8x8-engine variants reached through [`mcr::AnyVariant`] / [`mcr::VariantId`]
 //! (standard chess, chess960, atomic, …) and the geometry-layer fairy variants
-//! reached through [`mce::geometry::AnyWideVariant`] /
-//! [`mce::geometry::WideVariantId`] (xiangqi, shogi, janggi, …). Every fairy
+//! reached through [`mcr::geometry::AnyWideVariant`] /
+//! [`mcr::geometry::WideVariantId`] (xiangqi, shogi, janggi, …). Every fairy
 //! variant is enumerated from `WideVariantId::ALL`, so the combo option always
 //! matches whatever the library currently registers.
 
 use std::io::{self, BufRead, Write};
 
-use mce::geometry::{AnyWideVariant, GameStatus, WideVariantId};
-use mce::{AnyVariant, Color, Outcome, VariantId};
+use mcr::geometry::{AnyWideVariant, GameStatus, WideVariantId};
+use mcr::{AnyVariant, Color, Outcome, VariantId};
 
 /// The concrete-engine variants, paired with the `UCI_Variant` name the combo
 /// advertises. Each name round-trips through `VariantId::from_str`, and none
@@ -100,7 +100,7 @@ impl GamePos {
         }
     }
 
-    /// The position parsed from an mce-dialect `fen`, or an error message.
+    /// The position parsed from an mcr-dialect `fen`, or an error message.
     fn from_fen(kind: VariantKind, fen: &str) -> Result<Self, String> {
         match kind {
             VariantKind::Classic(id) => AnyVariant::from_fen(id, fen)
@@ -584,7 +584,7 @@ impl Adapter {
         };
         match cmd {
             "uci" => {
-                writeln!(out, "id name mce-uci {}", env!("CARGO_PKG_VERSION"))?;
+                writeln!(out, "id name mcr-uci {}", env!("CARGO_PKG_VERSION"))?;
                 writeln!(out, "id author {}", env!("CARGO_PKG_AUTHORS"))?;
                 writeln!(out, "{}", uci_variant_option())?;
                 writeln!(out, "uciok")?;

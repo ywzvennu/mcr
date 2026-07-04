@@ -7,7 +7,7 @@
 //! either engine. This module provides exactly that, parsing once into each
 //! engine's native runtime type:
 //!
-//! * mce via [`mce::AnyVariant`] (chess960 is its own [`mce::VariantId`]);
+//! * mcr via [`mcr::AnyVariant`] (chess960 is its own [`mcr::VariantId`]);
 //! * shakmaty via [`shakmaty::variant::VariantPosition`] for the seven non-960
 //!   variants, and `Chess` with [`CastlingMode::Chess960`] for chess960
 //!   (shakmaty folds 960 into `Chess` + a castling mode rather than a variant).
@@ -18,7 +18,7 @@ use shakmaty::fen::Fen;
 use shakmaty::variant::{Variant as ShVariant, VariantPosition as ShVariantPos};
 use shakmaty::{CastlingMode, Chess as ShChess, EnPassantMode, Position as _};
 
-use mce::{AnyVariant, VariantId};
+use mcr::{AnyVariant, VariantId};
 
 /// A side-agnostic, engine-agnostic game result for the differential check.
 ///
@@ -40,7 +40,7 @@ pub enum TermStatus {
 
 /// The nine variant keys used throughout the suite, matching [`crate::VARIANTS`].
 ///
-/// Returns the mce [`VariantId`] and the shakmaty [`ShVariant`] plus the
+/// Returns the mcr [`VariantId`] and the shakmaty [`ShVariant`] plus the
 /// castling mode. shakmaty has no chess960 *variant*; we represent it as
 /// `(Chess, Chess960)` and special-case parsing below.
 fn keys(variant: &str) -> Option<VariantId> {
@@ -75,14 +75,14 @@ fn shak_keys(variant: &str) -> Option<(Option<ShVariant>, CastlingMode)> {
     })
 }
 
-/// An mce position parsed for a known variant key, ready for perft / move-gen.
-pub struct McePos {
+/// An mcr position parsed for a known variant key, ready for perft / move-gen.
+pub struct McrPos {
     inner: AnyVariant,
 }
 
-impl McePos {
+impl McrPos {
     /// Parse `fen` for `variant`. Returns `None` if the key is unknown or the
-    /// FEN does not parse in mce.
+    /// FEN does not parse in mcr.
     pub fn parse(variant: &str, fen: &str) -> Option<Self> {
         let id = keys(variant)?;
         let inner = AnyVariant::from_fen(id, fen).ok()?;
@@ -106,7 +106,7 @@ impl McePos {
 
     /// The legal-move set as sorted UCI strings.
     ///
-    /// mce renders castling as king→king-destination-square (the lichess/UCI
+    /// mcr renders castling as king→king-destination-square (the lichess/UCI
     /// "standard" form, e.g. `e1g1`), so to compare against shakmaty the
     /// shakmaty side must render with [`CastlingMode::Standard`] too (see
     /// [`ShakPos::legal_ucis`]).
@@ -131,10 +131,10 @@ impl McePos {
     pub fn term_status(&self) -> TermStatus {
         match self.inner.outcome() {
             None => TermStatus::Ongoing,
-            Some(mce::Outcome::Decisive { winner }) => TermStatus::Decisive {
+            Some(mcr::Outcome::Decisive { winner }) => TermStatus::Decisive {
                 white_won: winner.is_white(),
             },
-            Some(mce::Outcome::Draw) => TermStatus::Draw,
+            Some(mcr::Outcome::Draw) => TermStatus::Draw,
         }
     }
 
@@ -156,15 +156,15 @@ impl McePos {
     }
 
     /// Whether any node within `depth` plies of this position is variant-
-    /// terminal (an mce-reported [`mce::Outcome`]). Used to confirm that a
+    /// terminal (an mcr-reported [`mcr::Outcome`]). Used to confirm that a
     /// mismatch against shakmaty is the documented terminal-divergence case
-    /// (shakmaty prunes at the terminal; mce keeps expanding) rather than a bug.
+    /// (shakmaty prunes at the terminal; mcr keeps expanding) rather than a bug.
     pub fn any_reaches_terminal(&self, depth: u32) -> bool {
         reaches(&self.inner, depth)
     }
 }
 
-/// Recursive helper for [`McePos::any_reaches_terminal`].
+/// Recursive helper for [`McrPos::any_reaches_terminal`].
 fn reaches(pos: &AnyVariant, depth: u32) -> bool {
     if pos.outcome().is_some() {
         return true;
@@ -229,7 +229,7 @@ impl ShakPos {
     ///
     /// Rendered with [`CastlingMode::Standard`] for **all** variants — including
     /// chess960 — so castling is emitted as king→king-destination-square
-    /// (`e1g1`), matching mce. (`CastlingMode::Chess960` would emit the
+    /// (`e1g1`), matching mcr. (`CastlingMode::Chess960` would emit the
     /// king→rook form `e1h1` and spuriously diverge.)
     pub fn legal_ucis(&self) -> Vec<String> {
         let render = |m: &shakmaty::Move| m.to_uci(CastlingMode::Standard).to_string();

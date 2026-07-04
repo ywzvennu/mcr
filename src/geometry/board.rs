@@ -94,7 +94,7 @@ impl fmt::Display for WidePiece {
 /// square.
 ///
 /// ```
-/// use mce::geometry::{Board, Chess8x8};
+/// use mcr::geometry::{Board, Chess8x8};
 ///
 /// let board = Board::<Chess8x8>::from_fen_placement(
 ///     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",

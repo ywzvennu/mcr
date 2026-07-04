@@ -6,7 +6,7 @@
 //! the Lion wins by reaching the far rank *and being safe there*.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Dobutsu::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Dobutsu::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant dobutsu`) running `go perft` on the byte-identical position. The
 //! `compare-fairy/` harness re-runs that head-to-head on demand
 //! (`compare-fairy/src/dobutsu.rs`); this test pins the FSF-confirmed numbers so a
@@ -20,7 +20,7 @@
 //! gle/1c1/1C1/ELG[-] w 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket. Its piece
+//! mcr renders the same position with an empty `[]` holdings bracket. Its piece
 //! letters differ from FSF's — the Lion is a King (`k`), the Chick a Pawn (`p`),
 //! the Elephant a Met (`m`), and the Giraffe the Wazir overflow role (`*j`) — so
 //! the placement is `*jkm/1p1/1P1/MK*J`; the `compare-fairy/` harness translates
@@ -41,10 +41,10 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_dobutsu -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Dobutsu, Dobutsu3x4};
+use mcr::geometry::{perft as gperft, Dobutsu, Dobutsu3x4};
 
 /// The Dobutsu starting FEN, confirmed against Fairy-Stockfish's
-/// `UCI_Variant dobutsu`. The hand is empty (`[]`). mce's letters: Lion `k`,
+/// `UCI_Variant dobutsu`. The hand is empty (`[]`). mcr's letters: Lion `k`,
 /// Chick `p`, Elephant `m`, Giraffe `*j`.
 const STARTPOS: &str = "*jkm/1p1/1P1/MK*J[] w - - 0 1";
 

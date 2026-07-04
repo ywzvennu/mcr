@@ -41,7 +41,7 @@
 //! * Reduced to a **single** royal, that piece behaves exactly like an ordinary
 //!   royal King (checks, mate).
 //!
-//! mce expresses this with the multi-royal machinery (reused from Spartan / Chak):
+//! mcr expresses this with the multi-royal machinery (reused from Spartan / Chak):
 //! [`royal_squares`](WideVariant::royal_squares) reports the King and the Crown
 //! Prince, and [`royal_constraint_active`](WideVariant::royal_constraint_active)
 //! turns the king-safety constraint **off** while the side holds more than one of
@@ -57,9 +57,9 @@
 //! ```
 //!
 //! with the Drunk Elephant as `e`/`E`. The single-`*` overflow alphabet being
-//! exhausted, mce spells the Drunk Elephant and Crown Prince with the **doubled**
+//! exhausted, mcr spells the Drunk Elephant and Crown Prince with the **doubled**
 //! overflow prefix `**` (`**E`/`**e` Drunk Elephant, `**C`/`**c` Crown Prince), so
-//! mce's start FEN is
+//! mcr's start FEN is
 //!
 //! ```text
 //! lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL w - - 0 1
@@ -88,7 +88,7 @@ use super::shogi::ShogiRules;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ShoShogiRules;
 
-/// The confirmed Sho Shogi starting placement (mce dialect; the Drunk Elephants
+/// The confirmed Sho Shogi starting placement (mcr dialect; the Drunk Elephants
 /// are the doubled-overflow `**E` / `**e` tokens).
 const SHOSHOGI_PLACEMENT: &str =
     "lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL";
@@ -250,7 +250,7 @@ impl WideVariant<Shogi9x9> for ShoShogiRules {
 /// [`Shogi9x9`] geometry.
 ///
 /// Construct the starting position with
-/// [`ShoShogi::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`ShoShogi::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`ShoShogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the Drunk Elephant → Crown Prince
 /// promotion, and the count-thresholded two-royal rule.
@@ -260,7 +260,7 @@ pub type ShoShogi = GenericPosition<Shogi9x9, ShoShogiRules>;
 mod tests {
     use super::*;
 
-    /// The canonical start FEN round-trips through mce's FEN I/O.
+    /// The canonical start FEN round-trips through mcr's FEN I/O.
     #[test]
     fn startpos_round_trips() {
         let pos = ShoShogi::startpos();

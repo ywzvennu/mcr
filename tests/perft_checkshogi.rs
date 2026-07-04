@@ -1,12 +1,12 @@
 //! Checkshogi (Check Shogi, 9x9 / `u128`) perft validation on the generic engine
-//! (issue #406) — **standard 9x9 Shogi** ([`Shogi`](mce::geometry::Shogi)) with a
+//! (issue #406) — **standard 9x9 Shogi** ([`Shogi`](mcr::geometry::Shogi)) with a
 //! single terminal twist: **giving check wins the game**. Every piece, the
 //! persistent hand, drops, and the promotion zone are Shogi's; the rule layer
 //! delegates every move-generation hook to `ShogiRules` and overrides only the
 //! terminal condition.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::CheckShogi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::CheckShogi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant checkshogi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`--difffuzz --variant checkshogi`, 0 divergences); this test pins
@@ -21,7 +21,7 @@
 //! ```
 //!
 //! The `1+1` field is FSF's per-side **check counter** (one check to win). Because
-//! a single check is terminal, mce keeps no counter and omits the field; FSF fills
+//! a single check is terminal, mcr keeps no counter and omits the field; FSF fills
 //! the absent field with its `1+1` default, so the two see the byte-identical
 //! position and no dialect rewrite is needed. Since no opening move gives check,
 //! the startpos perft sequence coincides with Shogi's:
@@ -38,10 +38,10 @@
 //! check within the tree, so their perft counts exercise the truncation. See
 //! `check_win_is_terminal` for the terminal reporting.
 
-use mce::geometry::{perft as gperft, CheckShogi, Shogi9x9, WideEndReason, WideOutcome};
-use mce::Color;
+use mcr::geometry::{perft as gperft, CheckShogi, Shogi9x9, WideEndReason, WideOutcome};
+use mcr::Color;
 
-/// The Checkshogi starting FEN (mce omits FSF's `1+1` check-counter field). The
+/// The Checkshogi starting FEN (mcr omits FSF's `1+1` check-counter field). The
 /// hand is empty (`[]`).
 const STARTPOS: &str = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[] w - - 0 1";
 
@@ -118,7 +118,7 @@ fn hands_midboard_deep() {
 
 /// A position whose side to move is in check is terminal: the checker (the side
 /// *not* to move) has won, there are zero legal moves, and the outcome is a
-/// variant win. (This is mce's rule read off a single position; FSF's `go perft`
+/// variant win. (This is mcr's rule read off a single position; FSF's `go perft`
 /// on such a *root* resets its check counter and would instead let the king
 /// escape, so this exact node is not perft-pinned against FSF — the in-tree
 /// truncation the perft cases above exercise is what FSF confirms.)

@@ -6,7 +6,7 @@
 //!
 //! ## Armies (asymmetric)
 //!
-//! * **White** — Rook, Knight, Knight, **Chancellor** (Rook + Knight, mce's
+//! * **White** — Rook, Knight, Knight, **Chancellor** (Rook + Knight, mcr's
 //!   [`WideRole::Elephant`], FEN `e`/`E`; FSF spells it `c`/`C`), King, Knight,
 //!   Knight, Rook. No bishops, no queen: a pure knight army.
 //! * **Black** — Rook, Bishop, Bishop, Queen, King, Bishop, Bishop, Rook. No
@@ -31,10 +31,10 @@
 //!
 //! ```text
 //! FSF dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNCKNNR w KQkq - 0 1
-//! mce dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1
+//! mcr dialect: rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in White's chancellor letter (`c` in FSF, `e` in mce). The
+//! The two differ only in White's chancellor letter (`c` in FSF, `e` in mcr). The
 //! Black back rank is standard piece letters, identical in both dialects.
 
 use crate::geometry::position::{
@@ -43,7 +43,7 @@ use crate::geometry::position::{
 use crate::geometry::{Board, Chess8x8, Geometry, PromotionConfig, WideRole, WideVariant};
 use crate::Color;
 
-/// The confirmed Chigorin starting placement in the mce dialect (White chancellor
+/// The confirmed Chigorin starting placement in the mcr dialect (White chancellor
 /// = `E`): Black bishop army over White knight army, byte-for-byte equivalent to
 /// FSF's `rbbqkbbr/.../RNNCKNNR` modulo the chancellor's letter.
 const CHIGORIN_START_PLACEMENT: &str = "rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR";

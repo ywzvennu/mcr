@@ -1,10 +1,10 @@
 //! Shared helpers: the error type, FEN/variant parsing, board rendering, and a
-//! tiny deterministic RNG used by `mce play`.
+//! tiny deterministic RNG used by `mcr play`.
 
 use std::fmt;
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{AnyVariant, CastleSide, Color, File, Position, Rank, Square, VariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::{AnyVariant, CastleSide, Color, File, Position, Rank, Square, VariantId};
 
 /// The standard chess starting FEN, used as the expansion of `startpos`.
 pub const STARTPOS_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -115,7 +115,7 @@ pub fn castling_string(pos: &Position) -> String {
 }
 
 /// Renders a bitboard of squares as a space-separated list, or `-` when empty.
-pub fn squares_string(bb: mce::Bitboard) -> String {
+pub fn squares_string(bb: mcr::Bitboard) -> String {
     if bb.is_empty() {
         return "-".to_owned();
     }
@@ -131,7 +131,7 @@ pub fn squares_string(bb: mce::Bitboard) -> String {
 pub fn print_board_fen(fen: &str) {
     // The first space-separated field is the piece placement; render it.
     let placement = fen.split(' ').next().unwrap_or("");
-    match mce::Board::from_fen_placement(placement) {
+    match mcr::Board::from_fen_placement(placement) {
         Ok(board) => print_board(&board),
         // Fall back to a literal echo if the placement is unexpectedly shaped;
         // callers only pass FENs the library already accepted.
@@ -139,8 +139,8 @@ pub fn print_board_fen(fen: &str) {
     }
 }
 
-/// Prints an [`mce::Board`] as an 8x8 grid with labels.
-pub fn print_board(board: &mce::Board) {
+/// Prints an [`mcr::Board`] as an 8x8 grid with labels.
+pub fn print_board(board: &mcr::Board) {
     for rank_idx in (0..8).rev() {
         let rank = Rank::new(rank_idx).expect("0..8 is a valid rank index");
         print!("{}  ", rank.char());

@@ -5,7 +5,7 @@
 //! promotion.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Shogi::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Shogi::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant shogi`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/shogi.rs`); this test pins the FSF-confirmed
@@ -19,7 +19,7 @@
 //! lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[-] w - - 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket (its hand is
+//! mcr renders the same position with an empty `[]` holdings bracket (its hand is
 //! empty at the start). The Shogi piece letters coincide with FSF's — `l n s g k
 //! r b p` and the `+`-prefixed promoted forms `+P +L +N +S +R +B` — so no FEN
 //! dialect rewrite is needed (unlike Xiangqi). The well-known Shogi startpos
@@ -30,13 +30,13 @@
 //!
 //! Real Shogi forbids a pawn drop that gives immediate checkmate. **FSF's `shogi`
 //! perft does not enforce this** — a mating pawn drop is listed as a legal move —
-//! so mce, validated node-for-node against FSF, does not filter it either (the
+//! so mcr, validated node-for-node against FSF, does not filter it either (the
 //! `nifu_mate` case below contains a mating pawn drop that both engines count).
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shogi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Shogi, Shogi9x9};
+use mcr::geometry::{perft as gperft, Shogi, Shogi9x9};
 
 /// The Shogi starting FEN, confirmed against Fairy-Stockfish's `UCI_Variant
 /// shogi`. The hand is empty (`[]`).

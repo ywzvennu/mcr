@@ -45,7 +45,7 @@ impl File {
     /// Returns the file with the given zero-based index, or `None` if `index >= 8`.
     ///
     /// ```
-    /// use mce::File;
+    /// use mcr::File;
     /// assert_eq!(File::new(0), Some(File::A));
     /// assert_eq!(File::new(7), Some(File::H));
     /// assert_eq!(File::new(8), None);
@@ -83,7 +83,7 @@ impl File {
     /// Parses a file from its character, accepting `'a'`..=`'h'` and `'A'`..=`'H'`.
     ///
     /// ```
-    /// use mce::File;
+    /// use mcr::File;
     /// assert_eq!(File::from_char('c'), Some(File::C));
     /// assert_eq!(File::from_char('C'), Some(File::C));
     /// assert_eq!(File::from_char('i'), None);

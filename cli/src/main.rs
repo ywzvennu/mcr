@@ -1,17 +1,17 @@
-//! `mce` — the unified command-line front end for the mce chess library.
+//! `mcr` — the unified command-line front end for the mcr chess library.
 //!
 //! A single binary consolidating the repo's example tools and a few new
 //! utilities, so the library is usable straight from the shell:
 //!
-//! - `mce perft <FEN|startpos> <depth>` — node counts, optionally per-root-move
+//! - `mcr perft <FEN|startpos> <depth>` — node counts, optionally per-root-move
 //!   (`--divide`), parallel (`--parallel`), and per variant (`--variant`).
-//! - `mce inspect <FEN>` — an ASCII board plus everything the library knows
+//! - `mcr inspect <FEN>` — an ASCII board plus everything the library knows
 //!   about the position.
-//! - `mce play` — seeded random self-play, printing the move list and result.
-//! - `mce convert` — PGN(mainline) → final FEN, or FEN → one-line summary.
-//! - `mce validate <FEN>` — parse + validate a FEN, exit 0 / nonzero.
+//! - `mcr play` — seeded random self-play, printing the move list and result.
+//! - `mcr convert` — PGN(mainline) → final FEN, or FEN → one-line summary.
+//! - `mcr validate <FEN>` — parse + validate a FEN, exit 0 / nonzero.
 //!
-//! Every subcommand uses only the public mce API and reports bad input as an
+//! Every subcommand uses only the public mcr API and reports bad input as an
 //! error on stderr with a nonzero exit code rather than panicking.
 
 use std::process::ExitCode;
@@ -24,9 +24,9 @@ mod util;
 /// Top-level command-line interface.
 #[derive(Debug, Parser)]
 #[command(
-    name = "mce",
+    name = "mcr",
     version,
-    about = "Unified command-line tool for the mce chess engine",
+    about = "Unified command-line tool for the mcr chess rules library",
     long_about = None,
 )]
 struct Cli {
@@ -34,7 +34,7 @@ struct Cli {
     command: Command,
 }
 
-/// The subcommands exposed by the `mce` binary.
+/// The subcommands exposed by the `mcr` binary.
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Count the leaf nodes of the move tree to a fixed depth (perft).

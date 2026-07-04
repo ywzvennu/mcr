@@ -2,9 +2,9 @@
 //! Crown Prince) perft validation on the generic engine (issue #267).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::ShoShogi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
+//! `mcr::geometry::ShoShogi::perft` and by Fairy-Stockfish (FSF, `UCI_Variant
 //! shoshogi`) running `go perft` on the byte-identical position — the FSF divide
-//! matches mce's move-for-move, including the full Shogi army and its
+//! matches mcr's move-for-move, including the full Shogi army and its
 //! `+`-promotions, the Drunk Elephant's seven-direction step, the Drunk Elephant →
 //! Crown Prince promotion (creating a **second royal**), and the
 //! **count-thresholded** two-royal rule (while a side holds both a King and a Crown
@@ -22,9 +22,9 @@
 //! ```
 //!
 //! with the Drunk Elephant as `e`/`E`. The single-`*` overflow alphabet being
-//! exhausted, mce spells the Drunk Elephant and Crown Prince with the **doubled**
+//! exhausted, mcr spells the Drunk Elephant and Crown Prince with the **doubled**
 //! overflow prefix `**` (`**E`/`**e` Drunk Elephant, `**C`/`**c` Crown Prince), so
-//! mce's start FEN is
+//! mcr's start FEN is
 //!
 //! ```text
 //! lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL w - - 0 1
@@ -34,9 +34,9 @@
 //! when driving FSF. The deep layers are `#[ignore]`d so `cargo test` stays fast —
 //! run them with `cargo test --release --test perft_shoshogi -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, ShoShogi, Shogi9x9};
+use mcr::geometry::{perft as gperft, ShoShogi, Shogi9x9};
 
-/// The Sho Shogi starting FEN in mce's dialect, confirmed against FSF's
+/// The Sho Shogi starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant shoshogi` / `position startpos`.
 const STARTPOS: &str =
     "lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL w - - 0 1";
@@ -138,11 +138,11 @@ fn lone_crown_prince_cheap() {
 
 /// A White-to-move node **in check** (a Black Pawn on h4 attacks the lone White
 /// King on h3) where White still holds an **un-promoted** Drunk Elephant on d6.
-/// Reached from issue #454's parent by Black `h5h4`. mce finds **four** legal
+/// Reached from issue #454's parent by Black `h5h4`. mcr finds **four** legal
 /// evasions; FSF finds only three — the difference is the Drunk-Elephant → Crown-
 /// Prince promotion, which is a genuine fourth evasion under Sho Shogi's rules
 /// (gaining a second royal drops the whole notion of check) but which FSF's move
-/// generator does not emit. mce is correct; the `compare-fairy` fuzzer discounts
+/// generator does not emit. mcr is correct; the `compare-fairy` fuzzer discounts
 /// exactly this FSF-omitted move (see `shoshogi_fsf_visible_count`) so the
 /// cross-check stays faithful.
 const IN_CHECK_DE_ESCAPE: &str =
@@ -191,11 +191,11 @@ fn in_check_de_promotion_is_a_legal_evasion() {
 
 /// A **not-in-check** node where White's Drunk Elephant (d7) is **pinned** in
 /// front of its King (d1) by a Black Rook (d8). Moving the Elephant off the d-file
-/// would expose the King — so mce allows it **only by promoting**: the six off-file
+/// would expose the King — so mcr allows it **only by promoting**: the six off-file
 /// Crown-Prince promotions are legal (each gains a second royal, and a two-royal
 /// side is never in check, so leaving the King en prise is fine), while their
 /// non-promoting twins are not. Only `d7d8`/`d7d8**c` (capturing the pinner) has a
-/// legal non-promoting form. FSF omits the six promotions; mce is correct.
+/// legal non-promoting form. FSF omits the six promotions; mcr is correct.
 const PINNED_DE_PROMOTES_OFF_PIN: &str =
     "l1+Ng1g3/3r1k3/1+S1**E**ep1pl/1pp6/2P2P1np/7G1/PP2+n1N2/L3G3L/3K2S2 w - - 1 46";
 

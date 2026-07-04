@@ -5,7 +5,7 @@
 //! Generals, and a Pawn row per side, plus a **Lance and a Knight in hand**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Gorogoro::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Gorogoro::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant gorogoroplus`, built `largeboards=yes`, with the
 //! `gorogoroplus` definition loaded from `variants.ini`) running `go perft` on
 //! the byte-identical position. The `compare-fairy/` harness re-runs that
@@ -20,7 +20,7 @@
 //! sgkgs/5/1ppp1/1PPP1/5/SGKGS[LNln] w 0 1
 //! ```
 //!
-//! mce renders the same position with the `[LNln]` holdings bracket — a Lance
+//! mcr renders the same position with the `[LNln]` holdings bracket — a Lance
 //! and a Knight in each side's hand — and the explicit `- -` castling/ep fields
 //! its FEN dialect uses. The FSF-confirmed startpos perft sequence is
 //! `39, 1438, 44436, 1330443, 36102221`.
@@ -36,7 +36,7 @@
 //! ## Note on *uchifuzume* (no pawn-drop mate)
 //!
 //! As with Shogi (#190), **FSF's `gorogoroplus` perft does not enforce
-//! uchifuzume** — it lists a pawn drop even when it gives mate — so mce,
+//! uchifuzume** — it lists a pawn drop even when it gives mate — so mcr,
 //! validated node-for-node against FSF, does not filter it either. The `nifu`
 //! case pins the **nifu** filter (no second unpromoted pawn on a file); a Tokin
 //! does not count.
@@ -44,7 +44,7 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_gorogoro -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Gorogoro, Gorogoro5x6};
+use mcr::geometry::{perft as gperft, Gorogoro, Gorogoro5x6};
 
 /// The Gorogoro Shogi Plus starting FEN, confirmed against Fairy-Stockfish's
 /// `UCI_Variant gorogoroplus`. Each side holds a Lance and a Knight (`[LNln]`).

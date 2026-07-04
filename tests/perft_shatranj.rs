@@ -2,30 +2,30 @@
 //!
 //! The node counts below are pinned **and cross-checked against Fairy-Stockfish**
 //! (FSF, `UCI_Variant shatranj`, a built-in): every `(depth, nodes)` pair here
-//! was produced identically by `mce::geometry::Shatranj::perft` and by FSF's `go
+//! was produced identically by `mcr::geometry::Shatranj::perft` and by FSF's `go
 //! perft` on the byte-identical position. The `compare-fairy/` harness re-runs
 //! that head-to-head on demand (see `compare-fairy/src/shatranj.rs`); this test
 //! pins the confirmed numbers so a regression is caught without FSF present.
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF render the same position with different piece letters. FSF's
+//! mcr and FSF render the same position with different piece letters. FSF's
 //! `shatranj` uses `b` for the Alfil (elephant) and `q` for the Ferz (counselor);
-//! mce reuses `b`/`q` for its Bishop/Queen, so the Ferz takes the Makruk Met `m`
+//! mcr reuses `b`/`q` for its Bishop/Queen, so the Ferz takes the Makruk Met `m`
 //! and the Alfil — past the exhausted single-letter alphabet — the `*`-prefixed
 //! overflow token `*x`. The harness rewrites these (`*x → b`, `m → q`) when
 //! driving FSF.
 //!
-//! Confirmed Shatranj starting FEN (from FSF `position startpos`, mce dialect):
+//! Confirmed Shatranj starting FEN (from FSF `position startpos`, mcr dialect):
 //!   `rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - 0 1`
 //!
 //! The cheap layers run as ordinary tests; the deep layers are `#[ignore]`d so
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_shatranj -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Shatranj};
+use mcr::geometry::{perft as gperft, Chess8x8, Shatranj};
 
-/// The Shatranj starting FEN (mce dialect), confirmed byte-for-byte against
+/// The Shatranj starting FEN (mcr dialect), confirmed byte-for-byte against
 /// Fairy-Stockfish's `UCI_Variant shatranj` / `position startpos`.
 const STARTPOS: &str = "rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - 0 1";
 
@@ -104,6 +104,6 @@ fn mid2_ferzes_deep() {
 #[test]
 fn bared_king_truncates_to_zero() {
     // The bared side has lost: FSF reports the node terminal, so `go perft N` is 0
-    // at every depth. mce's baring-loss truncation matches exactly.
+    // at every depth. mcr's baring-loss truncation matches exactly.
     check(BARED, &[(1, 0), (2, 0), (3, 0), (4, 0)]);
 }

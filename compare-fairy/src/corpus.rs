@@ -1,8 +1,8 @@
-//! The shared-position corpus: identical positions run through both mce and FSF.
+//! The shared-position corpus: identical positions run through both mcr and FSF.
 //!
-//! These FENs are reused from the mce regression tests and the `compare/` (mce
+//! These FENs are reused from the mcr regression tests and the `compare/` (mcr
 //! vs shakmaty) basket — opening / midgame / tactical / endgame shapes per
-//! variant. Each carries an mce [`VariantId`] (the FSF mapping + FEN dialect are
+//! variant. Each carries an mcr [`VariantId`] (the FSF mapping + FEN dialect are
 //! handled in [`crate::variants`]) and a per-position depth.
 //!
 //! Depths are kept modest by default because FSF's perft is the slower side of
@@ -10,22 +10,22 @@
 //! cross-check plus a representative throughput sample, not a multi-minute deep
 //! perft. `--full` deepens them (see `main.rs`).
 
-use mce::VariantId;
+use mcr::VariantId;
 
 /// One shared corpus position.
 #[derive(Debug, Clone, Copy)]
 pub struct Case {
-    /// The mce variant.
+    /// The mcr variant.
     pub id: VariantId,
     /// Short human label, unique within the variant.
     pub label: &'static str,
-    /// FEN in mce dialect (the FSF dialect is derived in `variants::fen_to_fsf`).
+    /// FEN in mcr dialect (the FSF dialect is derived in `variants::fen_to_fsf`).
     pub fen: &'static str,
     /// Default perft depth (deepened by `+1` in `--full`).
     pub depth: u32,
 }
 
-/// The shared corpus, grouped by variant. Every variant FSF and mce both
+/// The shared corpus, grouped by variant. Every variant FSF and mcr both
 /// support appears with several positions.
 pub const CASES: &[Case] = &[
     // ---- standard ---------------------------------------------------------
@@ -85,7 +85,7 @@ pub const CASES: &[Case] = &[
         fen: "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
         depth: 4,
     },
-    // ---- three-check (mce trailing W+B; reconciled to FSF after-ep) --------
+    // ---- three-check (mcr trailing W+B; reconciled to FSF after-ep) --------
     Case {
         id: VariantId::ThreeCheck,
         label: "startpos-3+3",

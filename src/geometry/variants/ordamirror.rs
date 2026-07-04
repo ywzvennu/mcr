@@ -10,13 +10,13 @@
 //! Four of the five distinct pieces are exactly the Orda cavalry, reused verbatim
 //! ([`OrdaRules`](super::orda::OrdaRules) defines the same movements):
 //!
-//! * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mce `f`) — moves like a
+//! * **Lancer** ([`WideRole::Lancer`], FSF `kniroo` `l`, mcr `f`) — moves like a
 //!   knight to an empty square; captures like a **rook**.
-//! * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mce `w`) — a **King +
+//! * **Kheshig** ([`WideRole::Kheshig`], FSF `centaur` `h`, mcr `w`) — a **King +
 //!   Knight** leaper (sixteen squares); moves and captures alike.
-//! * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mce `y`) — moves like a
+//! * **Archer** ([`WideRole::Archer`], FSF `knibis` `a`, mcr `y`) — moves like a
 //!   knight to an empty square; captures like a **bishop**.
-//! * **Falcon** ([`WideRole::Falcon`], FSF `customPiece1 = f:mQcN` `f`, mce
+//! * **Falcon** ([`WideRole::Falcon`], FSF `customPiece1 = f:mQcN` `f`, mcr
 //!   overflow `*f`) — the **inverse** of the Lancer / Archer: it **moves like a
 //!   queen** (any distance along a rank, file, or diagonal, to an empty square)
 //!   but **captures like a knight** (a 2-1 leap). Its quiet queen slides are
@@ -40,7 +40,7 @@
 //! `flagRegionWhite = *8`, `flagRegionBlack = *1`) — exactly the Orda rule, and
 //! the generic [`WideVariant::has_flag_win`] / [`WideVariant::flag_rank`]
 //! defaults express it (the shared `flag_win_reached` termination on the losing
-//! side's turn). This is what makes mce's perft match FSF's at a flag node.
+//! side's turn). This is what makes mcr's perft match FSF's at a flag node.
 //!
 //! ## Confirmed starting FEN
 //!
@@ -50,7 +50,7 @@
 //! lhafkahl/8/pppppppp/8/8/PPPPPPPP/8/LHAFKAHL w - - 0 1
 //! ```
 //!
-//! with FSF's letters `l h a f k` (Lancer, Kheshig, Archer, Falcon, King). mce
+//! with FSF's letters `l h a f k` (Lancer, Kheshig, Archer, Falcon, King). mcr
 //! reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the horde pieces take the
 //! distinct letters Lancer `f`, Kheshig `w`, Archer `y`, and the Falcon takes the
 //! overflow token `*f` (its base letter `f` is the FSF mnemonic; the `*` prefix
@@ -86,7 +86,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct OrdamirrorRules;
 
-/// The confirmed Ordamirror starting placement in mce's role letters: both back
+/// The confirmed Ordamirror starting placement in mcr's role letters: both back
 /// ranks `f w y *f k y w f` (Lancer, Kheshig, Archer, Falcon, King, Archer,
 /// Kheshig, Lancer) with each side's pawns **one rank advanced** (White on the
 /// 3rd rank, Black on the 6th; the 2nd and 7th ranks are empty) — the symmetric

@@ -1,12 +1,12 @@
 //! Xiangqi (9x10) differential perft + timing against Fairy-Stockfish (issue
 //! #187).
 //!
-//! Xiangqi runs on mce's **generic** `u128` engine (`mce::geometry::Xiangqi`, a
+//! Xiangqi runs on mcr's **generic** `u128` engine (`mcr::geometry::Xiangqi`, a
 //! `GenericPosition<Xiangqi9x10, XiangqiRules>`), not the concrete 8x8
 //! `AnyVariant` layer the rest of this harness drives, so it has its own corpus
 //! and comparison loop here (mirroring `shako.rs`). The FSF side selects
 //! `UCI_Variant xiangqi`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput. The corpus exercises the **cannon**
+//! match, and reports mcr-vs-FSF throughput. The corpus exercises the **cannon**
 //! over-screen captures, the **horse** hobbling-leg, the **elephant** eye blocks,
 //! the **soldier** river crossing, the **palace** confinement, and a
 //! **flying-general** pin.
@@ -18,9 +18,9 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF agree on the position but spell four pieces differently: FSF uses
+//! mcr and FSF agree on the position but spell four pieces differently: FSF uses
 //! `a n b p` for the Advisor / Horse / Elephant / Soldier, but those letters
-//! already name the Hawk / Knight / Bishop / Pawn in mce's `WideRole`, so mce
+//! already name the Hawk / Knight / Bishop / Pawn in mcr's `WideRole`, so mcr
 //! spells them `u j o z`. [`fen_to_fsf`] rewrites those letters in the placement
 //! field only; the chariots (`r`) and cannons (`c`) are unchanged.
 //!
@@ -29,11 +29,11 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Xiangqi, Xiangqi9x10};
+use mcr::geometry::{perft as gperft, Xiangqi, Xiangqi9x10};
 
 use crate::uci::Engine;
 
-/// One Xiangqi corpus position, in the **mce dialect**.
+/// One Xiangqi corpus position, in the **mcr dialect**.
 struct Case {
     label: &'static str,
     fen: &'static str,
@@ -72,7 +72,7 @@ const CASES: &[Case] = &[
     },
     // Horse gives check (issue #198): a black horse on e3 checks the white general
     // on d1 with its leg e2 empty. The old `attackers_to` reverse-projection missed
-    // this check; FSF and mce now agree (perft 3 = 14, 4 = 50).
+    // this check; FSF and mcr now agree (perft 3 = 14, 4 = 50).
     Case {
         label: "horse-check",
         fen: "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
@@ -81,7 +81,7 @@ const CASES: &[Case] = &[
     // Soldier guards the square ahead (issue #201): a white soldier on e7 guards
     // e8, so the black general on d8 may step only to d9. The old `attackers_to`
     // reverse-projected the Soldier's color-directional forward attack without the
-    // color flip and missed the guard; FSF and mce now agree (perft 1 = 1, 4 = 53).
+    // color flip and missed the guard; FSF and mcr now agree (perft 1 = 1, 4 = 53).
     Case {
         label: "soldier-guard-fwd",
         fen: "9/9/3k5/4Z4/9/9/9/9/9/4K4 b - - 0 1",
@@ -92,7 +92,7 @@ const CASES: &[Case] = &[
     // the black general on d9 may step only to d10. A plain color-flipped reverse-
     // projection flips the color-dependent river threshold and misses the crossed
     // soldier; forward projection via `role_attack_is_leg_asymmetric` fixes it.
-    // FSF and mce now agree (perft 1 = 1, 4 = 26).
+    // FSF and mcr now agree (perft 1 = 1, 4 = 26).
     Case {
         label: "soldier-guard-side",
         fen: "9/3k5/4Z4/9/9/9/9/9/9/4K4 b - - 0 1",
@@ -100,7 +100,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrite an mce-dialect Xiangqi FEN into the FSF dialect: the Advisor `u`/`U`,
+/// Rewrite an mcr-dialect Xiangqi FEN into the FSF dialect: the Advisor `u`/`U`,
 /// Horse `j`/`J`, Elephant `o`/`O`, and Soldier `z`/`Z` become `a n b p` (with
 /// case preserved) in the *placement* field only. The chariot `r`/`R` and cannon
 /// `c`/`C` are unchanged.
@@ -130,17 +130,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -153,15 +153,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Xiangqi corpus through mce and FSF. Returns the number of mismatches
+/// Run the Xiangqi corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched, or FSF lacks `xiangqi` and the suite is skipped).
 /// Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -179,7 +179,7 @@ UCI_Variant xiangqi (issue #187):"
 
     let head = format!(
         "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -198,10 +198,10 @@ UCI_Variant xiangqi (issue #187):"
                     "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -213,16 +213,16 @@ UCI_Variant xiangqi (issue #187):"
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "xiangqi OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "xiangqi OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -235,10 +235,10 @@ UCI_Variant xiangqi (issue #187):"
         eprintln!("ERROR: {mismatches} Xiangqi parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH xiangqi/{} depth {}: mce={} fsf={}  mce FEN: {}  FSF FEN: {}",
+                "  MISMATCH xiangqi/{} depth {}: mcr={} fsf={}  mcr FEN: {}  FSF FEN: {}",
                 r.label,
                 r.depth,
-                r.mce_nodes,
+                r.mcr_nodes,
                 r.fsf_nodes,
                 r.fen,
                 fen_to_fsf(r.fen),
@@ -248,12 +248,12 @@ UCI_Variant xiangqi (issue #187):"
     mismatches
 }
 
-/// Run one Xiangqi position through mce's generic perft and FSF's `go perft`.
+/// Run one Xiangqi position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Xiangqi::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Xiangqi::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("xiangqi", false)?;
@@ -264,10 +264,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -303,14 +303,14 @@ mod tests {
         }
     }
 
-    /// The mce -> FSF dialect rewrite swaps only the four Xiangqi piece letters in
+    /// The mcr -> FSF dialect rewrite swaps only the four Xiangqi piece letters in
     /// the placement field and leaves the chariot, cannon, and every other field
     /// intact.
     #[test]
     fn fen_dialect_rewrites_only_the_xiangqi_pieces() {
-        let mce = "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1";
+        let mcr = "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1";
         let fsf = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1";
-        assert_eq!(fen_to_fsf(mce), fsf);
+        assert_eq!(fen_to_fsf(mcr), fsf);
         // The cannon `C`/`c` and side-to-move field are untouched.
         let out = fen_to_fsf("4k4/9/9/9/9/9/9/9/4R4/4K4 b - - 1 9");
         assert_eq!(out, "4k4/9/9/9/9/9/9/9/4R4/4K4 b - - 1 9");

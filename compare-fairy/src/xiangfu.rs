@@ -1,7 +1,7 @@
 //! Xiang Fu (9x9 Xiangqi-themed drop variant) differential perft + timing against
 //! Fairy-Stockfish (issue #274).
 //!
-//! Xiang Fu runs on mce's **generic** `u128` engine (`mce::geometry::Xiangfu`, a
+//! Xiang Fu runs on mcr's **generic** `u128` engine (`mcr::geometry::Xiangfu`, a
 //! `GenericPosition<Shogi9x9, XiangfuRules>`), so it has its own corpus and
 //! comparison loop here (mirroring `cannonshogi.rs` / `chak.rs`). It is the first
 //! variant to combine the **multi-royal pseudo-royal** path with a Shogi-style
@@ -12,10 +12,10 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF agree on the Chariot (`r`), Bishop (`b`), Cannon (`c`), the digits,
+//! mcr and FSF agree on the Chariot (`r`), Bishop (`b`), Cannon (`c`), the digits,
 //! and the `[..]` holdings bracket, but spell the rest differently:
 //!
-//! | mce | FSF | piece |
+//! | mcr | FSF | piece |
 //! |-----|-----|-------|
 //! | `=k` / `=K` | `+g` / `+G` | Champion (royal, ring-confined) |
 //! | `*u` / `*U` | `g` / `G` | Pupil (the plain Commoner; hand only) |
@@ -25,7 +25,7 @@
 //! | `c` / `C` | `c` / `C` | Cannon (`mRcpR`) |
 //! | `b` / `B`, `r` / `R` | `b` / `B`, `r` / `R` | Bishop, Chariot |
 //!
-//! [`fen_to_fsf`] rewrites the placement and holdings; an empty mce `[]` becomes
+//! [`fen_to_fsf`] rewrites the placement and holdings; an empty mcr `[]` becomes
 //! FSF's `[-]`. The turn / clock tail is passed through unchanged.
 //!
 //! GPL FENCE unchanged: FSF is driven purely as a subprocess (see `uci.rs`); no
@@ -34,7 +34,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Shogi9x9, Xiangfu};
+use mcr::geometry::{perft as gperft, Shogi9x9, Xiangfu};
 
 use crate::uci::Engine;
 
@@ -72,7 +72,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrites an mce Xiang Fu FEN into FSF's `xiangfu` dialect: each `=`-prefixed
+/// Rewrites an mcr Xiang Fu FEN into FSF's `xiangfu` dialect: each `=`-prefixed
 /// overflow token (`=k → +g`, `=m → m`, `=c → w`) and the `*u`/`*U` Pupil
 /// (`*u → g`) are mapped via [`fsf_token`], the bare Horse `j`/`J` becomes `n`/`N`,
 /// and an empty hand `[]` becomes `[-]`. Every other character — the Chariot,
@@ -92,10 +92,10 @@ pub fn fen_to_fsf(fen: &str) -> String {
                 }
                 out.push(c);
             }
-            // The bare Horse (mce reuses `WideRole::Horse`, spelled `j`) is FSF's `n`.
+            // The bare Horse (mcr reuses `WideRole::Horse`, spelled `j`) is FSF's `n`.
             'j' => out.push('n'),
             'J' => out.push('N'),
-            // An empty mce hand `[]` is FSF's `[-]`.
+            // An empty mcr hand `[]` is FSF's `[-]`.
             '[' => {
                 out.push('[');
                 if chars.peek() == Some(&']') {
@@ -108,7 +108,7 @@ pub fn fen_to_fsf(fen: &str) -> String {
     out
 }
 
-/// The FSF spelling of an mce Xiang Fu overflow token: `prefix` is `=` (Champion /
+/// The FSF spelling of an mcr Xiang Fu overflow token: `prefix` is `=` (Champion /
 /// Mahout / Crossbow) or `*` (Pupil), `base` the recycled base letter (case =
 /// colour).
 fn fsf_token(prefix: char, base: char) -> &'static str {
@@ -148,7 +148,7 @@ generic engine vs FSF UCI_Variant xiangfu (issue #274):"
             }
             None => {
                 println!(
-                    "  (skipped: no variants.ini found; set $MCE_FSF_VARIANTS_INI to FSF's \
+                    "  (skipped: no variants.ini found; set $MCR_FSF_VARIANTS_INI to FSF's \
                      variants.ini to enable the Xiang Fu comparison)"
                 );
                 return 0;
@@ -165,7 +165,7 @@ generic engine vs FSF UCI_Variant xiangfu (issue #274):"
 
     let head = format!(
         "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -184,10 +184,10 @@ generic engine vs FSF UCI_Variant xiangfu (issue #274):"
                     "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -199,16 +199,16 @@ generic engine vs FSF UCI_Variant xiangfu (issue #274):"
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "xiangfu OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "xiangfu OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -221,20 +221,20 @@ generic engine vs FSF UCI_Variant xiangfu (issue #274):"
         eprintln!("ERROR: {mismatches} Xiang Fu parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH xiangfu/{} depth {}: mce={} fsf={}  FEN: {}",
-                r.label, r.depth, r.mce_nodes, r.fsf_nodes, r.fen,
+                "  MISMATCH xiangfu/{} depth {}: mcr={} fsf={}  FEN: {}",
+                r.label, r.depth, r.mcr_nodes, r.fsf_nodes, r.fen,
             );
         }
     }
     mismatches
 }
 
-/// Run one Xiang Fu position through mce's generic perft and FSF's `go perft`.
+/// Run one Xiang Fu position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Xiangfu::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Shogi9x9, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Xiangfu::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Shogi9x9, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("xiangfu", false)?;
@@ -245,18 +245,18 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
 
-/// Locate FSF's `variants.ini` (which defines `xiangfu`): `$MCE_FSF_VARIANTS_INI`
+/// Locate FSF's `variants.ini` (which defines `xiangfu`): `$MCR_FSF_VARIANTS_INI`
 /// first, then a sibling of the FSF binary, then the vendored build tree.
 fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("MCE_FSF_VARIANTS_INI") {
+    if let Ok(p) = std::env::var("MCR_FSF_VARIANTS_INI") {
         let path = PathBuf::from(p);
         if path.is_file() {
             return Some(path);
@@ -284,17 +284,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             0.0
         }
@@ -307,8 +307,8 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             0.0
         }
@@ -342,7 +342,7 @@ mod tests {
         }
     }
 
-    /// The FEN rewriter maps the mce Xiang Fu dialect to FSF's spelling.
+    /// The FEN rewriter maps the mcr Xiang Fu dialect to FSF's spelling.
     #[test]
     fn fen_rewrite_matches_fsf_dialect() {
         assert_eq!(

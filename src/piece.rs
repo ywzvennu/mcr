@@ -38,7 +38,7 @@ impl Role {
     /// Returns the lowercase character used for this role in FEN and SAN.
     ///
     /// ```
-    /// use mce::Role;
+    /// use mcr::Role;
     /// assert_eq!(Role::Knight.char(), 'n');
     /// ```
     #[must_use]
@@ -71,7 +71,7 @@ impl Role {
     /// Parses a role from its character, accepting either case.
     ///
     /// ```
-    /// use mce::Role;
+    /// use mcr::Role;
     /// assert_eq!(Role::from_char('N'), Some(Role::Knight));
     /// assert_eq!(Role::from_char('q'), Some(Role::Queen));
     /// assert_eq!(Role::from_char('x'), None);
@@ -126,7 +126,7 @@ impl Piece {
     /// for black.
     ///
     /// ```
-    /// use mce::{Color, Piece, Role};
+    /// use mcr::{Color, Piece, Role};
     /// assert_eq!(Piece::new(Color::White, Role::Pawn).char(), 'P');
     /// assert_eq!(Piece::new(Color::Black, Role::Knight).char(), 'n');
     /// ```
@@ -143,7 +143,7 @@ impl Piece {
     /// pieces, lowercase yield black pieces.
     ///
     /// ```
-    /// use mce::{Color, Piece, Role};
+    /// use mcr::{Color, Piece, Role};
     /// assert_eq!(Piece::from_char('K'), Some(Piece::new(Color::White, Role::King)));
     /// assert_eq!(Piece::from_char('q'), Some(Piece::new(Color::Black, Role::Queen)));
     /// assert_eq!(Piece::from_char('1'), None);

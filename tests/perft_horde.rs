@@ -15,7 +15,7 @@
 //! meant to be run with `cargo test --release -- --ignored`. No numbers are
 //! invented.
 
-use mce::{perft_variant, Color, Horde, Role, VariantId};
+use mcr::{perft_variant, Color, Horde, Role, VariantId};
 
 /// One reference position: its EPD/FEN and the `(depth, node-count)` pairs.
 struct PerftCase {

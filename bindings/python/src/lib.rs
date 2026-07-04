@@ -1,7 +1,7 @@
-//! Python bindings for the `mce` chess engine, built with pyo3.
+//! Python bindings for the `mcr` chess rules library, built with pyo3.
 //!
-//! This crate exposes a thin, Pythonic `mce` module: a single [`Position`]
-//! class wrapping [`mce::AnyVariant`] (so every variant is reachable through one
+//! This crate exposes a thin, Pythonic `mcr` module: a single [`Position`]
+//! class wrapping [`mcr::AnyVariant`] (so every variant is reachable through one
 //! type) plus a module-level [`perft`] function. The surface mirrors
 //! python-chess where that is natural — `legal_moves()`, `push()`, `fen`,
 //! `turn`, `is_check()`, … — while staying a direct, allocation-light forward
@@ -15,12 +15,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use ::mce::geometry::{AnyWideVariant, WideEndReason, WideMove, WideOutcome, WideVariantId};
-use ::mce::{
+use ::mcr::geometry::{AnyWideVariant, WideEndReason, WideMove, WideOutcome, WideVariantId};
+use ::mcr::{
     AnyVariant, Board, Color, EndReason, Move, Outcome, Position as CorePosition, Square, VariantId,
 };
 
-/// Reaches the standard-chess core [`mce::Position`] inside an [`AnyVariant`].
+/// Reaches the standard-chess core [`mcr::Position`] inside an [`AnyVariant`].
 ///
 /// `AnyVariant` is an enum with one arm per variant and does not itself expose
 /// the core, but every arm wraps a `VariantPosition<V>` whose `.core()` returns
@@ -98,7 +98,7 @@ fn outcome_str(outcome: Outcome) -> &'static str {
 /// Construct from a FEN (defaulting to the variant's start position) and a
 /// variant name, then generate and play moves through the same surface
 /// regardless of variant.
-#[pyclass(module = "mce", from_py_object)]
+#[pyclass(module = "mcr", from_py_object)]
 #[derive(Clone)]
 struct Position {
     inner: AnyVariant,
@@ -414,14 +414,14 @@ fn wide_outcome_str(outcome: WideOutcome) -> &'static str {
 }
 
 /// A fairy-chess position on the geometry layer: xiangqi, shogi, janggi, orda,
-/// and the rest of the wide variants, reached through mce's runtime
+/// and the rest of the wide variants, reached through mcr's runtime
 /// [`AnyWideVariant`] dispatch.
 ///
 /// This mirrors [`Position`] (construct by name, FEN I/O, legal moves, perft,
 /// play) for the variants whose board geometry differs from 8x8, so it is a
 /// separate class. SAN, the Zobrist hash, and the 8x8 ASCII board do not apply
 /// here and are not exposed. List the variant names with [`variants`].
-#[pyclass(module = "mce", from_py_object)]
+#[pyclass(module = "mcr", from_py_object)]
 #[derive(Clone)]
 struct FairyPosition {
     inner: AnyWideVariant,
@@ -584,9 +584,9 @@ fn variants() -> Vec<&'static str> {
     WideVariantId::ALL.iter().map(|id| id.as_str()).collect()
 }
 
-/// The `mce` Python module.
+/// The `mcr` Python module.
 #[pymodule]
-fn mce(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn mcr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Position>()?;
     m.add_class::<FairyPosition>()?;
     m.add_function(wrap_pyfunction!(perft, m)?)?;

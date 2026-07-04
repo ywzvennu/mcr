@@ -55,7 +55,7 @@
 //!
 //! As in Shogi (#190), **FSF's `judkins` perft does not enforce *uchifuzume***
 //! (the no-pawn-drop-mate rule): a mating pawn drop is listed as a legal move.
-//! Since this variant is validated node-for-node against FSF, mce matches FSF and
+//! Since this variant is validated node-for-node against FSF, mcr matches FSF and
 //! does **not** apply the uchifuzume filter (`pawn_drop_mate_forbidden` stays
 //! `false`).
 //!
@@ -67,7 +67,7 @@
 //! rbnsgk/5p/6/6/P5/KGSNBR[-] w - - 0 1
 //! ```
 //!
-//! mce uses the same board placement and an empty `[]` holdings bracket; the
+//! mcr uses the same board placement and an empty `[]` holdings bracket; the
 //! `compare-fairy/` harness reconciles the empty-hand rendering when driving FSF.
 
 use crate::geometry::position::{

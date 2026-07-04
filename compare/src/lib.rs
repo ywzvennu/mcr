@@ -1,8 +1,8 @@
-//! Shared benchmark fixtures for the mce-vs-shakmaty perft comparison.
+//! Shared benchmark fixtures for the mcr-vs-shakmaty perft comparison.
 //!
 //! This crate links the GPL-3.0+ `shakmaty` crate for benchmarking only and is
 //! never published or distributed. See the crate `README.md` for the licensing
-//! rationale. The `mce` library itself does not depend on shakmaty.
+//! rationale. The `mcr` library itself does not depend on shakmaty.
 //!
 //! # The basket
 //!
@@ -14,7 +14,7 @@
 //! equal, which makes the suite a broad, independent correctness cross-check in
 //! addition to a benchmark.
 //!
-//! FENs and depths are reused from the `mce` regression tests
+//! FENs and depths are reused from the `mcr` regression tests
 //! (`tests/perft*.rs`) wherever possible; a handful of extra antichess and
 //! endgame FENs are documented inline. Depths are chosen so each individual
 //! perft visits roughly 1–20M nodes (large enough that timing is signal, not
@@ -71,9 +71,9 @@ pub const VARIANTS: &[&str] = &[
 /// several positions exercising opening / midgame / tactical / endgame shapes.
 ///
 /// Depths are tuned (see module docs) so each perft visits ~1–20M nodes. The
-/// reference node counts are the published perft values transcribed in the mce
+/// reference node counts are the published perft values transcribed in the mcr
 /// regression tests; positions whose deep counts are not in those tests are
-/// still fully validated here because mce and shakmaty must agree on every one.
+/// still fully validated here because mcr and shakmaty must agree on every one.
 pub const CASES: &[Case] = &[
     // ---- standard: canonical perft positions ------------------------------
     Case {
@@ -181,7 +181,7 @@ pub const CASES: &[Case] = &[
         // terminal condition is checked on every node but never triggers within
         // this depth, so the node count matches standard chess and shakmaty —
         // unlike a kings-near-the-hill endgame, where shakmaty stops expanding a
-        // line the instant a king reaches a hill square and mce does not, so
+        // line the instant a king reaches a hill square and mcr does not, so
         // those positions cannot be used for an apples-to-apples parity check.
         variant: "king-of-the-hill",
         position: "cpw5-tactical",
@@ -206,7 +206,7 @@ pub const CASES: &[Case] = &[
         // which neither king is checked three times on any line. That keeps the
         // node count identical to standard chess and to shakmaty: when the check
         // budget *is* exhausted within the search, shakmaty stops expanding the
-        // (now decided) line while mce keeps counting, so a low-budget or
+        // (now decided) line while mcr keeps counting, so a low-budget or
         // forcing position would mismatch and is deliberately avoided here. The
         // three-check terminal check still runs on every node — it just never
         // fires within these depths.
@@ -270,7 +270,7 @@ pub const CASES: &[Case] = &[
     },
     Case {
         // After 1.e4 e5 2.Nc3 (forced-capture-rich open centre). New FEN
-        // (not in the regression tests); validated here by mce==shakmaty.
+        // (not in the regression tests); validated here by mcr==shakmaty.
         variant: "antichess",
         position: "open-center",
         fen: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/8/PPPP1PPP/RNBQKBNR w - - 2 3",
@@ -348,9 +348,9 @@ pub fn case(variant: &str) -> &'static Case {
         .unwrap_or_else(|| panic!("no benchmark case for variant {variant:?}"))
 }
 
-/// Run perft for `case` using the `mce` engine.
-pub fn mce_perft(case: &Case) -> u64 {
-    use mce::{
+/// Run perft for `case` using the `mcr` engine.
+pub fn mcr_perft(case: &Case) -> u64 {
+    use mcr::{
         perft_variant, Antichess as MAntichess, Atomic as MAtomic, Chess, Chess960,
         Crazyhouse as MCrazyhouse, Horde as MHorde, KingOfTheHill as MKoth, RacingKings as MRacing,
         ThreeCheck as MThreeCheck,
@@ -358,7 +358,7 @@ pub fn mce_perft(case: &Case) -> u64 {
 
     macro_rules! run {
         ($ty:ty) => {{
-            let pos = <$ty>::from_fen(case.fen).expect("valid mce FEN");
+            let pos = <$ty>::from_fen(case.fen).expect("valid mcr FEN");
             perft_variant(&pos, case.depth)
         }};
     }

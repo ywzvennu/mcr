@@ -5,7 +5,7 @@
 //! `0..960` (the *Scharnagl* / SP-number scheme used by FICS, Lichess, and the
 //! chess960 literature). This module maps an id to the back-rank placement and
 //! emits a full start FEN with X-FEN castling rights (file letters for the rook
-//! files, e.g. `HAha`), which is exactly the format both mce's `Chess960` and
+//! files, e.g. `HAha`), which is exactly the format both mcr's `Chess960` and
 //! shakmaty's `Chess` (in [`CastlingMode::Chess960`]) parse.
 //!
 //! The placement algorithm is the standard one:

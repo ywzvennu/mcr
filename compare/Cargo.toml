@@ -1,46 +1,46 @@
-# mce-compare — perft benchmark comparing mce against shakmaty.
+# mcr-compare — perft benchmark comparing mcr against shakmaty.
 #
-# This is a separate, nested crate. It is NOT part of the published `mce`
+# This is a separate, nested crate. It is NOT part of the published `mcr`
 # library, the workspace, or the parent crate's normal `cargo build`/`cargo
-# test`; it depends on `mce` by path.
+# test`; it depends on `mcr` by path.
 #
 # LICENSING ISOLATION (hard requirement): this crate links `shakmaty`, which
 # is GPL-3.0+, for BENCHMARKING ONLY. It is `publish = false` and is never
-# published or distributed, so it imposes no copyleft obligation on the `mce`
-# library, which remains clean-room MIT OR Apache-2.0. The `mce` crate itself
+# published or distributed, so it imposes no copyleft obligation on the `mcr`
+# library, which remains clean-room MIT OR Apache-2.0. The `mcr` crate itself
 # does not depend on shakmaty (not even as a dev-dependency).
 
 [package]
-name = "mce-compare"
+name = "mcr-compare"
 version = "0.0.0"
 edition = "2021"
 publish = false
 license = "GPL-3.0-or-later"
 
 [features]
-# Forward to the mce dependency's `magic` feature so the same benchmark binary
+# Forward to the mcr dependency's `magic` feature so the same benchmark binary
 # can measure magic-on vs magic-off sliders. Run the magic build with:
-#   cargo run --release --features magic --bin mce-compare
-magic = ["mce/magic"]
+#   cargo run --release --features magic --bin mcr-compare
+magic = ["mcr/magic"]
 
 [dependencies]
 # `default-features = false` plus an explicit `std` keeps the benchmark on the
 # full std build (it links the std-only `shakmaty`) while still letting the
 # `magic` feature above toggle the slider backend independently of `default`.
-mce = { path = "..", default-features = false, features = ["std"] }
+mcr = { path = "..", default-features = false, features = ["std"] }
 shakmaty = { version = "0.27", features = ["variant"] }
 
 [dev-dependencies]
 criterion = "0.5"
 
 [[bin]]
-name = "mce-compare"
+name = "mcr-compare"
 path = "src/main.rs"
 test = false
 doc = false
 bench = false
 
-# Differential fuzzing harness (issue #109): seeded mce-vs-shakmaty cross-check
+# Differential fuzzing harness (issue #109): seeded mcr-vs-shakmaty cross-check
 # of legal moves / perft / check+terminal status / FEN round-trip over random
 # positions. Run with: cargo run --release --bin difftest [-- --full]
 [[bin]]

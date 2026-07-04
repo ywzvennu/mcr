@@ -5,7 +5,7 @@
 //! **no Lance**.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Judkins::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Judkins::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant judkins`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. This test pins the FSF-confirmed numbers so a
 //! regression is caught even without FSF present.
@@ -18,7 +18,7 @@
 //! rbnsgk/5p/6/6/P5/KGSNBR[-] w - - 0 1
 //! ```
 //!
-//! mce renders the same position with an empty `[]` holdings bracket (its hand is
+//! mcr renders the same position with an empty `[]` holdings bracket (its hand is
 //! empty at the start). The piece letters coincide with FSF's — `n s g k r b p`
 //! and the `+`-prefixed promoted forms `+P +N +S +R +B` — so no FEN dialect
 //! rewrite is needed. The FSF-confirmed startpos perft sequence is
@@ -34,14 +34,14 @@
 //! ## Note on *uchifuzume* (no pawn-drop mate)
 //!
 //! As with Shogi (#190), **FSF's `judkins` perft does not enforce uchifuzume** —
-//! it lists a pawn drop even when it gives mate — so mce, validated node-for-node
+//! it lists a pawn drop even when it gives mate — so mcr, validated node-for-node
 //! against FSF, does not filter it either. The `nifu` case pins the **nifu** filter
 //! (no second unpromoted pawn on a file); a Tokin does not count.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_judkins -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Judkins, Judkins6x6};
+use mcr::geometry::{perft as gperft, Judkins, Judkins6x6};
 
 /// The Judkins Shogi starting FEN, confirmed against Fairy-Stockfish's
 /// `UCI_Variant judkins`. The hand is empty (`[]`).

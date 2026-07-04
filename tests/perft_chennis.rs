@@ -5,7 +5,7 @@
 //! confined to a 5x4 zone).
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Chennis::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Chennis::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant chennis`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that head-to-head
 //! on demand (`compare-fairy/src/chennis.rs`); this test pins the FSF-confirmed
@@ -19,7 +19,7 @@
 //! 1fkm3/1p1s3/7/7/7/3S1P1/3MKF1[] w - 0 1
 //! ```
 //!
-//! mce renders the same placement in its own dialect (the Ferz is `m`, the Soldier
+//! mcr renders the same placement in its own dialect (the Ferz is `m`, the Soldier
 //! `z`, the Commoner `*u`, the Pawn `**p`) with an empty `[]` holdings bracket. The
 //! FSF-confirmed startpos perft sequence is `10, 100, 1371, 18633, 289367,
 //! 4534068`.
@@ -37,9 +37,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_chennis -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chennis, Chennis7x7};
+use mcr::geometry::{perft as gperft, Chennis, Chennis7x7};
 
-/// The Chennis starting FEN, confirmed against FSF's `UCI_Variant chennis`, in mce
+/// The Chennis starting FEN, confirmed against FSF's `UCI_Variant chennis`, in mcr
 /// dialect (Ferz `m`, Soldier `z`, Commoner `*u`, Pawn `**p`). The hand is empty.
 const STARTPOS: &str = "1mk*u3/1**p1z3/7/7/7/3Z1**P1/3*UKM1[] w - - 0 1";
 

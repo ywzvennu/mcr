@@ -4,7 +4,7 @@
 //! leaps) with one terminal twist: **giving check wins the game**. The node counts
 //! below are pinned **and cross-checked against Fairy-Stockfish** (FSF,
 //! `UCI_Variant karouk`): every `(depth, nodes)` pair here was produced identically
-//! by `mce::geometry::Karouk::perft` and by FSF's `go perft` on the byte-identical
+//! by `mcr::geometry::Karouk::perft` and by FSF's `go perft` on the byte-identical
 //! FEN. The `compare-fairy/` harness re-runs that head-to-head on demand (its
 //! `--difffuzz --variant karouk` mode); this test pins the confirmed numbers so a
 //! regression is caught without FSF present.
@@ -12,7 +12,7 @@
 //! Confirmed Ka Ouk starting FEN (from FSF `position startpos`):
 //!   `rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w DEde - 1+1 0 1`
 //!
-//! mce omits the `1+1` check-counter field (a single check is terminal, so mce
+//! mcr omits the `1+1` check-counter field (a single check is terminal, so mcr
 //! keeps no counter); FSF fills it with its default, so the two see the identical
 //! position. The `DEde` leap-rights field is exactly Cambodian's.
 //!
@@ -25,10 +25,10 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_karouk -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Chess8x8, Karouk, Square, WideMoveKind, WideOutcome, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
 /// The Ka Ouk starting FEN, confirmed byte-for-byte against Fairy-Stockfish's
 /// `UCI_Variant karouk` / `position startpos`.

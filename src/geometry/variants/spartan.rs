@@ -56,7 +56,7 @@
 //! ```
 //!
 //! with FSF's Spartan letters `l g k c w h` (Lieutenant, General, King, Captain,
-//! Warlord, Hoplite). mce uses the same board but its own role letters — the
+//! Warlord, Hoplite). mcr uses the same board but its own role letters — the
 //! Lieutenant is `t`, the General `d`, the Captain `i`, the Warlord `a` (Hawk),
 //! and the Hoplite `h`:
 //!
@@ -85,7 +85,7 @@ use alloc::vec::Vec;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct SpartanRules;
 
-/// The confirmed Spartan starting placement, in mce's role letters (White =
+/// The confirmed Spartan starting placement, in mcr's role letters (White =
 /// standard `RNBQKBNR`/`PPPPPPPP`; Black = `t d k i i k a t` on the back rank
 /// with two kings on the c- and f-files, and a rank of Hoplites).
 const SPARTAN_START_PLACEMENT: &str = "tdkiikat/hhhhhhhh/8/8/8/8/PPPPPPPP/RNBQKBNR";

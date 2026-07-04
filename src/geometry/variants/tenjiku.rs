@@ -79,11 +79,11 @@ use super::super::Tenjiku16x16;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TenjikuRules;
 
-/// The Tenjiku Shogi starting placement (mce dialect), reproducing the HaChu
+/// The Tenjiku Shogi starting placement (mcr dialect), reproducing the HaChu
 /// oracle's `variant tenjiku` board **exactly** — including its hand-written
 /// asymmetries (White's second rank is one file short of Black's, and the central
 /// General / Free-Eagle pieces sit mirrored between the colours). The board is set
-/// left-to-right the way HaChu's `SetUp` places it, so mce's start-position legal
+/// left-to-right the way HaChu's `SetUp` places it, so mcr's start-position legal
 /// moves match HaChu's node-for-node (see `perft_tenjiku`). New Tenjiku pieces
 /// render with the quadrupled `****` fifth-tier prefix; Dragon Kings as `+R`,
 /// Dragon Horses as `+B`, the Drunk Elephant as `**E`, and the Chu/Dai overflow
@@ -664,7 +664,7 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// [`Tenjiku16x16`].
 ///
 /// Construct the starting position with
-/// [`Tenjiku::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect)
+/// [`Tenjiku::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect)
 /// with [`Tenjiku::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the army, the two-royal rule, the five-rank promotion zone, and
 /// which powers are modelled vs. approximated.

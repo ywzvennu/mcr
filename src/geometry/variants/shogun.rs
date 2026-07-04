@@ -17,7 +17,7 @@
 //! * **Pawn (P)** — a standard chess pawn (double push, diagonal capture, en
 //!   passant); promotes into a **Commoner**.
 //! * **Fers / "Queen" (the start `+f`)** — the d-file piece of the start array is
-//!   a **promoted Fers**, which moves as a full Queen. In mce it is the
+//!   a **promoted Fers**, which moves as a full Queen. In mcr it is the
 //!   [`WideRole::Queen`] (a promoted [`WideRole::Met`]); on capture it banks to the
 //!   hand as a Met (fers), and a bare Met dropped from hand promotes back into a
 //!   Queen.
@@ -25,7 +25,7 @@
 //! Each base piece's promoted form (all reuse existing roles — Shogun adds **no
 //! new role**):
 //!
-//! | base | promotes to | mce role | moves like |
+//! | base | promotes to | mcr role | moves like |
 //! |------|-------------|----------|------------|
 //! | Pawn   | Commoner   | [`WideRole::Commoner`] (`*u`) | a King (non-royal, eight one-steps) |
 //! | Knight | Centaur    | [`WideRole::Kheshig`] (`w`)    | King + Knight |
@@ -74,7 +74,7 @@
 //! rnb+fkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB+FKBNR[] w KQkq - 0 1
 //! ```
 //!
-//! The `+f` / `+F` is a **promoted Fers** that moves as a Queen. mce represents it
+//! The `+f` / `+F` is a **promoted Fers** that moves as a Queen. mcr represents it
 //! with the [`WideRole::Queen`] token, so its canonical start FEN is exactly the
 //! standard chess array with an empty holdings bracket:
 //!
@@ -83,7 +83,7 @@
 //! ```
 //!
 //! The two are the same position; the `compare-fairy/` harness translates the
-//! promoted-piece tokens (mce's `q`/`w`/`a`/`e`/`*u` ↔ FSF's `+f`/`+n`/`+b`/`+r`/`+p`,
+//! promoted-piece tokens (mcr's `q`/`w`/`a`/`e`/`*u` ↔ FSF's `+f`/`+n`/`+b`/`+r`/`+p`,
 //! and the bare Met `m` ↔ FSF's fers `f`) when driving FSF.
 
 use crate::geometry::position::{

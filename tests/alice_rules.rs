@@ -7,10 +7,10 @@
 //! issue calls for: **rules-validated (no FSF oracle); perft pins hand-derived per
 //! the documented Alice ruleset.**
 
-use mce::geometry::position::{GenericCastling, GenericGating, GenericPlacement, GenericState};
-use mce::geometry::{Alice, Bitboard, Board, Chess8x8, Square, WideMoveKind, WidePiece};
-use mce::geometry::{WideRole, WideVariant};
-use mce::Color;
+use mcr::geometry::position::{GenericCastling, GenericGating, GenericPlacement, GenericState};
+use mcr::geometry::{Alice, Bitboard, Board, Chess8x8, Square, WideMoveKind, WidePiece};
+use mcr::geometry::{WideRole, WideVariant};
+use mcr::Color;
 
 type Sq = Square<Chess8x8>;
 
@@ -553,5 +553,5 @@ fn perft_divide_consistency() {
 /// `AliceRules::is_alice()` is the only enabled hook, and it is on.
 #[test]
 fn is_alice_hook_is_on() {
-    assert!(<mce::geometry::AliceRules as WideVariant<Chess8x8>>::is_alice());
+    assert!(<mcr::geometry::AliceRules as WideVariant<Chess8x8>>::is_alice());
 }

@@ -18,8 +18,8 @@
 //!   `insta` pattern, done with `std` only). Regenerate the committed file with
 //!   `REGEN=1 cargo test --test variants_doc` (or set `BLESS=1`).
 
-use mce::geometry::{AnyWideVariant, WideVariantId};
-use mce::{AnyVariant, VariantId};
+use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::{AnyVariant, VariantId};
 
 /// The hand-authored, non-derivable columns for one variant.
 struct Meta {
@@ -70,9 +70,9 @@ fn render() -> String {
     out.push_str(
         "<!-- Regenerate with: REGEN=1 cargo test --test variants_doc (see tests/variants_doc.rs). -->\n\n",
     );
-    out.push_str("# mce variant reference\n\n");
+    out.push_str("# mcr variant reference\n\n");
     out.push_str(
-        "Every variant mce registers, generated straight from the code so it stays in \
+        "Every variant mcr registers, generated straight from the code so it stays in \
 sync. The **display name**, **canonical name**, **board size**, and **start FEN** \
 columns are pulled programmatically from the registries \
 (`VariantId`/`WideVariantId`, `AnyWideVariant::dimensions`, and each position's \
@@ -82,7 +82,7 @@ per-variant match. A drift-check test regenerates this file and asserts it equal
 the committed copy, so it can never fall behind the code.\n\n",
     );
     out.push_str(
-        "Board size is `files`x`ranks`. Start FENs are in mce's own piece dialect; \
+        "Board size is `files`x`ranks`. Start FENs are in mcr's own piece dialect; \
 where that differs from Fairy-Stockfish's spelling the `compare-fairy/` harness \
 reconciles the two (see each variant's module docs).\n\n",
     );
@@ -90,8 +90,8 @@ reconciles the two (see each variant's module docs).\n\n",
     // -- Concrete 8x8 engine ------------------------------------------------
     out.push_str("## Concrete 8x8 engine\n\n");
     out.push_str(&format!(
-        "The frozen, hand-tuned 8x8 engine reached through `mce::AnyVariant` / \
-`mce::VariantId` — **{}** variants.\n\n",
+        "The frozen, hand-tuned 8x8 engine reached through `mcr::AnyVariant` / \
+`mcr::VariantId` — **{}** variants.\n\n",
         VariantId::ALL.len()
     ));
     out.push_str(TABLE_HEADER);
@@ -112,7 +112,7 @@ reconciles the two (see each variant's module docs).\n\n",
     // -- Fairy / geometry-layer variants ------------------------------------
     out.push_str("## Fairy / geometry-layer variants\n\n");
     out.push_str(&format!(
-        "The generic geometry engine reached through `mce::geometry::AnyWideVariant` / \
+        "The generic geometry engine reached through `mcr::geometry::AnyWideVariant` / \
 `WideVariantId` — **{}** variants, spanning 3x4 Dobutsu to 12x8 Courier and \
 10x10 Opulent / Ten-Cubed.\n\n",
         WideVariantId::ALL.len()
@@ -219,13 +219,13 @@ fn wide_meta(id: WideVariantId) -> Meta {
         },
         WideVariantId::Almost => Meta {
             display: "Almost Chess (8x8)",
-            pieces: "Standard chess army with the Queen replaced by a Chancellor (Rook + Knight, mce Elephant).",
+            pieces: "Standard chess army with the Queen replaced by a Chancellor (Rook + Knight, mcr Elephant).",
             rules: "Standard 8x8 chess with castling, double step, and en passant; with no Queen a pawn promotes to Chancellor, Rook, Bishop, or Knight. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant almost`).",
         },
         WideVariantId::Amazon => Meta {
             display: "Amazon Chess (8x8)",
-            pieces: "Standard chess army with the Queen replaced by an Amazon (Queen + Knight, mce Angel).",
+            pieces: "Standard chess army with the Queen replaced by an Amazon (Queen + Knight, mcr Angel).",
             rules: "Standard 8x8 chess with castling, double step, and en passant; with no Queen a pawn promotes to Amazon, Rook, Bishop, or Knight. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant amazon`).",
         },
@@ -273,7 +273,7 @@ fn wide_meta(id: WideVariantId) -> Meta {
         },
         WideVariantId::Centaur => Meta {
             display: "Centaur Chess (10x8)",
-            pieces: "Standard army with the Archbishop/Chancellor replaced by two Centaurs (King + Knight, mce Kheshig).",
+            pieces: "Standard army with the Archbishop/Chancellor replaced by two Centaurs (King + Knight, mcr Kheshig).",
             rules: "Capablanca board and castle geometry (king f to i/c); standard pawns, en passant, and last-rank promotion to Queen, Rook, Bishop, Knight, or Centaur. Win by checkmate.",
             oracle: "Fairy-Stockfish (INI `centaur`).",
         },
@@ -311,7 +311,7 @@ fn wide_meta(id: WideVariantId) -> Meta {
             display: "Chu Shogi (12x12)",
             pieces: "The 21-type Chu Shogi army: King, Free King, Lion, Dragon King/Horse, Kirin, Phoenix, Side/Vertical Mover, Copper/Silver/Gold/Ferocious Leopard/Blind Tiger/Drunk Elephant, Lance, Reverse Chariot, Go-Between, Pawn, and their promoted forms.",
             rules: "No hand or drops; mandatory promotion on entering the far four ranks (HaChu's promote-on-entry); two royals (King and the promoted Prince). The Lion and lion-power promoted pieces (Horned Falcon, Soaring Eagle) have their full move set: igui, double capture, two-step area move, and jitto pass. Lion-trading restrictions are not enforced (HaChu does not enforce them either).",
-            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 (byte-identical move set) and perft(2)=1296 match node-for-node; perft(3) mce=48319 vs HaChu=48317, agreeing at every node but one where HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mce is correct).",
+            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 (byte-identical move set) and perft(2)=1296 match node-for-node; perft(3) mcr=48319 vs HaChu=48317, agreeing at every node but one where HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mcr is correct).",
         },
         WideVariantId::Courier => Meta {
             display: "Courier chess (12x8)",
@@ -593,7 +593,7 @@ fn wide_meta(id: WideVariantId) -> Meta {
             display: "Tenjiku Shogi (16x16)",
             pieces: "The ~36-type Tenjiku army: the whole Chu army plus the jump-capturing Great/Vice/Rook/Bishop Generals, the area-burning Fire Demon, the Lion Hawk (Lion + Bishop), Free Eagle, Water Buffalo, Chariot Soldier, Heavenly Tetrarch, Vertical/Side Soldier, Multi-General, Dog, and the shared Iron General and Knight. Uses HaChu's exact `variant tenjiku` start layout, including its hand-written White/Black asymmetries.",
             rules: "No hand or drops; five-rank promotion zone with Tenjiku-specific promotions (Soaring Eagle→Rook General, Lion→Lion Hawk, Free King→Free Eagle, …); two royals (King and the promoted Prince). **Honest partial:** ordinary movement of every piece is modelled and validated; the Fire Demon's multi-square **area burn** and the four Generals' **jump-capture** are documented-unmodelled (they capture as ordinary blockable sliders); the Lion / Lion Hawk keep the full igui / double-capture / pass move set.",
-            oracle: "HaChu 0.23 **crashes deterministically** on `variant tenjiku` (its 16x16 board leaves no EDGE-sentinel border), so no live oracle is available. mce's start position is instead reconciled **move-for-move against HaChu's own source tables** (`tenjikuPieces` / `tenArray` / `GenNonCapts`): start-position perft(1)=72 node-for-node; perft(2)=5662 and perft(3)=424195 are mce regression pins (faithful to the rules at these depths — no special power is reachable — but not HaChu-cross-checked).",
+            oracle: "HaChu 0.23 **crashes deterministically** on `variant tenjiku` (its 16x16 board leaves no EDGE-sentinel border), so no live oracle is available. mcr's start position is instead reconciled **move-for-move against HaChu's own source tables** (`tenjikuPieces` / `tenArray` / `GenNonCapts`): start-position perft(1)=72 node-for-node; perft(2)=5662 and perft(3)=424195 are mcr regression pins (faithful to the rules at these depths — no special power is reachable — but not HaChu-cross-checked).",
         },
         WideVariantId::Tori => Meta {
             display: "Tori Shogi (bird shogi, 7x7)",

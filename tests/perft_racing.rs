@@ -10,7 +10,7 @@
 //! are `#[ignore]`d and meant to be run with
 //! `cargo test --release -- --ignored`.
 
-use mce::{perft_variant, RacingKings};
+use mcr::{perft_variant, RacingKings};
 
 /// One reference position: its FEN and the published `(depth, node-count)` pairs.
 struct PerftCase {

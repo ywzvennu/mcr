@@ -3,7 +3,7 @@
 //! geometry ([`Grand10x10`], 100 squares) after Capablanca proved the 10x8 path.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Grand::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Grand::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant grand`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` harness re-runs that
 //! head-to-head on demand (`compare-fairy/src/grand.rs`); this test pins the
@@ -15,20 +15,20 @@
 //!
 //! ```text
 //! FSF dialect: r8r/1nbqkcabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKCABN1/R8R w - - 0 1
-//! mce dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1
+//! mcr dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1
 //! ```
 //!
 //! The two differ only in the marshal's letter (`c` in FSF — its chancellor —
-//! and `e` in mce, mce's letter for the rook-knight compound
-//! [`WideRole::Elephant`](mce::geometry::WideRole::Elephant)). The cardinal is `a`
-//! ([`WideRole::Hawk`](mce::geometry::WideRole::Hawk)) in both.
+//! and `e` in mcr, mcr's letter for the rook-knight compound
+//! [`WideRole::Elephant`](mcr::geometry::WideRole::Elephant)). The cardinal is `a`
+//! ([`WideRole::Hawk`](mcr::geometry::WideRole::Hawk)) in both.
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_grand -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Grand, Grand10x10};
+use mcr::geometry::{perft as gperft, Grand, Grand10x10};
 
-/// The Grand starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Grand starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant grand`.
 const STARTPOS: &str = "r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1";
 

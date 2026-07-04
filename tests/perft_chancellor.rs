@@ -3,7 +3,7 @@
 //! board with a Rook + Knight Chancellor, validating the [`Chess9x9`] geometry.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Chancellor::perft` and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Chancellor::perft` and by Fairy-Stockfish (FSF,
 //! `UCI_Variant chancellor`, built `largeboards=yes`) running `go perft` on the
 //! byte-identical position. The `compare-fairy/` differential fuzzer re-runs that
 //! head-to-head on demand (`cargo run -- --difffuzz --variant chancellor`); this
@@ -18,21 +18,21 @@
 //!
 //! ```text
 //! FSF dialect: rnbqkcnbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKCNBR w KQkq - 0 1
-//! mce dialect: rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1
+//! mcr dialect: rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1
 //! ```
 //!
-//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mce, mce's
+//! The two differ only in the chancellor's letter (`c` in FSF, `e` in mcr, mcr's
 //! letter for the rook-knight compound [`WideRole::Elephant`]).
 //!
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_chancellor -- --include-ignored`.
 
-use mce::geometry::{
+use mcr::geometry::{
     perft as gperft, Chancellor, Chess9x9, Square, WideMoveKind, WidePiece, WideRole,
 };
-use mce::Color;
+use mcr::Color;
 
-/// The Chancellor starting FEN (mce dialect), confirmed against Fairy-Stockfish's
+/// The Chancellor starting FEN (mcr dialect), confirmed against Fairy-Stockfish's
 /// `UCI_Variant chancellor`.
 const STARTPOS: &str = "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1";
 

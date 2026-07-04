@@ -3,12 +3,12 @@
 //!
 //! Manchu is an **asymmetric Xiangqi**: one side keeps a full Xiangqi army, the
 //! other replaces its rook/cannon/horse cluster with a single SUPER-PIECE — the
-//! **Banner** (Rook + Cannon + Horse combined). It runs on mce's **generic**
-//! `u128` engine (`mce::geometry::Manchu`, a `GenericPosition<Xiangqi9x10,
+//! **Banner** (Rook + Cannon + Horse combined). It runs on mcr's **generic**
+//! `u128` engine (`mcr::geometry::Manchu`, a `GenericPosition<Xiangqi9x10,
 //! ManchuRules>`), reusing the entire Xiangqi rule layer, so it has its own corpus
 //! and comparison loop here (mirroring `xiangqi.rs`). The FSF side selects
 //! `UCI_Variant manchu`, sets the FEN, runs `go perft`, asserts the node counts
-//! match, and reports mce-vs-FSF throughput. The corpus exercises the Banner's
+//! match, and reports mcr-vs-FSF throughput. The corpus exercises the Banner's
 //! rook slide, cannon over-screen captures, and hobbled horse leaps, plus the full
 //! Black Xiangqi army and the Banner's cannon-check / rook-check detection.
 //!
@@ -19,11 +19,11 @@
 //!
 //! ## FEN dialect
 //!
-//! mce and FSF agree on the position but spell pieces differently: FSF uses
-//! `a n b p` for the Advisor / Horse / Elephant / Soldier (mce spells them
+//! mcr and FSF agree on the position but spell pieces differently: FSF uses
+//! `a n b p` for the Advisor / Horse / Elephant / Soldier (mcr spells them
 //! `u j o z`, those letters already naming the Hawk / Knight / Bishop / Pawn) and
-//! `m` for the Banner (mce spells it the overflow token `*m`, FSF's `m` already
-//! naming the Makruk Met in mce). [`fen_to_fsf`] rewrites those tokens in the
+//! `m` for the Banner (mcr spells it the overflow token `*m`, FSF's `m` already
+//! naming the Makruk Met in mcr). [`fen_to_fsf`] rewrites those tokens in the
 //! placement field only; the chariots (`r`) and cannons (`c`) are unchanged.
 //!
 //! GPL FENCE unchanged: FSF is driven purely as a subprocess (see `uci.rs`); no
@@ -31,18 +31,18 @@
 
 use std::time::Instant;
 
-use mce::geometry::{perft as gperft, Manchu, Xiangqi9x10};
+use mcr::geometry::{perft as gperft, Manchu, Xiangqi9x10};
 
 use crate::uci::Engine;
 
-/// One Manchu corpus position, in the **mce dialect**.
+/// One Manchu corpus position, in the **mcr dialect**.
 struct Case {
     label: &'static str,
     fen: &'static str,
     depth: u32,
 }
 
-/// The Manchu comparison corpus (mce dialect): the FSF-confirmed startpos; the
+/// The Manchu comparison corpus (mcr dialect): the FSF-confirmed startpos; the
 /// Banner centred (rook/cannon/horse in the open); Black's full Xiangqi army to
 /// move; the Banner deep in enemy territory (many captures); a Banner
 /// cannon-checkmate (over-screen cannon check); and a Banner rook-check. Depths
@@ -80,7 +80,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// Rewrite an mce-dialect Manchu FEN into the FSF dialect: the Advisor `u`/`U`,
+/// Rewrite an mcr-dialect Manchu FEN into the FSF dialect: the Advisor `u`/`U`,
 /// Horse `j`/`J`, Elephant `o`/`O`, and Soldier `z`/`Z` become `a n b p` (case
 /// preserved), and the Banner overflow token `*M`/`*m` becomes the bare `M`/`m`,
 /// in the *placement* field only. The chariot `r`/`R` and cannon `c`/`C` are
@@ -121,17 +121,17 @@ struct Row {
     label: &'static str,
     fen: &'static str,
     depth: u32,
-    mce_nodes: u64,
+    mcr_nodes: u64,
     fsf_nodes: u64,
     matched: bool,
-    mce_secs: f64,
+    mcr_secs: f64,
     fsf_secs: f64,
 }
 
 impl Row {
-    fn mce_mnps(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.mce_nodes as f64 / self.mce_secs / 1e6
+    fn mcr_mnps(&self) -> f64 {
+        if self.mcr_secs > 0.0 {
+            self.mcr_nodes as f64 / self.mcr_secs / 1e6
         } else {
             f64::INFINITY
         }
@@ -144,15 +144,15 @@ impl Row {
         }
     }
     fn speedup(&self) -> f64 {
-        if self.mce_secs > 0.0 {
-            self.fsf_secs / self.mce_secs
+        if self.mcr_secs > 0.0 {
+            self.fsf_secs / self.mcr_secs
         } else {
             f64::NAN
         }
     }
 }
 
-/// Run the Manchu corpus through mce and FSF. Returns the number of mismatches
+/// Run the Manchu corpus through mcr and FSF. Returns the number of mismatches
 /// (0 = all positions matched, or FSF lacks `manchu` and the suite is skipped).
 /// Prints a table and a one-line summary.
 pub fn run(engine: &mut Engine, full: bool) -> usize {
@@ -170,7 +170,7 @@ engine vs FSF UCI_Variant manchu (issue #230):"
 
     let head = format!(
         "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10} {:>10} {:>8}",
-        "position", "depth", "mce nodes", "fsf nodes", "match", "mce Mn/s", "fsf Mn/s", "mce/fsf",
+        "position", "depth", "mcr nodes", "fsf nodes", "match", "mcr Mn/s", "fsf Mn/s", "mcr/fsf",
     );
     println!("{head}");
     println!("{}", "-".repeat(head.len()));
@@ -189,10 +189,10 @@ engine vs FSF UCI_Variant manchu (issue #230):"
                     "{:<18} {:>5} {:>14} {:>14} {:>9} {:>10.1} {:>10.1} {:>7.2}x",
                     row.label,
                     row.depth,
-                    row.mce_nodes,
+                    row.mcr_nodes,
                     row.fsf_nodes,
                     if row.matched { "ok" } else { "MISMATCH" },
-                    row.mce_mnps(),
+                    row.mcr_mnps(),
                     row.fsf_mnps(),
                     row.speedup(),
                 );
@@ -204,16 +204,16 @@ engine vs FSF UCI_Variant manchu (issue #230):"
         }
     }
 
-    let nodes: u64 = rows.iter().map(|r| r.mce_nodes).sum();
-    let mce_s: f64 = rows.iter().map(|r| r.mce_secs).sum();
+    let nodes: u64 = rows.iter().map(|r| r.mcr_nodes).sum();
+    let mcr_s: f64 = rows.iter().map(|r| r.mcr_secs).sum();
     let fsf_s: f64 = rows.iter().map(|r| r.fsf_secs).sum();
     println!("{}", "-".repeat(head.len()));
-    if mce_s > 0.0 && fsf_s > 0.0 {
+    if mcr_s > 0.0 && fsf_s > 0.0 {
         println!(
-            "manchu OVERALL: {nodes} nodes verified; mce {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
-            nodes as f64 / mce_s / 1e6,
+            "manchu OVERALL: {nodes} nodes verified; mcr {:.1} Mn/s vs fsf {:.1} Mn/s ({:.2}x).",
+            nodes as f64 / mcr_s / 1e6,
             nodes as f64 / fsf_s / 1e6,
-            fsf_s / mce_s,
+            fsf_s / mcr_s,
         );
     }
 
@@ -226,10 +226,10 @@ engine vs FSF UCI_Variant manchu (issue #230):"
         eprintln!("ERROR: {mismatches} Manchu parity mismatch(es) vs FSF.");
         for r in rows.iter().filter(|r| !r.matched) {
             eprintln!(
-                "  MISMATCH manchu/{} depth {}: mce={} fsf={}  mce FEN: {}  FSF FEN: {}",
+                "  MISMATCH manchu/{} depth {}: mcr={} fsf={}  mcr FEN: {}  FSF FEN: {}",
                 r.label,
                 r.depth,
-                r.mce_nodes,
+                r.mcr_nodes,
                 r.fsf_nodes,
                 r.fen,
                 fen_to_fsf(r.fen),
@@ -239,12 +239,12 @@ engine vs FSF UCI_Variant manchu (issue #230):"
     mismatches
 }
 
-/// Run one Manchu position through mce's generic perft and FSF's `go perft`.
+/// Run one Manchu position through mcr's generic perft and FSF's `go perft`.
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
-    let pos = Manchu::from_fen(case.fen).map_err(|e| format!("mce rejected FEN: {e:?}"))?;
-    let mce_start = Instant::now();
-    let mce_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
-    let mce_secs = mce_start.elapsed().as_secs_f64();
+    let pos = Manchu::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
+    let mcr_start = Instant::now();
+    let mcr_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
+    let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
     engine.set_variant("manchu", false)?;
@@ -255,10 +255,10 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
         label: case.label,
         fen: case.fen,
         depth,
-        mce_nodes,
+        mcr_nodes,
         fsf_nodes: fsf.nodes,
-        matched: mce_nodes == fsf.nodes,
-        mce_secs,
+        matched: mcr_nodes == fsf.nodes,
+        mcr_secs,
         fsf_secs: fsf.elapsed.as_secs_f64(),
     })
 }
@@ -292,14 +292,14 @@ mod tests {
         }
     }
 
-    /// The mce -> FSF dialect rewrite strips the `*` off the Banner token, maps the
+    /// The mcr -> FSF dialect rewrite strips the `*` off the Banner token, maps the
     /// four Xiangqi piece letters, and leaves the chariot, cannon, and every other
     /// field intact.
     #[test]
     fn fen_dialect_rewrites_banner_and_xiangqi_pieces() {
-        let mce = "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1";
+        let mcr = "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1";
         let fsf = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/9/9/M1BAKAB2 w - - 0 1";
-        assert_eq!(fen_to_fsf(mce), fsf);
+        assert_eq!(fen_to_fsf(mcr), fsf);
         // The cannon `C`/`c` and side-to-move field are untouched; a black Banner
         // `*m` strips to `m`.
         let out = fen_to_fsf("4k4/9/9/9/9/9/9/9/9/4*m4 b - - 1 9");

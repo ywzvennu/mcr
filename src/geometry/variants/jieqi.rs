@@ -7,7 +7,7 @@
 //!
 //! ## Rules
 //!
-//! Jieqi is played on the same 9x10 board as Xiangqi (mce's [`Xiangqi9x10`]), with
+//! Jieqi is played on the same 9x10 board as Xiangqi (mcr's [`Xiangqi9x10`]), with
 //! the same palace, river, and flying-general rule. The two **Generals** start
 //! face-up on their home squares (e1 / e10). **Every other piece starts
 //! face-down** as a [`WideRole::Dark`] piece.
@@ -52,7 +52,7 @@
 //!
 //! ## Starting FEN
 //!
-//! The all-dark start, in the mce dialect (`=D`/`=d` is a face-down piece, `K`/`k`
+//! The all-dark start, in the mcr dialect (`=D`/`=d` is a face-down piece, `K`/`k`
 //! the face-up General):
 //!
 //! ```text
@@ -60,7 +60,7 @@
 //! ```
 //!
 //! Its identity-reveal Xiangqi equivalent is FSF's Xiangqi startpos
-//! `rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR` (mce
+//! `rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR` (mcr
 //! `rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR`).
 
 use super::xiangqi::XiangqiRules;
@@ -79,7 +79,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct JieqiRules;
 
-/// The all-dark Jieqi starting placement in the mce dialect: the two Generals
+/// The all-dark Jieqi starting placement in the mcr dialect: the two Generals
 /// (`K`/`k`) face-up on e1/e10, every other piece a face-down [`WideRole::Dark`]
 /// (`=D`/`=d`) on its standard Xiangqi home square.
 const JIEQI_START_PLACEMENT: &str =
@@ -374,7 +374,7 @@ impl WideVariant<Xiangqi9x10> for JieqiRules {
 /// geometry.
 ///
 /// Construct the all-dark start with
-/// [`Jieqi::startpos`](GenericPosition::startpos) or parse a FEN (mce dialect,
+/// [`Jieqi::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect,
 /// face-down pieces as `=D`/`=d`) with
 /// [`Jieqi::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the hidden movement, the reveal model, and how correctness is validated.

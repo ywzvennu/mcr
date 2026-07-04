@@ -868,7 +868,7 @@ impl<V: Variant> VariantPosition<V> {
     /// TT move pays nothing for it.
     ///
     /// ```
-    /// use mce::Atomic;
+    /// use mcr::Atomic;
     /// use std::collections::BTreeSet;
     ///
     /// // `Atomic` is the `VariantPosition<AtomicRules>` alias.

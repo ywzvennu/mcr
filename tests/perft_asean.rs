@@ -10,13 +10,13 @@
 //! first diverge at depth 6 (Makruk 142_078_049 vs ASEAN 142_078_057).
 //!
 //! Every `(depth, nodes)` pair below was produced identically by
-//! `mce::geometry::Asean::perft` and by Fairy-Stockfish (`UCI_Variant asean`,
-//! `go perft`) on the byte-identical FEN (rewriting the mce `s`/`m` letters to
+//! `mcr::geometry::Asean::perft` and by Fairy-Stockfish (`UCI_Variant asean`,
+//! `go perft`) on the byte-identical FEN (rewriting the mcr `s`/`m` letters to
 //! FSF's `b`/`q`). The `compare-fairy/` harness re-runs that head-to-head on
 //! demand (`compare-fairy/src/main.rs --asean`); this test pins the confirmed
 //! numbers so a regression is caught without FSF present.
 //!
-//! Confirmed ASEAN starting FEN (mce dialect; FSF reports the same array as
+//! Confirmed ASEAN starting FEN (mcr dialect; FSF reports the same array as
 //! `rnbqkbnr/8/pppppppp/8/8/PPPPPPPP/8/RNBQKBNR w - - 0 1`):
 //!   `rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSMKSNR w - - 0 1`
 //!
@@ -24,10 +24,10 @@
 //! `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_asean -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Asean, Chess8x8};
+use mcr::geometry::{perft as gperft, Asean, Chess8x8};
 
 /// The ASEAN starting FEN, confirmed byte-for-byte against Fairy-Stockfish's
-/// `UCI_Variant asean` / `position startpos` (mce dialect).
+/// `UCI_Variant asean` / `position startpos` (mcr dialect).
 const STARTPOS: &str = "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSMKSNR w - - 0 1";
 
 /// A midgame: an edge pawn pushed, a king-pawn advanced, black to move.

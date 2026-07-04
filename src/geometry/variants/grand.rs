@@ -7,13 +7,13 @@
 //! Grand chess is played on a ten-files by ten-ranks board (files a..j, ranks
 //! 1..10). Beyond the standard chess army each side adds two compound pieces:
 //!
-//! * **Marshal** (Rook + Knight) — mce's [`WideRole::Elephant`], whose default
+//! * **Marshal** (Rook + Knight) — mcr's [`WideRole::Elephant`], whose default
 //!   movement (`rook | knight`) is already the marshal's. FEN letter `e`/`E` in
-//!   the mce dialect (Fairy-Stockfish spells the chancellor/marshal `c`/`C`, a
+//!   the mcr dialect (Fairy-Stockfish spells the chancellor/marshal `c`/`C`, a
 //!   dialect difference `compare-fairy/` reconciles, exactly as for Capablanca).
-//! * **Cardinal** (Bishop + Knight) — mce's [`WideRole::Hawk`], whose default
+//! * **Cardinal** (Bishop + Knight) — mcr's [`WideRole::Hawk`], whose default
 //!   movement (`bishop | knight`) is already the cardinal's. FEN letter `a`/`A`
-//!   in both mce and FSF.
+//!   in both mcr and FSF.
 //!
 //! ## Rules that differ from standard chess
 //!
@@ -41,11 +41,11 @@
 //!
 //! ```text
 //! FSF dialect: r8r/1nbqkcabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKCABN1/R8R w - - 0 1
-//! mce dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1
+//! mcr dialect: r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1
 //! ```
 //!
 //! The two strings differ only in the marshal/chancellor's letter (`c` in FSF,
-//! `e` in mce). The corners (a1/j1, a10/j10) hold the rooks; rank 2 (white) and
+//! `e` in mcr). The corners (a1/j1, a10/j10) hold the rooks; rank 2 (white) and
 //! rank 9 (black) hold, files b..i, knight-bishop-queen-king-**marshal**-**cardinal**-bishop-knight,
 //! with the king on the e-file (file 4) and the marshal beside it on the f-file
 //! (file 5). Pawns sit on ranks 3 and 8.
@@ -68,7 +68,7 @@ use crate::Color;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct GrandRules;
 
-/// The confirmed Grand starting placement in the mce dialect (marshal = `e`/`E`),
+/// The confirmed Grand starting placement in the mcr dialect (marshal = `e`/`E`),
 /// byte-for-byte equivalent to Fairy-Stockfish's
 /// `r8r/1nbqkcabn1/.../1NBQKCABN1/R8R` modulo the marshal's letter.
 const GRAND_START_PLACEMENT: &str =

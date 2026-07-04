@@ -15,7 +15,7 @@
 //! Plus malformed-input handling: every decoder must return `Err` (never panic)
 //! on truncated, mis-tagged, or out-of-range bytes.
 
-use mce::geometry::{decode_game, encode_game, AnyWideVariant, WideMove, WideVariantId, WireError};
+use mcr::geometry::{decode_game, encode_game, AnyWideVariant, WideMove, WideVariantId, WireError};
 
 /// Encodes then decodes `pos` through the self-describing format and asserts the
 /// canonical FEN survives (positions have no `PartialEq`, so FEN is the oracle).

@@ -5,9 +5,9 @@
 //! **flag-win (campmate)** terminal rule.
 //!
 //! Every `(depth, nodes)` pair below was produced **identically** by
-//! `mce::geometry::Ordamirror` perft and by Fairy-Stockfish (FSF,
+//! `mcr::geometry::Ordamirror` perft and by Fairy-Stockfish (FSF,
 //! `UCI_Variant ordamirror`) running `go perft` on the byte-identical position —
-//! the FSF divide matches mce's move-for-move, including each horde piece's
+//! the FSF divide matches mcr's move-for-move, including each horde piece's
 //! split: the Lancer captures like a rook and the Archer like a bishop (both
 //! *move* like a knight), the Kheshig is a King + Knight leaper, and the **Falcon
 //! moves like a queen but captures like a knight** (the inverse of the Lancer /
@@ -25,11 +25,11 @@
 //! lhafkahl/8/pppppppp/8/8/PPPPPPPP/8/LHAFKAHL w - - 0 1
 //! ```
 //!
-//! with FSF's letters `l h a f k` (Lancer, Kheshig, Archer, Falcon, King). mce
+//! with FSF's letters `l h a f k` (Lancer, Kheshig, Archer, Falcon, King). mcr
 //! reuses `l`/`h`/`a` for its Lance/Hoplite/Hawk, so the horde pieces take
 //! distinct letters — Lancer `f`, Kheshig `w`, Archer `y` — and the Falcon takes
 //! the overflow token `*f` (its base letter `f` is the FSF mnemonic; the `*`
-//! prefix keeps it distinct from the bare Lancer `f`). mce's canonical start FEN
+//! prefix keeps it distinct from the bare Lancer `f`). mcr's canonical start FEN
 //! is
 //!
 //! ```text
@@ -57,9 +57,9 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_ordamirror -- --include-ignored`.
 
-use mce::geometry::{perft as gperft, Chess8x8, Ordamirror};
+use mcr::geometry::{perft as gperft, Chess8x8, Ordamirror};
 
-/// The Ordamirror starting FEN in mce's dialect, confirmed against FSF's
+/// The Ordamirror starting FEN in mcr's dialect, confirmed against FSF's
 /// `UCI_Variant ordamirror` / `position startpos`.
 const STARTPOS: &str = "fwy*fkywf/8/pppppppp/8/8/PPPPPPPP/8/FWY*FKYWF w - - 0 1";
 
@@ -171,7 +171,7 @@ fn flag_race_cheap() {
     );
 }
 
-// -- The starting FEN round-trips through mce's FEN I/O ----------------------
+// -- The starting FEN round-trips through mcr's FEN I/O ----------------------
 
 #[test]
 fn startpos_fen_round_trips() {

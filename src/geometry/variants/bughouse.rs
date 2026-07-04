@@ -57,7 +57,7 @@
 //! ```
 //!
 //! The trailing `[]` is the empty crazyhouse hand (FSF accepts it present or
-//! omitted). The piece letters `K Q R B N P` are shared between mce and FSF, so no
+//! omitted). The piece letters `K Q R B N P` are shared between mcr and FSF, so no
 //! dialect translation is needed.
 
 use crate::geometry::position::{

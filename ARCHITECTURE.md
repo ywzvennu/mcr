@@ -1,11 +1,11 @@
 # Architecture
 
-This document describes how `mce` is built as shipped. It complements
+This document describes how `mcr` is built as shipped. It complements
 [`docs/fairy-variants-architecture.md`](docs/fairy-variants-architecture.md),
 the Milestone-10 *design* doc that proposed the geometry layer; this file
 records the *as-built* result and the terminology used in the code.
 
-`mce` has **two parallel engines** that share no hot-path code:
+`mcr` has **two parallel engines** that share no hot-path code:
 
 1. **The frozen 8x8 `u64` core.** The original concrete `Bitboard(u64)` /
    `Square(u8)` / `Board` / `Position` types, the hyperbola-quintessence (or
@@ -211,7 +211,7 @@ geometry:
 - **Concrete 8x8** — `Position`, the `Variant` / `VariantPosition<V>` types, and
   the runtime-dispatch `AnyVariant` / `VariantId`.
 - **Generic-geometry fairy** — `GenericPosition<G, V>` and the runtime-dispatch
-  `AnyWideVariant` / `WideVariantId`, under `mce::geometry`.
+  `AnyWideVariant` / `WideVariantId`, under `mcr::geometry`.
 
 A goal of the public surface is that the two families **read the same** where
 they overlap, so the naming was audited for consistency and standardized by
@@ -253,7 +253,7 @@ no change.
 
 Fairy-variant move generation is pinned against
 [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish) (FSF) as a
-black-box perft oracle: mce's node counts are asserted equal to FSF's, node for
+black-box perft oracle: mcr's node counts are asserted equal to FSF's, node for
 node, on byte-identical positions, with the per-move `divide` localising any
 divergence. The deterministic, full-information variants use this directly; the
 imperfect-information / stochastic specials (Alice, Bughouse, Jieqi, Fog of War)
@@ -262,7 +262,7 @@ use the tailored methods recorded in the README matrix.
 The head-to-head lives in the separate **`compare-fairy/`** crate, which drives
 an external `fairy-stockfish` UCI binary purely as a **subprocess**. FSF is
 GPL-3.0-or-later; `compare-fairy/` is a non-workspace crate (`publish = false`),
-is **not** in mce's dependency graph, and reads / copies / links no FSF source
-— so the licensing never crosses the process boundary and the `mce` library
+is **not** in mcr's dependency graph, and reads / copies / links no FSF source
+— so the licensing never crosses the process boundary and the `mcr` library
 itself stays clean-room MIT OR Apache-2.0. See the README's *Validation against
 Fairy-Stockfish* section for how to run it.

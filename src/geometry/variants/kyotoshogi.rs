@@ -57,7 +57,7 @@
 //! p+nks+l/5/5/5/+LSK+NP[-] w 0 1
 //! ```
 //!
-//! mce uses the same board placement (`+`-prefixed promoted tokens are written by
+//! mcr uses the same board placement (`+`-prefixed promoted tokens are written by
 //! the shared board FEN I/O) and an empty `[]` holdings bracket; the
 //! `compare-fairy/` harness reconciles the empty-hand rendering when driving FSF.
 
