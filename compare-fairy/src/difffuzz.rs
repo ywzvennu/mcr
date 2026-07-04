@@ -42,7 +42,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use mcr::geometry::{AnyWideVariant, WideVariantId};
+use mcr::geometry::{AnyWideVariant, WideMove, WideMoveKind, WideVariantId};
 
 use crate::uci::Engine;
 
@@ -687,7 +687,7 @@ const SPECS: &[Spec] = &[
 ///   so mcr's move set is legitimately larger; FSF simply never generates it.
 ///   Rather than skip such nodes wholesale (the divergence usually surfaces one ply
 ///   down, inside `perft(2)`), [`check_node`] discounts exactly those moves via
-///   [`shoshogi_fsf_visible_count`] so the cross-check stays faithful while still
+///   [`fsf_visible_count`] so the cross-check stays faithful while still
 ///   catching any *other* Sho Shogi movegen difference.
 ///
 /// Currently held back (an FSF oracle limitation, not an mcr bug):
@@ -695,8 +695,8 @@ const SPECS: &[Spec] = &[
 /// * **Janggi** (issue #442) — FSF over-generates the **pass** (the general staying
 ///   put, `from == to`) under an in-check position, an illegal move (a pass cannot
 ///   resolve check) that mcr correctly rejects (`position.rs` gates the pass behind
-///   `!in_check`). Unlike the Sho Shogi artifact — a clean per-move rule discounted
-///   by [`shoshogi_fsf_visible_count`] — FSF's Janggi in-check pass is **not
+///   `!in_check`). Unlike the reconstructable artifacts — clean per-move rules
+///   discounted by [`fsf_visible_count`] — FSF's Janggi in-check pass is **not
 ///   uniform**: it appears under some piece checks (e.g. a Horse check, and every
 ///   checkmate, where FSF then reports the pass as the sole "legal" move) but not
 ///   others (e.g. a Chariot check, where FSF omits it and agrees with mcr), so no
@@ -710,37 +710,37 @@ const SPECS: &[Spec] = &[
 ///   (`compare-fairy`, whose curated positions avoid the artifact) and the exact
 ///   node counts in `tests/perft_janggi.rs`. Still reachable with `--variant janggi`.
 ///
-/// * **Sittuyin** (issue #442) — FSF *suppresses* a legal in-place/diagonal
-///   promotion (a Pawn promoting to the General / `Met` Ferz) when that promotion
-///   uncovers a **discovered check**, a move mcr correctly generates; so mcr's move
-///   set is legitimately larger (the divergent children show mcr with one more move
-///   than FSF). Confirmed mcr-correct in the #422 bug-hunt. Clean at the previous
-///   gate depth but surfaces once games or plies grow, so it is held back from the
-///   deep sweep and kept at its proven-clean depth explicitly; the fixed-corpus
-///   differential and `tests/perft_sittuyin.rs` pin its exact node counts.
-///
-/// * **Synochess** (issue #442) — FSF *drops* a legal castle keyed on the enemy
-///   king's square (an FSF-internal restriction mcr does not share); mcr correctly
-///   generates the castle. E.g. from a mid-game node White's queenside `e1c1` is
-///   legal and even gives check (the a1 rook lands on d1, checking the black king
-///   down an open d-file), yet FSF omits it — the sole root divergence, every other
-///   move matching. Confirmed mcr-correct (the same class the #422 bug-hunt found
-///   for Empire, whose `is_empire_no_queenside_castle_artifact` skip is the
-///   analogue). Clean at the previous gate depth but surfaces as games/plies grow,
-///   so it is held back from the deep sweep and kept at its proven-clean depth
-///   explicitly; the fixed-corpus differential and `tests/perft_synochess.rs` pin
-///   its node counts.
-///
-/// * **Empire** (issue #442) — the same enemy-king-keyed castle drop as Synochess,
-///   on the **kingside**: after a White king step FSF omits Black's legal `e8g8`
-///   (king e8→g8 with f8/g8 empty and unattacked), the sole child divergence, while
-///   mcr generates it. The corpus differential's targeted
-///   [`is_empire_no_queenside_castle_artifact`] skip covers only the *queenside*
-///   case; the kingside variant surfaces once the fuzzer runs deeper, so Empire is
-///   held back from the deep sweep and kept at its proven-clean depth explicitly.
-///   Confirmed mcr-correct; `tests/perft_empire.rs` pins its node counts.
-///
 /// Resolved and released back into the default sweep:
+///
+/// * **Sittuyin** (issue #460) — FSF *suppresses* a legal Pawn → Met (Ferz)
+///   promotion whenever it gives check (`Position::legal` in position.cpp marks any
+///   `sittuyin_promotion()` promotion with `gives_check` illegal — discovered *or*
+///   direct), a move mcr correctly generates; so mcr's move set is legitimately
+///   larger. Confirmed mcr-correct in the #422 bug-hunt. Reconstructed mcr-side by
+///   [`fsf_drops_sittuyin_promotion`] (a promotion that leaves the enemy king in
+///   check), so the discount is inert on every other node; clean over the deep
+///   sweep. Its exact node counts are also pinned by `tests/perft_sittuyin.rs`.
+///
+/// * **Synochess** (issue #460) — FSF *drops* a legal castle whose rook gives
+///   check: with `flyingGeneral = true`, FSF's castling legality (position.cpp)
+///   rejects a castle when any king-transit square — including the rook's landing
+///   square — faces the enemy king down an open file/rank. E.g. White's queenside
+///   `e1c1` lands the a1 rook on d1, checking the black king down an open d-file;
+///   FSF omits it, the sole root divergence, while mcr correctly generates it.
+///   Confirmed mcr-correct. Reconstructed mcr-side by [`fsf_drops_castle`] (the
+///   castled rook's landing square is among the enemy king's checkers); inert on
+///   every non-checking castle. Clean over the deep sweep; `tests/perft_synochess.rs`
+///   pins its node counts.
+///
+/// * **Empire** (issue #460) — the same `flyingGeneral` rook-check castle drop as
+///   Synochess, seen on the **kingside**: Black's `e8g8` lands the h8 rook on f8,
+///   checking the white king down an open f-file, which FSF omits while mcr
+///   generates it. Reconstructed by the same [`fsf_drops_castle`] discount (which
+///   covers either wing). Note this is distinct from the *queenside* artifact still
+///   handled by the [`is_empire_no_queenside_castle_artifact`] node skip: FSF drops
+///   Black's queenside castle unconditionally (its rook-piece auto-detection, not a
+///   check), so that node is skipped rather than count-reconstructed. Clean over the
+///   deep sweep; `tests/perft_empire.rs` pins its node counts.
 ///
 /// * **Tori** (Tori Shogi, issue #416) — a latent **mcr** bug surfaced by the
 ///   deeper sweep (`--difffuzz --variant tori --seed 1 --games 8 --plies 60`,
@@ -774,12 +774,7 @@ const SPECS: &[Spec] = &[
 ///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
 ///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
 ///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
-const HELD_BACK: &[WideVariantId] = &[
-    WideVariantId::Janggi,
-    WideVariantId::Sittuyin,
-    WideVariantId::Synochess,
-    WideVariantId::Empire,
-];
+const HELD_BACK: &[WideVariantId] = &[WideVariantId::Janggi];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
@@ -959,16 +954,113 @@ fn shoshogi_move_is_omitted_escape(uci: &str, legal_ucis: &[String]) -> bool {
     !legal_ucis.iter().any(|u| u == base)
 }
 
+/// Whether `mv` — a legal Sittuyin move of `pos` — is a Pawn → Met promotion FSF
+/// wrongly suppresses because it gives check (issue #460).
+///
+/// Sittuyin's only promotion is the Pawn → Met (Ferz) in-place/diagonal promotion.
+/// FSF marks any such promotion that gives check **illegal** (`Position::legal`,
+/// position.cpp: a `sittuyin_promotion()` `PROMOTION` for which `gives_check` holds
+/// returns `false`), so it never emits the discovered- or direct-check promotion
+/// mcr correctly generates — the divergent nodes show mcr with one more move than
+/// FSF. Confirmed mcr-correct in the #422 bug-hunt. Reconstructed mcr-side by
+/// playing the promotion and asking whether the enemy king is left in check; inert
+/// on every promotion that gives no check.
+fn fsf_drops_sittuyin_promotion(pos: &AnyWideVariant, mv: &WideMove) -> bool {
+    if mv.promotion().is_none() {
+        return false;
+    }
+    let child = pos.play(mv);
+    // After the promotion it is the enemy's turn; a checked enemy means the
+    // promotion gave check, so FSF's generator dropped it.
+    let enemy = child.turn();
+    child.is_in_check(enemy)
+}
+
+/// Whether `mv` — a legal castling move of `pos` — is one FSF's `flyingGeneral`
+/// castling legality wrongly drops (issue #460): the castled **rook** lands on a
+/// square from which it checks the enemy king down an open file/rank.
+///
+/// Synochess and Empire both set `flyingGeneral = true`. FSF's `Position::legal`
+/// CASTLING branch (position.cpp) walks the king's transit squares and, for each,
+/// rejects the castle if a rook placed there would face the enemy king — and the
+/// rook's landing square is always one of those transit squares (the square the
+/// king steps over). So whenever the castled rook gives check, FSF drops the whole
+/// castle; mcr correctly generates it (the sole root divergence, e.g. White's
+/// synochess `e1c1` giving check down an open d-file, or Black's empire `e8g8`
+/// giving check down an open f-file). Reconstructed mcr-side by playing the castle
+/// and asking whether the rook's landing square is among the enemy king's checkers
+/// — a genuine *rook* check, not an unrelated discovered check (which FSF keeps,
+/// as does mcr, so it must not be discounted). Inert on every castle that gives no
+/// such rook check.
+fn fsf_drops_castle(pos: &AnyWideVariant, mv: &WideMove) -> bool {
+    // The rook lands on the square the king steps over: one file toward the king's
+    // origin from its destination (the f-file for O-O, the d-file for O-O-O).
+    let king_to = mv.to_index();
+    let rook_sq = match mv.kind() {
+        WideMoveKind::CastleKingside => king_to - 1,
+        WideMoveKind::CastleQueenside => king_to + 1,
+        _ => return false,
+    };
+    let child = pos.play(mv);
+    let enemy = child.turn();
+    child.checkers_of(enemy).contains(&rook_sq)
+}
+
+/// Whether the legal move `mv` of `pos` (UCI `uci`, the node's full legal UCI list
+/// `legal_ucis`) is one FSF's generator omits for variant `id` — the union of the
+/// per-move FSF artifacts the fuzzer reconstructs (issues #454, #460). Returns
+/// `false` (inert) for every variant/move without a known artifact, so the
+/// cross-check stays byte-identical wherever the engines already agree.
+fn fsf_omits_move(
+    id: WideVariantId,
+    pos: &AnyWideVariant,
+    mv: &WideMove,
+    uci: &str,
+    legal_ucis: &[String],
+) -> bool {
+    match id {
+        WideVariantId::ShoShogi => shoshogi_move_is_omitted_escape(uci, legal_ucis),
+        WideVariantId::Sittuyin => fsf_drops_sittuyin_promotion(pos, mv),
+        WideVariantId::Synochess | WideVariantId::Empire => fsf_drops_castle(pos, mv),
+        _ => false,
+    }
+}
+
+/// Whether variant `id` carries a per-move FSF artifact the fuzzer reconstructs
+/// (see [`fsf_omits_move`]). Gates the (slightly costlier) FSF-visible counting so
+/// every other variant keeps the plain `perft(1)` child count.
+fn variant_has_fsf_artifact(id: WideVariantId) -> bool {
+    matches!(
+        id,
+        WideVariantId::ShoShogi
+            | WideVariantId::Sittuyin
+            | WideVariantId::Synochess
+            | WideVariantId::Empire
+    )
+}
+
 /// The count of `pos`'s legal moves **as FSF's generator sees them**: the full
-/// legal count minus the crown-prince escapes FSF omits (issue #454, see
-/// [`shoshogi_move_is_omitted_escape`]). On any node without such an escape this
-/// equals the plain legal-move count, so it is inert everywhere except the exact
-/// FSF-limited nodes.
-fn shoshogi_fsf_visible_count(pos: &AnyWideVariant) -> u64 {
-    let ucis: Vec<String> = pos.legal_moves().iter().map(|mv| pos.to_uci(mv)).collect();
-    ucis.iter()
-        .filter(|u| !shoshogi_move_is_omitted_escape(u, &ucis))
+/// legal count minus the moves FSF omits for variant `id` (see [`fsf_omits_move`]).
+/// On any node without such a move this equals the plain legal-move count, so it is
+/// inert everywhere except the exact FSF-limited nodes. Used to reconstruct a
+/// child's `perft(1)` the way FSF counts it, so the artifact does not leak into the
+/// parent node's `perft(2)`.
+fn fsf_visible_count(id: WideVariantId, pos: &AnyWideVariant) -> u64 {
+    let moves = pos.legal_moves();
+    let ucis: Vec<String> = moves.iter().map(|mv| pos.to_uci(mv)).collect();
+    moves
+        .iter()
+        .zip(ucis.iter())
+        .filter(|(mv, uci)| !fsf_omits_move(id, pos, mv, uci, &ucis))
         .count() as u64
+}
+
+/// The count of `pos`'s legal Sho Shogi moves as FSF's generator sees them — the
+/// crown-prince special case of [`fsf_visible_count`] (issue #454). Kept as a named
+/// entry point for the unit test that pins the discount.
+#[cfg(test)]
+fn shoshogi_fsf_visible_count(pos: &AnyWideVariant) -> u64 {
+    fsf_visible_count(WideVariantId::ShoShogi, pos)
 }
 
 /// Cross-check one node: mcr `perft(1)`/`perft(2)` + divide vs FSF's.
@@ -996,28 +1088,37 @@ fn check_node(
     // ---- mcr side: perft(1) is the legal-move count; perft(2)'s divide is each
     // legal move's child perft(1). --------------------------------------------
     //
-    // Sho Shogi carries one FSF discrepancy that is an FSF limitation, not an mcr
-    // bug (issue #454): while a lone King is in check, mcr also lets the side
-    // **promote a Drunk Elephant into a Crown Prince** (gaining a second royal,
-    // which drops the check under the count-thresholded pseudo-royalty), an escape
-    // FSF's in-check generator never emits. It usually surfaces one ply down, in a
-    // child's move count, so [`shoshogi_fsf_visible_count`] counts each node the way
-    // FSF does — discounting exactly those escapes — and the diverging root moves
-    // are dropped here too. Every other Sho Shogi difference still shows through.
-    let is_shoshogi = spec.id == WideVariantId::ShoShogi;
+    // A few variants carry a documented FSF *movegen* limitation (never an mcr bug):
+    // FSF's generator omits a legal move mcr correctly emits, so mcr's move set is
+    // legitimately larger. The reconstructed count [`fsf_visible_count`] counts each
+    // node the way FSF's generator sees it — discounting exactly those FSF-omitted
+    // moves (see [`fsf_omits_move`]) — so the cross-check stays faithful while still
+    // catching any *other* movegen difference:
+    //
+    //   * **Sho Shogi** (#454) — a Drunk-Elephant → Crown-Prince second-royal escape
+    //     FSF's pinned/in-check generator never emits.
+    //   * **Sittuyin** (#460) — a Pawn → Met promotion FSF drops because it gives
+    //     (discovered or direct) check.
+    //   * **Synochess / Empire** (#460) — a castle whose rook gives check, which
+    //     FSF's `flyingGeneral` castling legality wrongly rejects.
+    //
+    // The omitted move usually also surfaces one ply down, in a child's move count,
+    // so the child perft(1) is likewise counted through [`fsf_visible_count`] and the
+    // diverging root moves are dropped here too.
+    let discounted = variant_has_fsf_artifact(spec.id);
     let moves = node.legal_moves();
     let root_ucis: Vec<String> = moves.iter().map(|mv| node.to_uci(mv)).collect();
     let mut mcr_p1 = 0u64;
     let mut mcr_divide: Vec<(String, u64)> = Vec::with_capacity(moves.len());
     let mut mcr_p2 = 0u64;
     for (mv, uci) in moves.iter().zip(root_ucis.iter()) {
-        if is_shoshogi && shoshogi_move_is_omitted_escape(uci, &root_ucis) {
+        if discounted && fsf_omits_move(spec.id, &node, mv, uci, &root_ucis) {
             continue;
         }
         mcr_p1 += 1;
         let child = node.play(mv);
-        let child_nodes = if is_shoshogi {
-            shoshogi_fsf_visible_count(&child)
+        let child_nodes = if discounted {
+            fsf_visible_count(spec.id, &child)
         } else {
             child.perft(1)
         };
@@ -1627,5 +1728,65 @@ mod tests {
         assert!(!pin.is_check());
         assert_eq!(pin.legal_moves().len(), 43);
         assert_eq!(shoshogi_fsf_visible_count(&pin), 37);
+    }
+
+    /// [`fsf_visible_count`] discounts exactly the Sittuyin Pawn → Met promotions
+    /// FSF drops for giving check (issue #460), and nothing else.
+    #[test]
+    fn sittuyin_visible_count_discounts_only_checking_promotions() {
+        // A #460 node (child of White `b6c8`): Black's `e4d3m` promotes to a Met and
+        // uncovers a discovered check on the White King down the e-file; FSF omits
+        // it, so mcr's 33 legal moves count as 32 to FSF.
+        let node = AnyWideVariant::from_fen(
+            WideVariantId::Sittuyin,
+            "r1N1r3/6n1/k4npp/1p1s1P1P/pP1spPP1/P1P5/7N/SRMSK2R[] b - - 0 34",
+        )
+        .expect("valid Sittuyin FEN");
+        assert_eq!(node.legal_moves().len(), 33);
+        assert_eq!(fsf_visible_count(WideVariantId::Sittuyin, &node), 32);
+
+        // The placement-phase start position has no promotions at all: nothing is
+        // discounted, so the count is the plain legal-move count.
+        let start = AnyWideVariant::startpos(WideVariantId::Sittuyin);
+        assert_eq!(
+            fsf_visible_count(WideVariantId::Sittuyin, &start),
+            start.legal_moves().len() as u64
+        );
+    }
+
+    /// [`fsf_visible_count`] discounts exactly the Synochess / Empire castles whose
+    /// rook gives check (the `flyingGeneral` drop, issue #460), and nothing else.
+    #[test]
+    fn castle_visible_count_discounts_only_checking_castles() {
+        // Synochess #460 node: White's queenside `e1c1` lands the a1 rook on d1,
+        // checking the Black King (d7) down the open d-file; FSF omits it, so mcr's
+        // 40 legal moves count as 39.
+        let syno = AnyWideVariant::from_fen(
+            WideVariantId::Synochess,
+            "1nv*u1vn1/3k4/r5c1/zzz1PzB1/P1P5/NQ6/1P2PPPr/R3KBNR[] w KQ - 1 8",
+        )
+        .expect("valid Synochess FEN");
+        assert_eq!(syno.legal_moves().len(), 40);
+        assert_eq!(fsf_visible_count(WideVariantId::Synochess, &syno), 39);
+
+        // Empire #460 node: Black's kingside `e8g8` lands the h8 rook on f8, checking
+        // the White King (f2) down the open f-file; FSF omits it, so mcr's 39 legal
+        // moves count as 38.
+        let empire = AnyWideVariant::from_fen(
+            WideVariantId::Empire,
+            "1n2k2r/1q1pp1bp/r1b5/p3p2P/P1nZ4/1P1p*D1P1/*E3*CK2/4*E2*T b k - 0 33",
+        )
+        .expect("valid Empire FEN");
+        assert_eq!(empire.legal_moves().len(), 39);
+        assert_eq!(fsf_visible_count(WideVariantId::Empire, &empire), 38);
+
+        // Neither start position offers a checking castle, so nothing is discounted.
+        for id in [WideVariantId::Synochess, WideVariantId::Empire] {
+            let start = AnyWideVariant::startpos(id);
+            assert_eq!(
+                fsf_visible_count(id, &start),
+                start.legal_moves().len() as u64
+            );
+        }
     }
 }
