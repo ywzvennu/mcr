@@ -589,6 +589,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "10x10 board, no castling; pawns double-push from rank 3/8, take en passant, and promote on the last rank only to a Queen, Marshal, or Archbishop (unrestricted). Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant tencubed`).",
         },
+        WideVariantId::Tenjiku => Meta {
+            display: "Tenjiku Shogi (16x16)",
+            pieces: "The ~36-type Tenjiku army: the whole Chu army plus the jump-capturing Great/Vice/Rook/Bishop Generals, the area-burning Fire Demon, the Lion Hawk (Lion + Bishop), Free Eagle, Water Buffalo, Chariot Soldier, Heavenly Tetrarch, Vertical/Side Soldier, Multi-General, Dog, and the shared Iron General and Knight. Uses HaChu's exact `variant tenjiku` start layout, including its hand-written White/Black asymmetries.",
+            rules: "No hand or drops; five-rank promotion zone with Tenjiku-specific promotions (Soaring Eagle→Rook General, Lion→Lion Hawk, Free King→Free Eagle, …); two royals (King and the promoted Prince). **Honest partial:** ordinary movement of every piece is modelled and validated; the Fire Demon's multi-square **area burn** and the four Generals' **jump-capture** are documented-unmodelled (they capture as ordinary blockable sliders); the Lion / Lion Hawk keep the full igui / double-capture / pass move set.",
+            oracle: "HaChu 0.23 **crashes deterministically** on `variant tenjiku` (its 16x16 board leaves no EDGE-sentinel border), so no live oracle is available. mce's start position is instead reconciled **move-for-move against HaChu's own source tables** (`tenjikuPieces` / `tenArray` / `GenNonCapts`): start-position perft(1)=72 node-for-node; perft(2)=5662 and perft(3)=424353 are mce regression pins (faithful to the rules at these depths — no special power is reachable — but not HaChu-cross-checked).",
+        },
         WideVariantId::Tori => Meta {
             display: "Tori Shogi (bird shogi, 7x7)",
             pieces: "A seven-bird army: Swallow (to Goose), Falcon (to Eagle), Crane, Left and Right Quail, Pheasant, and King.",

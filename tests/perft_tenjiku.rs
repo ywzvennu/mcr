@@ -160,8 +160,12 @@ fn horned_falcon_jumps_two_forward_over_a_blocker() {
     );
     // h10 = (7, 9) must be reachable (the jump), even though h9 = (7, 8) is a
     // friendly blocker (so the single forward step is not available).
-    let h10 = Square::<Tenjiku16x16>::from_file_rank(7, 9).unwrap().index();
-    let h9 = Square::<Tenjiku16x16>::from_file_rank(7, 8).unwrap().index();
+    let h10 = Square::<Tenjiku16x16>::from_file_rank(7, 9)
+        .unwrap()
+        .index();
+    let h9 = Square::<Tenjiku16x16>::from_file_rank(7, 8)
+        .unwrap()
+        .index();
     assert!(got.contains(&h10), "Horned Falcon should jump to h10");
     assert!(!got.contains(&h9), "h9 is a friendly blocker");
 }
@@ -177,8 +181,12 @@ fn soaring_eagle_jumps_two_forward_diagonally() {
         7,
         7,
     );
-    let f10 = Square::<Tenjiku16x16>::from_file_rank(5, 9).unwrap().index();
-    let j10 = Square::<Tenjiku16x16>::from_file_rank(9, 9).unwrap().index();
+    let f10 = Square::<Tenjiku16x16>::from_file_rank(5, 9)
+        .unwrap()
+        .index();
+    let j10 = Square::<Tenjiku16x16>::from_file_rank(9, 9)
+        .unwrap()
+        .index();
     assert!(got.contains(&f10) && got.contains(&j10));
 }
 
@@ -191,10 +199,8 @@ fn attackers_and_pins_consistency() {
     // Black Rook on h6 aimed down the h-file at the White King on h2, with a White
     // blocker Pawn between them on h4: the King is not in check, and no legal move
     // may expose it.
-    let pos = Tenjiku::from_fen(
-        "15k/16/16/16/16/16/16/16/16/16/7r8/16/7P8/16/7K8/16 w - - 0 1",
-    )
-    .expect("valid Tenjiku FEN");
+    let pos = Tenjiku::from_fen("15k/16/16/16/16/16/16/16/16/16/7r8/16/7P8/16/7K8/16 w - - 0 1")
+        .expect("valid Tenjiku FEN");
     let king = Square::<Tenjiku16x16>::from_file_rank(7, 1).unwrap();
     assert!(!pos.is_attacked(king, mce::Color::Black));
     for m in pos.legal_moves().iter() {

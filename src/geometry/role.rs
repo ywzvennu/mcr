@@ -1222,7 +1222,7 @@ pub enum WideRole {
     /// Fire Demon (火鬼, Tenjiku Shogi) — moves as a Flying Ox (any distance
     /// vertically or diagonally, not sideways) and additionally "burns" (captures
     /// without moving onto) every enemy on the up-to-eight squares adjacent to its
-    /// destination. The area-burn is not packable into [`WideMove`], so only the
+    /// destination. The area-burn is not packable into [`WideMove`](super::WideMove), so only the
     /// Flying-Ox movement is modelled here (see the `tenjiku` module for the
     /// documented gap). Does not promote. FEN token `****I` / `****i`.
     FireDemon = 132,

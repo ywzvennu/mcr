@@ -1061,7 +1061,10 @@ mod tests {
         // The complement of FULL is EMPTY — there are no off-board high bits to
         // survive, since every bit is on-board at 256 squares.
         assert_eq!(!Bitboard::<Tenjiku16x16>::FULL, Bitboard::EMPTY);
-        assert_eq!(!Bitboard::<Tenjiku16x16>::EMPTY, Bitboard::<Tenjiku16x16>::FULL);
+        assert_eq!(
+            !Bitboard::<Tenjiku16x16>::EMPTY,
+            Bitboard::<Tenjiku16x16>::FULL
+        );
     }
 
     #[test]

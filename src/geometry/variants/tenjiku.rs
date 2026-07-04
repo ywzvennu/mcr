@@ -46,7 +46,8 @@
 //!   vertically or diagonally, a Flying Ox) is exact. Its **area "burn"** — after
 //!   moving, it captures every enemy on the up-to-eight adjacent squares, and it
 //!   may also burn in place (igui) — is **not modelled**: a multi-square capture
-//!   cannot be packed into [`WideMove`] (which carries one intermediate square).
+//!   cannot be packed into [`WideMove`](crate::geometry::WideMove) (which carries
+//!   one intermediate square).
 //! * **Jump-capturing Generals** ([`WideRole::GreatGeneral`],
 //!   [`WideRole::ViceGeneral`], [`WideRole::RookGeneral`],
 //!   [`WideRole::BishopGeneral`]) — their *slide* is exact. Their ability to
@@ -96,11 +97,11 @@ const TENJIKU_PLACEMENT: &str = concat!(
     "****s****lb+b+r****w****i****g****h****i****w+r+bb****l****s/",
     // rank 13 (Black)
     "***i***vr***h***e****b****r****v****g****r****b***e***hr***v***i/",
-    "pppppppppppppppp/",  // rank 12 (Black pawns)
-    "4+r6+r4/",           // rank 11 (Black free Dragon Kings, files e, l)
-    "16/16/16/16/",       // ranks 10..7 (empty)
-    "4+R6+R4/",           // rank 6  (White free Dragon Kings)
-    "PPPPPPPPPPPPPPPP/",  // rank 5  (White pawns)
+    "pppppppppppppppp/", // rank 12 (Black pawns)
+    "4+r6+r4/",          // rank 11 (Black free Dragon Kings, files e, l)
+    "16/16/16/16/",      // ranks 10..7 (empty)
+    "4+R6+R4/",          // rank 6  (White free Dragon Kings)
+    "PPPPPPPPPPPPPPPP/", // rank 5  (White pawns)
     // rank 4  (White)
     "***I***VR***H***E****B****R****G****V****R****B***E***HR***V***I/",
     // rank 3  (White)

@@ -162,7 +162,7 @@ fn assert_consistent<G: Geometry, V: WideVariant<G>>(
     let occupied = board.occupied();
 
     for index in 0..G::SQUARES {
-        let t = Square::<G>::new(index);
+        let t = Square::<G>::new(index as u8);
         for c in Color::ALL {
             let reverse = pos.attackers_to(t, c, occupied);
             let forward = forward_attacks_to(pos, t, c, occupied);
