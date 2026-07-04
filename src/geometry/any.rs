@@ -24,7 +24,7 @@ use core::str::FromStr;
 use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
     Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier,
-    Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
+    Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
     Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins,
     Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi,
@@ -679,6 +679,7 @@ wide_variants! {
     Chigorin, Chigorin, Chigorin, "chigorin";
     Chu, Chu, Box<Chu>, "chu", "chushogi", "chu-shogi";
     Courier, Courier, Courier, "courier";
+    Dai, Dai, Box<Dai>, "dai", "daishogi", "dai-shogi";
     Dobutsu, Dobutsu, Dobutsu, "dobutsu";
     Dragon, Dragon, Dragon, "dragon";
     Duck, Duck, Duck, "duck";
