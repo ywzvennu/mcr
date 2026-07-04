@@ -373,25 +373,59 @@ jobs:
       # Where the corpus differential above pins a fixed basket of positions, this
       # plays seeded random *legal* games from each variant's start and cross-checks
       # mce's perft(1)/perft(2)+divide against FSF node-by-node, so a regression on a
-      # reachable-but-un-pinned position surfaces here. Fixed seeds + bounded
-      # games/plies keep it fully deterministic. This job is GATED (schedule /
+      # reachable-but-un-pinned position surfaces here. Bounded games/plies keep each
+      # game deterministic from its seed. This job is GATED (schedule /
       # workflow_dispatch only), so it does not spend per-PR CI minutes and can afford
-      # a deeper budget than a per-push gate would: the previous 3 games × 30 plies
-      # gate depth missed the Empire under-generation later caught at greater depth
-      # (issue #359), so the gate now sweeps 3 seeds × 8 games × 60 plies across all
-      # fuzzable variants (~2–3 min). MCE_FSF_BIN/MCE_FSF_VARIANTS_INI are already
-      # exported above, so the harness runs (rather than skipping); `main` exits
-      # non-zero on any divergence and the default `bash -e` shell propagates that out
-      # of the loop, so a divergence on ANY seed fails the job.
-      - name: compare-fairy differential fuzzer vs FSF (seeded)
+      # a deeper budget than a per-push gate would.
+      #
+      # Depth/seed strategy (issue #442): the previous 3 games × 30 plies gate depth
+      # missed the Empire under-generation later caught deeper (issue #359), so this
+      # runs a DEEPER 12 games × 90 plies sweep (~40 s/seed across the fuzzable
+      # variants, ~58k nodes). Rather than the same three fixed seeds every week, the
+      # base seed **rotates with `github.run_number`** (`run_number*3 + {0,1,2}`), so
+      # successive scheduled runs walk different random trajectories and accumulate
+      # coverage over time while any single run stays fully reproducible from its
+      # printed seeds. MCE_FSF_BIN/MCE_FSF_VARIANTS_INI are already exported above, so
+      # the harness runs (rather than skipping); `main` exits non-zero on any
+      # divergence and the default `bash -e` shell propagates that out of the loop, so
+      # a divergence on ANY seed fails the job. Four variants (Janggi, Sittuyin,
+      # Synochess, Empire) are held back from this deep sweep — each hits a documented
+      # FSF *oracle* limitation, not an mce bug, whose false divergences scale with
+      # games/plies (see `difffuzz.rs::HELD_BACK`). They stay covered by the
+      # fixed-corpus differential above, their `perft_*` tests, and the explicit
+      # proven-clean fuzz step below.
+      - name: compare-fairy differential fuzzer vs FSF (seeded, rotating)
         run: |
-          for seed in 1 2 3; do
+          run="${GITHUB_RUN_NUMBER:-0}"
+          for i in 0 1 2; do
+            seed=$(( run * 3 + i ))
             cargo run --release --manifest-path compare-fairy/Cargo.toml -- \
-              --difffuzz --seed "$seed" --games 8 --plies 60
+              --difffuzz --seed "$seed" --games 12 --plies 90
+          done
+
+      # Four variants are held back from the rotating sweep above (see
+      # `difffuzz.rs::HELD_BACK`): each hits a documented FSF *oracle* limitation, not
+      # an mce bug — Janggi's illegal in-check pass, Sittuyin's suppressed
+      # discovered-check promotion, and Synochess's / Empire's dropped
+      # enemy-king-keyed castle (queenside and kingside respectively) — whose false
+      # divergences scale with games/plies and cannot be reconstructed by a fixed
+      # mce-side discount. To keep the fuzz coverage the previous gate gave them, still
+      # run each explicitly at the fixed depth where it is divergence-free (3 seeds ×
+      # 8 games × 60 plies), reachable because `--variant` bypasses the hold-back. A
+      # divergence here still fails the job. (They are additionally pinned by the
+      # fixed-corpus differential above and their `perft_*` tests.)
+      - name: compare-fairy differential fuzzer vs FSF (held-back variants, proven-clean depth)
+        run: |
+          for variant in janggi sittuyin synochess empire; do
+            for seed in 1 2 3; do
+              cargo run --release --manifest-path compare-fairy/Cargo.toml -- \
+                --difffuzz --variant "$variant" --seed "$seed" --games 8 --plies 60
+            done
           done
 
       # Deep geometry-layer perft sweep: the expensive `#[ignore]`d layers that
-      # `cargo test` skips for speed. Run here against published reference counts.
+      # `cargo test` skips for speed. Run here against published reference counts so
+      # the heaviest large-board positions are re-validated on every scheduled run.
       - name: Deep perft sweep (ignored tests)
         run: cargo test --release --all-features -- --include-ignored
 

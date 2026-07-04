@@ -686,9 +686,55 @@ const SPECS: &[Spec] = &[
 ///   [`shoshogi_fsf_visible_count`] so the cross-check stays faithful while still
 ///   catching any *other* Sho Shogi movegen difference.
 ///
-/// Currently held back (deeper-sweep candidate awaiting a fix):
+/// Currently held back (an FSF oracle limitation, not an mce bug):
 ///
-/// * *(none — every surfaced candidate has been fixed and released below.)*
+/// * **Janggi** (issue #442) — FSF over-generates the **pass** (the general staying
+///   put, `from == to`) under an in-check position, an illegal move (a pass cannot
+///   resolve check) that mce correctly rejects (`position.rs` gates the pass behind
+///   `!in_check`). Unlike the Sho Shogi artifact — a clean per-move rule discounted
+///   by [`shoshogi_fsf_visible_count`] — FSF's Janggi in-check pass is **not
+///   uniform**: it appears under some piece checks (e.g. a Horse check, and every
+///   checkmate, where FSF then reports the pass as the sole "legal" move) but not
+///   others (e.g. a Chariot check, where FSF omits it and agrees with mce), so no
+///   fixed mce-side discount reconstructs FSF's count. It also cannot be keyed on
+///   [`is_in_check`](AnyWideVariant::is_in_check): both generals share the central
+///   file and face each other constantly, and mce (correctly) treats a bikjang
+///   facing as a check, so `is_in_check` fires on ~60% of nodes while FSF's
+///   `Checkers` (piece-only) does not. The false divergences scale with fuzz depth
+///   (in-check nodes become common past ~80 plies), so Janggi is held back from the
+///   deep default sweep and validated instead by the fixed-corpus differential
+///   (`compare-fairy`, whose curated positions avoid the artifact) and the exact
+///   node counts in `tests/perft_janggi.rs`. Still reachable with `--variant janggi`.
+///
+/// * **Sittuyin** (issue #442) — FSF *suppresses* a legal in-place/diagonal
+///   promotion (a Pawn promoting to the General / `Met` Ferz) when that promotion
+///   uncovers a **discovered check**, a move mce correctly generates; so mce's move
+///   set is legitimately larger (the divergent children show mce with one more move
+///   than FSF). Confirmed mce-correct in the #422 bug-hunt. Clean at the previous
+///   gate depth but surfaces once games or plies grow, so it is held back from the
+///   deep sweep and kept at its proven-clean depth explicitly; the fixed-corpus
+///   differential and `tests/perft_sittuyin.rs` pin its exact node counts.
+///
+/// * **Synochess** (issue #442) — FSF *drops* a legal castle keyed on the enemy
+///   king's square (an FSF-internal restriction mce does not share); mce correctly
+///   generates the castle. E.g. from a mid-game node White's queenside `e1c1` is
+///   legal and even gives check (the a1 rook lands on d1, checking the black king
+///   down an open d-file), yet FSF omits it — the sole root divergence, every other
+///   move matching. Confirmed mce-correct (the same class the #422 bug-hunt found
+///   for Empire, whose `is_empire_no_queenside_castle_artifact` skip is the
+///   analogue). Clean at the previous gate depth but surfaces as games/plies grow,
+///   so it is held back from the deep sweep and kept at its proven-clean depth
+///   explicitly; the fixed-corpus differential and `tests/perft_synochess.rs` pin
+///   its node counts.
+///
+/// * **Empire** (issue #442) — the same enemy-king-keyed castle drop as Synochess,
+///   on the **kingside**: after a White king step FSF omits Black's legal `e8g8`
+///   (king e8→g8 with f8/g8 empty and unattacked), the sole child divergence, while
+///   mce generates it. The corpus differential's targeted
+///   [`is_empire_no_queenside_castle_artifact`] skip covers only the *queenside*
+///   case; the kingside variant surfaces once the fuzzer runs deeper, so Empire is
+///   held back from the deep sweep and kept at its proven-clean depth explicitly.
+///   Confirmed mce-correct; `tests/perft_empire.rs` pins its node counts.
 ///
 /// Resolved and released back into the default sweep:
 ///
@@ -724,7 +770,12 @@ const SPECS: &[Spec] = &[
 ///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
 ///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
 ///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
-const HELD_BACK: &[WideVariantId] = &[];
+const HELD_BACK: &[WideVariantId] = &[
+    WideVariantId::Janggi,
+    WideVariantId::Sittuyin,
+    WideVariantId::Synochess,
+    WideVariantId::Empire,
+];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
@@ -1238,7 +1289,7 @@ excluded by design).",
             // Held back from the default all-variants sweep (see `HELD_BACK`); still
             // reachable with `--variant` for investigation.
             println!(
-                "  HELD {:<14} (deeper-sweep divergence under follow-up; --variant to run)",
+                "  HELD {:<14} (held back from the default sweep, see HELD_BACK; --variant to run)",
                 spec.id.as_str()
             );
             variants_skipped += 1;
