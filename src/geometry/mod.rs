@@ -79,20 +79,20 @@ pub use variants::{
     AseanRules, Bughouse, BughouseRules, Cambodian, CambodianRules, CannonShogi, CannonShogiRules,
     Capablanca, CapablancaRules, Capahouse, CapahouseRules, Caparandom, CaparandomRules, Centaur,
     CentaurRules, Chak, ChakRules, Chancellor, ChancellorRules, CheckShogi, CheckShogiRules,
-    Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules, Courier, CourierRules, Dobutsu,
-    DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules, Empire, EmpireRules,
-    EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
-    GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
-    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Judkins, JudkinsRules, Karouk,
-    KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules,
-    Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules,
-    Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Opulent,
-    OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
-    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
-    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
-    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
-    Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules,
-    Xiangqi, XiangqiRules,
+    Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules, Courier, CourierRules, Dai,
+    DaiRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules,
+    Empire, EmpireRules, EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules, Gorogoro,
+    GorogoroRules, Gothic, GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
+    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules,
+    Judkins, JudkinsRules, Karouk, KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules,
+    Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules,
+    Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi,
+    MinixiangqiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
+    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
+    Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
+    Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    Synochess, SynochessRules, Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules,
+    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -575,6 +575,26 @@ geometry!(
 );
 
 geometry!(
+    /// The Dai Shogi board: fifteen files by fifteen ranks (225 squares), backed
+    /// by [`U256`].
+    ///
+    /// The largest board yet: `15 * 15 = 225`, comfortably inside the 256-bit
+    /// two-limb [`U256`] backing (a square index reaches `224`, in the high limb),
+    /// exercising the limb-boundary shifts and high-square masking on an odd width.
+    /// Edge-masked east/west shifts must not wrap past the fifteenth file. Files run
+    /// a..o, ranks 1..15.
+    ///
+    /// It hosts Dai Shogi — Chu Shogi widened to 15x15: no drops, a deep five-rank
+    /// promotion zone, ~29 piece types including the ranging sliders, the
+    /// double-moving **Lion**, and a handful of extra short-range generals (Iron,
+    /// Stone, Violent Ox, Flying Dragon, Evil Wolf).
+    Dai15x15,
+    u256,
+    15,
+    15
+);
+
+geometry!(
     /// The Wa Shogi board: eleven files by eleven ranks (121 squares), backed by
     /// `u128`.
     ///
@@ -593,7 +613,8 @@ geometry!(
 #[cfg(test)]
 mod tests {
     use super::{
-        Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Courier12x8, Geometry, Square,
+        Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Courier12x8, Dai15x15, Geometry,
+        Square,
     };
     use crate::{Bitboard as CBitboard, Square as CSquare};
     use alloc::vec::Vec;
@@ -914,6 +935,77 @@ mod tests {
         assert_eq!(
             Bitboard::<Chu12x12>::from_square(a11).east(),
             Bitboard::from_square(Square::new(133))
+        );
+    }
+
+    #[test]
+    fn dai15x15_constants() {
+        assert_eq!(Dai15x15::WIDTH, 15);
+        assert_eq!(Dai15x15::HEIGHT, 15);
+        assert_eq!(Dai15x15::SQUARES, 225);
+        // One bit per rank on the first/last file.
+        assert_eq!(Dai15x15::FILE_A_MASK.count_ones(), 15);
+        assert_eq!(Dai15x15::LAST_FILE_MASK.count_ones(), 15);
+        // BOARD_MASK is exactly the 225 low bits, spanning both limbs.
+        assert_eq!(Dai15x15::BOARD_MASK.count_ones(), 225);
+        assert_eq!(Bitboard::<Dai15x15>::FULL.count(), 225);
+        // No off-board high bits survive in FULL.
+        assert_eq!(
+            !Bitboard::<Dai15x15>::FULL & Bitboard::<Dai15x15>::FULL,
+            Bitboard::EMPTY
+        );
+    }
+
+    #[test]
+    fn dai15x15_square_file_rank_high_squares() {
+        // Index 129 lives in the high limb: file 9, rank 8.
+        let s = Square::<Dai15x15>::from_file_rank(9, 8).unwrap();
+        assert_eq!(s.index(), 129);
+        assert_eq!((s.file(), s.rank()), (9, 8));
+        // The very last square, index 224, is file 14, rank 14.
+        let last = Square::<Dai15x15>::new(224);
+        assert_eq!((last.file(), last.rank()), (14, 14));
+        assert!(Square::<Dai15x15>::try_new(225).is_none());
+        assert!(Square::<Dai15x15>::from_file_rank(15, 0).is_none());
+    }
+
+    #[test]
+    fn dai15x15_north_south_cross_the_limb_seam() {
+        // File 0, rank 7 -> index 105 (low limb). North (+15) -> 120 still low;
+        // another north -> 135, which is in the HIGH limb: the shift must carry
+        // across the 128-bit seam.
+        let s = Square::<Dai15x15>::from_file_rank(0, 7).unwrap();
+        assert_eq!(s.index(), 105);
+        let n1 = Bitboard::<Dai15x15>::from_square(s).north();
+        assert_eq!(n1, Bitboard::from_square(Square::new(120)));
+        let n2 = n1.north();
+        assert_eq!(n2.0.hi, 1u128 << (135 - 128)); // landed in the high limb
+        assert_eq!(n2.0.lo, 0);
+        assert_eq!(n2, Bitboard::from_square(Square::new(135)));
+        // South back across the seam returns to the low limb.
+        assert_eq!(n2.south(), n1);
+        // North off the top rank vanishes (no wrap into off-board high bits).
+        let top = Bitboard::<Dai15x15>::from_square(Square::new(224));
+        assert_eq!(top.north(), Bitboard::EMPTY);
+    }
+
+    #[test]
+    fn dai15x15_east_west_do_not_leak_across_files_in_high_limb() {
+        // Last file, top ranks (high-limb squares): east must vanish.
+        assert_eq!(Bitboard::<Dai15x15>::LAST_FILE.east(), Bitboard::EMPTY);
+        assert_eq!(Bitboard::<Dai15x15>::FILE_A.west(), Bitboard::EMPTY);
+        // The high-limb last-file square (file 14, rank 14 = index 224): east empty.
+        let hi = Square::<Dai15x15>::new(224);
+        assert_eq!(
+            Bitboard::<Dai15x15>::from_square(hi).east(),
+            Bitboard::EMPTY
+        );
+        // Interior high-limb move: file 0, rank 14 (index 210) east -> index 211.
+        let a15 = Square::<Dai15x15>::from_file_rank(0, 14).unwrap();
+        assert_eq!(a15.index(), 210);
+        assert_eq!(
+            Bitboard::<Dai15x15>::from_square(a15).east(),
+            Bitboard::from_square(Square::new(211))
         );
     }
 

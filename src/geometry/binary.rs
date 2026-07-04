@@ -89,12 +89,13 @@ const F_BOARD_B: u16 = 1 << 7;
 const F_PASSES: u16 = 1 << 8;
 const F_CLOCKS: u16 = 1 << 9;
 
-/// The widest board the geometry layer supports is the 12x12 Chu Shogi board
-/// (144 squares, U256-backed), so an occupancy bitset never exceeds this many
-/// bytes (`ceil(144 / 8) = 18`); using a fixed buffer keeps the bitset encoder
+/// The widest board the geometry layer supports is the 15x15 Dai Shogi board
+/// (225 squares, U256-backed), so an occupancy bitset never exceeds this many
+/// bytes (`ceil(225 / 8) = 29`); using a fixed buffer keeps the bitset encoder
 /// allocation-free. Each geometry still emits only its own `bitset_len::<G>()`
-/// bytes, so boards up to 128 squares stay byte-identical.
-const MAX_BITSET_BYTES: usize = 18;
+/// bytes, so smaller boards (including the 144-square Chu board) stay
+/// byte-identical.
+const MAX_BITSET_BYTES: usize = 29;
 
 /// The error returned when a [`WireError`]-producing decoder is handed input it
 /// cannot parse. Every decoder returns this rather than panicking.
@@ -763,19 +764,20 @@ mod tests {
             v
         };
 
-        // A role byte with bit 7 set (index 130) is read as index 130 — out of
-        // range *today*, so `BadRole(130)`. A v1 `& 0x7f` mask would have read it as
-        // index 2 (Bishop) and silently mis-decoded, so this proves the full byte
-        // is honoured and index 130 will round-trip once role 130 exists.
+        // A role byte with bit 7 set (index 200) is read as index 200 — out of
+        // range *today* (`WideRole::COUNT` is 132), so `BadRole(200)`. A v1 `& 0x7f`
+        // mask would have read it as index 72 and silently mis-decoded, so this
+        // proves the full byte is honoured and index 200 will round-trip once role
+        // 200 exists.
         assert!(matches!(
-            Pos::decode_body(&body(130)),
-            Err(WireError::BadRole(130))
+            Pos::decode_body(&body(200)),
+            Err(WireError::BadRole(200))
         ));
 
-        // A high-but-valid index (126, the current top slot) still decodes to the
+        // A high-but-valid index (131, the current top slot) still decodes to the
         // right role, and the colour plane — not a role byte bit — decides colour.
-        let hi_role = WideRole::from_index(126).expect("index 126 is a valid role");
-        let pos = Pos::decode_body(&body(126)).expect("valid high-index role decodes");
+        let hi_role = WideRole::from_index(131).expect("index 131 is a valid role");
+        let pos = Pos::decode_body(&body(131)).expect("valid high-index role decodes");
         let piece = pos.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();
         assert_eq!(piece.role, hi_role);
         assert_eq!(piece.color, Color::White);
@@ -783,7 +785,7 @@ mod tests {
         // Flip the colour plane's first bit (the sole occupied square): same role
         // byte, now Black — proving colour rides its own plane, decoupled from the
         // (now full) role byte.
-        let mut black_body = body(126);
+        let mut black_body = body(131);
         black_body[2 + bitset] |= 0x01; // the 1-byte colour plane, right after occupancy
         let pos_b = Pos::decode_body(&black_body).expect("Black high-index role decodes");
         let piece_b = pos_b.board().piece_at(Square::<Chess8x8>::new(0)).unwrap();

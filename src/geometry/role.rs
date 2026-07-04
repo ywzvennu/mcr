@@ -1164,6 +1164,45 @@ pub enum WideRole {
     /// two-step power along each forward-diagonal line only. FEN token
     /// `***E` / `***e`.
     SoaringEagle = 126,
+
+    // --- Dai Shogi (15x15) army (§ Milestone 16, issue #401) ---
+    //
+    // Dai Shogi is Chu Shogi widened to a 15x15 board with ~29 piece types and no
+    // drops. It reuses almost all of Chu's roles wholesale (King, Free King =
+    // [`Queen`](WideRole::Queen), Lion = [`ChuLion`](WideRole::ChuLion), the ranging
+    // sliders, the generals, Kirin, Phoenix, Drunk Elephant / Prince, the ranging
+    // promoted forms, …). Two of its extra pieces reuse existing roles too — the
+    // **Angry Boar** (嗔猪, one orthogonal step) is a [`Wazir`](WideRole::Wazir) and
+    // the **Cat Sword** (猫刄, one diagonal step) is a [`Met`](WideRole::Met) (Ferz),
+    // and its **Knight** (桂馬, forward 2-1 leaper) is the [`ShogiKnight`](WideRole::ShogiKnight).
+    // The genuinely-new movers are the five below; like the Chu army they are
+    // **fourth-tier overflow** roles ([`is_overflow4`](WideRole::is_overflow4)) whose
+    // FEN token is the [`OVERFLOW_PREFIX`] **tripled** (`***`) plus a distinct
+    // recycled base letter (clear of every base Chu already claims in the `***`
+    // tier) whose case carries the colour. All five promote to a Gold general.
+    /// Violent Ox (猛牛, Dai Shogi) — slides one **or two** squares along any of the
+    /// four orthogonal directions (a range-2 rook), blocked by an intervening piece.
+    /// Promotes to a Gold general. A fourth-tier overflow role: its FEN token is
+    /// `***X` / `***x`.
+    ViolentOx = 127,
+    /// Flying Dragon (飛龍, Dai Shogi) — slides one **or two** squares along any of
+    /// the four diagonal directions (a range-2 bishop), blocked by an intervening
+    /// piece. Promotes to a Gold general. A fourth-tier overflow role: its FEN token
+    /// is `***D` / `***d`.
+    FlyingDragon = 128,
+    /// Evil Wolf (悪狼, Dai Shogi) — steps one square straight forward, straight
+    /// sideways, or diagonally forward (five targets: every King step with a
+    /// non-backward component, i.e. `frlK`). Promotes to a Gold general. A
+    /// fourth-tier overflow role: its FEN token is `***F` / `***f`.
+    EvilWolf = 129,
+    /// Iron General (鉄将, Dai Shogi) — steps one square straight forward or
+    /// diagonally forward (three targets, `fK`). Promotes to a Gold general. A
+    /// fourth-tier overflow role: its FEN token is `***U` / `***u`.
+    IronGeneral = 130,
+    /// Stone General (石将, Dai Shogi) — steps one square diagonally forward only
+    /// (two targets, `fF`). Promotes to a Gold general. A fourth-tier overflow role:
+    /// its FEN token is `***Z` / `***z`.
+    StoneGeneral = 131,
 }
 
 impl WideRole {
@@ -1183,14 +1222,14 @@ impl WideRole {
     /// `0xff` mask to `0` (Pawn) and silently corrupt every packed move — so
     /// `COUNT` must never exceed `256`.
     ///
-    /// At `COUNT == 127` there are **129** free slots left, ample room for the
-    /// jumbo shogi armies (issue #401 Dai, #402 Tenjiku), which #448 widened the
+    /// At `COUNT == 132` there are **124** free slots left, ample room for the
+    /// remaining jumbo shogi armies (issue #402 Tenjiku), which #448 widened the
     /// field to unblock. Before #448 the field was 7 bits (a 128-role ceiling,
     /// one slot from full); see issue #441 for the budget audit and the widening
     /// design. Do **not** grow this past `256` without another field widening (a
     /// fresh wire-format version bump touching `super::binary` and
     /// [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 127;
+    pub const COUNT: usize = 132;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1321,6 +1360,11 @@ impl WideRole {
         WideRole::FreeBoar,
         WideRole::HornedFalcon,
         WideRole::SoaringEagle,
+        WideRole::ViolentOx,
+        WideRole::FlyingDragon,
+        WideRole::EvilWolf,
+        WideRole::IronGeneral,
+        WideRole::StoneGeneral,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1655,6 +1699,16 @@ impl WideRole {
             WideRole::FreeBoar => 'b',
             WideRole::HornedFalcon => 'h',
             WideRole::SoaringEagle => 'e',
+            // Dai Shogi army — **fourth-tier** overflow roles (`***`), each a
+            // distinct recycled base letter clear of every base Chu already claims
+            // in the `***` tier: violent ox `x`, flying dragon `d`, evil wolf `f`,
+            // iron general `u`, stone general `z`. The `compare-fairy` harness
+            // rewrites each `***<base>` to HaChu's Dai letter when driving Dai Shogi.
+            WideRole::ViolentOx => 'x',
+            WideRole::FlyingDragon => 'd',
+            WideRole::EvilWolf => 'f',
+            WideRole::IronGeneral => 'u',
+            WideRole::StoneGeneral => 'z',
         }
     }
 
@@ -2040,6 +2094,11 @@ impl WideRole {
                 | WideRole::FreeBoar
                 | WideRole::HornedFalcon
                 | WideRole::SoaringEagle
+                | WideRole::ViolentOx
+                | WideRole::FlyingDragon
+                | WideRole::EvilWolf
+                | WideRole::IronGeneral
+                | WideRole::StoneGeneral
         )
     }
 
@@ -2070,6 +2129,11 @@ impl WideRole {
             'b' => Some(WideRole::FreeBoar),
             'h' => Some(WideRole::HornedFalcon),
             'e' => Some(WideRole::SoaringEagle),
+            'x' => Some(WideRole::ViolentOx),
+            'd' => Some(WideRole::FlyingDragon),
+            'f' => Some(WideRole::EvilWolf),
+            'u' => Some(WideRole::IronGeneral),
+            'z' => Some(WideRole::StoneGeneral),
             _ => None,
         }
     }
@@ -2263,6 +2327,11 @@ impl fmt::Display for WideRole {
             WideRole::FreeBoar => "free-boar",
             WideRole::HornedFalcon => "horned-falcon",
             WideRole::SoaringEagle => "soaring-eagle",
+            WideRole::ViolentOx => "violent-ox",
+            WideRole::FlyingDragon => "flying-dragon",
+            WideRole::EvilWolf => "evil-wolf",
+            WideRole::IronGeneral => "iron-general",
+            WideRole::StoneGeneral => "stone-general",
         })
     }
 }
