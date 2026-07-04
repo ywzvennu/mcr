@@ -2919,6 +2919,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             (1, 1),
         ];
         let board = &self.board;
+        // The jitto pass is a single "do nothing" null move for the side to move:
+        // whichever lion-power piece could step out and back, the resulting position
+        // is identical. Emit it **at most once per side** (mirroring HaChu's single
+        // tracked null move) so a variant with several lion-power pieces — Tenjiku
+        // has both a Lion and a Lion-Hawk — does not produce duplicate passes that
+        // would collide on the `--` pass notation and break SAN round-tripping.
+        let mut pass_emitted = false;
         for role in WideRole::ALL {
             let full = V::role_is_full_lion(role);
             let lines = V::role_lion_lines(role);
@@ -3023,11 +3030,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         }
                     }
                 }
-                if can_pass {
+                if can_pass && !pass_emitted {
                     // The jitto pass: step to an empty adjacent square and back, a
-                    // net-zero move that only passes the turn. One per piece, with
-                    // an inert mid square (no capture).
+                    // net-zero move that only passes the turn. Emitted once per side
+                    // (see `pass_emitted` above), with an inert mid square (no
+                    // capture).
                     out.push(WideMove::lion(from, from, from, false, false));
+                    pass_emitted = true;
                 }
             }
         }

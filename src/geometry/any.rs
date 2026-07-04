@@ -28,7 +28,7 @@ use super::{
     Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins,
     Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi,
-    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tori,
+    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Tori,
     WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
@@ -724,6 +724,7 @@ wide_variants! {
     Spartan, Spartan, Spartan, "spartan";
     Synochess, Synochess, Synochess, "synochess";
     Tencubed, Tencubed, Tencubed, "tencubed";
+    Tenjiku, Tenjiku, Box<Tenjiku>, "tenjiku", "tenjikushogi", "tenjiku-shogi";
     Tori, Tori, Tori, "tori", "torishogi";
     Xiangfu, Xiangfu, Xiangfu, "xiangfu";
     Xiangqi, Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
@@ -769,7 +770,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 67, "all 67 fairy variants are covered");
+        assert_eq!(count, 68, "all 68 fairy variants are covered");
     }
 
     #[test]

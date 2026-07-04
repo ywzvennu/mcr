@@ -46,9 +46,10 @@ use crate::Color;
 const COLORS: usize = 2;
 /// The number of [`WideRole`]s — the piece-key table's role dimension.
 const ROLES: usize = WideRole::COUNT;
-/// The largest square count of any wide geometry: the 225-square, U256-backed
-/// [`Dai15x15`](super::Dai15x15) board, so every square index is `< MAX_SQUARES`.
-const MAX_SQUARES: usize = 225;
+/// The largest square count of any wide geometry: the 256-square, U256-backed
+/// [`Tenjiku16x16`](super::Tenjiku16x16) board, so every square index is
+/// `< MAX_SQUARES`.
+const MAX_SQUARES: usize = 256;
 /// The historical square-table width — the largest square count of every
 /// `u128`-backed board (128 squares). Square-indexed tables draw their first
 /// `BASE_SQUARES` keys in the original stream order and defer the high squares to
@@ -58,9 +59,16 @@ const BASE_SQUARES: usize = 128;
 /// The Chu-tier square width: the 144-square [`Chu12x12`](super::Chu12x12) board.
 /// The first extension pass draws squares `[BASE_SQUARES..CHU_SQUARES)` exactly as
 /// before Dai widened `MAX_SQUARES`, so the 144-square Chu board keeps its high-
-/// square keys **byte-identical**; the newer squares `[CHU_SQUARES..MAX_SQUARES)`
+/// square keys **byte-identical**; the newer squares `[CHU_SQUARES..DAI_SQUARES)`
 /// (reachable only by the 225-square Dai board) are drawn in a second, later tier.
 const CHU_SQUARES: usize = 144;
+/// The Dai-tier square width: the 225-square [`Dai15x15`](super::Dai15x15) board.
+/// The second extension pass draws squares `[CHU_SQUARES..DAI_SQUARES)` exactly as
+/// before Tenjiku widened `MAX_SQUARES`, so the 225-square Dai board keeps its
+/// high-square keys **byte-identical**; the newest squares
+/// `[DAI_SQUARES..MAX_SQUARES)` (reachable only by the 256-square Tenjiku board)
+/// are drawn in a third, later tier.
+const DAI_SQUARES: usize = 225;
 /// The castling table's file dimension: an upper bound on any board width (the
 /// widest wide board is ten files), so every rook start file is `< MAX_FILES`.
 const MAX_FILES: usize = 16;
@@ -228,23 +236,42 @@ impl Keys {
         fill_range!(&mut state, alice, BASE_SQUARES, CHU_SQUARES);
         fill_range!(&mut state, promoted, BASE_SQUARES, CHU_SQUARES);
 
-        // Extension tier 2: the Dai high squares `[CHU_SQUARES, MAX_SQUARES)`,
-        // reachable only by the 225-square Dai board. Drawn last of all, so every
-        // smaller board (including Chu) is untouched by this widening.
+        // Extension tier 2: the Dai high squares `[CHU_SQUARES, DAI_SQUARES)`,
+        // reachable only by the 225-square Dai board. Drawn after tier 1 and before
+        // tier 3, so every board with at most `DAI_SQUARES` squares (including Chu
+        // and Dai) is untouched by the Tenjiku widening below.
         let mut c = 0;
         while c < COLORS {
             let mut r = 0;
             while r < ROLES {
-                fill_range!(&mut state, pieces[c][r], CHU_SQUARES, MAX_SQUARES);
+                fill_range!(&mut state, pieces[c][r], CHU_SQUARES, DAI_SQUARES);
                 r += 1;
             }
             c += 1;
         }
-        fill_range!(&mut state, ep, CHU_SQUARES, MAX_SQUARES);
-        fill_range!(&mut state, gating_eligible, CHU_SQUARES, MAX_SQUARES);
-        fill_range!(&mut state, duck, CHU_SQUARES, MAX_SQUARES);
-        fill_range!(&mut state, alice, CHU_SQUARES, MAX_SQUARES);
-        fill_range!(&mut state, promoted, CHU_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, ep, CHU_SQUARES, DAI_SQUARES);
+        fill_range!(&mut state, gating_eligible, CHU_SQUARES, DAI_SQUARES);
+        fill_range!(&mut state, duck, CHU_SQUARES, DAI_SQUARES);
+        fill_range!(&mut state, alice, CHU_SQUARES, DAI_SQUARES);
+        fill_range!(&mut state, promoted, CHU_SQUARES, DAI_SQUARES);
+
+        // Extension tier 3: the Tenjiku high squares `[DAI_SQUARES, MAX_SQUARES)`,
+        // reachable only by the 256-square Tenjiku board. Drawn last of all, so
+        // every smaller board (including Chu and Dai) keeps byte-identical keys.
+        let mut c = 0;
+        while c < COLORS {
+            let mut r = 0;
+            while r < ROLES {
+                fill_range!(&mut state, pieces[c][r], DAI_SQUARES, MAX_SQUARES);
+                r += 1;
+            }
+            c += 1;
+        }
+        fill_range!(&mut state, ep, DAI_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, gating_eligible, DAI_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, duck, DAI_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, alice, DAI_SQUARES, MAX_SQUARES);
+        fill_range!(&mut state, promoted, DAI_SQUARES, MAX_SQUARES);
 
         Keys {
             pieces,

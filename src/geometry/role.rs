@@ -1203,6 +1203,84 @@ pub enum WideRole {
     /// (two targets, `fF`). Promotes to a Gold general. A fourth-tier overflow role:
     /// its FEN token is `***Z` / `***z`.
     StoneGeneral = 131,
+
+    // --- Tenjiku Shogi (16x16) army (§ Milestone 16, issue #402) ---
+    //
+    // Tenjiku Shogi is the enormous 16x16 large shogi with ~36 piece types and no
+    // drops. It reuses almost all of Chu's roles wholesale (King, Free King =
+    // [`Queen`](WideRole::Queen), Lion = [`ChuLion`](WideRole::ChuLion), the ranging
+    // sliders, the generals, Kirin, Phoenix, Drunk Elephant / Prince, the ranging
+    // promoted forms, Soaring Eagle, Horned Falcon, …) plus the shared
+    // [`IronGeneral`](WideRole::IronGeneral) and [`ShogiKnight`](WideRole::ShogiKnight).
+    // The genuinely-new movers are the fourteen below. The `***` fourth tier is
+    // full (only four base letters free), so these are **fifth-tier overflow**
+    // roles ([`is_overflow5`](WideRole::is_overflow5)) whose FEN token is the
+    // [`OVERFLOW_PREFIX`] **quadrupled** (`****`) plus a recycled base letter whose
+    // case carries the colour. The three hardest powers — the Fire Demon's area
+    // "burn", the Generals' jump-capture, and the Lion-Hawk's compound Lion+range —
+    // are modelled to the honesty bar documented in the `tenjiku` module.
+    /// Fire Demon (火鬼, Tenjiku Shogi) — moves as a Flying Ox (any distance
+    /// vertically or diagonally, not sideways) and additionally "burns" (captures
+    /// without moving onto) every enemy on the up-to-eight squares adjacent to its
+    /// destination. The area-burn is not packable into [`WideMove`](super::WideMove), so only the
+    /// Flying-Ox movement is modelled here (see the `tenjiku` module for the
+    /// documented gap). Does not promote. FEN token `****I` / `****i`.
+    FireDemon = 132,
+    /// Great General (大将, Tenjiku Shogi) — slides any distance in all eight
+    /// directions (a Free-King ride) and, on a capture, jumps over any lower-ranked
+    /// piece in its path (jump-capture). Only the ordinary slide is modelled; the
+    /// jump-capture is documented in the `tenjiku` module. Does not promote. FEN
+    /// token `****G` / `****g`.
+    GreatGeneral = 133,
+    /// Vice General (副将, Tenjiku Shogi) — like the Great General but on the four
+    /// diagonals only (a Bishop ride plus jump-capture). Does not promote. FEN token
+    /// `****V` / `****v`.
+    ViceGeneral = 134,
+    /// Rook General (車将, Tenjiku Shogi) — jump-captures along the four orthogonals
+    /// (a Rook ride plus jump-capture). Promotes to a Great General. FEN token
+    /// `****R` / `****r`.
+    RookGeneral = 135,
+    /// Bishop General (角将, Tenjiku Shogi) — jump-captures along the four diagonals
+    /// (a Bishop ride plus jump-capture). Promotes to a Vice General. FEN token
+    /// `****B` / `****b`.
+    BishopGeneral = 136,
+    /// Lion Hawk (獅鷹, Tenjiku Shogi) — full Lion power (the double King-step, igui
+    /// and pass) in all eight directions, plus unlimited Bishop range along each
+    /// diagonal. Does not promote. FEN token `****H` / `****h`.
+    LionHawk = 137,
+    /// Free Eagle (奔鷲, Tenjiku Shogi) — modelled (as in the HaChu oracle) as a
+    /// Free King: slides any distance in all eight directions. Does not promote. FEN
+    /// token `****E` / `****e`.
+    FreeEagle = 138,
+    /// Heavenly Tetrarch (四天, Tenjiku Shogi) — slides any distance forward,
+    /// backward, and along all four diagonals, and one or two squares sideways.
+    /// The promoted Chariot Soldier. Does not promote further. FEN token
+    /// `****T` / `****t`.
+    HeavenlyTetrarch = 139,
+    /// Chariot Soldier (車兵, Tenjiku Shogi) — slides any distance forward,
+    /// backward, and along all four diagonals, and one or two squares sideways.
+    /// Promotes to a Heavenly Tetrarch. FEN token `****C` / `****c`.
+    ChariotSoldier = 140,
+    /// Water Buffalo (水牛, Tenjiku Shogi) — slides any distance sideways and along
+    /// all four diagonals, and one or two squares straight forward/back. Promotes to
+    /// a Fire Demon. FEN token `****W` / `****w`.
+    WaterBuffalo = 141,
+    /// Vertical Soldier (竪兵, Tenjiku Shogi) — slides any distance straight
+    /// forward, one or two squares sideways, and one square straight back. Promotes
+    /// to a Chariot Soldier. FEN token `****L` / `****l`.
+    VerticalSoldier = 142,
+    /// Side Soldier (横兵, Tenjiku Shogi) — slides any distance sideways, one or two
+    /// squares straight forward, and one square straight back. Promotes to a Water
+    /// Buffalo. FEN token `****S` / `****s`.
+    SideSoldier = 143,
+    /// Multi-General (奔将, Tenjiku Shogi) — slides any distance straight forward and
+    /// along the two backward diagonals. The promoted Dog. Does not promote further.
+    /// FEN token `****M` / `****m`.
+    MultiGeneral = 144,
+    /// Dog (犬, Tenjiku Shogi) — steps one square straight forward or to either
+    /// backward diagonal (three targets). Promotes to a Multi-General. FEN token
+    /// `****D` / `****d`.
+    Dog = 145,
 }
 
 impl WideRole {
@@ -1222,14 +1300,14 @@ impl WideRole {
     /// `0xff` mask to `0` (Pawn) and silently corrupt every packed move — so
     /// `COUNT` must never exceed `256`.
     ///
-    /// At `COUNT == 132` there are **124** free slots left, ample room for the
-    /// remaining jumbo shogi armies (issue #402 Tenjiku), which #448 widened the
-    /// field to unblock. Before #448 the field was 7 bits (a 128-role ceiling,
-    /// one slot from full); see issue #441 for the budget audit and the widening
-    /// design. Do **not** grow this past `256` without another field widening (a
-    /// fresh wire-format version bump touching `super::binary` and
+    /// At `COUNT == 146` there are **110** free slots left, ample headroom past the
+    /// jumbo shogi armies (issue #402 Tenjiku added the fourteen roles `132..=145`),
+    /// which #448 widened the field to unblock. Before #448 the field was 7 bits (a
+    /// 128-role ceiling, one slot from full); see issue #441 for the budget audit
+    /// and the widening design. Do **not** grow this past `256` without another
+    /// field widening (a fresh wire-format version bump touching `super::binary` and
     /// [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 132;
+    pub const COUNT: usize = 146;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1365,6 +1443,20 @@ impl WideRole {
         WideRole::EvilWolf,
         WideRole::IronGeneral,
         WideRole::StoneGeneral,
+        WideRole::FireDemon,
+        WideRole::GreatGeneral,
+        WideRole::ViceGeneral,
+        WideRole::RookGeneral,
+        WideRole::BishopGeneral,
+        WideRole::LionHawk,
+        WideRole::FreeEagle,
+        WideRole::HeavenlyTetrarch,
+        WideRole::ChariotSoldier,
+        WideRole::WaterBuffalo,
+        WideRole::VerticalSoldier,
+        WideRole::SideSoldier,
+        WideRole::MultiGeneral,
+        WideRole::Dog,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1709,6 +1801,25 @@ impl WideRole {
             WideRole::EvilWolf => 'f',
             WideRole::IronGeneral => 'u',
             WideRole::StoneGeneral => 'z',
+            // Tenjiku Shogi army — **fifth-tier** overflow roles (`****`), each a
+            // distinct recycled base letter within the fresh fifth tier (the
+            // fourth `***` tier is full). The `compare-fairy` harness never uses
+            // these letters (it drives HaChu with coordinates, not piece letters),
+            // so they need only be self-consistent for mce's own FEN round-trip.
+            WideRole::FireDemon => 'i',
+            WideRole::GreatGeneral => 'g',
+            WideRole::ViceGeneral => 'v',
+            WideRole::RookGeneral => 'r',
+            WideRole::BishopGeneral => 'b',
+            WideRole::LionHawk => 'h',
+            WideRole::FreeEagle => 'e',
+            WideRole::HeavenlyTetrarch => 't',
+            WideRole::ChariotSoldier => 'c',
+            WideRole::WaterBuffalo => 'w',
+            WideRole::VerticalSoldier => 'l',
+            WideRole::SideSoldier => 's',
+            WideRole::MultiGeneral => 'm',
+            WideRole::Dog => 'd',
         }
     }
 
@@ -2138,6 +2249,64 @@ impl WideRole {
         }
     }
 
+    /// Returns `true` if this is a **fifth-tier overflow** role — a fairy role
+    /// added after the single-letter alphabet and *all four* of the `*` / `**` /
+    /// `=` / `***` overflow banks were exhausted. The Tenjiku Shogi (16x16) army is
+    /// the first such tier. Like the lower tiers it has **no bare letter of its
+    /// own**: its FEN token is the [`OVERFLOW_PREFIX`] **quadrupled** (`****`)
+    /// followed by a recycled base letter (returned by [`char`](WideRole::char))
+    /// whose case carries the colour, and the board FEN parser / writer handle the
+    /// prefix (see [`overflow5_from_base`](WideRole::overflow5_from_base)).
+    #[must_use]
+    #[inline]
+    pub const fn is_overflow5(self) -> bool {
+        matches!(
+            self,
+            WideRole::FireDemon
+                | WideRole::GreatGeneral
+                | WideRole::ViceGeneral
+                | WideRole::RookGeneral
+                | WideRole::BishopGeneral
+                | WideRole::LionHawk
+                | WideRole::FreeEagle
+                | WideRole::HeavenlyTetrarch
+                | WideRole::ChariotSoldier
+                | WideRole::WaterBuffalo
+                | WideRole::VerticalSoldier
+                | WideRole::SideSoldier
+                | WideRole::MultiGeneral
+                | WideRole::Dog
+        )
+    }
+
+    /// Maps a recycled base letter (after a quadrupled [`OVERFLOW_PREFIX`], `****`)
+    /// back to its fifth-tier overflow role, returning `None` if the letter does
+    /// not name one. The inverse of [`char`](WideRole::char) for an
+    /// [`is_overflow5`](WideRole::is_overflow5) role; used by the board FEN parser
+    /// when it sees a `****`-prefixed token. Accepts either case (the case carries
+    /// colour, handled by the caller).
+    #[must_use]
+    #[inline]
+    pub const fn overflow5_from_base(ch: char) -> Option<WideRole> {
+        match ch.to_ascii_lowercase() {
+            'i' => Some(WideRole::FireDemon),
+            'g' => Some(WideRole::GreatGeneral),
+            'v' => Some(WideRole::ViceGeneral),
+            'r' => Some(WideRole::RookGeneral),
+            'b' => Some(WideRole::BishopGeneral),
+            'h' => Some(WideRole::LionHawk),
+            'e' => Some(WideRole::FreeEagle),
+            't' => Some(WideRole::HeavenlyTetrarch),
+            'c' => Some(WideRole::ChariotSoldier),
+            'w' => Some(WideRole::WaterBuffalo),
+            'l' => Some(WideRole::VerticalSoldier),
+            's' => Some(WideRole::SideSoldier),
+            'm' => Some(WideRole::MultiGeneral),
+            'd' => Some(WideRole::Dog),
+            _ => None,
+        }
+    }
+
     /// Returns the uppercase FEN/SAN character for this role.
     #[must_use]
     #[inline]
@@ -2332,6 +2501,20 @@ impl fmt::Display for WideRole {
             WideRole::EvilWolf => "evil-wolf",
             WideRole::IronGeneral => "iron-general",
             WideRole::StoneGeneral => "stone-general",
+            WideRole::FireDemon => "fire-demon",
+            WideRole::GreatGeneral => "great-general",
+            WideRole::ViceGeneral => "vice-general",
+            WideRole::RookGeneral => "rook-general",
+            WideRole::BishopGeneral => "bishop-general",
+            WideRole::LionHawk => "lion-hawk",
+            WideRole::FreeEagle => "free-eagle",
+            WideRole::HeavenlyTetrarch => "heavenly-tetrarch",
+            WideRole::ChariotSoldier => "chariot-soldier",
+            WideRole::WaterBuffalo => "water-buffalo",
+            WideRole::VerticalSoldier => "vertical-soldier",
+            WideRole::SideSoldier => "side-soldier",
+            WideRole::MultiGeneral => "multi-general",
+            WideRole::Dog => "dog",
         })
     }
 }
@@ -2388,6 +2571,7 @@ mod tests {
                 || role.is_overflow2()
                 || role.is_overflow3()
                 || role.is_overflow4()
+                || role.is_overflow5()
             {
                 continue;
             }
@@ -2446,6 +2630,7 @@ mod tests {
                     && !r.is_overflow2()
                     && !r.is_overflow3()
                     && !r.is_overflow4()
+                    && !r.is_overflow5()
             })
             .map(WideRole::char)
             .filter(|&c| c != '?')
@@ -2602,5 +2787,46 @@ mod tests {
         assert_eq!(WideRole::overflow4_from_base('k'), Some(WideRole::Kirin));
         assert_eq!(WideRole::overflow4_from_base('n'), Some(WideRole::ChuLion));
         assert_eq!(WideRole::overflow4_from_base('?'), None);
+    }
+
+    #[test]
+    fn overflow5_roles_round_trip_through_the_quadrupled_prefix() {
+        // A fifth-tier overflow role (the Tenjiku Shogi army) has no bare letter:
+        // its `char()` is a recycled base letter, and `overflow5_from_base` maps
+        // that base letter back to the role (what the board FEN parser does after a
+        // `****` prefix). None of them is a lower-tier overflow or a promoted role,
+        // and every base letter within the fresh fifth tier is distinct.
+        let mut bases = alloc::vec::Vec::new();
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow5()) {
+            assert!(!role.is_overflow());
+            assert!(!role.is_overflow2());
+            assert!(!role.is_overflow3());
+            assert!(!role.is_overflow4());
+            assert!(!role.is_promoted());
+            let base = role.char();
+            assert_ne!(base, '?', "overflow-5 base letter is real");
+            assert_eq!(WideRole::overflow5_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow5_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+            bases.push(base);
+        }
+        let count = bases.len();
+        bases.sort_unstable();
+        bases.dedup();
+        assert_eq!(bases.len(), count, "fifth-tier base letters are distinct");
+        // The Fire Demon recycles `i`, the Great General `g`, the Lion Hawk `h`.
+        assert_eq!(WideRole::FireDemon.char(), 'i');
+        assert_eq!(
+            WideRole::overflow5_from_base('i'),
+            Some(WideRole::FireDemon)
+        );
+        assert_eq!(
+            WideRole::overflow5_from_base('g'),
+            Some(WideRole::GreatGeneral)
+        );
+        assert_eq!(WideRole::overflow5_from_base('h'), Some(WideRole::LionHawk));
+        assert_eq!(WideRole::overflow5_from_base('?'), None);
     }
 }

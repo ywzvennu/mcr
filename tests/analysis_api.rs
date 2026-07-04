@@ -81,7 +81,7 @@ fn assert_primitives<G: Geometry, V: WideVariant<G>>(
         // Forward union (attack_map) == reverse query (attackers_of) == is_attacked,
         // square for square. This is the public mirror of the attackers_to guard.
         for index in 0..G::SQUARES {
-            let sq = Square::<G>::new(index);
+            let sq = Square::<G>::new(index as u8);
             let by_map = map.contains(sq);
             let by_attackers = !pos.attackers_of(sq, c).is_empty();
             let by_flag = pos.is_attacked(sq, c);
@@ -111,7 +111,7 @@ fn assert_primitives<G: Geometry, V: WideVariant<G>>(
     // Per-piece decomposition: every occupied square has a piece_attacks set whose
     // count is piece_mobility and which is a subset of its owner's attack_map.
     for index in 0..G::SQUARES {
-        let sq = Square::<G>::new(index);
+        let sq = Square::<G>::new(index as u8);
         match board.color_at(sq) {
             None => assert!(
                 pos.piece_attacks(sq).is_none() && pos.piece_mobility(sq) == 0,
@@ -233,7 +233,7 @@ fn assert_queries<G: Geometry, V: WideVariant<G>>(
             "a royal is reported pinned in {variant}, color {c:?}, FEN: {fen}",
         );
         for index in 0..G::SQUARES {
-            let sq = Square::<G>::new(index);
+            let sq = Square::<G>::new(index as u8);
             let ray = pos.pin_ray_of(c, sq);
             if pinned.contains(sq) {
                 let ray = ray.expect("a pinned piece has a pin ray");
@@ -267,7 +267,7 @@ fn assert_queries<G: Geometry, V: WideVariant<G>>(
     // to move has exactly one royal.
     let confines = pos.royal_squares(us).count() == 1;
     for index in 0..G::SQUARES {
-        let sq = Square::<G>::new(index);
+        let sq = Square::<G>::new(index as u8);
         let from_here = pos.legal_moves_from(sq);
         for mv in &from_here {
             assert_eq!(

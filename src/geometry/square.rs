@@ -83,7 +83,7 @@ impl<G: Geometry> Square<G> {
     #[must_use]
     #[inline]
     pub const fn new(index: u8) -> Square<G> {
-        assert!(index < G::SQUARES, "square index out of range");
+        assert!((index as u16) < G::SQUARES, "square index out of range");
         Square(index, PhantomData)
     }
 
@@ -92,7 +92,7 @@ impl<G: Geometry> Square<G> {
     #[must_use]
     #[inline]
     pub const fn try_new(index: u8) -> Option<Square<G>> {
-        if index < G::SQUARES {
+        if (index as u16) < G::SQUARES {
             Some(Square(index, PhantomData))
         } else {
             None
