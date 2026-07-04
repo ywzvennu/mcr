@@ -769,7 +769,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 66, "all 66 fairy variants are covered");
+        assert_eq!(count, 67, "all 67 fairy variants are covered");
     }
 
     #[test]
