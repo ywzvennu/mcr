@@ -89,13 +89,13 @@ const F_BOARD_B: u16 = 1 << 7;
 const F_PASSES: u16 = 1 << 8;
 const F_CLOCKS: u16 = 1 << 9;
 
-/// The widest board the geometry layer supports is the 15x15 Dai Shogi board
-/// (225 squares, U256-backed), so an occupancy bitset never exceeds this many
-/// bytes (`ceil(225 / 8) = 29`); using a fixed buffer keeps the bitset encoder
+/// The widest board the geometry layer supports is the 16x16 Tenjiku Shogi board
+/// (256 squares, U256-backed), so an occupancy bitset never exceeds this many
+/// bytes (`ceil(256 / 8) = 32`); using a fixed buffer keeps the bitset encoder
 /// allocation-free. Each geometry still emits only its own `bitset_len::<G>()`
-/// bytes, so smaller boards (including the 144-square Chu board) stay
-/// byte-identical.
-const MAX_BITSET_BYTES: usize = 29;
+/// bytes, so smaller boards (including the 225-square Dai and 144-square Chu
+/// boards) stay byte-identical.
+const MAX_BITSET_BYTES: usize = 32;
 
 /// The error returned when a [`WireError`]-producing decoder is handed input it
 /// cannot parse. Every decoder returns this rather than panicking.

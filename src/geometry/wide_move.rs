@@ -811,6 +811,8 @@ impl WideMove {
     fn push_role_prefix(out: &mut String, role: WideRole) {
         if role.is_promoted() {
             out.push('+');
+        } else if role.is_overflow5() {
+            out.push_str("****");
         } else if role.is_overflow4() {
             out.push_str("***");
         } else if role.is_overflow2() {

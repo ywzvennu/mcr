@@ -428,12 +428,31 @@ impl<G: Geometry> Board<G> {
                                 bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
                                     crate::geometry::role::OVERFLOW_PREFIX,
                                 ))?;
-                            let role = WideRole::overflow4_from_base(base as char).ok_or(
-                                ParseBoardError::InvalidChar(
-                                    crate::geometry::role::OVERFLOW_PREFIX,
-                                ),
-                            )?;
-                            (role, base)
+                            // A **quadrupled** prefix (`****`) marks a fifth-tier
+                            // overflow role (the Tenjiku Shogi army, added after all
+                            // four lower banks were exhausted): the letter after the
+                            // fourth `*` is the recycled base, resolved via
+                            // `WideRole::overflow5_from_base`.
+                            if base as char == crate::geometry::role::OVERFLOW_PREFIX {
+                                i += 1;
+                                let base =
+                                    bytes.get(i).copied().ok_or(ParseBoardError::InvalidChar(
+                                        crate::geometry::role::OVERFLOW_PREFIX,
+                                    ))?;
+                                let role = WideRole::overflow5_from_base(base as char).ok_or(
+                                    ParseBoardError::InvalidChar(
+                                        crate::geometry::role::OVERFLOW_PREFIX,
+                                    ),
+                                )?;
+                                (role, base)
+                            } else {
+                                let role = WideRole::overflow4_from_base(base as char).ok_or(
+                                    ParseBoardError::InvalidChar(
+                                        crate::geometry::role::OVERFLOW_PREFIX,
+                                    ),
+                                )?;
+                                (role, base)
+                            }
                         } else {
                             let role = WideRole::overflow2_from_base(base as char).ok_or(
                                 ParseBoardError::InvalidChar(
@@ -549,6 +568,14 @@ impl<G: Geometry> Board<G> {
                         // for a promoted role, so only the prefix is added.
                         if piece.role.is_promoted() {
                             fen.push('+');
+                        } else if piece.role.is_overflow5() {
+                            // A fifth-tier overflow role (the Tenjiku Shogi army)
+                            // renders as the **quadrupled** `****` prefix plus its
+                            // recycled base letter.
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
+                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
                         } else if piece.role.is_overflow4() {
                             // A fourth-tier overflow role (the Chu Shogi army)
                             // renders as the **tripled** `***` prefix plus its

@@ -91,8 +91,8 @@ pub use variants::{
     Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
     Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
     Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
-    Synochess, SynochessRules, Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules,
-    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Tori, ToriRules,
+    Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -121,7 +121,12 @@ pub trait Geometry: Copy + 'static {
     const HEIGHT: u8;
 
     /// The number of squares, `WIDTH * HEIGHT`. Must be `<= Bits::BITS`.
-    const SQUARES: u8;
+    ///
+    /// This is a **`u16`**, not a `u8`: the 16x16 Tenjiku board has `256` squares,
+    /// which is exactly one past `u8::MAX`. Square *indices* stay `u8` (they reach
+    /// `255`, the last on-board square), but the square *count* needs the wider
+    /// type at the boundary.
+    const SQUARES: u16;
 
     /// A mask of the first file (file `0`): one bit set in every rank, at the
     /// low file. The concrete 8x8 analogue is `Bitboard::FILE_A`.
@@ -217,7 +222,9 @@ pub const fn last_file_mask_u256(width: u8, height: u8) -> U256 {
     let mut hi: u128 = 0;
     let mut rank = 0u8;
     while rank < height {
-        let n = (rank * width + width - 1) as u32;
+        // Compute in u32: at the 16x16 boundary `rank*width + width` reaches 256,
+        // which would overflow the u8 intermediate before the `- 1`.
+        let n = rank as u32 * width as u32 + width as u32 - 1;
         if n < 128 {
             lo |= 1u128 << n;
         } else {
@@ -230,9 +237,11 @@ pub const fn last_file_mask_u256(width: u8, height: u8) -> U256 {
 
 /// Builds the board mask (the `squares` low bits) over a [`U256`] backing.
 ///
-/// `squares` must be `<= 256`; passing `256` yields all ones.
+/// `squares` must be `<= 256`; passing `256` yields all ones. Takes a `u16`
+/// (not a `u8`) so the 256-square 16x16 Tenjiku board — whose count is exactly one
+/// past `u8::MAX` — can request its all-ones mask without overflow.
 #[must_use]
-pub const fn board_mask_u256(squares: u8) -> U256 {
+pub const fn board_mask_u256(squares: u16) -> U256 {
     let s = squares as u32;
     if s >= 256 {
         U256::from_parts(!0u128, !0u128)
@@ -276,7 +285,7 @@ macro_rules! geometry {
             type Bits = u64;
             const WIDTH: u8 = $width;
             const HEIGHT: u8 = $height;
-            const SQUARES: u8 = $width * $height;
+            const SQUARES: u16 = $width as u16 * $height as u16;
             const FILE_A_MASK: u64 = $crate::geometry::file_a_mask_u64($width, $height);
             const LAST_FILE_MASK: u64 =
                 $crate::geometry::file_a_mask_u64($width, $height) << ($width - 1);
@@ -292,7 +301,7 @@ macro_rules! geometry {
             type Bits = u128;
             const WIDTH: u8 = $width;
             const HEIGHT: u8 = $height;
-            const SQUARES: u8 = $width * $height;
+            const SQUARES: u16 = $width as u16 * $height as u16;
             const FILE_A_MASK: u128 = $crate::geometry::file_a_mask_u128($width, $height);
             const LAST_FILE_MASK: u128 =
                 $crate::geometry::file_a_mask_u128($width, $height) << ($width - 1);
@@ -308,13 +317,13 @@ macro_rules! geometry {
             type Bits = $crate::geometry::U256;
             const WIDTH: u8 = $width;
             const HEIGHT: u8 = $height;
-            const SQUARES: u8 = $width * $height;
+            const SQUARES: u16 = $width as u16 * $height as u16;
             const FILE_A_MASK: $crate::geometry::U256 =
                 $crate::geometry::file_a_mask_u256($width, $height);
             const LAST_FILE_MASK: $crate::geometry::U256 =
                 $crate::geometry::last_file_mask_u256($width, $height);
             const BOARD_MASK: $crate::geometry::U256 =
-                $crate::geometry::board_mask_u256($width * $height);
+                $crate::geometry::board_mask_u256($width as u16 * $height as u16);
         }
     };
 }
@@ -595,6 +604,30 @@ geometry!(
 );
 
 geometry!(
+    /// The Tenjiku Shogi board: sixteen files by sixteen ranks (256 squares),
+    /// backed by [`U256`].
+    ///
+    /// The largest board in the project and a **boundary geometry**: `16 * 16 =
+    /// 256` squares fill the two-limb [`U256`] backing **exactly**, so a square
+    /// index reaches `255` — the very top bit of the high limb — and
+    /// [`BOARD_MASK`](Geometry::BOARD_MASK) is all-ones across both limbs
+    /// (`count_ones() == 256`). This is the one geometry whose square count equals
+    /// its backing width, so the edge-masked east/west shifts and the full-board
+    /// mask are exercised right at the 256-bit ceiling (Chu at 144 and Dai at 225
+    /// never reach it). Edge-masked east/west shifts must not wrap past the
+    /// sixteenth file. Files run a..p, ranks 1..16.
+    ///
+    /// It hosts Tenjiku Shogi — the enormous 16x16 large shogi: no drops, a deep
+    /// promotion zone, ~36 piece types including the ranging sliders, the
+    /// double-moving **Lion**, the jump-capturing **Generals**, and the
+    /// area-burning **Fire Demon**.
+    Tenjiku16x16,
+    u256,
+    16,
+    16
+);
+
+geometry!(
     /// The Wa Shogi board: eleven files by eleven ranks (121 squares), backed by
     /// `u128`.
     ///
@@ -614,7 +647,7 @@ geometry!(
 mod tests {
     use super::{
         Bitboard, BitboardBacking, Cap10x8, Chess8x8, Chu12x12, Courier12x8, Dai15x15, Geometry,
-        Square,
+        Square, Tenjiku16x16,
     };
     use crate::{Bitboard as CBitboard, Square as CSquare};
     use alloc::vec::Vec;
@@ -1006,6 +1039,88 @@ mod tests {
         assert_eq!(
             Bitboard::<Dai15x15>::from_square(a15).east(),
             Bitboard::from_square(Square::new(211))
+        );
+    }
+
+    // ----- u256 boundary geometry: 256 squares fill both limbs exactly ---------
+
+    #[test]
+    fn tenjiku16x16_constants_fill_the_backing_exactly() {
+        assert_eq!(Tenjiku16x16::WIDTH, 16);
+        assert_eq!(Tenjiku16x16::HEIGHT, 16);
+        assert_eq!(Tenjiku16x16::SQUARES, 256);
+        // One bit per rank on the first/last file.
+        assert_eq!(Tenjiku16x16::FILE_A_MASK.count_ones(), 16);
+        assert_eq!(Tenjiku16x16::LAST_FILE_MASK.count_ones(), 16);
+        // BOARD_MASK is *all 256 bits* — the whole U256, both limbs all-ones. This
+        // is the boundary case Chu (144) and Dai (225) never reach.
+        assert_eq!(Tenjiku16x16::BOARD_MASK.count_ones(), 256);
+        assert_eq!(Tenjiku16x16::BOARD_MASK.lo, u128::MAX);
+        assert_eq!(Tenjiku16x16::BOARD_MASK.hi, u128::MAX);
+        assert_eq!(Bitboard::<Tenjiku16x16>::FULL.count(), 256);
+        // The complement of FULL is EMPTY — there are no off-board high bits to
+        // survive, since every bit is on-board at 256 squares.
+        assert_eq!(!Bitboard::<Tenjiku16x16>::FULL, Bitboard::EMPTY);
+        assert_eq!(!Bitboard::<Tenjiku16x16>::EMPTY, Bitboard::<Tenjiku16x16>::FULL);
+    }
+
+    #[test]
+    fn tenjiku16x16_top_square_index_255() {
+        // The very last square, index 255, is the top bit of the high limb: file
+        // 15, rank 15.
+        let last = Square::<Tenjiku16x16>::new(255);
+        assert_eq!((last.file(), last.rank()), (15, 15));
+        assert!(Square::<Tenjiku16x16>::try_new(255).is_some());
+        assert!(Square::<Tenjiku16x16>::from_file_rank(16, 0).is_none());
+        // Its bitboard is exactly the top bit of the high limb.
+        let bb = Bitboard::<Tenjiku16x16>::from_square(last);
+        assert_eq!(bb.0.hi, 1u128 << 127);
+        assert_eq!(bb.0.lo, 0);
+        // North / east off the top-right corner vanish (no wrap at the 256-bit
+        // boundary — the shift-left by WIDTH or +1 must not alias low bits).
+        assert_eq!(bb.north(), Bitboard::EMPTY);
+        assert_eq!(bb.east(), Bitboard::EMPTY);
+        // West and south from the corner stay on board.
+        assert_eq!(
+            bb.west(),
+            Bitboard::from_square(Square::<Tenjiku16x16>::new(254))
+        );
+        assert_eq!(
+            bb.south(),
+            Bitboard::from_square(Square::<Tenjiku16x16>::new(255 - 16))
+        );
+    }
+
+    #[test]
+    fn tenjiku16x16_north_south_cross_the_limb_seam() {
+        // File 0, rank 7 -> index 112 (low limb). North (+16) -> 128, the FIRST
+        // bit of the high limb: the shift must carry across the 128-bit seam.
+        let s = Square::<Tenjiku16x16>::from_file_rank(0, 7).unwrap();
+        assert_eq!(s.index(), 112);
+        let n1 = Bitboard::<Tenjiku16x16>::from_square(s).north();
+        assert_eq!(n1.0.hi, 1u128); // landed at bit 128 (high-limb bit 0)
+        assert_eq!(n1.0.lo, 0);
+        assert_eq!(n1, Bitboard::from_square(Square::new(128)));
+        // South back across the seam returns to the low limb.
+        assert_eq!(n1.south(), Bitboard::from_square(s));
+    }
+
+    #[test]
+    fn tenjiku16x16_east_west_do_not_leak_at_the_boundary() {
+        // Whole last file east / first file west vanish, even at the very top.
+        assert_eq!(Bitboard::<Tenjiku16x16>::LAST_FILE.east(), Bitboard::EMPTY);
+        assert_eq!(Bitboard::<Tenjiku16x16>::FILE_A.west(), Bitboard::EMPTY);
+        // FULL shifted one bit left then masked keeps no off-board bits: at 256
+        // squares there are none, so FULL << 1 masked back is still on-board.
+        let shifted = Bitboard::<Tenjiku16x16>::FULL.east();
+        assert_eq!(shifted & !Bitboard::<Tenjiku16x16>::FULL, Bitboard::EMPTY);
+        // East from the last-but-one file square (index 254, file 14) reaches the
+        // top square (index 255), not off-board.
+        let f14 = Square::<Tenjiku16x16>::new(254);
+        assert_eq!((f14.file(), f14.rank()), (14, 15));
+        assert_eq!(
+            Bitboard::<Tenjiku16x16>::from_square(f14).east(),
+            Bitboard::from_square(Square::<Tenjiku16x16>::new(255))
         );
     }
 
