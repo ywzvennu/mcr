@@ -148,7 +148,7 @@ fn mce_uci(m: &mce::geometry::WideMove) -> String {
 
 /// mce's legal moves for `pos` as sorted, deduped coordinate strings.
 fn mce_moves(pos: &mce::geometry::Dai) -> Vec<String> {
-    let mut v: Vec<String> = pos.legal_moves().iter().map(|m| mce_uci(&m)).collect();
+    let mut v: Vec<String> = pos.legal_moves().iter().map(mce_uci).collect();
     v.sort();
     v.dedup();
     v
@@ -159,8 +159,8 @@ fn mce_moves(pos: &mce::geometry::Dai) -> Vec<String> {
 fn mce_play(pos: &mce::geometry::Dai, uci: &str) -> Option<mce::geometry::Dai> {
     pos.legal_moves()
         .iter()
-        .find(|m| mce_uci(&m) == uci)
-        .map(|m| pos.play(&m))
+        .find(|m| mce_uci(m) == uci)
+        .map(|m| pos.play(m))
 }
 
 /// HaChu's legal-move list at the Dai position reached by replaying `seq` from the
@@ -206,8 +206,14 @@ fn compare_dai(bin: &str) -> usize {
         return 0;
     };
     let mut mismatches = 0usize;
-    let only_mce: Vec<&String> = mce_start.iter().filter(|m| !hachu_start.contains(m)).collect();
-    let only_hachu: Vec<&String> = hachu_start.iter().filter(|m| !mce_start.contains(m)).collect();
+    let only_mce: Vec<&String> = mce_start
+        .iter()
+        .filter(|m| !hachu_start.contains(m))
+        .collect();
+    let only_hachu: Vec<&String> = hachu_start
+        .iter()
+        .filter(|m| !mce_start.contains(m))
+        .collect();
     if only_mce.is_empty() && only_hachu.is_empty() {
         println!(
             "    perft(1): {} moves, node-for-node identical to HaChu.",

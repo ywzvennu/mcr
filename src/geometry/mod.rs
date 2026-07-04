@@ -80,20 +80,19 @@ pub use variants::{
     Capablanca, CapablancaRules, Capahouse, CapahouseRules, Caparandom, CaparandomRules, Centaur,
     CentaurRules, Chak, ChakRules, Chancellor, ChancellorRules, CheckShogi, CheckShogiRules,
     Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules, Courier, CourierRules, Dai,
-    DaiRules, Dobutsu,
-    DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules, Empire, EmpireRules,
-    EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic,
-    GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules,
-    Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules, Judkins, JudkinsRules, Karouk,
-    KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules,
-    Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules,
-    Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Opulent,
-    OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
-    Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules,
-    Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
-    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
-    Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules,
-    Xiangqi, XiangqiRules,
+    DaiRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules, Embassy, EmbassyRules,
+    Empire, EmpireRules, EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules, Gorogoro,
+    GorogoroRules, Gothic, GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
+    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules,
+    Judkins, JudkinsRules, Karouk, KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules,
+    Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules,
+    Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi,
+    MinixiangqiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
+    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
+    Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
+    Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
+    Synochess, SynochessRules, Tencubed, TencubedRules, Tori, ToriRules, Washogi, WashogiRules,
+    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -997,7 +996,10 @@ mod tests {
         assert_eq!(Bitboard::<Dai15x15>::FILE_A.west(), Bitboard::EMPTY);
         // The high-limb last-file square (file 14, rank 14 = index 224): east empty.
         let hi = Square::<Dai15x15>::new(224);
-        assert_eq!(Bitboard::<Dai15x15>::from_square(hi).east(), Bitboard::EMPTY);
+        assert_eq!(
+            Bitboard::<Dai15x15>::from_square(hi).east(),
+            Bitboard::EMPTY
+        );
         // Interior high-limb move: file 0, rank 14 (index 210) east -> index 211.
         let a15 = Square::<Dai15x15>::from_file_rank(0, 14).unwrap();
         assert_eq!(a15.index(), 210);

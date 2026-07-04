@@ -319,6 +319,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Twelve-file board, no castling, non-standard array with advanced pawns and a Ferz; single-step pawns promote only to Ferz; bare-king loss and stalemate-is-loss. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant courier`).",
         },
+        WideVariantId::Dai => Meta {
+            display: "Dai Shogi (15x15)",
+            pieces: "Chu Shogi widened to 15x15: the whole Chu army (King, Free King, Lion, Dragon King/Horse, Kirin, Phoenix, the ranging movers, the generals, Drunk Elephant/Prince, Lance, Reverse Chariot, Go-Between, Pawn and their promoted forms) plus five short-range movers — Violent Ox (range-2 rook), Flying Dragon (range-2 bishop), Evil Wolf, Iron General, Stone General — and the reused Angry Boar (Wazir), Cat Sword (Ferz) and forward Knight.",
+            rules: "No hand or drops; mandatory promotion on entering the far **five** ranks (HaChu's promote-on-entry). Unlike Chu, the Kirin, Phoenix and Gold do not promote; every weak piece promotes to Gold, the rest as in Chu. Two royals (King and the promoted Prince). The Lion and the lion-power promoted pieces keep their full move set (igui, double capture, area move, jitto pass).",
+            oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=71 (node-for-node identical move set, pinning the Kirin/Phoenix chirality) and perft(2)=5041 match node-for-node; perft(3)=357836 validated at the subtree/leaf level with zero real mismatches (a full depth-3 node-by-node walk is intractable; a few nodes are unreachable due to HaChu 0.23 segfaults).",
+        },
         WideVariantId::Dobutsu => Meta {
             display: "Dobutsu (Animal Shogi, 3x4)",
             pieces: "Lion (non-royal king-stepper), Giraffe (wazir), Elephant (ferz), and a Chick (pawn) that promotes to a Hen (gold mover).",

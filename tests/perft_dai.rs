@@ -117,7 +117,16 @@ fn violent_ox_range_two_and_blocked() {
     let got = targets(&lone("***X"), 7, 7);
     assert_eq!(
         got,
-        idx(&[(7, 8), (7, 9), (7, 6), (7, 5), (8, 7), (9, 7), (6, 7), (5, 7)])
+        idx(&[
+            (7, 8),
+            (7, 9),
+            (7, 6),
+            (7, 5),
+            (8, 7),
+            (9, 7),
+            (6, 7),
+            (5, 7)
+        ])
     );
     // Own blocker one square north (h9): the north ray cannot enter it and cannot
     // jump past it, so neither h9 nor h10 is reachable.
@@ -136,7 +145,16 @@ fn flying_dragon_range_two() {
     let got = targets(&lone("***D"), 7, 7);
     assert_eq!(
         got,
-        idx(&[(8, 8), (9, 9), (6, 8), (5, 9), (8, 6), (9, 5), (6, 6), (5, 5)])
+        idx(&[
+            (8, 8),
+            (9, 9),
+            (6, 8),
+            (5, 9),
+            (8, 6),
+            (9, 5),
+            (6, 6),
+            (5, 5)
+        ])
     );
 }
 
@@ -172,7 +190,11 @@ fn angry_boar_and_cat_sword() {
     );
     // Cat Sword = `M` (Met / Ferz): four diagonal steps.
     assert_eq!(
-        targets("14k/15/15/15/15/15/15/7M7/15/15/15/15/15/15/K14 w - - 0 1", 7, 7),
+        targets(
+            "14k/15/15/15/15/15/15/7M7/15/15/15/15/15/15/K14 w - - 0 1",
+            7,
+            7
+        ),
         idx(&[(8, 8), (6, 8), (8, 6), (6, 6)])
     );
 }
@@ -200,17 +222,15 @@ fn attackers_and_pins_consistency() {
     // White King on h2 (file7 rank1): the Ox attacks two squares down the h-file,
     // reaching the pawn; the pawn is the sole piece between Ox and King two squares
     // further, so it is pinned. All pieces on the h-file within range 2.
-    let pos = Dai::from_fen(
-        "14k/15/15/15/15/15/15/15/15/7***x7/15/7P7/15/7K7/15 w - - 0 1",
-    )
-    .expect("valid Dai FEN");
+    let pos = Dai::from_fen("14k/15/15/15/15/15/15/15/15/7***x7/15/7P7/15/7K7/15 w - - 0 1")
+        .expect("valid Dai FEN");
     let king = Square::<Dai15x15>::from_file_rank(7, 1).unwrap();
     // The King is not in check (the pawn blocks the Ox at range one).
     assert!(!pos.is_attacked(king, mce::Color::Black));
     // Every legal move is self-consistent: replaying it never leaves our King
     // attacked (a base sanity net on the new-piece attacker projection).
     for m in pos.legal_moves().iter() {
-        let after = pos.play(&m);
+        let after = pos.play(m);
         let k = {
             let mut it = None;
             for f in 0..15 {

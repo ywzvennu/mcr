@@ -81,15 +81,15 @@ const DAI_PLACEMENT: &str = concat!(
     "1***x1*j1***f***p***n***k***f1*j1***x1/",
     // rank 12 (Black): Rook / Flying Dragon / Side & Vertical Mover / Bishop / Dragons / Free King
     "r***d***i***vb+b+rq+r+bb***v***i***dr/",
-    "ppppppppppppppp/",        // rank 11 (Black pawns)
-    "4***g5***g4/",            // rank 10 (Black go-betweens: files e, k)
-    "15/15/15/",               // ranks 9, 8, 7 (empty)
-    "4***G5***G4/",            // rank 6  (White go-betweens: files e, k)
-    "PPPPPPPPPPPPPPP/",        // rank 5  (White pawns)
-    "R***D***I***VB+B+RQ+R+BB***V***I***DR/", // rank 4 (White ranging pieces)
+    "ppppppppppppppp/",                        // rank 11 (Black pawns)
+    "4***g5***g4/",                            // rank 10 (Black go-betweens: files e, k)
+    "15/15/15/",                               // ranks 9, 8, 7 (empty)
+    "4***G5***G4/",                            // rank 6  (White go-betweens: files e, k)
+    "PPPPPPPPPPPPPPP/",                        // rank 5  (White pawns)
+    "R***D***I***VB+B+RQ+R+BB***V***I***DR/",  // rank 4 (White ranging pieces)
     "1***X1*J1***F***K***N***P***F1*J1***X1/", // rank 3 (White: Kirin-Lion-Phoenix)
-    "***R1M1***L1***T**E***T1***L1M1***R/", // rank 2 (White)
-    "L*N***Z***U***CSGKGS***C***U***Z*NL"  // rank 1 (White back)
+    "***R1M1***L1***T**E***T1***L1M1***R/",    // rank 2 (White)
+    "L*N***Z***U***CSGKGS***C***U***Z*NL"      // rank 1 (White back)
 );
 
 impl DaiRules {

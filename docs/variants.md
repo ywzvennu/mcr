@@ -25,7 +25,7 @@ The frozen, hand-tuned 8x8 engine reached through `mce::AnyVariant` / `mce::Vari
 
 ## Fairy / geometry-layer variants
 
-The generic geometry engine reached through `mce::geometry::AnyWideVariant` / `WideVariantId` — **66** variants, spanning 3x4 Dobutsu to 12x8 Courier and 10x10 Opulent / Ten-Cubed.
+The generic geometry engine reached through `mce::geometry::AnyWideVariant` / `WideVariantId` — **67** variants, spanning 3x4 Dobutsu to 12x8 Courier and 10x10 Opulent / Ten-Cubed.
 
 | Variant | Canonical | Board | Start FEN | Notable pieces | Special rules | Validation oracle |
 |---|---|---|---|---|---|---|
