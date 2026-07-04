@@ -256,7 +256,7 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
 mod tests {
     use super::*;
 
-    /// The corpus FENs all parse on the generic Synochess engine, and the pinned
+    /// The corpus FENs all parse on the generic engine for Synochess, and the pinned
     /// shallow counts match the FSF-confirmed numbers in
     /// `tests/perft_synochess.rs` (this runs without FSF present).
     #[test]

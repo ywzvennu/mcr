@@ -1,7 +1,7 @@
 //! # Ataxx — a standalone 7×7 stones game (issue #280)
 //!
 //! This module is a **self-contained, non-chess game** that lives *beside* the
-//! chess engine but shares none of its machinery. It does not use
+//! chess core but shares none of its machinery. It does not use
 //! [`crate::Board`], [`crate::Position`], [`crate::Bitboard`], the
 //! [`crate::Variant`] trait, or any geometry type — it is its own tiny world
 //! built on a single `u64` over the 49 squares of a 7×7 board. Ataxx has no

@@ -2,7 +2,7 @@
 //!
 //! Ataxx is **not** a chess variant — no pieces, no king, no attacks — so mcr
 //! implements it in a self-contained module (`mcr::ataxx`), separate from the
-//! chess engine, rather than on the `AnyVariant` corpus this harness otherwise
+//! chess core, rather than on the `AnyVariant` corpus this harness otherwise
 //! drives. Like Duck it therefore has its own corpus and comparison loop here.
 //! The FSF side selects the built-in `UCI_Variant ataxx` (no `variants.ini`
 //! needed), sets the FEN, runs `go perft`, and the node counts are asserted

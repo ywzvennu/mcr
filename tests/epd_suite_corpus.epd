@@ -1,7 +1,7 @@
 # Pinned EPD test corpus for the mcr EPD/perft runner (issue #356).
 #
 # Each record is `<variant> <EPD>` where <variant> is a tag the runner maps to
-# either the concrete standard-chess engine (`standard`) or a wide-layer
+# either the concrete standard-chess core (`standard`) or a wide-layer
 # `WideVariantId` (every other tag). The EPD that follows is the variant's
 # structural FEN fields (the two move clocks dropped) plus a list of operations:
 #
