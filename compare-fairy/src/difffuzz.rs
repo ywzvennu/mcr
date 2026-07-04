@@ -673,6 +673,18 @@ const SPECS: &[Spec] = &[
 ///   the king has moved" and reads it as a *castling right*, emitting an illegal
 ///   castle of the already-moved king. That exact node is skipped (see
 ///   [`is_schess_corner_castle_artifact`]); every other S-Chess node is checked.
+/// * **Sho Shogi** (issue #454) — the only residual is an FSF artifact, not an mce
+///   bug: mce lets a side **promote a Drunk Elephant into a Crown Prince** (a
+///   second royal) on a move that FSF's generator confines away — a King already
+///   in check escaping by gaining a second royal, or a Drunk Elephant pinned in
+///   front of its King stepping off the pin *because the promotion makes the
+///   exposure legal*. Both engines agree the resulting two-royal position is not in
+///   check (a two-royal side is never in check and may leave either king en prise),
+///   so mce's move set is legitimately larger; FSF simply never generates it.
+///   Rather than skip such nodes wholesale (the divergence usually surfaces one ply
+///   down, inside `perft(2)`), [`check_node`] discounts exactly those moves via
+///   [`shoshogi_fsf_visible_count`] so the cross-check stays faithful while still
+///   catching any *other* Sho Shogi movegen difference.
 ///
 /// Currently held back (deeper-sweep candidate awaiting a fix):
 ///
@@ -863,6 +875,47 @@ fn is_empire_no_queenside_castle_artifact(spec: &Spec, fen: &str) -> bool {
         && files[4] == Some('k')
 }
 
+/// Whether `uci` — a legal move of `pos` — is a Sho Shogi Drunk-Elephant →
+/// Crown-Prince promotion that FSF's move generator omits (issue #454).
+///
+/// Sho Shogi's Crown Prince is a *second royal*; while a side holds two royals
+/// neither is royal, so the side is never in check and may leave *either* king en
+/// prise (mce and FSF **agree** on that rule — a two-royal side with both kings
+/// attacked still gets every move). The one place they part is *generation*: a
+/// Drunk Elephant that is pinned to, or shielding, its lone King is confined by
+/// FSF (as any single-royal pinned/blocking piece would be), so FSF never emits
+/// the move that steps it off that line — even though, *because that move also
+/// promotes it to a second royal*, the resulting position is one both engines
+/// agree is legal (not in check). mce generates it; FSF does not.
+///
+/// Such a move is spelled with the `**c` doubled-overflow promotion token (both
+/// colours) and is legal *solely* because of the promotion — detectable as its
+/// non-promoting twin (same from/to, without the `**c`) being **illegal**, i.e.
+/// absent from the legal set (moving the Drunk Elephant there without promoting
+/// would leave the single King attacked). A promotion whose non-promoting twin is
+/// *legal* is an ordinary move FSF emits too, so it is **not** omitted. This holds
+/// whether or not the side is currently in check: the same second-royal escape
+/// covers a King already in check and a Drunk Elephant pinned in front of a King
+/// that is not yet attacked. `legal_ucis` is the node's full legal-move UCI list.
+fn shoshogi_move_is_omitted_escape(uci: &str, legal_ucis: &[String]) -> bool {
+    let Some(base) = uci.strip_suffix("**c") else {
+        return false;
+    };
+    !legal_ucis.iter().any(|u| u == base)
+}
+
+/// The count of `pos`'s legal moves **as FSF's generator sees them**: the full
+/// legal count minus the crown-prince escapes FSF omits (issue #454, see
+/// [`shoshogi_move_is_omitted_escape`]). On any node without such an escape this
+/// equals the plain legal-move count, so it is inert everywhere except the exact
+/// FSF-limited nodes.
+fn shoshogi_fsf_visible_count(pos: &AnyWideVariant) -> u64 {
+    let ucis: Vec<String> = pos.legal_moves().iter().map(|mv| pos.to_uci(mv)).collect();
+    ucis.iter()
+        .filter(|u| !shoshogi_move_is_omitted_escape(u, &ucis))
+        .count() as u64
+}
+
 /// Cross-check one node: mce `perft(1)`/`perft(2)` + divide vs FSF's.
 ///
 /// Returns `Ok(())` when the two engines agree, `Ok-with-Err` carrying a
@@ -886,15 +939,35 @@ fn check_node(
         .map_err(|e| format!("mce failed to re-parse its own FEN {fen:?}: {e:?}"))?;
 
     // ---- mce side: perft(1) is the legal-move count; perft(2)'s divide is each
-    // legal move's child perft(1). -------------------------------------------
+    // legal move's child perft(1). --------------------------------------------
+    //
+    // Sho Shogi carries one FSF discrepancy that is an FSF limitation, not an mce
+    // bug (issue #454): while a lone King is in check, mce also lets the side
+    // **promote a Drunk Elephant into a Crown Prince** (gaining a second royal,
+    // which drops the check under the count-thresholded pseudo-royalty), an escape
+    // FSF's in-check generator never emits. It usually surfaces one ply down, in a
+    // child's move count, so [`shoshogi_fsf_visible_count`] counts each node the way
+    // FSF does — discounting exactly those escapes — and the diverging root moves
+    // are dropped here too. Every other Sho Shogi difference still shows through.
+    let is_shoshogi = spec.id == WideVariantId::ShoShogi;
     let moves = node.legal_moves();
-    let mce_p1 = moves.len() as u64;
+    let root_ucis: Vec<String> = moves.iter().map(|mv| node.to_uci(mv)).collect();
+    let mut mce_p1 = 0u64;
     let mut mce_divide: Vec<(String, u64)> = Vec::with_capacity(moves.len());
     let mut mce_p2 = 0u64;
-    for mv in &moves {
-        let child_nodes = node.play(mv).perft(1);
+    for (mv, uci) in moves.iter().zip(root_ucis.iter()) {
+        if is_shoshogi && shoshogi_move_is_omitted_escape(uci, &root_ucis) {
+            continue;
+        }
+        mce_p1 += 1;
+        let child = node.play(mv);
+        let child_nodes = if is_shoshogi {
+            shoshogi_fsf_visible_count(&child)
+        } else {
+            child.perft(1)
+        };
         mce_p2 += child_nodes;
-        mce_divide.push((node.to_uci(mv), child_nodes));
+        mce_divide.push((uci.clone(), child_nodes));
     }
 
     // ---- FSF side -----------------------------------------------------------
@@ -1439,5 +1512,62 @@ mod tests {
             other,
             "r3k3/pppppppp/8/8/8/8/PPPPPPPP/R3K3 b q - 0 1",
         ));
+    }
+
+    /// [`shoshogi_fsf_visible_count`] counts a node's moves as FSF's in-check
+    /// generator would: every legal move, minus the Drunk-Elephant → Crown-Prince
+    /// promotions whose legality rests solely on gaining a second royal (their
+    /// non-promoting twin is illegal, so FSF omits them). It equals the full legal
+    /// count on any non-diverging node.
+    #[test]
+    fn shoshogi_fsf_visible_count_discounts_only_crown_prince_escapes() {
+        // Issue #454's node: White's lone King (h3) is in check from the Pawn on
+        // h4, and the Drunk Elephant on d6 promotes to a Crown Prince (`d6d7**c`).
+        // mce has 4 legal evasions; FSF sees 3.
+        let node = AnyWideVariant::from_fen(
+            WideVariantId::ShoShogi,
+            "7k1/l3**er2l/1p+N1Ng2n/ps1**Esbp2/9/P2PPPPpp/LG4GK1/6S1R/2S5L w - - 0 50",
+        )
+        .expect("valid Sho Shogi FEN");
+        assert_eq!(node.legal_moves().len(), 4);
+        assert_eq!(shoshogi_fsf_visible_count(&node), 3);
+
+        // A Drunk Elephant in the promotion zone but NOT in check: its promotions
+        // are ordinary moves FSF also generates, so nothing is discounted.
+        let de = AnyWideVariant::from_fen(
+            WideVariantId::ShoShogi,
+            "4k4/9/4**E4/9/9/9/9/9/4K4 w - - 0 1",
+        )
+        .expect("valid Sho Shogi FEN");
+        assert!(!de.is_check());
+        assert_eq!(
+            shoshogi_fsf_visible_count(&de),
+            de.legal_moves().len() as u64
+        );
+
+        // An ordinary single-royal check with no Drunk Elephant to promote: no
+        // discount, full count.
+        let plain =
+            AnyWideVariant::from_fen(WideVariantId::ShoShogi, "4k4/9/9/9/9/9/9/9/r3K4 w - - 0 1")
+                .expect("valid Sho Shogi FEN");
+        assert!(plain.is_check());
+        assert_eq!(
+            shoshogi_fsf_visible_count(&plain),
+            plain.legal_moves().len() as u64
+        );
+
+        // A Drunk Elephant (d7) pinned in front of its King (d1) by a Rook (d8),
+        // the side NOT in check: mce lets it step off the pin *only by promoting*
+        // (six `**c` moves whose non-promoting twins are illegal); FSF omits all
+        // six. The `d7d8`/`d7d8**c` pair that captures the pinner keeps its legal
+        // twin, so it is not discounted.
+        let pin = AnyWideVariant::from_fen(
+            WideVariantId::ShoShogi,
+            "l1+Ng1g3/3r1k3/1+S1**E**ep1pl/1pp6/2P2P1np/7G1/PP2+n1N2/L3G3L/3K2S2 w - - 1 46",
+        )
+        .expect("valid Sho Shogi FEN");
+        assert!(!pin.is_check());
+        assert_eq!(pin.legal_moves().len(), 43);
+        assert_eq!(shoshogi_fsf_visible_count(&pin), 37);
     }
 }

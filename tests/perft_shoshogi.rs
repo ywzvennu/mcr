@@ -133,3 +133,106 @@ fn de_promote_deep() {
 fn lone_crown_prince_cheap() {
     check(LONE_CROWN_PRINCE, &[(1, 2), (2, 74), (3, 232), (4, 5999)]);
 }
+
+// -- In-check crown-prince escape: promoting a Drunk Elephant drops the check --
+
+/// A White-to-move node **in check** (a Black Pawn on h4 attacks the lone White
+/// King on h3) where White still holds an **un-promoted** Drunk Elephant on d6.
+/// Reached from issue #454's parent by Black `h5h4`. mce finds **four** legal
+/// evasions; FSF finds only three — the difference is the Drunk-Elephant → Crown-
+/// Prince promotion, which is a genuine fourth evasion under Sho Shogi's rules
+/// (gaining a second royal drops the whole notion of check) but which FSF's move
+/// generator does not emit. mce is correct; the `compare-fairy` fuzzer discounts
+/// exactly this FSF-omitted move (see `shoshogi_fsf_visible_count`) so the
+/// cross-check stays faithful.
+const IN_CHECK_DE_ESCAPE: &str =
+    "7k1/l3**er2l/1p+N1Ng2n/ps1**Esbp2/9/P2PPPPpp/LG4GK1/6S1R/2S5L w - - 0 50";
+
+#[test]
+fn in_check_de_promotion_is_a_legal_evasion() {
+    let pos = ShoShogi::from_fen(IN_CHECK_DE_ESCAPE).expect("valid Sho Shogi FEN");
+
+    // White's lone King (h3) is in check from the Black Pawn on h4.
+    assert!(
+        pos.is_check(),
+        "White should be in check in {IN_CHECK_DE_ESCAPE}"
+    );
+
+    // Exactly four legal evasions, one of them the Drunk-Elephant → Crown-Prince
+    // promotion (rendered with the `**c` overflow-promotion token).
+    let moves = pos.legal_moves();
+    let mut ucis: Vec<String> = moves.iter().map(|mv| mv.to_uci::<Shogi9x9>()).collect();
+    ucis.sort();
+    assert_eq!(
+        ucis,
+        vec!["d6d7**c", "g3h4", "h3h2", "h3i4"],
+        "the four legal evasions, including the crown-prince promotion"
+    );
+    assert_eq!(
+        gperft::<Shogi9x9, _>(&pos, 1),
+        4,
+        "perft(1) is the legal-move count"
+    );
+
+    // Playing the promotion gives White a second royal (King h3 + Crown Prince d7):
+    // under Sho Shogi's count-thresholded pseudo-royalty neither is royal, so the
+    // side is no longer in check even though the King is still physically attacked.
+    let white = pos.turn();
+    let promo = moves
+        .iter()
+        .find(|mv| mv.to_uci::<Shogi9x9>() == "d6d7**c")
+        .expect("the crown-prince promotion is legal");
+    let after = pos.play(promo);
+    assert!(
+        !after.is_in_check(white),
+        "with two royals White is never in check, so the promotion escapes"
+    );
+}
+
+/// A **not-in-check** node where White's Drunk Elephant (d7) is **pinned** in
+/// front of its King (d1) by a Black Rook (d8). Moving the Elephant off the d-file
+/// would expose the King — so mce allows it **only by promoting**: the six off-file
+/// Crown-Prince promotions are legal (each gains a second royal, and a two-royal
+/// side is never in check, so leaving the King en prise is fine), while their
+/// non-promoting twins are not. Only `d7d8`/`d7d8**c` (capturing the pinner) has a
+/// legal non-promoting form. FSF omits the six promotions; mce is correct.
+const PINNED_DE_PROMOTES_OFF_PIN: &str =
+    "l1+Ng1g3/3r1k3/1+S1**E**ep1pl/1pp6/2P2P1np/7G1/PP2+n1N2/L3G3L/3K2S2 w - - 1 46";
+
+#[test]
+fn pinned_drunk_elephant_may_break_pin_only_by_promoting() {
+    let pos = ShoShogi::from_fen(PINNED_DE_PROMOTES_OFF_PIN).expect("valid Sho Shogi FEN");
+    let white = pos.turn();
+
+    // White holds a single royal (King d1) and is not in check — the Elephant
+    // shields it from the Rook on d8.
+    assert!(!pos.is_check());
+
+    // Every legal Drunk-Elephant move from d7. Off the d-file, only the promoting
+    // form is legal; on the d-file (d7d8, capturing the pinner) both forms are.
+    let mut de_moves: Vec<String> = pos
+        .legal_moves()
+        .iter()
+        .map(|mv| mv.to_uci::<Shogi9x9>())
+        .filter(|u| u.starts_with("d7"))
+        .collect();
+    de_moves.sort();
+    assert_eq!(
+        de_moves,
+        vec!["d7c6**c", "d7c7**c", "d7c8**c", "d7d8", "d7d8**c", "d7e6**c", "d7e7**c", "d7e8**c",],
+        "off-file Elephant moves are legal only as Crown-Prince promotions"
+    );
+
+    // Stepping off the pin by promoting exposes the King to the Rook, yet with two
+    // royals White is not in check, so the move is legal.
+    let off_pin = pos
+        .legal_moves()
+        .into_iter()
+        .find(|mv| mv.to_uci::<Shogi9x9>() == "d7c6**c")
+        .expect("the off-pin promotion is legal");
+    let after = pos.play(&off_pin);
+    assert!(
+        !after.is_in_check(white),
+        "two royals ⇒ never in check, even with the King now exposed to the rook"
+    );
+}
