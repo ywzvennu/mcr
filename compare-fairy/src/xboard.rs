@@ -296,26 +296,29 @@ pub fn parse_dump_move(line: &str) -> Option<String> {
     }
 }
 
-/// Whether `s` is a `<file><rank><file><rank>` coordinate move on the 15x15 board
-/// (files `a..o`, ranks `1..15`), with an optional trailing `+` promotion marker.
+/// Whether `s` is a `<file><rank><file><rank>` coordinate move on a large-shogi
+/// board up to 16x16 (files `a..p`, ranks `1..16`), with an optional trailing `+`
+/// promotion marker. The upper bound covers Tenjiku (16 files / ranks); the smaller
+/// Dai board (a..o, 1..15) never produces the extra file/rank, so widening the
+/// bound leaves the Dai walk unchanged.
 fn is_coordinate_move(s: &str) -> bool {
     let s = s.trim_end_matches('+');
     let b = s.as_bytes();
     let mut i = 0;
     let mut squares = 0;
     while i < b.len() {
-        // File letter a..o.
-        if !(b'a'..=b'o').contains(&b[i]) {
+        // File letter a..p.
+        if !(b'a'..=b'p').contains(&b[i]) {
             return false;
         }
         i += 1;
-        // One- or two-digit rank 1..15.
+        // One- or two-digit rank 1..16.
         let start = i;
         while i < b.len() && b[i].is_ascii_digit() {
             i += 1;
         }
         match s[start..i].parse::<u32>() {
-            Ok(r) if (1..=15).contains(&r) => {}
+            Ok(r) if (1..=16).contains(&r) => {}
             _ => return false,
         }
         squares += 1;

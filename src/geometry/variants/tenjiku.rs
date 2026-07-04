@@ -782,8 +782,10 @@ mod tests {
     /// jump-capture power is documented-unmodelled).
     #[test]
     fn great_general_rides_like_a_queen() {
+        // King on b1 (file 1, rank 0) sits off all eight rays from h8, so the
+        // General's ride is unobstructed to the board edges.
         let got = targets_from(
-            "16/16/16/16/16/16/16/16/7****G8/16/16/16/16/16/16/7K8 w - - 0 1",
+            "16/16/16/16/16/16/16/16/7****G8/16/16/16/16/16/16/1K14 w - - 0 1",
             7,
             7,
         );
