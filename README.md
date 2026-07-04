@@ -1,4 +1,4 @@
-# mcr — Modular Chess Rules
+# mcr — a clean-room chess rules library
 
 `mcr` is a permissively licensed (MIT OR Apache-2.0), clean-room chess
 move-generation and rules library written in Rust. It is an original

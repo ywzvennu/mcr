@@ -1,4 +1,4 @@
-//! # mcr — Modular Chess Rules
+//! # mcr — a clean-room chess rules library
 //!
 //! A permissively licensed (MIT OR Apache-2.0) chess **move-generation and rules**
 //! library. It is an original, clean-room implementation built from public
