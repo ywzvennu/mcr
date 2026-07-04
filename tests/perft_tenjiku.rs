@@ -25,7 +25,8 @@
 //!   forward-diagonal 2-jumps (6); and the 18 short down/sideways moves of the
 //!   back-three ranks into the four empty rank-2 squares (a HaChu array asymmetry
 //!   faithfully reproduced). This pinned down the exact start placement.
-//! * **perft(2) = 5662** and **perft(3) = 424353** are mce regression pins. They are
+//! * **perft(2) = 5662** and **perft(3) = 424195** are mce regression pins (the
+//!   jitto pass is emitted once per side, as HaChu tracks a single null move). They are
 //!   *faithful to the true Tenjiku rules at these depths* — the documented-unmodelled
 //!   powers (the Generals' jump-capture, the Fire Demon's area burn) are provably
 //!   unreachable this shallow, since those pieces are boxed in by their own army and
@@ -68,7 +69,7 @@ fn startpos_perft_regression() {
     let pos = Tenjiku::startpos();
     assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 72);
     assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 5662);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 3), 424353);
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 3), 424195);
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {
