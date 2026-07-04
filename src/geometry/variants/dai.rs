@@ -65,7 +65,8 @@ pub struct DaiRules;
 /// Silver, Copper, Iron General, Stone General, Knight, Lance — the King on the
 /// central h-file. Rank 2 carries the Reverse Chariots, Cat Swords, Ferocious
 /// Leopards, Blind Tigers and the central Drunk Elephant; rank 3 the Violent Oxen,
-/// Angry Boars, Evil Wolves and the central Phoenix / Lion / Kirin trio; rank 4 the
+/// Angry Boars, Evil Wolves and the central Kirin / Lion / Phoenix trio (Kirin on
+/// the King's left, matching the HaChu oracle); rank 4 the
 /// ranging pieces (Rooks, Flying Dragons, Side/Vertical Movers, Bishops, Dragon
 /// Horses, Dragon Kings and the central Free King). Rank 5 is the fifteen Pawns,
 /// rank 6 the two Go-Betweens (files e and k). Dragon Kings render as `+R`, Dragon
@@ -76,8 +77,8 @@ const DAI_PLACEMENT: &str = concat!(
     "l*n***z***u***csgkgs***c***u***z*nl/",
     // rank 14 (Black): Reverse Chariot / Cat Sword / Leopard / Blind Tiger / Elephant
     "***r1m1***l1***t**e***t1***l1m1***r/",
-    // rank 13 (Black): Violent Ox / Angry Boar / Evil Wolf / Kirin-Lion-Phoenix
-    "1***x1*j1***f***k***n***p***f1*j1***x1/",
+    // rank 13 (Black): Violent Ox / Angry Boar / Evil Wolf / Phoenix-Lion-Kirin
+    "1***x1*j1***f***p***n***k***f1*j1***x1/",
     // rank 12 (Black): Rook / Flying Dragon / Side & Vertical Mover / Bishop / Dragons / Free King
     "r***d***i***vb+b+rq+r+bb***v***i***dr/",
     "ppppppppppppppp/",        // rank 11 (Black pawns)
@@ -86,7 +87,7 @@ const DAI_PLACEMENT: &str = concat!(
     "4***G5***G4/",            // rank 6  (White go-betweens: files e, k)
     "PPPPPPPPPPPPPPP/",        // rank 5  (White pawns)
     "R***D***I***VB+B+RQ+R+BB***V***I***DR/", // rank 4 (White ranging pieces)
-    "1***X1*J1***F***P***N***K***F1*J1***X1/", // rank 3 (White: Phoenix-Lion-Kirin)
+    "1***X1*J1***F***K***N***P***F1*J1***X1/", // rank 3 (White: Kirin-Lion-Phoenix)
     "***R1M1***L1***T**E***T1***L1M1***R/", // rank 2 (White)
     "L*N***Z***U***CSGKGS***C***U***Z*NL"  // rank 1 (White back)
 );
@@ -655,7 +656,7 @@ mod tests {
         let pos = Dai::startpos();
         assert_eq!(
             pos.to_fen(),
-            "l*n***z***u***csgkgs***c***u***z*nl/***r1m1***l1***t**e***t1***l1m1***r/1***x1*j1***f***k***n***p***f1*j1***x1/r***d***i***vb+b+rq+r+bb***v***i***dr/ppppppppppppppp/4***g5***g4/15/15/15/4***G5***G4/PPPPPPPPPPPPPPP/R***D***I***VB+B+RQ+R+BB***V***I***DR/1***X1*J1***F***P***N***K***F1*J1***X1/***R1M1***L1***T**E***T1***L1M1***R/L*N***Z***U***CSGKGS***C***U***Z*NL w - - 0 1"
+            "l*n***z***u***csgkgs***c***u***z*nl/***r1m1***l1***t**e***t1***l1m1***r/1***x1*j1***f***p***n***k***f1*j1***x1/r***d***i***vb+b+rq+r+bb***v***i***dr/ppppppppppppppp/4***g5***g4/15/15/15/4***G5***G4/PPPPPPPPPPPPPPP/R***D***I***VB+B+RQ+R+BB***V***I***DR/1***X1*J1***F***K***N***P***F1*J1***X1/***R1M1***L1***T**E***T1***L1M1***R/L*N***Z***U***CSGKGS***C***U***Z*NL w - - 0 1"
         );
     }
 
