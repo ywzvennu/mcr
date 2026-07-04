@@ -467,13 +467,12 @@ jobs:
       - name: cargo-semver-checks (informational)
         run: cargo semver-checks --all-features || true
 
-  # Code-coverage report (report-only — NO hard gate / threshold initially).
+  # Code-coverage report with an ENFORCING line-coverage floor (issue #443).
   # cargo-llvm-cov is heavier (instrumented build + full test run), so it is
   # gated to push-to-main / schedule / manual rather than every PR, per the
-  # repo's CI-minutes posture. The lcov.info artifact is uploaded for inspection;
-  # a coverage threshold can be added later once a baseline is understood.
+  # repo's CI-minutes posture. The lcov.info artifact is uploaded for inspection.
   coverage:
-    name: coverage (llvm-cov, report-only)
+    name: coverage (llvm-cov, floor)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -490,12 +489,22 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      # Human-readable summary in the job log plus an lcov.info artifact. No
-      # `--fail-under-*` flag, so this is purely informational for now.
-      - name: Coverage (summary + lcov)
-        run: |
-          cargo llvm-cov --all-features --workspace --summary-only
-          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      # Run the instrumented suite ONCE (`--no-report`), then re-report from the
+      # cached profdata for the summary+floor and the lcov artifact — so the floor
+      # and the lcov export add no extra test time (the previous two `cargo llvm-cov`
+      # invocations each re-ran the whole suite).
+      #
+      # `--fail-under-lines 88` is an ENFORCING FLOOR: the job fails if line coverage
+      # drops below 88%. Baseline on 2026-07-04 was 91.65% lines (91.93% regions,
+      # 92.60% functions) across the workspace, so 88 sits a few points below to catch
+      # real regressions without churn. It is a RATCHET: when coverage climbs, raise
+      # this number toward the current level — never lower it to make a red run pass.
+      - name: Coverage (instrument once)
+        run: cargo llvm-cov --all-features --workspace --no-report
+      - name: Coverage summary + enforce line floor
+        run: cargo llvm-cov report --summary-only --fail-under-lines 88
+      - name: Coverage lcov export
+        run: cargo llvm-cov report --lcov --output-path lcov.info
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
