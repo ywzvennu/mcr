@@ -56,6 +56,8 @@ use crate::Color;
 fn push_role_token(out: &mut String, role: WideRole) {
     if role.is_promoted() {
         out.push('+');
+    } else if role.is_overflow5() {
+        out.push_str("****");
     } else if role.is_overflow4() {
         out.push_str("***");
     } else if role.is_overflow2() {
@@ -76,6 +78,10 @@ fn parse_leading_role(body: &str) -> Option<(WideRole, usize)> {
     let b = body.as_bytes();
     if b.is_empty() {
         return None;
+    }
+    if body.starts_with("****") {
+        let letter = *b.get(4)? as char;
+        return Some((WideRole::overflow5_from_base(letter)?, 5));
     }
     if body.starts_with("***") {
         let letter = *b.get(3)? as char;

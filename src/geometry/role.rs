@@ -2571,6 +2571,7 @@ mod tests {
                 || role.is_overflow2()
                 || role.is_overflow3()
                 || role.is_overflow4()
+                || role.is_overflow5()
             {
                 continue;
             }
@@ -2629,6 +2630,7 @@ mod tests {
                     && !r.is_overflow2()
                     && !r.is_overflow3()
                     && !r.is_overflow4()
+                    && !r.is_overflow5()
             })
             .map(WideRole::char)
             .filter(|&c| c != '?')
@@ -2785,5 +2787,46 @@ mod tests {
         assert_eq!(WideRole::overflow4_from_base('k'), Some(WideRole::Kirin));
         assert_eq!(WideRole::overflow4_from_base('n'), Some(WideRole::ChuLion));
         assert_eq!(WideRole::overflow4_from_base('?'), None);
+    }
+
+    #[test]
+    fn overflow5_roles_round_trip_through_the_quadrupled_prefix() {
+        // A fifth-tier overflow role (the Tenjiku Shogi army) has no bare letter:
+        // its `char()` is a recycled base letter, and `overflow5_from_base` maps
+        // that base letter back to the role (what the board FEN parser does after a
+        // `****` prefix). None of them is a lower-tier overflow or a promoted role,
+        // and every base letter within the fresh fifth tier is distinct.
+        let mut bases = alloc::vec::Vec::new();
+        for role in WideRole::ALL.into_iter().filter(|r| r.is_overflow5()) {
+            assert!(!role.is_overflow());
+            assert!(!role.is_overflow2());
+            assert!(!role.is_overflow3());
+            assert!(!role.is_overflow4());
+            assert!(!role.is_promoted());
+            let base = role.char();
+            assert_ne!(base, '?', "overflow-5 base letter is real");
+            assert_eq!(WideRole::overflow5_from_base(base), Some(role));
+            assert_eq!(
+                WideRole::overflow5_from_base(base.to_ascii_uppercase()),
+                Some(role)
+            );
+            bases.push(base);
+        }
+        let count = bases.len();
+        bases.sort_unstable();
+        bases.dedup();
+        assert_eq!(bases.len(), count, "fifth-tier base letters are distinct");
+        // The Fire Demon recycles `i`, the Great General `g`, the Lion Hawk `h`.
+        assert_eq!(WideRole::FireDemon.char(), 'i');
+        assert_eq!(
+            WideRole::overflow5_from_base('i'),
+            Some(WideRole::FireDemon)
+        );
+        assert_eq!(
+            WideRole::overflow5_from_base('g'),
+            Some(WideRole::GreatGeneral)
+        );
+        assert_eq!(WideRole::overflow5_from_base('h'), Some(WideRole::LionHawk));
+        assert_eq!(WideRole::overflow5_from_base('?'), None);
     }
 }
