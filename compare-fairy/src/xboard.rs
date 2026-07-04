@@ -137,6 +137,59 @@ impl Engine {
         self.sync()
     }
 
+    /// Select `name`, allocate `memory_mb` MB of hash and drop into `force` mode,
+    /// in the exact order HaChu 0.23 needs for a subsequent `usermove` (the hash
+    /// allocation must precede any move, or it segfaults). This is the entry point
+    /// for the external move-list perft walk on the large-shogi variants.
+    pub fn start_variant(&mut self, name: &str, memory_mb: u32) -> Result<(), String> {
+        self.send(&format!("variant {name}"))?;
+        self.send(&format!("memory {memory_mb}"))?;
+        self.send("level 0 0 10")?;
+        self.send("force")?;
+        self.sync()
+    }
+
+    /// Read HaChu's generated legal-move list for the current position by handing
+    /// it a deliberately illegal move (`usermove z9z9`), which under HaChu's
+    /// always-on debug output makes it print its full generated move list, then a
+    /// `ping`/`pong` sentinel to bound the read. Returns the coordinate move
+    /// strings, sorted and deduped, with the `p32p32` null placeholder and any
+    /// non-coordinate entries dropped.
+    ///
+    /// GPL fence unchanged: this only reads the subprocess's text output.
+    pub fn dump_legal_moves(&mut self) -> Result<Vec<String>, String> {
+        self.send("usermove z9z9")?;
+        self.ping_seq += 1;
+        let seq = self.ping_seq;
+        self.send(&format!("ping {seq}"))?;
+        let want = format!("pong {seq}");
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut moves = Vec::new();
+        loop {
+            if Instant::now() > deadline {
+                return Err("timed out reading HaChu move dump".to_string());
+            }
+            let mut line = String::new();
+            let n = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|e| format!("read failed: {e}"))?;
+            if n == 0 {
+                return Err("engine closed stdout during move dump".to_string());
+            }
+            let t = line.trim();
+            if t == want {
+                break;
+            }
+            if let Some(mv) = parse_dump_move(t) {
+                moves.push(mv);
+            }
+        }
+        moves.sort();
+        moves.dedup();
+        Ok(moves)
+    }
+
     /// Set the position from a HaChu-dialect FEN (`setboard`).
     ///
     /// Reserved for the node-by-node perft walk in issue #380 (setting arbitrary
@@ -152,10 +205,8 @@ impl Engine {
     ///
     /// HaChu applies a legal move silently and prints `Illegal move` for an
     /// illegal one; callers that need the legality verdict should read via
-    /// [`is_illegal_move_line`]. Reserved for the issue #380 tree walk (which
-    /// needs mce's Chu-Shogi move generator to compare against), hence
-    /// `allow(dead_code)`.
-    #[allow(dead_code)]
+    /// [`is_illegal_move_line`]. Used by the Dai external perft walk to replay a
+    /// move sequence before dumping the resulting move list.
     pub fn usermove(&mut self, mv: &str) -> Result<(), String> {
         self.send(&format!("usermove {mv}"))
     }
@@ -219,6 +270,59 @@ pub fn parse_feature_variants(line: &str) -> Option<Vec<String>> {
     )
 }
 
+/// Parse one line of HaChu's illegal-move move-list dump into its coordinate move.
+///
+/// A dump line looks like `# -58. 00009259 00013299 j5j6`: a `#` marker, an index
+/// ending in `.`, two hex words, then the move text. Returns the move text when it
+/// is a real coordinate move on the 15-file (`a..o`) board — a `<file><rank>`
+/// origin and destination, with an optional trailing `+` promotion marker — and
+/// `None` for the `p32p32` null placeholder, headers, or any other line.
+pub fn parse_dump_move(line: &str) -> Option<String> {
+    let mut it = line.split_whitespace();
+    if it.next()? != "#" {
+        return None;
+    }
+    let idx = it.next()?;
+    if !idx.ends_with('.') {
+        return None;
+    }
+    let _h1 = it.next()?;
+    let _h2 = it.next()?;
+    let mv = it.next()?;
+    if is_coordinate_move(mv) {
+        Some(mv.trim_end_matches('+').to_string())
+    } else {
+        None
+    }
+}
+
+/// Whether `s` is a `<file><rank><file><rank>` coordinate move on the 15x15 board
+/// (files `a..o`, ranks `1..15`), with an optional trailing `+` promotion marker.
+fn is_coordinate_move(s: &str) -> bool {
+    let s = s.trim_end_matches('+');
+    let b = s.as_bytes();
+    let mut i = 0;
+    let mut squares = 0;
+    while i < b.len() {
+        // File letter a..o.
+        if !(b'a'..=b'o').contains(&b[i]) {
+            return false;
+        }
+        i += 1;
+        // One- or two-digit rank 1..15.
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        match s[start..i].parse::<u32>() {
+            Ok(r) if (1..=15).contains(&r) => {}
+            _ => return false,
+        }
+        squares += 1;
+    }
+    squares == 2
+}
+
 /// Whether `line` is the `feature done=1` handshake terminator.
 pub fn is_feature_done(line: &str) -> bool {
     line.split_whitespace().any(|tok| tok == "done=1")
@@ -261,6 +365,26 @@ mod tests {
         assert!(is_feature_done("feature myname=\"HaChu 0.23\" done=1"));
         assert!(!is_feature_done("feature done=0"));
         assert!(!is_feature_done("feature ping=1"));
+    }
+
+    #[test]
+    fn dump_move_parses_coordinate_moves() {
+        assert_eq!(
+            parse_dump_move("# -58. 00009259 00013299 j5j6"),
+            Some("j5j6".to_string())
+        );
+        // Two-digit rank and a promotion marker.
+        assert_eq!(
+            parse_dump_move("# 7. 0000abcd 00001234 m4m11+"),
+            Some("m4m11".to_string())
+        );
+        // The null placeholder and header/other lines are not moves.
+        assert_eq!(parse_dump_move("# -41. fffffff8 00013299 p32p32+"), None);
+        assert_eq!(parse_dump_move("# suppress = a17"), None);
+        assert_eq!(parse_dump_move("# moveNr = 77 in {-8,77}"), None);
+        assert_eq!(parse_dump_move("pong 3"), None);
+        // Off-board file (past 'o') is rejected.
+        assert_eq!(parse_dump_move("# 1. 0 0 z9z9"), None);
     }
 
     #[test]

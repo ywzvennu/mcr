@@ -221,6 +221,8 @@ fn centaur_to_fsf(fen: &str) -> String {
 ///   it cannot be driven from an arbitrary fuzzed FEN.
 /// * **Chu** — 12x12 Chu Shogi is validated against the HaChu reference engine (the
 ///   `--hachu` mode), not Fairy-Stockfish, so it carries no FSF difffuzz spec.
+/// * **Dai** — 15x15 Dai Shogi is likewise HaChu-only (the `--hachu` mode, issue
+///   #401); Fairy-Stockfish does not implement it, so it carries no FSF spec.
 const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1416,7 +1418,7 @@ mod tests {
         }
     }
 
-    /// Every fuzzable spec names a real, distinct variant, and the three documented
+    /// Every fuzzable spec names a real, distinct variant, and the five documented
     /// exclusions are absent.
     #[test]
     fn specs_are_well_formed() {
@@ -1434,6 +1436,7 @@ mod tests {
             WideVariantId::Duck,
             WideVariantId::Jieqi,
             WideVariantId::Chu,
+            WideVariantId::Dai,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1441,10 +1444,11 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 4 by-design exclusions (Alice / Duck /
-        // Jieqi / Chu); the deeper-sweep follow-ups stay in SPECS but are skipped
+        // Every shipped variant minus the 5 by-design exclusions (Alice / Duck /
+        // Jieqi and the HaChu-only large-shogi Chu / Dai, which Fairy-Stockfish does
+        // not implement); the deeper-sweep follow-ups stay in SPECS but are skipped
         // via `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 4);
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 5);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never
