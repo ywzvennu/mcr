@@ -529,8 +529,12 @@ jobs:
   # pinned survivor-free, the `|| true` is dropped so a NEW survivor (a change to
   # `board.rs` behaviour that its unit tests fail to catch) fails the job. The
   # enforcing scope is intentionally narrow; broadening it to the movegen/rules
-  # modules (`position.rs`, the geometry layer) is tracked in #445, gated on those
-  # modules being swept clean and the test scope widened to the perft suites.
+  # modules (`position.rs`, the geometry layer) is tracked in #445. Groundwork
+  # for `position.rs` has landed (in-module perft/make-unmake/helper pins + the
+  # equivalent-mutant `exclude_re` in `.cargo/mutants.toml`), but a scoped sweep
+  # still leaves genuine survivors in the SEE swap-off, the pseudo-legal
+  # generator, and the no-magic slider paths, so it stays OUT of `examine_globs`
+  # until those are killed (see the TODO(#445) block in the mutants config).
   mutants:
     name: mutants (cargo-mutants, enforcing on src/board.rs)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -547,12 +551,37 @@ jobs:
       - name: Install cargo-mutants
         uses: taiki-e/install-action@cargo-mutants
 
-      # Reads `.cargo/mutants.toml` (scope + `--all-features --lib` test args +
-      # timeouts). `--no-shuffle` keeps the report order stable; `-j 2`
-      # parallelises within the runner. No `|| true`: a surviving mutant in scope
-      # now fails the job. The artifact below still carries the full outcome list.
+      # Reads `.cargo/mutants.toml` (scope + `--all-features --lib board::tests::`
+      # test args + timeouts + equivalent-mutant excludes). `--no-shuffle` keeps
+      # the report order stable; `-j 2` parallelises within the runner. The
+      # explicit tight `--timeout`/`--build-timeout` bound any mutant that spins a
+      # test into a (near-)infinite loop (e.g. `from_fen_placement`'s loop counter
+      # made non-advancing) so it dies in ~60 s instead of waiting out a
+      # baseline-derived bound.
+      #
+      # cargo-mutants exit codes: 0 = every mutant caught; 3 = one or more mutants
+      # *timed out*; 2 = one or more mutants *survived* (MISSED). A timeout is a
+      # killed infinite-loop mutant — exactly what the tight `--timeout` is for —
+      # so exit 3 is an acceptable pass; but a MISSED mutant must fail the job.
+      # This gate therefore fails iff `missed.txt` is non-empty OR the run errors
+      # for any reason other than a timeout. This is NOT `|| true`: a real
+      # surviving mutant still fails. (The 60 s bound is ~60x the sub-second
+      # baseline test, so a timeout here means a genuine infinite loop, never a
+      # merely-slow — and thus possibly-surviving — test.)
       - name: cargo-mutants (enforcing)
-        run: cargo mutants --no-shuffle -j 2
+        run: |
+          set +e
+          cargo mutants --no-shuffle -j 2 --timeout 60 --build-timeout 300
+          code=$?
+          set -e
+          if [ -s mutants.out/missed.txt ]; then
+            echo "::error::cargo-mutants found surviving (MISSED) mutants:"
+            cat mutants.out/missed.txt
+            exit 1
+          fi
+          if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then
+            exit "$code"
+          fi
 
       - name: Upload mutants report
         if: always()
