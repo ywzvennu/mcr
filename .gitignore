@@ -21,7 +21,7 @@ mutants.out.old/
 /compare-fairy/target
 /compare-fairy/build
 
-# Unified `mce` CLI crate (separate nested crate; never published)
+# Unified `mcr` CLI crate (separate nested crate; never published)
 /cli/target
 
 # WebAssembly bindings crate (separate, never published): build artifacts and

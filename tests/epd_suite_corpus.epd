@@ -1,4 +1,4 @@
-# Pinned EPD test corpus for the mce EPD/perft runner (issue #356).
+# Pinned EPD test corpus for the mcr EPD/perft runner (issue #356).
 #
 # Each record is `<variant> <EPD>` where <variant> is a tag the runner maps to
 # either the concrete standard-chess engine (`standard`) or a wide-layer
@@ -6,12 +6,12 @@
 # structural FEN fields (the two move clocks dropped) plus a list of operations:
 #
 #   * `Dn <count>`  -- perft node count to depth n (the classic CPW perft-suite
-#                      opcode, also documented by `mce::Epd`). The runner builds
+#                      opcode, also documented by `mcr::Epd`). The runner builds
 #                      the position, runs perft(n), and asserts it equals <count>.
 #   * `bm <SAN>...`  -- best move(s): each must parse via the variant's SAN parser
 #                      AND be present in `legal_moves()`.
 #   * `am <SAN>...`  -- avoid move(s): each must parse and be legal-but-flagged
-#                      (present in `legal_moves()`); mce is a movegen library, not
+#                      (present in `legal_moves()`); mcr is a movegen library, not
 #                      a search engine, so this validates legality/parse, not the
 #                      engine's choice.
 #   * `id "..."`     -- a human-readable record identifier.
