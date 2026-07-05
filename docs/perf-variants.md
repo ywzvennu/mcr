@@ -170,6 +170,66 @@ negative. (The larger cannon-path per-node cost, e.g. the make/unmake scratch
 clone, is intrinsic to the `&self` legal-move API and was already minimized by
 #193/#353.)
 
+# Cannon-family per-node cost: proven negatives (issue #507)
+
+The cannon / multi-royal family — **xiangqi, janggi, cannonshogi, shako,
+xiangfu, chak** — is the slowest per-node group in the registry (see the #409 and
+#503 throughput tables: e.g. cannonshogi 3064 µs and chak 2417 µs at perft d2).
+This section records *why*, and — more importantly — which optimizations have
+already been tried and **proven negative**, so future contributors do not spend
+the effort again. It is a documentation checkpoint; no perft node counts change.
+
+## Where the cost is
+
+The single slowest per-node line is the **scratch clone** at the head of the
+cannon and multi-royal legal-move generators (`src/geometry/position.rs`, the
+`let mut scratch = self.clone();` in `generate_cannon_verify_into` /
+`generate_multi_royal_into`): one ~2.4 KB `GenericPosition` copy per `legal_moves()`
+call (per node in a perft tree).
+
+This clone is **intrinsic to the `&self` legal-move API**. The generator borrows
+`self` immutably, but the per-move legality test drives **make/unmake**
+(`cannon_move_is_legal` / `multi_royal_move_is_legal` →
+[`apply_with_undo`](https://docs.rs/mcr/latest/mcr/geometry/struct.GenericPosition.html#method.apply_with_undo)
+… `undo`), which needs a `&mut` working position — hence one clone. Prior work
+(**#193/#353**) already collapsed what used to be a *per-move* clone into this
+single *per-node* clone reused for every sibling move, and layered on the
+geometry fast-accept (#193) that skips the make/unmake + king-safety scan
+entirely for moves provably off every royal line. The residual single clone is
+what remains; removing it entirely would require an `&mut self` (or interior
+mutability) legal-move API, not a hot-path tweak — out of scope for a low-payoff
+optimization.
+
+## Proven negatives — do NOT re-attempt
+
+1. **Incremental-attacker DB across make/unmake (#310/#364).** Carrying an
+   attacker/occupancy database incrementally through `apply_with_undo`/`undo`
+   instead of recomputing per node was measured **slower on every cannon
+   variant**: the incremental rebuild-and-restore bookkeeping costs more than the
+   direct scan it was meant to replace (cannon screens make the incremental
+   update non-local). Reverted.
+
+2. **One-hot slider `reverse_bits` → `bit()` reversal (#420).** Replacing the
+   hyperbola-quintessence one-hot source reversal `s.reverse_bits()` with the
+   algebraically-equal `bit(BITS - 1 - index)` **regressed** the very variants it
+   targeted — chu movegen **+13%**, xiangqi movegen **+11%**, jieqi **+3%** —
+   because `U256::from_bit` carries a `< 128` branch whereas `reverse_bits` is
+   branchless and CSE-friendly. Reverted (full write-up in the #420 section
+   above).
+
+## The one untried lever, and why the clone stays
+
+The only lever not covered by the negatives above is a **make/unmake-based
+legality path that avoids the whole-position clone**. As noted, the *per-move*
+version of this is already shipped (make/unmake on a single reused scratch); the
+only thing left to eliminate is the single per-node clone, which cannot go away
+without changing the `&self` signature of `legal_moves`. Evaluated under #507 and
+**not pursued**: the expected payoff (one 2.4 KB `memcpy` per node, against a
+generator that then does real per-move work) is low, and an `&mut self` /
+interior-mutability rework carries byte-identity risk disproportionate to it. The
+clone is kept and documented; this note exists so the make/unmake idea is not
+mistaken for untried territory.
+
 # Exhaustive per-variant perf + memory sweep (issue #503)
 
 Issues #409/#420 established throughput coverage over the whole `WideVariantId`

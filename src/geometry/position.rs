@@ -1808,6 +1808,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
         let royal_lines = multi_royal_attack_lines::<G>(kings);
 
+        // Per-node scratch clone (multi-royal sibling of the cannon path below):
+        // one reused `&mut` working position drives `multi_royal_move_is_legal` →
+        // `apply_with_undo`, so there is no per-move heap work. This single
+        // ~2.4 KB copy is intrinsic to the `&self` API and already minimized by
+        // #193/#353; the incremental-attacker DB (#310/#364) and the one-hot
+        // slider reversal (#420) are proven negatives — do NOT re-attempt. See the
+        // fuller note at the cannon `let mut scratch` below and
+        // `docs/perf-variants.md`.
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
             if !no_fast_accept && multi_royal_move_off_lines::<G>(&mv, kings, royal_lines) {
@@ -2376,6 +2384,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // move, so the fast-accept path stays correct.
         let contested_flag_rank = self.contested_flag_rank(us);
 
+        // Per-node scratch clone — the intrinsic cost of the `&self` legal-move
+        // API, and the single slowest per-node line for the cannon / multi-royal
+        // family (xiangqi, janggi, cannonshogi, shako, xiangfu, chak). `self` is
+        // borrowed immutably, but the legality test drives **make/unmake**
+        // (`cannon_move_is_legal` → `apply_with_undo` … `undo`), which needs a
+        // `&mut` working position; one clone here is reused for every sibling move
+        // with no per-move heap work (issues #193/#353 already collapsed the old
+        // per-move clones down to this single one). The residual ~2.4 KB copy is
+        // what remains, and eliminating it would need an `&mut self` API or
+        // interior mutability, not a hot-path tweak.
+        //
+        // Two lever ideas here are **proven negatives — do NOT re-attempt** (see
+        // `docs/perf-variants.md` § cannon-family per-node cost):
+        //   * an **incremental-attacker DB** carried across make/unmake (issues
+        //     #310/#364) measured slower on *every* cannon variant — the rebuild /
+        //     restore bookkeeping costs more than the scan it replaces;
+        //   * the one-hot slider `reverse_bits` → `bit()` reversal (issue #420)
+        //     regressed chu +13% / xiangqi +11% (`U256::from_bit`'s `< 128` branch
+        //     is slower than the branchless, CSE-friendly reversal).
         let mut scratch = self.clone();
         pseudo.for_each(|mv| {
             if let Some(rank) = contested_flag_rank {
