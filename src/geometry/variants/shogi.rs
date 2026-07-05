@@ -351,7 +351,39 @@ impl WideVariant<Shogi9x9> for ShogiRules {
         // side.
         true
     }
+
+    // --- Impasse / jishogi (entering king) --------------------------------
+    //
+    // Terminal-only adjudication (reported from the single position), never
+    // consulted by move generation, so perft is byte-identical.
+
+    fn impasse_rule() -> Option<crate::geometry::variant::ImpasseRule> {
+        // The modern Shogi **27-point rule** (lishogi's "27 Point System"): at the
+        // start of its turn the side to move wins if its king is in the promotion
+        // zone (and not in check), it has at least 10 *other* pieces in the zone,
+        // and its point count — Rook / Bishop and their promotions (Dragon King,
+        // Dragon Horse) = 5, every other non-king piece = 1, summed over pieces in
+        // the zone or in hand — reaches the per-side threshold: 28 for the first
+        // player (Sente, mcr's White), 27 for the second (Gote, mcr's Black).
+        Some(crate::geometry::variant::ImpasseRule {
+            min_pieces_in_zone: 10,
+            sente_threshold: 28,
+            gote_threshold: 27,
+            big_piece_points: 5,
+            small_piece_points: 1,
+            big_roles: &SHOGI_IMPASSE_BIG_ROLES,
+        })
+    }
 }
+
+/// The "big pieces" scored 5 in the Shogi impasse point count: the Rook and
+/// Bishop and their promoted forms (Dragon King `+R`, Dragon Horse `+B`).
+pub(crate) const SHOGI_IMPASSE_BIG_ROLES: [WideRole; 4] = [
+    WideRole::Rook,
+    WideRole::Bishop,
+    WideRole::Dragon,
+    WideRole::DragonHorse,
+];
 
 impl ShogiRules {
     /// The mask of every square on `rank`.
@@ -394,3 +426,115 @@ impl ShogiRules {
 /// [`Shogi::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the hand, drops, and promotion zone.
 pub type Shogi = GenericPosition<Shogi9x9, ShogiRules>;
+
+#[cfg(test)]
+mod impasse_tests {
+    //! Hand-derived tests for the Shogi impasse / jishogi (entering-king)
+    //! 27-point declaration. The positions are constructed (not from real games)
+    //! to pin the exact point count, the 10-piece-in-zone floor, and the
+    //! sente/gote 28-vs-27 threshold asymmetry. Fairy-Stockfish implements **no**
+    //! entering-king rule (its shogi has only sennichite / perpetual-check and
+    //! `tsumeMode`), so these are hand-derived from lishogi's published 27-point
+    //! rule, not cross-checked against FSF.
+
+    use super::Shogi;
+    use crate::geometry::{GenericGame, Shogi9x9, WideEndReason, WideOutcome};
+    use crate::Color;
+
+    type ShogiGame = GenericGame<Shogi9x9, ShogiRules>;
+    use super::ShogiRules;
+
+    // White (Sente, first player, threshold 28). Its zone (the top three ranks)
+    // holds 12 non-king pieces — 2 Dragons + 2 Dragon Horses (4 big × 5 = 20) and
+    // 4 Silvers + 4 Golds (8 small × 1 = 8) — for exactly 28 points, with the King
+    // in the zone and not in check: a met declaration.
+    const WIN_WHITE: &str = "+R+R+B+BKSSSS/GGGG5/9/9/9/9/9/9/4k4[] w - - 0 1";
+
+    // Identical shape but one point short: 4 big + 7 small = 27 (11 non-king
+    // pieces in zone). Below Sente's 28, so **not** declarable.
+    const WHITE_ONE_SHORT: &str = "+R+R+B+BKSSS1/GGGG5/9/9/9/9/9/9/4k4[] w - - 0 1";
+
+    // Black (Gote, second player, threshold 27). The mirror of `WHITE_ONE_SHORT`
+    // with colours swapped and Black to move: 4 big + 7 small = 27, which **does**
+    // meet Gote's lower 27 threshold — the sente/gote asymmetry.
+    const WIN_BLACK: &str = "4K4/9/9/9/9/9/9/gggg5/+r+r+b+bksss1[] b - - 0 1";
+
+    // King in the zone but alone (no other pieces): far below the 10-piece floor.
+    const LONE_KING_IN_ZONE: &str = "4K4/9/9/9/9/9/9/9/4k4[] w - - 0 1";
+
+    // A hand adds points but not in-zone pieces: White's king is in the zone with
+    // only 9 board pieces there (below the 10 floor), even though the hand alone
+    // would carry the points. Not declarable — the 10 must be *on the board*.
+    const HAND_HEAVY_TOO_FEW_IN_ZONE: &str =
+        "+R+R+B+BKSSSS/9/9/9/9/9/9/9/4k4[RRBBGGGGSSSS] w - - 0 1";
+
+    #[test]
+    fn white_sente_28_points_declares() {
+        let pos = Shogi::from_fen(WIN_WHITE).expect("valid FEN");
+        assert_eq!(pos.end_reason(), Some(WideEndReason::Impasse));
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+
+    #[test]
+    fn white_one_point_short_does_not_declare() {
+        let pos = Shogi::from_fen(WHITE_ONE_SHORT).expect("valid FEN");
+        // 27 < Sente's 28: not an impasse. The position is quiet (White has legal
+        // moves and is not in check), so the game is simply ongoing.
+        assert_ne!(pos.end_reason(), Some(WideEndReason::Impasse));
+        assert_eq!(pos.end_reason(), None);
+        assert_eq!(pos.outcome(), None);
+    }
+
+    #[test]
+    fn black_gote_27_points_declares() {
+        let pos = Shogi::from_fen(WIN_BLACK).expect("valid FEN");
+        // The very count that is one short for Sente meets Gote's 27 threshold.
+        assert_eq!(pos.end_reason(), Some(WideEndReason::Impasse));
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black
+            })
+        );
+    }
+
+    #[test]
+    fn lone_king_in_zone_is_not_impasse() {
+        let pos = Shogi::from_fen(LONE_KING_IN_ZONE).expect("valid FEN");
+        assert_eq!(pos.end_reason(), None);
+    }
+
+    #[test]
+    fn hand_points_do_not_satisfy_the_ten_in_zone_floor() {
+        let pos = Shogi::from_fen(HAND_HEAVY_TOO_FEW_IN_ZONE).expect("valid FEN");
+        // Nine board pieces in the zone (< 10), so no declaration even though the
+        // hand's points would be more than enough.
+        assert_ne!(pos.end_reason(), Some(WideEndReason::Impasse));
+    }
+
+    #[test]
+    fn startpos_is_not_impasse() {
+        let pos = Shogi::startpos();
+        assert_eq!(pos.end_reason(), None);
+    }
+
+    #[test]
+    fn game_level_surfaces_the_impasse_win() {
+        // The position-level terminal flows through the GenericGame wrapper.
+        let game = ShogiGame::new(Shogi::from_fen(WIN_WHITE).expect("valid FEN"));
+        assert_eq!(game.end_reason(), Some(WideEndReason::Impasse));
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+        assert!(game.is_over());
+        assert!(!game.is_draw());
+    }
+}
