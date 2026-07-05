@@ -844,19 +844,93 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         !self.attackers_to(sq, by, self.board.occupied()).is_empty()
     }
 
+    /// Returns `true` if any enemy Tenjiku **range-jumping General** (#478) gives
+    /// check to the royal square `king` by *jumping* over a screen (#491) — reaching
+    /// `king` across a **consecutive** run of strictly lower-ranked pieces it leaps.
+    ///
+    /// This is the jump-capture attack the ordinary slide cannot express, and so the
+    /// piece the generic [`attackers_to`](Self::attackers_to) reverse-projection
+    /// misses: a General's ordinary ride — including its capture of the **first**
+    /// blocker — is a plain symmetric slider that `attackers_to` already sees, so only
+    /// the capture reached **beyond** the first blocker is added here. Because the
+    /// jump is occupancy-dependent and asymmetric (a run of low-ranked screens, ended
+    /// by the first equal-or-higher piece), it cannot be reverse-projected from the
+    /// king square; this scans **forward** from each enemy General exactly as the
+    /// [`gen_jump_general_moves`](Self::gen_jump_general_moves) generator does, on the
+    /// live board. Gated Tenjiku-only by the caller via
+    /// [`has_jump_captures`](WideVariant::has_jump_captures); every other variant
+    /// never calls it.
+    #[must_use]
+    fn jump_general_checks(&self, king: Square<G>, by: Color) -> bool {
+        let board = &self.board;
+        for role in WideRole::ALL {
+            if !V::role_is_jump_capturer(role) {
+                continue;
+            }
+            let generals = board.pieces(by, role);
+            if generals.is_empty() {
+                continue;
+            }
+            let mover_rank = V::role_jump_rank(role);
+            let dirs = V::role_jump_dirs(role);
+            for from in generals {
+                for &(df, dr) in dirs {
+                    let mut cur = from.offset(df, dr);
+                    // Whether we have already leapt at least one blocker: only a
+                    // capture reached *after* a jump is the new (#491) attack — the
+                    // first blocker's own capture belongs to the ordinary ride, which
+                    // `attackers_to` already reverse-projects. Once jumping, the run
+                    // must stay consecutive: an empty square ends it (the General
+                    // cannot resume sliding over empties to a distant capture).
+                    let mut jumped = false;
+                    while let Some(sq) = cur {
+                        let Some(piece) = board.piece_at(sq) else {
+                            if jumped {
+                                break;
+                            }
+                            cur = sq.offset(df, dr);
+                            continue;
+                        };
+                        if jumped && sq == king {
+                            // The king stands within / just beyond a consecutive
+                            // jumped run — a jump-check the ordinary ride could not
+                            // deliver.
+                            return true;
+                        }
+                        if V::role_jump_rank(piece.role) < mover_rank {
+                            jumped = true;
+                            cur = sq.offset(df, dr);
+                        } else {
+                            // Equal-or-higher rank (a royal is rank 4, above every
+                            // General): an opaque wall — the ray stops. If this is the
+                            // king itself with `jumped == false` it is the ordinary
+                            // first-blocker check, already seen by `attackers_to`.
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Returns `true` if the royal square `sq` is attacked by color `by` under
     /// `occupied`, **including** any variant-specific extra royal attack.
     ///
-    /// This is the per-role [`attackers_to`](Self::attackers_to) test ORed with
-    /// the default-off [`WideVariant::extra_royal_attack`] hook — the Xiangqi
-    /// flying-general confrontation (the two generals facing down an open file).
-    /// For every variant without that hook (`has_flying_general() == false`) the
-    /// extra term is skipped and this is exactly `attackers_to(...).is_empty()`
-    /// negated, so those variants are byte-identical.
+    /// This is the per-role [`attackers_to`](Self::attackers_to) test ORed with the
+    /// default-off [`WideVariant::extra_royal_attack`] hook (the Xiangqi flying-general
+    /// confrontation — two generals facing down an open file) and, for Tenjiku, the
+    /// range-jumping General's [jump-check](Self::jump_general_checks). For every
+    /// variant with neither hook (`has_flying_general()` and `has_jump_captures()`
+    /// both `false`) the extra terms are skipped and this is exactly
+    /// `attackers_to(...).is_empty()` negated, so those variants are byte-identical.
     #[must_use]
     #[inline]
     fn royal_attacked(&self, sq: Square<G>, by: Color, occupied: Bitboard<G>) -> bool {
         if !self.attackers_to(sq, by, occupied).is_empty() {
+            return true;
+        }
+        if V::has_jump_captures() && self.jump_general_checks(sq, by) {
             return true;
         }
         V::has_flying_general() && V::extra_royal_attack(&self.board, sq, by, occupied)
@@ -2603,6 +2677,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 return false;
             }
         }
+        // The Tenjiku range-jumping General's jump-*check* through a screen (#491):
+        // an occupancy-dependent, asymmetric attack the reverse-projecting slider
+        // scan above cannot see, so it is tested forward here. Gated behind
+        // `has_jump_captures` (default-off), so every other variant is byte-identical.
+        if V::has_jump_captures() && self.jump_general_checks(king, by) {
+            return false;
+        }
         // The Xiangqi flying-general file attack (default-off elsewhere). Skipped
         // when `consider_facing` is false — an en-passant capture, whose FSF legality
         // ignores this pseudo-attacker (issue #359).
@@ -2741,16 +2822,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         let occ = self.board.occupied();
         let them = who.opposite();
+        // A royal is safe when no ordinary attacker bears on it *and* — for Tenjiku —
+        // no enemy General jump-*checks* it through a screen (#491). The jump term is
+        // gated behind `has_jump_captures` (default-off), so Spartan / Chak are
+        // byte-identical. This mirrors `king_safe_after` exactly, so the debug-assert
+        // that cross-checks the two never diverges.
+        let safe = |k: Square<G>| {
+            self.attackers_to(k, them, occ).is_empty()
+                && !(V::has_jump_captures() && self.jump_general_checks(k, them))
+        };
         // See `royals_survive_after`: Chak requires every royal safe, Spartan only
         // one. Default (at-least-one) keeps Spartan byte-identical.
         if V::royals_all_must_survive() {
-            kings
-                .into_iter()
-                .all(|k| self.attackers_to(k, them, occ).is_empty())
+            kings.into_iter().all(safe)
         } else {
-            kings
-                .into_iter()
-                .any(|k| self.attackers_to(k, them, occ).is_empty())
+            kings.into_iter().any(safe)
         }
     }
 
@@ -2825,7 +2911,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             let is_area_burner = V::has_area_burn() && V::role_is_area_burner(role);
             for from in board.pieces(us, role) {
                 if is_area_burner {
-                    self.gen_fire_demon_moves(pseudo, from, role, us, occupied, their_pieces);
+                    self.gen_fire_demon_moves(
+                        pseudo,
+                        from,
+                        role,
+                        us,
+                        occupied,
+                        their_pieces,
+                        capture_immune_enemies,
+                    );
                     continue;
                 }
                 // A board-aware role (the Janggi cannon, whose screen/target may
@@ -2911,7 +3005,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // leaper `role_attacks` cannot express. Emitted only under `has_lion_moves`,
         // so every other variant skips this and is byte-identical.
         if V::has_lion_moves() {
-            self.gen_lion_moves(pseudo, us, their_pieces, our_pieces);
+            self.gen_lion_moves(pseudo, us, their_pieces, our_pieces, capture_immune_enemies);
         }
 
         // Tenjiku range-jumping Generals (issue #478): the jump-captures beyond the
@@ -2955,7 +3049,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         us: Color,
         their_pieces: Bitboard<G>,
         our_pieces: Bitboard<G>,
+        immune: Bitboard<G>,
     ) {
+        // A capture-immune enemy (Tenjiku's Great General, #491) may be **neither
+        // stepped onto nor captured** by a Lion multi-step: treat it like a friendly
+        // blocker for stepping (`blocked`) and drop it from the capturable set
+        // (`capturable`). Both `immune` and hence these masks are empty / unchanged for
+        // every non-Tenjiku Lion variant (Chu / Dai have no immune role), so their
+        // generation is byte-identical.
+        let blocked = our_pieces | immune;
+        let capturable = their_pieces & !immune;
         // The eight King directions, the two-step alphabet of a full lion.
         const DIRS8: [(i8, i8); 8] = [
             (-1, -1),
@@ -2996,12 +3099,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         let Some(s1) = from.offset(d1.0, d1.1) else {
                             continue;
                         };
-                        if our_pieces.contains(s1) {
-                            // Cannot step onto a friendly piece (only jump over it,
-                            // which the leaper already covers).
+                        if blocked.contains(s1) {
+                            // Cannot step onto a friendly piece — or an immune Great
+                            // General (#491) — (only jump over it, which the leaper
+                            // already covers).
                             continue;
                         }
-                        let s1_enemy = their_pieces.contains(s1);
+                        let s1_enemy = capturable.contains(s1);
                         if s1_enemy {
                             // igui: capture the adjacent enemy and return home.
                             out.push(WideMove::lion(from, from, s1, true, false));
@@ -3030,10 +3134,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                             let Some(s2) = s1.offset(d2.0, d2.1) else {
                                 continue;
                             };
-                            if s2 == from || our_pieces.contains(s2) {
+                            if s2 == from || blocked.contains(s2) {
                                 continue;
                             }
-                            let s2_enemy = their_pieces.contains(s2);
+                            let s2_enemy = capturable.contains(s2);
                             let emit = if s1_enemy {
                                 true
                             } else {
@@ -3056,12 +3160,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         let Some(s1) = from.offset(df, dr) else {
                             continue;
                         };
-                        if our_pieces.contains(s1) {
-                            // Cannot step onto a friendly first square (only the
-                            // leaper's jump over it, already covered).
+                        if blocked.contains(s1) {
+                            // Cannot step onto a friendly first square — or an immune
+                            // Great General (#491) — (only the leaper's jump over it,
+                            // already covered).
                             continue;
                         }
-                        let s1_enemy = their_pieces.contains(s1);
+                        let s1_enemy = capturable.contains(s1);
                         if s1_enemy {
                             // igui: capture the enemy on the line and return home.
                             out.push(WideMove::lion(from, from, s1, true, false));
@@ -3072,8 +3177,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                         // move only when it captures on a leg — a non-capturing
                         // straight double-step coincides with the leaper's jump.
                         if let Some(s2) = s1.offset(df, dr) {
-                            let s2_enemy = their_pieces.contains(s2);
-                            if !our_pieces.contains(s2) && (s1_enemy || s2_enemy) {
+                            let s2_enemy = capturable.contains(s2);
+                            if !blocked.contains(s2) && (s1_enemy || s2_enemy) {
                                 out.push(WideMove::lion(from, s2, s1, s1_enemy, s2_enemy));
                             }
                         }
@@ -3106,6 +3211,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// that igui is a *capture*), so it is emitted only when there is a victim.
     /// Runs only under [`WideVariant::has_area_burn`]; every other variant is
     /// byte-identical.
+    #[allow(clippy::too_many_arguments)]
     fn gen_fire_demon_moves<S: WideSink>(
         &self,
         out: &mut S,
@@ -3114,11 +3220,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         us: Color,
         occupied: Bitboard<G>,
         their_pieces: Bitboard<G>,
+        immune: Bitboard<G>,
     ) {
         let our_pieces = self.board.by_color(us);
         // The Flying-Ox ride: any distance vertically or diagonally, blocked by the
-        // first piece; friendly-occupied landing squares are not legal targets.
-        let targets = V::role_attacks(role, us, from, occupied) & !our_pieces;
+        // first piece; friendly-occupied landing squares are not legal targets, and a
+        // capture-immune enemy (Tenjiku's Great General, #491) may not be displaced by
+        // landing on it either. `immune` is empty for every non-Tenjiku area-burn
+        // variant, so their generation is byte-identical.
+        let targets = V::role_attacks(role, us, from, occupied) & !our_pieces & !immune;
         for to in targets {
             out.push(WideMove::new(
                 from,
@@ -3127,8 +3237,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             ));
         }
         // Igui: burn the adjacent enemies in place. Only a move when at least one
-        // enemy is adjacent to burn (a burn-nothing igui is not a move).
-        let adjacent_enemies = king_attacks::<G>(from) & their_pieces;
+        // *burnable* enemy is adjacent (a burn-nothing igui is not a move); an
+        // immune Great General does not count as a victim (#491).
+        let adjacent_enemies = king_attacks::<G>(from) & their_pieces & !immune;
         if !adjacent_enemies.is_empty() {
             out.push(WideMove::new(
                 from,
@@ -4611,16 +4722,28 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // read from the post-lift board and is naturally `false` there.
                 let dest_capture = self.board.piece_at(to).is_some();
                 let burn = king_attacks::<G>(to) & self.board.by_color(them);
+                // A capture-immune enemy — Tenjiku's Great General (#491) — is **not**
+                // burned: the area burn is a separate capture path from the ordinary
+                // slide/jump immunity mask, so its immunity must be re-enforced here.
+                // `role_is_capture_immune` is default-`false`, so every other
+                // area-burn variant removes every victim exactly as before. Track
+                // whether any piece was actually removed so the clock resets only on a
+                // real capture.
+                let mut burned_any = false;
                 for victim_sq in burn {
                     if let Some(victim) = self.board.piece_at(victim_sq) {
+                        if V::role_is_capture_immune(victim.role) {
+                            continue;
+                        }
                         self.board.remove_known(victim_sq, victim);
+                        burned_any = true;
                     }
                 }
                 // The demon burns at least one enemy on any legal Fire Demon move
-                // (an igui is generated only with a victim; a slide is re-tagged as
-                // a burn move but may land with nothing to burn) — reset the clock
-                // whenever it actually removes a piece.
-                reset_clock = dest_capture || !burn.is_empty();
+                // (an igui is generated only with a burnable victim; a slide is
+                // re-tagged as a burn move but may land with nothing to burn) — reset
+                // the clock whenever it actually removes a piece.
+                reset_clock = dest_capture || burned_any;
                 // `set_piece` clears any enemy on the landing square (the
                 // displacement capture) before landing the demon; for an igui the
                 // lifted `to == from` is empty, so this lands it back home.

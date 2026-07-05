@@ -47,10 +47,13 @@
 //!   The precise jump-capture mechanics are hand-derived and pinned in the
 //!   `Jump-capturing Generals` tests below.
 //!
-//! What is **not** modelled (see the module docs): a General's jump-*check* through a
-//! screen is not in the attack model (king-safety uses the ordinary ride only), and a
-//! Great General taken as a Lion double-capture's / Fire Demon burn's *secondary*
-//! victim is not specially made immune.
+//! Now modelled (issue #491, previously deferred): a General's jump-*check* through a
+//! screen **is** in the attack model (king-safety folds the jump into the royal-attack
+//! query, so a move leaving one's own king in a jump-check is illegal and a jump-check
+//! must be answered), and a Great General removed as a Lion double-capture's / Fire
+//! Demon burn's *secondary* victim **is** made immune. Both are hand-derived (HaChu
+//! segfaults on Tenjiku) — see the `Jump-general check detection` and
+//! `Great-General secondary-victim immunity` tests below.
 
 use mcr::geometry::{perft, Square, Tenjiku, Tenjiku16x16};
 
@@ -581,4 +584,194 @@ fn great_general_captures_great_general() {
         targets(jump, 0, 1).contains(&sq_index(0, 3)),
         "a Great General jump-captures an enemy Great General over a screen"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Jump-general **check detection** (issue #491, deferred from #478)
+// ---------------------------------------------------------------------------
+//
+// King-safety folds the range-jumping General's *jump* into the attack model: a
+// General giving check by jumping over a screen (a consecutive run of strictly
+// lower-ranked pieces) is now seen, so a move that leaves its own king in a
+// jump-check is illegal and a jump-check must be answered. The ordinary slide
+// (`attackers_to`) is blocked by the screen and cannot see the king, so these
+// checks are *only* visible through the new forward jump scan — the tests below
+// use exactly that isolation: `is_attacked` (ordinary) is `false` while
+// `is_check` (jump-aware) is `true`. No machine oracle (HaChu segfaults on
+// Tenjiku); the positions and counts are hand-derived.
+
+/// **A Rook General jump-checks the enemy king through a screen.**
+///
+/// ```text
+///   White: King a1=(0,0); Pawn a2=(0,1) (the screen the check jumps over).
+///   Black: Rook General a3=(0,2); King p16=(15,15).
+/// ```
+/// The Black Rook General slides down the a-file; its **ordinary** ride is stopped
+/// by the White Pawn on a2 (so the plain slider scan cannot see the King). But
+/// jumping that single lower-ranked screen lands it on the King a1 — a **jump-check**.
+/// So the ordinary `is_attacked(a1)` is `false` while `is_check()` is `true`: the
+/// King is in check and must respond. Its only replies are the Pawn's straight
+/// capture of the checker (a2×a3), and the two king steps b1 / b2 (neither on the
+/// General's file or rank) — **perft(1) = 3**. (Before #491 the jump-check was
+/// invisible, but this position happens to have the same 3 replies; the load-bearing
+/// assertion is that `is_check()` now fires.)
+#[test]
+fn jump_general_delivers_check_over_a_screen() {
+    let fen = "15k/16/16/16/16/16/16/16/16/16/16/16/16/****r15/P15/K15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    let king = Square::<Tenjiku16x16>::from_file_rank(0, 0).unwrap();
+    // The ordinary slider scan is blocked by the screen Pawn — it cannot see the
+    // King — yet the jump-aware royal query reports the check.
+    assert!(
+        !pos.is_attacked(king, Color::Black),
+        "the ordinary ride is blocked by the a2 screen"
+    );
+    assert!(
+        pos.is_check(),
+        "the Rook General jump-checks the King over the a2 screen"
+    );
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 3);
+    // Every legal reply leaves the King out of the jump-check.
+    for m in pos.legal_moves().iter() {
+        let after = pos.play(m);
+        assert!(
+            !after.is_in_check(Color::White),
+            "reply {} must resolve the jump-check",
+            m.to_uci::<Tenjiku16x16>()
+        );
+    }
+}
+
+/// **A king may not step into a jump-check** (and the move is otherwise legal by the
+/// ordinary attack model, so only #491 forbids it).
+///
+/// ```text
+///   White: King c3=(2,2); Pawn d2=(3,1) (a screen).
+///   Black: Rook General e2=(4,1); King p16=(15,15).
+/// ```
+/// The White King is **not** in check on c3. Its neighbour c2=(2,1) is unattacked by
+/// the ordinary ride — the General's rank-1 slide is stopped by the d2 screen at
+/// d2 — but the General **jumps** that screen to reach c2, so stepping the King
+/// c3→c2 lands it in a jump-check and is illegal. The King's other seven neighbours:
+/// d2 is a friendly Pawn (blocked), c2 is the forbidden jump-check square, and
+/// b2 / b3 / d3 / b4 / c4 / d4 are all safe (b2 is *not* jump-attacked — after the
+/// General jumps d2 the run ends on the empty c2, so it never reaches b2). That is
+/// **6** king moves; the Pawn adds its one forward push d2→d3. **perft(1) = 7**
+/// (before #491 the King could also step into c2, giving 8).
+#[test]
+fn king_may_not_step_into_a_jump_check() {
+    let fen = "15k/16/16/16/16/16/16/16/16/16/16/16/16/2K13/3P****r11/16 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    assert!(!pos.is_check(), "the King is not in check on c3");
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 7);
+    let king_targets = targets(fen, 2, 2);
+    assert!(
+        !king_targets.contains(&sq_index(2, 1)),
+        "the King may not step onto c2 — a jump-check square"
+    );
+    assert!(
+        king_targets.contains(&sq_index(1, 1)),
+        "b2 is safe (the jump run ends on the empty c2 and never reaches b2)"
+    );
+    assert!(
+        king_targets.contains(&sq_index(3, 2)) && king_targets.contains(&sq_index(2, 3)),
+        "d3 / c4 are ordinary safe king steps"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Great-General secondary-victim immunity (issue #491, deferred from #478)
+// ---------------------------------------------------------------------------
+//
+// The Great General is un-capturable except by another Great General. #478 enforced
+// that for the ordinary slide and the range-jump; #491 extends it to the two
+// *separate* capture paths that bypass that mask: a Fire Demon area-burn and a Lion
+// multi-step (double-capture / igui) may **not** remove a Great General. Hand-derived
+// (no Tenjiku oracle).
+
+/// **A Fire Demon area-burn does not burn an adjacent Great General**, and the demon
+/// cannot land on one either.
+///
+/// ```text
+///   White: Fire Demon h8=(7,7); King a1=(0,0).
+///   Black: Great General g9=(6,8); Pawn g7=(6,6); King p16=(15,15).
+/// ```
+/// Both the Great General (up-left diagonal) and the Pawn (down-left diagonal) are
+/// adjacent to the demon. The **igui** h8→h8 burns every adjacent *burnable* enemy:
+/// the Pawn g7 is burned, but the immune Great General g9 **survives**. And because
+/// the General sits on the demon's up-left ride, the demon may not land on it (a
+/// displacement capture is forbidden too): g9 is not a Fire-Demon target.
+#[test]
+fn fire_demon_burn_spares_great_general() {
+    let fen = "15k/16/16/16/16/16/16/6****g9/7****I8/6p9/16/16/16/16/16/K15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    // The demon may not land on the immune Great General (displacement capture).
+    assert!(
+        !targets(fen, 7, 7).contains(&sq_index(6, 8)),
+        "the Fire Demon may not displace-capture the Great General g9"
+    );
+    // Igui burns the adjacent Pawn but spares the immune Great General.
+    let after = after_move(fen, "h8h8");
+    assert!(
+        white_role_at(&after, 7, 7, WideRole::FireDemon),
+        "demon stays on h8"
+    );
+    assert!(!black_at(&after, 6, 6), "the adjacent Pawn g7 is burned");
+    let gg = Square::<Tenjiku16x16>::from_file_rank(6, 8).unwrap();
+    assert!(
+        matches!(pos.board().piece_at(gg), Some(p) if p.role == WideRole::GreatGeneral),
+        "sanity: the Great General is on g9 in the start position"
+    );
+    assert!(
+        matches!(after.board().piece_at(gg), Some(p) if p.color == Color::Black && p.role == WideRole::GreatGeneral),
+        "the immune Great General g9 is NOT burned by the area burn"
+    );
+    // No legal Fire-Demon (or any) move ever removes the Great General.
+    for m in pos.legal_moves().iter() {
+        let played = pos.play(m);
+        assert!(
+            matches!(played.board().piece_at(gg), Some(p) if p.role == WideRole::GreatGeneral),
+            "move {} must not remove the immune Great General",
+            m.to_uci::<Tenjiku16x16>()
+        );
+    }
+}
+
+/// **A Lion multi-step (double-capture / igui) does not remove a Great General.**
+///
+/// ```text
+///   White: Lion h8=(7,7); King a1=(0,0).
+///   Black: Great General g8=(6,7) (adjacent); King p16=(15,15).
+/// ```
+/// The Lion stands next to the immune Great General. Its ordinary single step onto
+/// g8 is already forbidden by the #478 immunity mask, and #491 additionally suppresses
+/// the Lion's **igui** (step onto g8 and return) and any **double-step** whose
+/// intermediate square is g8 — so no Lion move removes the Great General. Every legal
+/// move therefore leaves it on the board.
+#[test]
+fn lion_cannot_capture_great_general() {
+    let fen = "15k/16/16/16/16/16/16/16/6****g***N8/16/16/16/16/16/16/K15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    let gg = Square::<Tenjiku16x16>::from_file_rank(6, 7).unwrap();
+    assert!(
+        matches!(pos.board().piece_at(gg), Some(p) if p.role == WideRole::GreatGeneral),
+        "sanity: the Great General is adjacent to the Lion"
+    );
+    // The immune General's square is not a capture target of the Lion.
+    assert!(
+        !targets(fen, 7, 8).contains(&sq_index(6, 7)),
+        "the Lion may not step onto the immune Great General"
+    );
+    // No legal move (igui, double-step, or otherwise) removes the Great General.
+    let mut moves = 0;
+    for m in pos.legal_moves().iter() {
+        moves += 1;
+        let after = pos.play(m);
+        assert!(
+            matches!(after.board().piece_at(gg), Some(p) if p.role == WideRole::GreatGeneral),
+            "move {} must not remove the immune Great General",
+            m.to_uci::<Tenjiku16x16>()
+        );
+    }
+    assert!(moves > 0, "the Lion has legal moves to exercise");
 }
