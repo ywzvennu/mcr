@@ -170,5 +170,97 @@ negative. (The larger cannon-path per-node cost, e.g. the make/unmake scratch
 clone, is intrinsic to the `&self` legal-move API and was already minimized by
 #193/#353.)
 
+# Exhaustive per-variant perf + memory sweep (issue #503)
+
+Issues #409/#420 established throughput coverage over the whole `WideVariantId`
+registry, but the **memory** picture was thin: only Chu had a `size_of` bench,
+Dai/Tenjiku had no large-board perft, the footprint table hard-coded three rows,
+and no wide variant had an allocation-count number. Issue #503 closes those gaps
+so every variant now carries a size *and* space figure.
+
+## What the sweep now emits, per variant
+
+* **`size_of` / `align_of`** of the variant's concrete `GenericPosition`, read
+  from the new [`WideVariantId::position_footprint`] accessor (a `const fn`
+  matching the enum arm to `size_of`/`align_of` of its concrete position, plus a
+  forwarding [`AnyWideVariant::position_footprint`] instance method). The
+  `largeboard` bench's footprint table now iterates `WideVariantId::ALL` through
+  it instead of hard-coding Seirawan/Grand/Chu.
+* **Heap traffic** for a shallow move generation, measured by a counting
+  `#[global_allocator]` installed in the new `benches/footprint.rs`: the byte
+  size of the `legal_moves()` result buffer, and the allocation count / bytes a
+  fixed depth-2 perft performs from the start position.
+* alongside the existing **throughput** number from the `variants` sweep.
+
+The new `footprint` bench walks both the 69 wide variants and the 9 concrete 8×8
+variants; run it with `cargo bench --bench footprint` (add `-- --test` to print
+the table and self-check without timing).
+
+## Throughput — the 10 variants added since #409
+
+Same reduced-sample methodology as the #409 table (`--warm-up-time 0.4
+--measurement-time 1.0 --sample-size 10`); criterion medians, a few-percent
+run-to-run noise. These complete the registry table to all **69** wide variants.
+
+| variant | movegen (µs) | perft d2 (µs) |
+|---|--:|--:|
+| ai-wok | 11.37 | 165.7 |
+| centaur | 15.68 | 349.5 |
+| checkshogi | 27.57 | 629.7 |
+| dai | 213.8 | 10909.0 |
+| euroshogi | 18.33 | 244.6 |
+| judkins | 11.90 | 185.6 |
+| karouk | 9.29 | 199.3 |
+| micro | 10.85 | 94.1 |
+| tenjiku | 6092.6 | 281550.0 |
+| washogi | 16.16 | 1112.0 |
+
+**Dai** (15×15) and **Tenjiku** (16×16) are the two U256 large-shogi boards that
+had no benchmark before; they now also have pinned large-board perft benches in
+`largeboard` (`dai_15x15/startpos_d{1,2}` = 71 / 5041, `tenjiku_16x16/startpos_d{1,2}`
+= 72 / 5663 — HaChu-validated, asserted in-bench before timing). Their cost tracks
+board size and the ranging-slider / Lion (and, for Tenjiku, jumping-general and
+Fire-Demon) rule richness — Tenjiku's 256-square board fills the two-limb U256
+backing exactly, so it is the heaviest position in the project, as expected. No
+cliff; the wider boards are simply proportionately more work.
+
+## Memory footprint (`size_of`, current toolchain)
+
+The concrete positions have grown since the #409/#420 tables (added variant
+state and role sets), so these are the current measured sizes across the whole
+registry via the new accessor. The value depends only on the backing integer:
+
+| backing | `GenericPosition` size (B) | align | example variants |
+|---|--:|--:|---|
+| `u64` (≤ 8×8) | **1528** | 8 | seirawan, makruk, dobutsu, micro, spartan |
+| `u128` (9×9 … 11×11) | **2752** | 16 | shogi, xiangqi, grand, capablanca, washogi |
+| U256 (12×12 … 16×16) | **5168** | 16 | chu, dai, tenjiku |
+
+`size_of::<WideMove>() == 8` and `size_of::<Move>() == 2` still hold; the
+concrete `AnyVariant` runtime facade is 96 B (sized by its largest 8×8 arm).
+
+## Allocation counts — a shallow-perft finding
+
+The counting allocator confirms the alloc-free-perft property holds for **most**
+variants: a depth-2 start-position perft performs **zero** heap allocations for
+the large majority (all the big shogi boards — chu, dai, tenjiku — included). A
+small set does allocate on this path, and the numbers pinpoint exactly which:
+
+| variant | perft d2 nodes | allocs | bytes |
+|---|--:|--:|--:|
+| duck | 379440 | 7692 | 2789632 |
+| shouse | 7944 | 93 | 744 |
+| seirawan | 784 | 29 | 232 |
+| spartan | 640 | 21 | 84 |
+
+`duck` is inherent — every move spawns a duck-placement sub-enumeration, so the
+tree (not a single `legal_moves`) fans out and touches the heap. The others are
+the gating / pocket-carrying variants whose make-move clones a small owned buffer.
+This is a *measurement*, not a regression: it turns the previously unenforced
+"alloc-free perft" claim into a concrete per-variant number that a future change
+can be checked against.
+
 [`WideVariantId::ALL`]: https://docs.rs/mcr/latest/mcr/geometry/enum.WideVariantId.html
 [`AnyWideVariant`]: https://docs.rs/mcr/latest/mcr/geometry/enum.AnyWideVariant.html
+[`WideVariantId::position_footprint`]: https://docs.rs/mcr/latest/mcr/geometry/enum.WideVariantId.html#method.position_footprint
+[`AnyWideVariant::position_footprint`]: https://docs.rs/mcr/latest/mcr/geometry/enum.AnyWideVariant.html#method.position_footprint

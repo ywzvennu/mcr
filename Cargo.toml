@@ -142,6 +142,10 @@ harness = false
 name = "largeboard"
 harness = false
 
+[[bench]]
+name = "footprint"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
