@@ -422,3 +422,29 @@ impl WideVariant<Chennis7x7> for ChennisRules {
 /// for the per-move flip, the hand, the dual-form drops, and the king mobility
 /// region.
 pub type Chennis = GenericPosition<Chennis7x7, ChennisRules>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::position::WideOutcome;
+
+    /// Stalemate is scored as a **loss** for the side to move (FSF
+    /// `stalemateValue = loss`, issue #498). The Black king is confined to files
+    /// b..f on ranks 4-7, so on b7 its only in-region steps are b6, c6 and c7: a
+    /// White Rook on c1 seals the c-file (c6/c7) and a White Knight on d5 covers
+    /// b6 (and c7), while b7 itself is unattacked. Black is stalemated, so Black
+    /// loses and White wins.
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos =
+            Chennis::from_fen("1k5/7/3N3/7/7/7/2R1K2[] b - - 0 1").expect("valid chennis FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+}
