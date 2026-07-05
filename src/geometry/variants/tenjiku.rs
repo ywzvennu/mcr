@@ -759,6 +759,16 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
         // side.
         true
     }
+
+    // `attack_repetition_loses` is deliberately left at its default `false` (issue
+    // #485). Chu and Dai enable the "attacked pieces however futile → attacker must
+    // deviate or lose" rule, but Tenjiku's repetition convention is, per Wikipedia's
+    // *Tenjiku shogi* article, "debated and uncertain": the historical sources give
+    // no ruling and applying the modern Chu / JCSA rule to Tenjiku is explicitly only
+    // *presumed*, not confirmed. There is also no machine oracle (HaChu segfaults on
+    // Tenjiku). Enabling it would be guessing a disputed rule, so Tenjiku keeps only
+    // the base sennichite / perpetual-check of issue #471 and draws a non-checking
+    // repetition. See the [`GenericGame`](crate::geometry::game) module docs.
 }
 
 /// The Lion's reachable squares on an empty board: every square within two King

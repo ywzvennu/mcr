@@ -80,13 +80,50 @@
 //!
 //! * **Attack strength.** The test applies no value/protection filter (unlike the
 //!   Xiangqi chase above): the moved piece attacking *any* enemy non-royal counts.
-//! * **Ambiguous sub-cases fall back to the draw.** When **both** sides attacked in
-//!   the cycle, sources disagree (chessvariants forbids the repeating move outright;
-//!   others draw); mcr draws. The "one side started passing" sub-rule (Chu's Lion
-//!   `jitto` pass) is likewise **not** modelled here and draws. Only the
-//!   well-characterized one-sided-attack core is decisive. Tenjiku, whose repetition
-//!   convention is debated and unoracled, keeps only the base sennichite /
-//!   perpetual-check of issue #471 and does **not** enable this rule.
+//! * **Ambiguous sub-cases fall back to the draw.** Only the well-characterized
+//!   one-sided-attack core is decisive; three neighbouring sub-rules (issue #485)
+//!   are deliberately left as the sennichite draw, each for the sourced reason set
+//!   out below.
+//!
+//! ## Deferred attack-repetition sub-rules (issue #485)
+//!
+//! The modern Chu ruleset — H. G. Muller's rules (the HaChu author's; "perpetual
+//! checking is forbidden … other repetitions lose for the side that creates them"),
+//! adopted by the Japanese Chu Shogi Association and summarised on Wikipedia's *Chu
+//! shogi* article — scores a four-fold repeated cycle by a strict priority list:
+//! **(1)** perpetual **check** — the checker must deviate or lose; **(2)**
+//! **asymmetric attack** — if one side attacked enemy pieces (however futile) with
+//! any of its cycle moves and the other attacked nothing, that side must deviate or
+//! lose; **(3)** **consecutive passes** — if the repetition is sustained by both
+//! sides passing, whoever passed *first* must deviate or lose; **(4)** otherwise the
+//! position is a **draw**. mcr implements (1) and (2). The three open questions:
+//!
+//! * **Both sides attacked (mutual chase).** The priority list makes a repetition
+//!   decisive only in the *asymmetric* case (2); it has **no** clause for a mutual
+//!   attack, so under the modern loss-adjudication reading a two-sided chase falls
+//!   through to the (4) **draw**. (The older chessvariants.com Chu page instead
+//!   frames repetition as making the *repeating move* illegal — "a player may not
+//!   make a move if the resulting position has previously occurred" — a
+//!   move-legality-**in-history** concept, not a loss, and one that a history-free
+//!   move generator cannot express at generation time.) Both readings therefore
+//!   leave the mutual case as the sennichite draw, so mcr draws. This is **not** a
+//!   guess: it is what the dominant modern ruleset actually prescribes — a mutual
+//!   chase is simply not decisive.
+//! * **Lion `jitto`-pass "who passed first" (rule 3).** Canonically the side that
+//!   *started* passing loses. mcr keeps the **draw**: the rule is rare, entirely
+//!   unoracled (HaChu never exercises it), needs history from *before* the four-fold
+//!   window to name the first passer, and — because a `jitto` pass returns a Lion to
+//!   its home square where it may still threaten enemy pieces — its precedence
+//!   against the "attacks however futile" test (2) is pinned down by **no**
+//!   authoritative source. A false loss here would be worse than a conservative
+//!   draw, so mcr does not model it.
+//! * **Tenjiku.** Tenjiku's repetition convention is, per Wikipedia's *Tenjiku
+//!   shogi* article, **"debated and uncertain"**: the historical sources give no
+//!   ruling, and applying the Chu / JCSA rule to it is explicitly only *presumed*,
+//!   not confirmed doctrine. Enabling the attack-repetition loss would be guessing a
+//!   disputed rule, so Tenjiku keeps **only** the base sennichite / perpetual-check
+//!   of issue #471 and does **not** enable
+//!   [`attack_repetition_loses`](WideVariant::attack_repetition_loses).
 //!
 //! # Bikjang (Janggi)
 //!
@@ -632,15 +669,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// the other side attacked on **none** of its moves — or `None` if the cycle is
     /// not a clean one-sided attack.
     ///
-    /// This is the chessvariants Chu ruleset's asymmetric test ("one side attacked
-    /// pieces with any of his moves, and the other doesn't"): an **OR** over each
-    /// side's moves, not the every-move **AND** of [`perpetual_chaser`] /
+    /// This is the modern Chu ruleset's asymmetric test ("one side attacked pieces
+    /// with any of his moves, and the other doesn't"): an **OR** over each side's
+    /// moves, not the every-move **AND** of [`perpetual_chaser`] /
     /// [`perpetual_checker`]. When neither side attacked (a quiet repetition) the
-    /// result is the ordinary sennichite draw; when **both** attacked — a case whose
-    /// exact adjudication is genuinely ambiguous across sources (chessvariants would
-    /// forbid the repeating move outright; other rule-sets differ) — mcr
-    /// conservatively also falls back to the draw rather than guess, so only the
-    /// well-characterized one-sided-attack core is decisive.
+    /// result is the ordinary sennichite draw; when **both** attacked the modern
+    /// priority list has no decisive clause (it makes only the *asymmetric* case a
+    /// loss), so the mutual chase is the sennichite draw as well — see the
+    /// [module docs](self#deferred-attack-repetition-sub-rules-issue-485) for the
+    /// sources and the two-sided / passing / Tenjiku sub-rules left as the draw
+    /// under issue #485.
     ///
     /// [`perpetual_chaser`]: Self::perpetual_chaser
     /// [`perpetual_checker`]: Self::perpetual_checker
@@ -1219,7 +1257,7 @@ mod tests {
     use super::*;
     use crate::geometry::variants::{
         Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, Janggi, Makpong, Makruk, Minishogi,
-        Minixiangqi, ShoShogi, Shogi, Sittuyin, Xiangqi,
+        Minixiangqi, ShoShogi, Shogi, Sittuyin, Tenjiku, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1746,6 +1784,77 @@ mod tests {
                 winner: Color::Black,
             })
         );
+    }
+
+    #[test]
+    fn chu_mutual_attack_repetition_draws_by_sennichite() {
+        // Issue #485 sub-rule 1 (both-sides attack). Each side keeps a Rook (Chariot)
+        // perpetually attacking a lone enemy Gold that shuffles up and down the Rook's
+        // file, so BOTH sides attack an enemy non-royal on their Rook moves. The
+        // modern Chu priority list makes only the *asymmetric* case decisive, so a
+        // mutual chase is the sennichite draw — NOT an attack-repetition loss. This
+        // locks in the documented conservative decision. Neither Rook reaches an enemy
+        // King (kings in opposite corners, Rooks on the d- and i-files), so it is not
+        // perpetual check either. Chu is 12x12, index = rank*12 + file.
+        //   White: Ka1=0, R d1=3 (<->d2=15) attacks Black g d8=87 (<->d9=99).
+        //   Black: kl12=143, r i12=140 (<->i11=128) attacks White G i5=56 (<->i6=68).
+        // The Golds sit outside both four-rank promotion zones, so no promotion
+        // perturbs the cycle.
+        let pos = GenericPosition::<_, _>::from_fen(
+            "8r2k/12/12/12/3g8/12/12/8G3/12/12/12/K2R8 w - - 0 1",
+        )
+        .expect("valid chu fen");
+        let _: &Chu = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        // Three eight-ply cycles bring the start to its fourth occurrence. Each Rook
+        // re-attacks its target Gold; each Gold flees along the file, attacking nothing.
+        for _ in 0..3 {
+            play(&mut game, 3, 15); // W R d1->d2 (attacks the Black Gold)
+            play(&mut game, 140, 128); // B r i12->i11 (attacks the White Gold)
+            play(&mut game, 56, 68); // W G i5->i6 (flees, attacks nothing)
+            play(&mut game, 87, 99); // B g d8->d9 (flees, attacks nothing)
+            play(&mut game, 15, 3); // W R d2->d1 (attacks the Black Gold)
+            play(&mut game, 128, 140); // B r i11->i12 (attacks the White Gold)
+            play(&mut game, 68, 56); // W G i6->i5 (flees)
+            play(&mut game, 99, 87); // B g d9->d8 (flees)
+        }
+        assert_eq!(game.repetition_count(), 4);
+        // Both sides attacked, so no clean one-sided verdict: sennichite draw.
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn tenjiku_one_sided_attack_repetition_draws() {
+        // Issue #485 sub-rule 3 (Tenjiku convention). The very construction that
+        // LOSES for the attacker in Chu / Dai — a White Rook perpetually attacking a
+        // lone Black Gold that shuffles in its file while Black attacks nothing — must
+        // be only a sennichite DRAW in Tenjiku, whose repetition convention is
+        // "debated and uncertain" (Wikipedia) and so is left at the conservative base
+        // rule (`attack_repetition_loses` is not enabled). Tenjiku is 16x16, index =
+        // rank*16 + file. White: Ka1=0, R d1=3 (<->d2=19) attacks Black g d8=115
+        // (<->d9=131). Black king p16=255. The Gold is outside both promotion zones.
+        let pos = GenericPosition::<_, _>::from_fen(
+            "15k/16/16/16/16/16/16/16/3g12/16/16/16/16/16/16/K2R12 w - - 0 1",
+        )
+        .expect("valid tenjiku fen");
+        let _: &Tenjiku = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 3, 19); // W R d1->d2 (attacks the Black Gold)
+            play(&mut game, 115, 131); // B g d8->d9 (flees, attacks nothing)
+            play(&mut game, 19, 3); // W R d2->d1 (attacks the Black Gold)
+            play(&mut game, 131, 115); // B g d9->d8 (flees)
+        }
+        assert_eq!(game.repetition_count(), 4);
+        // Attack-repetition is NOT enabled for Tenjiku, so this draws by sennichite
+        // even though the identical Chu / Dai cycle is an attack-repetition loss.
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
     }
 
     // --- Makruk / Cambodian / ASEAN counting -----------------------------
