@@ -1918,6 +1918,108 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     fn write_first_move_rights(_rights: GenericCastling, _out: &mut alloc::string::String) {}
 }
 
+/// Which of a [`WideVariant`]'s history-independent **draw / adjudication hooks**
+/// are overridden away from their trait defaults.
+///
+/// This is a static, position-free snapshot computed by calling the concrete
+/// rules' hook methods and comparing each to its default (see
+/// [`GenericPosition::overridden_draw_hooks`](super::position::GenericPosition::overridden_draw_hooks)).
+/// It exists so a meta-test can *introspect* — rather than hand-maintain — the set
+/// of special terminal rules each variant carries, and require every variant that
+/// carries one to register an adjudication test (see `tests/coverage_gate.rs`).
+///
+/// Each field is `true` when the variant overrides that hook. The twelve hooks
+/// mirror the [`WideVariant`] draw-rule surface: the counting endgame
+/// ([`counting_rule`](WideVariant::counting_rule)), the impasse / jishogi rule
+/// ([`impasse_rule`](WideVariant::impasse_rule)), the perpetual-check
+/// ([`perpetual_check_loses`](WideVariant::perpetual_check_loses)),
+/// perpetual-chase ([`perpetual_chase_loses`](WideVariant::perpetual_chase_loses))
+/// and large-shogi attack-repetition
+/// ([`attack_repetition_loses`](WideVariant::attack_repetition_loses)) losses, the
+/// Janggi bikjang draw ([`has_bikjang`](WideVariant::has_bikjang)), a non-default
+/// repetition label ([`repetition_draw_reason`](WideVariant::repetition_draw_reason)),
+/// stalemate-as-loss ([`stalemate_is_loss`](WideVariant::stalemate_is_loss)), the
+/// two bare-king terminals
+/// ([`has_bare_king_draw`](WideVariant::has_bare_king_draw) /
+/// [`has_bare_king_loss`](WideVariant::has_bare_king_loss)), the move-count rule
+/// ([`move_rule_plies`](WideVariant::move_rule_plies)), and win-on-check
+/// ([`wins_on_check`](WideVariant::wins_on_check)).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DrawHooks {
+    /// [`WideVariant::counting_rule`] returns `Some`.
+    pub counting_rule: bool,
+    /// [`WideVariant::impasse_rule`] returns `Some`.
+    pub impasse_rule: bool,
+    /// [`WideVariant::perpetual_check_loses`] is `true`.
+    pub perpetual_check_loses: bool,
+    /// [`WideVariant::perpetual_chase_loses`] is `true`.
+    pub perpetual_chase_loses: bool,
+    /// [`WideVariant::attack_repetition_loses`] is `true`.
+    pub attack_repetition_loses: bool,
+    /// [`WideVariant::has_bikjang`] is `true`.
+    pub has_bikjang: bool,
+    /// [`WideVariant::repetition_draw_reason`] differs from the default
+    /// [`WideEndReason::Repetition`].
+    pub repetition_draw_reason: bool,
+    /// [`WideVariant::stalemate_is_loss`] is `true`.
+    pub stalemate_is_loss: bool,
+    /// [`WideVariant::has_bare_king_draw`] is `true`.
+    pub has_bare_king_draw: bool,
+    /// [`WideVariant::has_bare_king_loss`] is `true`.
+    pub has_bare_king_loss: bool,
+    /// [`WideVariant::move_rule_plies`] returns `Some`.
+    pub move_rule_plies: bool,
+    /// [`WideVariant::wins_on_check`] is `true`.
+    pub wins_on_check: bool,
+}
+
+impl DrawHooks {
+    /// Whether the variant overrides **any** draw / adjudication hook — i.e. it
+    /// carries at least one special terminal rule and so must register an
+    /// adjudication test.
+    #[must_use]
+    pub fn any(&self) -> bool {
+        self.counting_rule
+            || self.impasse_rule
+            || self.perpetual_check_loses
+            || self.perpetual_chase_loses
+            || self.attack_repetition_loses
+            || self.has_bikjang
+            || self.repetition_draw_reason
+            || self.stalemate_is_loss
+            || self.has_bare_king_draw
+            || self.has_bare_king_loss
+            || self.move_rule_plies
+            || self.wins_on_check
+    }
+
+    /// The canonical names of the overridden hooks, in declaration order — a
+    /// stable, human-readable list for a meta-test's failure message.
+    #[must_use]
+    pub fn names(&self) -> Vec<&'static str> {
+        let mut out = Vec::new();
+        for (on, name) in [
+            (self.counting_rule, "counting_rule"),
+            (self.impasse_rule, "impasse_rule"),
+            (self.perpetual_check_loses, "perpetual_check_loses"),
+            (self.perpetual_chase_loses, "perpetual_chase_loses"),
+            (self.attack_repetition_loses, "attack_repetition_loses"),
+            (self.has_bikjang, "has_bikjang"),
+            (self.repetition_draw_reason, "repetition_draw_reason"),
+            (self.stalemate_is_loss, "stalemate_is_loss"),
+            (self.has_bare_king_draw, "has_bare_king_draw"),
+            (self.has_bare_king_loss, "has_bare_king_loss"),
+            (self.move_rule_plies, "move_rule_plies"),
+            (self.wins_on_check, "wins_on_check"),
+        ] {
+            if on {
+                out.push(name);
+            }
+        }
+        out
+    }
+}
+
 /// The reason a wide game ended, the generic analogue of
 /// [`crate::EndReason`]. Only the standard outcomes are produced this phase;
 /// the variant arm is reserved for later fairy terminal rules.

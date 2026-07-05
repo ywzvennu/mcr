@@ -177,6 +177,21 @@ macro_rules! wide_variants {
                     $( WideVariantId::$variant => <$pos>::BACKING_BITS, )+
                 }
             }
+
+            /// Which of this variant's history-independent **draw / adjudication
+            /// hooks** are overridden away from their [`WideVariant`](super::WideVariant)
+            /// defaults, computed by calling the concrete rules' hook methods (see
+            /// [`GenericPosition::overridden_draw_hooks`](super::GenericPosition::overridden_draw_hooks)).
+            ///
+            /// A static per-variant fact, independent of any live position, so the
+            /// coverage-gate meta-test can introspect the special terminal rules the
+            /// whole registry carries without constructing one.
+            #[must_use]
+            pub fn draw_hooks(self) -> super::variant::DrawHooks {
+                match self {
+                    $( WideVariantId::$variant => <$pos>::overridden_draw_hooks(), )+
+                }
+            }
         }
 
         impl core::fmt::Display for WideVariantId {

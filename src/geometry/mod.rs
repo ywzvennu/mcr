@@ -71,8 +71,8 @@ pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use square::Square;
 pub use status::GameStatus;
 pub use variant::{
-    PromotionConfig, RoyalSlider, StandardChess, WideCountingRule, WideEndReason, WideRegion,
-    WideVariant,
+    DrawHooks, PromotionConfig, RoyalSlider, StandardChess, WideCountingRule, WideEndReason,
+    WideRegion, WideVariant,
 };
 pub use variants::{
     Aiwok, AiwokRules, Alice, AliceRules, Almost, AlmostRules, Amazon, AmazonRules, Asean,

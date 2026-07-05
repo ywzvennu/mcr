@@ -29,7 +29,7 @@ use super::attacks::{
     line, queen_attacks_masked, rook_attacks_masked, KingLineMasks,
 };
 use super::role::WideRole;
-use super::variant::{ImpasseRule, RoyalSlider, WideEndReason, WideVariant};
+use super::variant::{DrawHooks, ImpasseRule, RoyalSlider, WideEndReason, WideVariant};
 use super::zobrist;
 use super::{
     Bitboard, BitboardBacking, Board, GateRole, GateSquare, Geometry, Square, WideMove,
@@ -627,6 +627,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     pub fn startpos() -> Self {
         let (board, state) = V::starting_position();
         Self::from_parts(board, state)
+    }
+
+    /// Which of `V`'s history-independent **draw / adjudication hooks** are
+    /// overridden away from their [`WideVariant`] defaults.
+    ///
+    /// A static, position-free snapshot: each field is computed by calling the
+    /// concrete rules' hook method and comparing it to the trait default (a
+    /// `Some`/`true`/non-default value means "overridden"). It lets the
+    /// coverage-gate meta-test (`tests/coverage_gate.rs`) *introspect* the special
+    /// terminal rules a variant carries instead of hand-maintaining the list, and
+    /// require every variant that carries one to register an adjudication test.
+    /// See [`DrawHooks`] for the individual hooks.
+    #[must_use]
+    pub fn overridden_draw_hooks() -> DrawHooks {
+        DrawHooks {
+            counting_rule: V::counting_rule().is_some(),
+            impasse_rule: V::impasse_rule().is_some(),
+            perpetual_check_loses: V::perpetual_check_loses(),
+            perpetual_chase_loses: V::perpetual_chase_loses(),
+            attack_repetition_loses: V::attack_repetition_loses(),
+            has_bikjang: V::has_bikjang(),
+            repetition_draw_reason: V::repetition_draw_reason() != WideEndReason::Repetition,
+            stalemate_is_loss: V::stalemate_is_loss(),
+            has_bare_king_draw: V::has_bare_king_draw(),
+            has_bare_king_loss: V::has_bare_king_loss(),
+            move_rule_plies: V::move_rule_plies().is_some(),
+            wins_on_check: V::wins_on_check(),
+        }
     }
 
     /// Returns a reference to the board.
