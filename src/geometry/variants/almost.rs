@@ -64,7 +64,7 @@ impl WideVariant<Chess8x8> for AlmostRules {
     /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
     /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
     /// level. History-dependent and never consulted by a bare
-    /// [`GenericPosition`](crate::geometry::GenericPosition), so perft is unchanged.
+    /// [`GenericPosition`], so perft is unchanged.
     fn tracks_repetition() -> bool {
         true
     }
