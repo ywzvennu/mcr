@@ -32,7 +32,8 @@ use super::role::WideRole;
 use super::variant::{ImpasseRule, RoyalSlider, WideEndReason, WideVariant};
 use super::zobrist;
 use super::{
-    Bitboard, Board, GateRole, GateSquare, Geometry, Square, WideMove, WideMoveKind, WidePiece,
+    Bitboard, BitboardBacking, Board, GateRole, GateSquare, Geometry, Square, WideMove,
+    WideMoveKind, WidePiece,
 };
 use crate::Color;
 
@@ -601,6 +602,14 @@ impl<G: Geometry> core::fmt::Debug for Undo<G> {
 }
 
 impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+    /// The bit width of this position's bitboard backing integer — `64`, `128`,
+    /// or `256`, the geometry's [`Bits::BITS`](BitboardBacking::BITS). A static
+    /// per-variant fact (fixed by the geometry type), it lets the type-erased
+    /// [`AnyWideVariant`](super::AnyWideVariant) registry bucket variants by
+    /// their storage backing — e.g. to hold a per-backing position-size ceiling —
+    /// without naming the geometry.
+    pub const BACKING_BITS: u32 = <G::Bits as BitboardBacking>::BITS;
+
     /// Builds a position from a board and state directly.
     #[must_use]
     #[inline]
@@ -7349,5 +7358,37 @@ mod tests {
         // Both entry points produced the same 20 opening moves.
         assert_eq!(moves.len(), 20);
         assert_eq!(list.len(), 20);
+    }
+
+    /// Allocation-free wide perft gate (issue #504). Extends the alloc-free claim
+    /// from a single shallow move generation to a whole shallow **perft** over the
+    /// generic (wide) engine: on a spill-free variant, the recursion reuses one
+    /// stack-frame [`WideMoveList`] per ply and never touches the heap below the
+    /// root. This is the wide-path counterpart of the concrete engine's alloc-free
+    /// perft — a per-PR guard that a per-node heap allocation (e.g. a stray
+    /// `Vec<WideMove>` in the generator or make-move) can never creep back in.
+    ///
+    /// Standard-via-wide (`GenericPosition<Chess8x8, StandardChess>`) is used: it
+    /// never spills the inline move buffer, so the expected count is an exact zero
+    /// (a spilling variant such as a drop-heavy shogi could legitimately allocate).
+    #[test]
+    fn wide_perft_is_allocation_free_below_root() {
+        use super::alloc_probe::count_allocs;
+
+        let pos = Pos::startpos();
+        // Warm up the lazily-initialised shared magic slider tables (a one-time
+        // allocation on first movegen) so the measured region isolates perft's own
+        // per-node heap traffic from that setup.
+        let _ = perft(&pos, 2);
+
+        // Depth 3 = 8902 nodes for standard chess: enough interior nodes that a
+        // per-node allocation would show, while staying fast in a debug build.
+        let (nodes, allocs) = count_allocs(|| perft(&pos, 3));
+        assert_eq!(nodes, 8902, "standard-via-wide perft(3) node count");
+        assert_eq!(
+            allocs, 0,
+            "wide perft must be allocation-free below the root on a spill-free \
+             variant; a per-node heap allocation regressed (see docs/perf-regression.md)"
+        );
     }
 }
