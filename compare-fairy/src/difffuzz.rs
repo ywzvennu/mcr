@@ -225,6 +225,9 @@ fn centaur_to_fsf(fen: &str) -> String {
 ///   #401); Fairy-Stockfish does not implement it, so it carries no FSF spec.
 /// * **Tenjiku** — 16x16 Tenjiku Shogi is likewise HaChu-only (the `--hachu` mode,
 ///   issue #402); Fairy-Stockfish does not implement it, so it carries no FSF spec.
+/// * **Washogi** — 11x11 Wa Shogi is absent from Fairy-Stockfish's shogi family and
+///   HaChu's perft is unreliable, so it has no trustworthy oracle and is rules-only
+///   (like Alice); it carries no FSF spec.
 const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1541,6 +1544,7 @@ mod tests {
             WideVariantId::Chu,
             WideVariantId::Dai,
             WideVariantId::Tenjiku,
+            WideVariantId::Washogi,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1548,11 +1552,11 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 6 by-design exclusions (Alice / Duck /
-        // Jieqi and the HaChu-only large-shogi Chu / Dai / Tenjiku, which
-        // Fairy-Stockfish does not implement); the deeper-sweep follow-ups stay in
-        // SPECS but are skipped via `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 6);
+        // Every shipped variant minus the 7 by-design exclusions (Alice / Duck /
+        // Jieqi, the HaChu-only large-shogi Chu / Dai / Tenjiku, and the oracle-less
+        // Wa Shogi, which Fairy-Stockfish does not implement); the deeper-sweep
+        // follow-ups stay in SPECS but are skipped via `HELD_BACK` on the default run.
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 7);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never
