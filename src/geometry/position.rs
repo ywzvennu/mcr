@@ -2773,6 +2773,23 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // then skipped below. Every multi-royal variant without a hand keeps the
         // Pawn on the dedicated pawn generator, byte-identically.
         let pawn_is_stepper = V::pawn_is_stepper();
+        // Tenjiku Great-General immunity (issue #478): a capture-immune enemy (the
+        // Great General) may be taken only by a mover of the *same* role. Collect
+        // those enemy squares once; every mover of a different role has them removed
+        // from its capture targets below. Empty (a no-op) for every variant without
+        // `has_jump_captures`, so their generation is byte-identical.
+        let capture_immune_enemies = if V::has_jump_captures() {
+            let them = us.opposite();
+            let mut mask = Bitboard::EMPTY;
+            for role in WideRole::ALL {
+                if V::role_is_capture_immune(role) {
+                    mask |= board.pieces(them, role);
+                }
+            }
+            mask
+        } else {
+            Bitboard::EMPTY
+        };
         for role in WideRole::ALL {
             // The Berolina Hoplite is always handled by its own emitter below. A
             // standard chess Pawn (double push, diagonal capture, en passant) is
@@ -2825,6 +2842,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 } else {
                     V::role_attacks(role, us, from, occupied)
                 } & !our_pieces;
+                // Great-General immunity (issue #478): a mover of a different role
+                // cannot capture the immune enemy, so drop its square from the
+                // targets (the piece still blocks the slide — occupancy already
+                // stopped `role_attacks` there — it just cannot be taken). The immune
+                // role itself keeps the target (a Great General captures a Great
+                // General). `capture_immune_enemies` is empty otherwise, a no-op.
+                let targets = if V::role_is_capture_immune(role) {
+                    targets
+                } else {
+                    targets & !capture_immune_enemies
+                };
                 if promotable {
                     // The full Shogi-aware promotion expansion: a move that starts
                     // or ends in the zone may promote (to `role_promoted_to`), and
@@ -2884,6 +2912,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // so every other variant skips this and is byte-identical.
         if V::has_lion_moves() {
             self.gen_lion_moves(pseudo, us, their_pieces, our_pieces);
+        }
+
+        // Tenjiku range-jumping Generals (issue #478): the jump-captures beyond the
+        // first blocker that the ordinary slide above cannot express. Emitted only
+        // under `has_jump_captures` (default-off), so every other variant is
+        // byte-identical.
+        if V::has_jump_captures() {
+            self.gen_jump_general_moves(pseudo, us);
         }
 
         // Castling: only the single-king side (white, in Spartan) ever has it, and
@@ -3099,6 +3135,100 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 from,
                 WideMoveKind::FireDemonMove { igui: true },
             ));
+        }
+    }
+
+    /// Generates the side-to-move's **range-jumping General** captures (Tenjiku's
+    /// Great / Vice / Rook / Bishop General, issue #478) — the jump-captures the
+    /// ordinary slide cannot express.
+    ///
+    /// A range-jumping General slides as its base piece (Free King / Rook / Bishop);
+    /// that ordinary ride, including its capture of the **first** blocker, is already
+    /// emitted by the generic role loop. This pass adds the moves that reach a
+    /// capture **beyond** that first blocker: along each of the General's lines
+    /// ([`WideVariant::role_jump_dirs`]) it jumps over a **consecutive** run of
+    /// **strictly lower**-ranked pieces ([`WideVariant::role_jump_rank`], friend or
+    /// foe) and may capture any enemy standing within or immediately beyond that run,
+    /// stopped by the first equal-or-higher-ranked piece (which it may still capture
+    /// if it is an enemy). The run must be contiguous: **an empty square ends it**, so
+    /// the General never resumes sliding over empties to a distant capture — this is
+    /// what keeps the start position byte-identical (a General jumps its own pawn onto
+    /// an *empty* rank beyond and stops, with nothing to capture). Each landing is a
+    /// single-victim [`WideMoveKind::Capture`] (only the landing square is taken; the
+    /// jumped pieces are untouched), **except** a
+    /// [capture-immune](WideVariant::role_is_capture_immune) enemy (the Great
+    /// General), which only another Great General may take.
+    ///
+    /// Only squares past the first blocker are emitted here, so this never
+    /// duplicates the ordinary ride's first-blocker capture — a General with nothing
+    /// to jump over adds no move, and the start position (armies separated by empty
+    /// ranks, no capture available) is byte-identical. Runs only under
+    /// [`WideVariant::has_jump_captures`]; every other variant is byte-identical.
+    fn gen_jump_general_moves<S: WideSink>(&self, out: &mut S, us: Color) {
+        let board = &self.board;
+        let their_pieces = board.by_color(us.opposite());
+        for role in WideRole::ALL {
+            if !V::role_is_jump_capturer(role) {
+                continue;
+            }
+            let mover_rank = V::role_jump_rank(role);
+            let dirs = V::role_jump_dirs(role);
+            for from in board.pieces(us, role) {
+                let mut jump_targets = Bitboard::EMPTY;
+                for &(df, dr) in dirs {
+                    let mut cur = from.offset(df, dr);
+                    // Whether we have already jumped a blocker: only then is a landing
+                    // a *jump*-capture (the first blocker's own capture belongs to the
+                    // ordinary ride, emitted by the role loop). Once jumping, the run
+                    // of jumped pieces must be **consecutive**: an empty square ends
+                    // it, so the General cannot resume sliding over empties to a
+                    // distant capture. (This is what keeps the start position — a
+                    // General walled by its own pawns, then empty ranks — byte-
+                    // identical: it jumps the pawn onto an empty square and stops.)
+                    let mut jumped = false;
+                    while let Some(sq) = cur {
+                        let Some(piece) = board.piece_at(sq) else {
+                            // Empty square: while still sliding to the first blocker it
+                            // is a transparent ride square; once we have begun jumping,
+                            // the consecutive run has ended, so stop.
+                            if jumped {
+                                break;
+                            }
+                            cur = sq.offset(df, dr);
+                            continue;
+                        };
+                        if jumped && piece.color != us {
+                            // An enemy reached across the consecutive jumped run.
+                            // Capturable unless immune to all but its own role.
+                            let immune = V::role_is_capture_immune(piece.role);
+                            if !immune || piece.role == role {
+                                jump_targets.set(sq);
+                            }
+                        }
+                        if V::role_jump_rank(piece.role) < mover_rank {
+                            // Strictly lower-ranked (friend or foe): jump over it and
+                            // continue the consecutive run.
+                            jumped = true;
+                            cur = sq.offset(df, dr);
+                        } else {
+                            // Equal or higher rank: an opaque wall — stop the ray.
+                            break;
+                        }
+                    }
+                }
+                if jump_targets.is_empty() {
+                    continue;
+                }
+                // Route through the shared emitters so a promotable General (Rook /
+                // Bishop General) that jump-captures into the promotion zone offers
+                // its promotion exactly as an ordinary capture would; the others emit
+                // a plain single-victim capture.
+                if (V::has_piece_promotion() || V::has_hand()) && V::role_can_promote(role) {
+                    self.emit_promotable_targets(out, role, from, jump_targets, their_pieces, us);
+                } else {
+                    out.emit_targets(from, jump_targets, their_pieces);
+                }
+            }
         }
     }
 

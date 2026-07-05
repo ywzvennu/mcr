@@ -25,17 +25,32 @@
 //!   forward-diagonal 2-jumps (6); and the 18 short down/sideways moves of the
 //!   back-three ranks into the four empty rank-2 squares (a HaChu array asymmetry
 //!   faithfully reproduced). This pinned down the exact start placement.
-//! * **perft(2) = 5662** and **perft(3) = 424195** are mcr regression pins (the
-//!   jitto pass is emitted once per side, as HaChu tracks a single null move). They are
-//!   *faithful to the true Tenjiku rules at these depths* — the documented-unmodelled
-//!   powers (the Generals' jump-capture, the Fire Demon's area burn) are provably
-//!   unreachable this shallow, since those pieces are boxed in by their own army and
-//!   never touch an enemy within one or two plies — but they are **not**
-//!   HaChu-cross-checked (HaChu crashes on the variant).
+//! * **perft(2) = 5663** and **perft(3) = 424582** are mcr regression pins (the
+//!   jitto pass is emitted once per side, as HaChu tracks a single null move); they
+//!   are **not** HaChu-cross-checked (HaChu crashes on the variant). Before the
+//!   range-jumping Generals were modelled (issue #478) these read 5662 / 424195; the
+//!   difference is a **single genuine jump-capture recapture that first becomes
+//!   available at depth 2** (see below), plus its subtree. perft(1) — the
+//!   HaChu-validated, all-non-capture start move set — is **unchanged at 72**, which
+//!   is the true guard that the new generation never leaks into the non-capture
+//!   path: no jump-capture exists in the start position itself (every General is
+//!   walled by its own army and, jumping onto the empty rank beyond, has nothing to
+//!   capture).
 //!
-//! What is **not** modelled (out of reach at any validated depth; see the module
-//! docs): the Fire Demon's multi-square burn, and the jump-capture of the four
-//! General pieces.
+//!   The lone new depth-2 node: White's free Dragon King e6→e11 (`(4,5)→(4,10)`,
+//!   an ordinary Rook slide up the empty file) captures Black's free Dragon King;
+//!   Black's Great General on `(7,13)` then **recaptures** by jumping over its own
+//!   Rook General `(6,12)` and Pawn `(5,11)` — two consecutive lower-ranked friends —
+//!   to land on the White Dragon at `(4,10)`. That single reply raises perft(2) by
+//!   one (5662→5663); the extra depth-3 nodes (424195→424582) are its continuations
+//!   plus the further recaptures that open once a capture clears a General's line.
+//!   The precise jump-capture mechanics are hand-derived and pinned in the
+//!   `Jump-capturing Generals` tests below.
+//!
+//! What is **not** modelled (see the module docs): a General's jump-*check* through a
+//! screen is not in the attack model (king-safety uses the ordinary ride only), and a
+//! Great General taken as a Lion double-capture's / Fire Demon burn's *secondary*
+//! victim is not specially made immune.
 
 use mcr::geometry::{perft, Square, Tenjiku, Tenjiku16x16};
 
@@ -62,14 +77,17 @@ fn startpos_round_trips() {
 
 /// Start-position perft. perft(1) = 72 is validated node-for-node against HaChu's
 /// source tables (HaChu crashes on `variant tenjiku`, so a live oracle is
-/// unavailable); perft(2) / perft(3) are mcr regression pins, faithful to Tenjiku's
-/// rules at these depths (no special power is reachable this shallow).
+/// unavailable) and is **unchanged** by the range-jumping Generals (issue #478) —
+/// no jump-capture exists in the start position, so the new generation provably does
+/// not leak into the non-capture path. perft(2) / perft(3) are mcr regression pins;
+/// they rose by exactly the one depth-2 jump-capture recapture (and its subtree)
+/// documented in the module header (5662→5663, 424195→424582).
 #[test]
 fn startpos_perft_regression() {
     let pos = Tenjiku::startpos();
     assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 72);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 5662);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 3), 424195);
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 5663);
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 3), 424582);
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {
@@ -405,4 +423,162 @@ fn fire_demon_corner_igui_truncates_to_three_neighbours() {
 #[test]
 fn wide_move_is_eight_bytes_with_fire_demon() {
     assert_eq!(core::mem::size_of::<mcr::geometry::WideMove>(), 8);
+}
+
+// ---------------------------------------------------------------------------
+// Jump-capturing Generals (issue #478)
+// ---------------------------------------------------------------------------
+//
+// The four range-jumping Generals (Great / Vice / Rook / Bishop) slide as their
+// base piece and, **when capturing**, may jump over any number of *consecutive*
+// strictly-lower-ranked pieces (friend or foe) to capture an enemy beyond, stopped
+// by the first equal-or-higher-ranked piece. The Great General is un-capturable
+// except by another Great General. The rank hierarchy is King/Prince = 4, Great
+// General = 3, Vice General = 2, Rook/Bishop General = 1, everything else = 0.
+//
+// There is **no machine oracle** (HaChu crashes on Tenjiku), so these are validated
+// by hand-derived perft on constructed positions and by exact move-target sets. The
+// FEN dialect writes the Generals `****R/G/V/B` (White) and `****r/g/v/b` (Black).
+
+/// Convenience: the board index of square `(file, rank)`.
+fn sq_index(file: u8, rank: u8) -> u8 {
+    Square::<Tenjiku16x16>::from_file_rank(file, rank)
+        .expect("on board")
+        .index()
+}
+
+/// **Hand-derived perft — a Rook General jumping one lower-ranked piece.**
+///
+/// ```text
+///   White: Rook General a1=(0,0); King p16=(15,15).
+///   Black: King h16=(7,15); Pawn a2=(0,1); Rook a3=(0,2).
+/// ```
+/// The Rook General sits in the corner, so it has only two rays. **Up the a-file**:
+/// the ordinary ride is blocked by the Black Pawn on a2, which it captures (1 move);
+/// the Pawn (rank 0 < 1) is then **jumped**, landing on the Black Rook a3 — a
+/// jump-capture (1 move). The Rook a3 is itself lower-ranked, but the square beyond
+/// it (a4) is empty, so the consecutive run ends and the ride stops: a-file = 2
+/// moves. **Along rank 1**: b1…p1 are 15 empty quiet moves. So the Rook General has
+/// `2 + 15 = 17` moves. The King (p16 corner) has 3 (o16, o15, p15). Neither Black
+/// slider bears on the White King, so every move is legal. **perft(1) = 17 + 3 = 20**
+/// (exactly one more than the 19 of an ordinary blockable Rook, whose a-file stops at
+/// a2 — the `+1` is the jump-capture of a3).
+#[test]
+fn jump_general_single_jump_perft() {
+    let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/16/16/r15/p15/****R15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 20);
+
+    // The a-file targets are exactly a2 (ordinary capture) and a3 (jump-capture).
+    let got = targets(fen, 0, 0);
+    assert!(
+        got.contains(&sq_index(0, 1)),
+        "captures the Pawn a2 (ordinary)"
+    );
+    assert!(
+        got.contains(&sq_index(0, 2)),
+        "jump-captures the Rook a3 over the Pawn"
+    );
+    // The jump-capture actually removes only its landing square: a2 (the jumped
+    // Pawn) survives, a3 (the victim) is gone, the General stands on a3.
+    let after = after_move(fen, "a1a3");
+    assert!(white_role_at(&after, 0, 2, WideRole::RookGeneral));
+    assert!(black_at(&after, 0, 1), "the jumped Pawn a2 is not captured");
+}
+
+/// **Hand-derived perft — a Rook General jumping a run of three lower-ranked
+/// pieces.** Position as above but the a-file holds Pawns on a2, a3, a4 and a Rook on
+/// a5, all Black.
+///
+/// Up the a-file the General captures the first blocker a2 (ordinary), then
+/// jump-captures each further enemy across the consecutive lower-ranked run: a3
+/// (over a2), a4 (over a2, a3) and a5 (over a2, a3, a4) — 4 captures. Rank 1 adds 15
+/// quiets, so the General has 19 moves; the King has 3. **perft(1) = 22.**
+#[test]
+fn jump_general_over_three_pieces_perft() {
+    let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/r15/p15/p15/p15/****R15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 22);
+
+    let got = targets(fen, 0, 0);
+    for r in 1..=4 {
+        assert!(
+            got.contains(&sq_index(0, r)),
+            "the General reaches a{} across the run",
+            r + 1
+        );
+    }
+}
+
+/// **The jump stops at — and may capture — the first equal-or-higher-ranked piece,
+/// but goes no further.**
+///
+/// ```text
+///   White: Rook General a2=(0,1); Pawn a3=(0,2) (friendly); King p1=(15,0).
+///   Black: Vice General a4=(0,3); Rook a5=(0,4); King h16=(7,15).
+/// ```
+/// Up the a-file the Rook General jumps its own Pawn on a3 (rank 0), reaches the
+/// Black **Vice General** on a4 (rank 2 ≥ the mover's 1): it may capture it by
+/// landing on it — but the Vice General is an opaque wall, so the ride stops there.
+/// The Rook a5 beyond it is **not** reachable.
+#[test]
+fn jump_general_captures_higher_rank_then_stops() {
+    let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/r15/****v15/P15/****R15/15K w - - 0 1";
+    let got = targets(fen, 0, 1);
+    assert!(
+        got.contains(&sq_index(0, 3)),
+        "jump-captures the higher-ranked Vice General a4"
+    );
+    assert!(
+        !got.contains(&sq_index(0, 4)),
+        "cannot pass the Vice General to reach the Rook a5"
+    );
+    assert!(
+        !got.contains(&sq_index(0, 2)),
+        "does not capture its own screening Pawn a3"
+    );
+}
+
+/// **A range-jumping General cannot jump-capture the immune Great General.** As above
+/// but the piece beyond the friendly Pawn screen is a Black **Great General**.
+#[test]
+fn range_jumper_cannot_capture_great_general() {
+    let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/16/****g15/P15/****R15/15K w - - 0 1";
+    let got = targets(fen, 0, 1);
+    assert!(
+        !got.contains(&sq_index(0, 3)),
+        "the Rook General may not take the immune Great General"
+    );
+}
+
+/// **The Great General is immune to an ordinary slider too.** A White Rook on c3 has
+/// a Black Great General on a3 directly along its rank; occupancy still blocks the
+/// slide there, but the capture is forbidden — the Rook reaches b3 and stops.
+#[test]
+fn great_general_immune_to_ordinary_rook() {
+    let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/16/16/****g1R13/16/K15 w - - 0 1";
+    let got = targets(fen, 2, 2);
+    assert!(got.contains(&sq_index(1, 2)), "the Rook may step to b3");
+    assert!(
+        !got.contains(&sq_index(0, 2)),
+        "the Rook may not capture the Great General a3"
+    );
+}
+
+/// **Only a Great General captures a Great General** — both an adjacent ordinary
+/// capture and a jump-capture across a friendly screen are permitted for the mover.
+#[test]
+fn great_general_captures_great_general() {
+    // Adjacent: White Great General b3 next to Black Great General a3.
+    let adj = "7k7K/16/16/16/16/16/16/16/16/16/16/16/16/****g****G14/16/15K w - - 0 1";
+    assert!(
+        targets(adj, 1, 2).contains(&sq_index(0, 2)),
+        "a Great General captures the adjacent enemy Great General"
+    );
+    // Across a screen: White Great General a2, own Pawn a3, Black Great General a4.
+    let jump = "7k7K/16/16/16/16/16/16/16/16/16/16/16/****g15/P15/****G15/15K w - - 0 1";
+    assert!(
+        targets(jump, 0, 1).contains(&sq_index(0, 3)),
+        "a Great General jump-captures an enemy Great General over a screen"
+    );
 }

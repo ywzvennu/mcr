@@ -58,10 +58,24 @@
 //!   constructed capture positions — see `tests/perft_tenjiku.rs`.
 //! * **Jump-capturing Generals** ([`WideRole::GreatGeneral`],
 //!   [`WideRole::ViceGeneral`], [`WideRole::RookGeneral`],
-//!   [`WideRole::BishopGeneral`]) — their *slide* is exact. Their ability to
-//!   **jump over a lower-ranked piece and capture beyond it** (and the piece-value
-//!   "ranking" hierarchy that governs it) is **not modelled**; they capture only as
-//!   ordinary blockable sliders.
+//!   [`WideRole::BishopGeneral`]) — **fully modelled** (issue #478). Each slides as
+//!   its base piece (Free King / Bishop / Rook / Bishop) and, **when capturing**, may
+//!   jump over any number of *consecutive* **strictly lower-ranked** pieces (friend or
+//!   foe) in a straight line to capture an enemy beyond, stopped by the first
+//!   equal-or-higher-ranked piece. The ranking hierarchy is King / Prince = 4, Great
+//!   General = 3, Vice General = 2, Rook / Bishop General = 1, every other piece = 0
+//!   ([`TenjikuRules::role_jump_rank`]). The **Great General is un-capturable except
+//!   by another Great General** ([`TenjikuRules::role_is_capture_immune`]), enforced
+//!   for both ordinary and jump captures. A jump-capture is a single-victim
+//!   `from → to` [`Capture`](crate::geometry::WideMoveKind::Capture) (only the landing
+//!   square is taken; the jumped pieces are untouched), so it needs no new move
+//!   representation. Emitted by the multi-royal generator's `gen_jump_general_moves`
+//!   pass, gated behind [`WideVariant::has_jump_captures`]. Two facets stay
+//!   approximated: a General's jump-*check* through a screen is not in the attack
+//!   model (king-safety uses the ordinary ride), and a Great General taken as a Lion
+//!   double-capture's / Fire Demon burn's *secondary* victim is not made immune. There
+//!   is **no machine oracle** (HaChu segfaults on Tenjiku), so the jump-captures are
+//!   validated by **hand-derived perft** — see `tests/perft_tenjiku.rs`.
 //! * **Lion / Lion-Hawk multi-move captures** — the Lion double-step, igui and
 //!   pass are modelled via the shared [`gen_lion_moves`](crate::geometry::GenericPosition)
 //!   pass exactly as in Chu/Dai. The Lion-Hawk ([`WideRole::LionHawk`]) adds
@@ -193,6 +207,17 @@ const FERZ: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 const WAZIR: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 const VERT: [(i8, i8); 2] = [(0, 1), (0, -1)];
 const HORIZ: [(i8, i8); 2] = [(1, 0), (-1, 0)];
+/// All eight King directions — the Great General's slide / range-jump lines.
+const EIGHT_DIRS: [(i8, i8); 8] = [
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+    (1, 1),
+    (1, -1),
+    (-1, 1),
+    (-1, -1),
+];
 
 impl WideVariant<Tenjiku16x16> for TenjikuRules {
     fn starting_position() -> (Board<Tenjiku16x16>, GenericState<Tenjiku16x16>) {
@@ -290,15 +315,18 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
             WideRole::Rook => attacks::rook_attacks::<Tenjiku16x16>(sq, occ),
             WideRole::Bishop => attacks::bishop_attacks::<Tenjiku16x16>(sq, occ),
             // Free King (奔王), and the Great General / Free Eagle whose ordinary
-            // ride is the same eight-way slide (the Generals' jump-capture is
-            // documented-unmodelled; see the module docs).
+            // ride is the same eight-way slide. This is only the Generals' *ordinary*
+            // ride; their jump-capture (issue #478) rides the dedicated
+            // `gen_jump_general_moves` path, gated behind `has_jump_captures`.
             WideRole::Queen | WideRole::GreatGeneral | WideRole::FreeEagle => {
                 attacks::rook_attacks::<Tenjiku16x16>(sq, occ)
                     | attacks::bishop_attacks::<Tenjiku16x16>(sq, occ)
             }
-            // Rook General: ordinary Rook ride (jump-capture unmodelled).
+            // Rook General: ordinary Rook ride (the jump-capture rides the generator's
+            // jump pass, not this attack set).
             WideRole::RookGeneral => attacks::rook_attacks::<Tenjiku16x16>(sq, occ),
-            // Vice / Bishop General: ordinary Bishop ride (jump-capture unmodelled).
+            // Vice / Bishop General: ordinary Bishop ride (jump-capture in the jump
+            // pass).
             WideRole::ViceGeneral | WideRole::BishopGeneral => {
                 attacks::bishop_attacks::<Tenjiku16x16>(sq, occ)
             }
@@ -489,6 +517,56 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
         // The Fire Demon is the sole area-burner: it slides as a Flying Ox and then
         // burns every enemy adjacent to its destination, or igui-burns in place.
         matches!(role, WideRole::FireDemon)
+    }
+
+    // --- range-jumping Generals (issue #478) ------------------------------
+
+    fn has_jump_captures() -> bool {
+        true
+    }
+
+    fn role_jump_rank(role: WideRole) -> u8 {
+        // The Tenjiku range-jump hierarchy (chessvariants / Wikipedia "Tenjiku
+        // shogi"): a General jumps only over *strictly lower*-ranked pieces and is
+        // stopped by any equal-or-higher one. Royals sit at the top and are never
+        // jumped (they also outrank every General, so no General can leap them).
+        match role {
+            WideRole::King | WideRole::CrownPrince => 4,
+            WideRole::GreatGeneral => 3,
+            WideRole::ViceGeneral => 2,
+            WideRole::RookGeneral | WideRole::BishopGeneral => 1,
+            _ => 0,
+        }
+    }
+
+    fn role_is_jump_capturer(role: WideRole) -> bool {
+        // The four range-jumping Generals; the Fire Demon is **not** one (it uses the
+        // area-burn path instead).
+        matches!(
+            role,
+            WideRole::GreatGeneral
+                | WideRole::ViceGeneral
+                | WideRole::RookGeneral
+                | WideRole::BishopGeneral
+        )
+    }
+
+    fn role_jump_dirs(role: WideRole) -> &'static [(i8, i8)] {
+        // The jump travels along the same lines as the General's ordinary slide
+        // (see `role_attacks`): the Great General queen-wise, the Rook General
+        // orthogonally, the Vice and Bishop Generals diagonally.
+        match role {
+            WideRole::GreatGeneral => &EIGHT_DIRS,
+            WideRole::RookGeneral => &WAZIR,
+            WideRole::ViceGeneral | WideRole::BishopGeneral => &FERZ,
+            _ => &[],
+        }
+    }
+
+    fn role_is_capture_immune(role: WideRole) -> bool {
+        // The Great General ("dai-dai-shō") is un-capturable except by another Great
+        // General.
+        matches!(role, WideRole::GreatGeneral)
     }
 
     fn role_lion_lines(role: WideRole) -> &'static [(i8, i8)] {
