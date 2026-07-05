@@ -29,7 +29,8 @@ use super::{
     Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj, Shinobi,
     ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Tori,
-    Washogi, WideEndReason, WideFenError, WideMove, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant,
+    Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -293,6 +294,19 @@ macro_rules! wide_variants {
             pub fn legal_moves(&self) -> Vec<WideMove> {
                 match self {
                     $( AnyWideVariant::$variant(p) => p.legal_moves(), )+
+                }
+            }
+
+            /// Fills `out` with the legal moves of the side to move under the
+            /// wrapped variant, reusing the caller's buffer instead of allocating
+            /// a fresh `Vec` per call — the allocation-free analogue of
+            /// [`legal_moves`](Self::legal_moves). A consumer that lists moves for
+            /// many positions keeps one [`WideMoveList`] and hands it back each
+            /// call; the common (non-spilling) path allocates nothing. The move
+            /// set is byte-identical to [`legal_moves`](Self::legal_moves).
+            pub fn legal_moves_into(&self, out: &mut WideMoveList) {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.legal_moves_into(out), )+
                 }
             }
 
@@ -777,6 +791,40 @@ impl WideVariantId {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+
+    /// Fills `list` with `pos`'s legal moves via the allocation-free
+    /// `legal_moves_into` and asserts they equal, byte-for-byte and in order, the
+    /// move set the Vec-returning `legal_moves` produces.
+    fn assert_into_agrees(pos: &AnyWideVariant, list: &mut WideMoveList) {
+        let via_vec = pos.legal_moves();
+        pos.legal_moves_into(list);
+        let mut via_list = Vec::with_capacity(list.len());
+        list.for_each(|mv| via_list.push(mv));
+        assert_eq!(
+            via_vec,
+            via_list,
+            "legal_moves_into diverged from legal_moves for {}",
+            pos.variant_id()
+        );
+    }
+
+    #[test]
+    fn legal_moves_into_matches_legal_moves_every_variant() {
+        // One buffer reused across every shipped variant and one ply of children,
+        // proving the allocation-free entry point agrees with the Vec form on
+        // every generator dispatch (standard and the special paths — duck, Alice,
+        // placement, multi-royal, cannon, gating, hands) without corruption from
+        // reuse.
+        let mut list = WideMoveList::new();
+        for &id in WideVariantId::ALL {
+            let pos = AnyWideVariant::startpos(id);
+            assert_into_agrees(&pos, &mut list);
+            for mv in pos.legal_moves() {
+                let child = pos.play(&mv);
+                assert_into_agrees(&child, &mut list);
+            }
+        }
+    }
 
     #[test]
     fn from_str_round_trips_every_canonical_name() {

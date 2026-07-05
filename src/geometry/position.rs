@@ -1133,11 +1133,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     // -- Move generation ---------------------------------------------------
 
     /// Generates every legal move for the side to move.
+    ///
+    /// Ergonomic, owned-`Vec` boundary form: it fills a fresh [`WideMoveList`]
+    /// through [`legal_moves_into`](Self::legal_moves_into) and hands back its
+    /// contents as a `Vec`. A caller on a hot path that lists moves repeatedly
+    /// (search, tooling) should instead call
+    /// [`legal_moves_into`](Self::legal_moves_into) with a reused list to avoid
+    /// the per-call heap allocation this method makes.
     #[must_use]
     pub fn legal_moves(&self) -> Vec<WideMove> {
-        let mut out = Vec::new();
-        self.generate_into(&mut out);
-        out
+        let mut out = WideMoveList::new();
+        self.legal_moves_into(&mut out);
+        out.into_vec()
+    }
+
+    /// Generates every legal move for the side to move into the caller's
+    /// buffer, reusing its allocation instead of returning a fresh `Vec`.
+    ///
+    /// The allocation-free analogue of [`legal_moves`](Self::legal_moves): it
+    /// clears `out` and refills it with the exact same move set, so a consumer
+    /// that lists moves for many positions can keep one [`WideMoveList`] and
+    /// hand it back each call. On the common (non-spilling) path — every
+    /// standard and standard-king-safety position fits the list's inline
+    /// capacity — this performs **zero heap allocations**. The move set is
+    /// byte-identical to [`legal_moves`](Self::legal_moves) (both drive the same
+    /// generator dispatch); only the allocation is elided.
+    pub fn legal_moves_into(&self, out: &mut WideMoveList) {
+        out.clear();
+        self.generate_list(out);
     }
 
     /// Returns the number of legal moves (perft depth-1 leaf count).
@@ -1170,7 +1193,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// legal, so the move set may be bulk-counted without materialising it.
     ///
     /// This is the negation of every default-off variant hook that diverts
-    /// [`generate_into`](Self::generate_into) to a special generator (duck,
+    /// [`generate_list`](Self::generate_list) to a special generator (duck,
     /// active placement phase, multi-royal, cannon) or that adds moves a count
     /// sink cannot tally by population count (Seirawan gating, variant drops).
     /// For standard chess and every standard-king-safety variant it is `true`.
@@ -1188,10 +1211,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     }
 
     /// Drives the generator into `out` for a variant **not** on the standard
-    /// path. Mirrors [`generate_into`](Self::generate_into)'s dispatch but is
-    /// generic over the destination buffer (`Vec<WideMove>` or [`WideMoveList`]),
-    /// so the reusable-buffer perft recursion can reuse one allocation across
-    /// sibling nodes for these variants too. Never reached on the standard path.
+    /// path. Mirrors [`generate_list`](Self::generate_list)'s dispatch but is
+    /// generic over the destination [`WideSink`] (a [`WideMoveList`] to
+    /// materialise, or a [`WideCountSink`] to bulk-count), so the reusable-buffer
+    /// perft recursion can reuse one allocation across sibling nodes for these
+    /// variants too. Never reached on the standard path.
     fn generate_special_into<S: WideSink>(&self, out: &mut S) {
         if V::is_alice() {
             self.generate_alice_into(out);
@@ -1205,76 +1229,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_cannon_verify_into(out);
         } else {
             // The standard path with the gating / drop addenda a count sink
-            // cannot tally; materialise it through the same body the public
-            // `generate_into` uses.
+            // cannot tally; materialise it through the standard generator
+            // (`generate_standard_into`), the same body the fast path uses.
             self.generate_standard_into(out);
         }
     }
 
-    /// Pushes every legal move into `out`.
-    fn generate_into(&self, out: &mut Vec<WideMove>) {
-        // Alice chess: two mirror boards with per-piece plane membership. Movement,
-        // capture, blocking, and king-safety are all plane-restricted and every
-        // move transfers the mover to the opposite plane, so it has its own
-        // generator. Gated behind `is_alice()` (default-off), so every other
-        // variant takes the standard path below unchanged.
-        if V::is_alice() {
-            self.generate_alice_into(out);
-            return;
-        }
-        // Duck chess has its own generator: there is no check, so no pin /
-        // king-danger filtering, and every base piece move is crossed with every
-        // legal duck placement. Gated behind `has_duck()` (default off), so every
-        // other variant takes the standard path below unchanged.
-        if V::has_duck() {
-            self.generate_duck_into(out);
-            return;
-        }
-        // Setup / placement phase (Sittuyin): while the side to move still has
-        // pieces in hand it makes a placement drop — never a board move — onto its
-        // own territory. The phase is per-side (a side that has emptied its pocket
-        // plays normally even while the opponent is still deploying), and FSF
-        // applies no check filtering to placement drops. Gated behind
-        // `has_placement()` (default-off), so every other variant takes the
-        // standard path below unchanged.
-        if V::has_placement() && self.state.placement.any(self.state.turn) {
-            self.generate_placement_into(out);
-            return;
-        }
-        // Multi-king variants (Spartan): a side can hold several royal kings, so
-        // "in check" generalises to a set of royal squares and the single-king
-        // legality fast path (one king, one check mask, one pin set) no longer
-        // applies. Generate pseudo-legal moves and keep those that leave at least
-        // one king unattacked. Gated behind `multi_royal()` (default-off), so
-        // every other variant takes the standard single-king path below unchanged.
-        if V::multi_royal() {
-            self.generate_multi_royal_into(out);
-            return;
-        }
-        // Cannon variants (Shako): a cannon's check and king-danger are
-        // screen-dependent, so the mask-based single-king fast path (lifted-king
-        // danger map, `between` interpose) is unsound — a king sliding along a
-        // cannon ray, or a move that adds/removes a screen, can leave the king en
-        // prise (or wrongly forbid a safe square). Generate pseudo-legal moves and
-        // verify each against the actual post-move occupancy. Gated behind
-        // `has_cannons()` (default-off), so every other variant takes the standard
-        // path below unchanged.
-        // Cannon variants and the flying-general / flag-win variants (Synochess)
-        // share this per-move verify path: a flying-general confrontation is a
-        // king-danger source the mask path never computes, and the flag-rank
-        // ("campmate") rule forbids a king move that the standard generator would
-        // otherwise emit. Gated behind the default-off hooks, so every other
-        // variant takes the standard path below unchanged.
-        if V::has_cannons() || V::has_flying_general() {
-            self.generate_cannon_verify_into(out);
-            return;
-        }
-        self.generate_standard_into(out);
-    }
-
     /// The **standard single-king** move generator, generic over the destination
-    /// [`WideSink`] (`Vec<WideMove>` / [`WideMoveList`] to materialise, or
-    /// [`WideCountSink`] to bulk-count at a perft leaf).
+    /// [`WideSink`] (a [`WideMoveList`] to materialise, or a [`WideCountSink`] to
+    /// bulk-count at a perft leaf).
     ///
     /// Every move this pushes is already legal — the king-danger map, check mask,
     /// and pin lines confine each piece's targets before they are emitted, so the
@@ -1595,12 +1558,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(us.opposite());
 
-        // Collect the pseudo-legal base moves first (no check filtering).
-        let mut base = Vec::new();
+        // Collect the pseudo-legal base moves first (no check filtering) into a
+        // stack-backed list, so a duck node materialises its base moves without a
+        // heap allocation on the common path.
+        let mut base = WideMoveList::new();
         self.gen_duck_base_moves(&mut base, us, occupied, our_pieces, their_pieces);
 
         // Cross each base move with every legal duck placement.
-        for mv in base {
+        base.for_each(|mv| {
             // The board occupancy after the base move: the piece leaves `from`
             // and lands on `to` (a capture removes the enemy already counted in
             // `piece_occ`). An en-passant also frees the captured pawn's square.
@@ -1640,7 +1605,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             for dsq in duck_targets {
                 out.push(mv.with_duck::<G>(dsq));
             }
-        }
+        });
     }
 
     /// Pushes the pseudo-legal base piece moves for Duck chess (no check / pin
@@ -1648,7 +1613,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// landings and slider rays.
     fn gen_duck_base_moves(
         &self,
-        base: &mut Vec<WideMove>,
+        base: &mut WideMoveList,
         us: Color,
         occupied: Bitboard<G>,
         our_pieces: Bitboard<G>,
@@ -3880,11 +3845,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         let forward: i8 = if us.is_white() { 1 } else { -1 };
         let start_rank = V::double_push_rank(us);
-        // The legal promotion targets. The default reads only the static
-        // promotion config (every existing variant), so it is unchanged for them;
-        // Grand chess overrides it to a board-dependent set, so it is recomputed
-        // per generation from the live board.
-        let promo_roles = V::promotion_targets(us, board);
+        // The legal promotion targets, materialised **lazily**. The default reads
+        // only the static promotion config (every existing variant); Grand chess
+        // overrides it to a board-dependent set recomputed from the live board.
+        // Either way [`promotion_targets`](WideVariant::promotion_targets) returns
+        // an owned `Vec`, so building it eagerly heap-allocates on every movegen
+        // call — even for the overwhelming majority of positions where no pawn is
+        // on a promotion rank. Deferring it to the first pawn that actually
+        // promotes keeps the common path (and every non-promoting perft node)
+        // allocation-free while leaving the emitted moves byte-identical.
+        let mut promo_roles: Option<Vec<WideRole>> = None;
 
         for from in pawns {
             let pin_line = pins.line_of(from);
@@ -3894,7 +3864,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 if !occupied.contains(one) {
                     if check_mask.contains(one) && pin_line.contains(one) {
                         if V::in_promotion_zone(us, one.rank()) {
-                            for &role in &promo_roles {
+                            let roles =
+                                promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
+                            for &role in roles.iter() {
                                 out.push(WideMove::new(
                                     from,
                                     one,
@@ -3933,7 +3905,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     continue;
                 }
                 if V::in_promotion_zone(us, to.rank()) {
-                    for &role in &promo_roles {
+                    let roles = promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
+                    for &role in roles.iter() {
                         out.push(WideMove::new(
                             from,
                             to,
@@ -3963,7 +3936,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // (the check mask never contains a friendly pawn's own square).
             if V::has_placement() {
                 if let Some(targets) = V::special_promotion_targets(board, from, us) {
-                    let met = promo_roles.first().copied().unwrap_or(WideRole::Met);
+                    let roles = promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
+                    let met = roles.first().copied().unwrap_or(WideRole::Met);
                     for to in targets {
                         if check_mask.contains(to) && pin_line.contains(to) {
                             out.push(WideMove::new(
@@ -5707,8 +5681,8 @@ pub enum WideOutcome {
 /// The generic analogue of the concrete [`MoveSink`](crate::position): the
 /// standard single-king generator pushes each candidate move into a sink rather
 /// than a fixed buffer, so one generator body serves both the *materialising*
-/// callers (a `Vec<WideMove>` or a stack-backed [`WideMoveList`], which record
-/// every move) and the *bulk leaf-counting* caller a perft leaf wants
+/// caller (a stack-backed [`WideMoveList`], which records every move) and the
+/// *bulk leaf-counting* caller a perft leaf wants
 /// ([`WideCountSink`], which only tallies how many moves there are). Because a
 /// perft leaf needs the *number* of legal moves and never the moves themselves,
 /// the counting sink replaces each per-target loop with a single population
@@ -5754,21 +5728,6 @@ pub(crate) trait WideSink {
 
     /// The move at `index` (the gating pass reads the base moves back by index).
     fn get(&self, index: usize) -> WideMove;
-}
-
-impl WideSink for Vec<WideMove> {
-    #[inline]
-    fn push(&mut self, mv: WideMove) {
-        Vec::push(self, mv);
-    }
-    #[inline]
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-    #[inline]
-    fn get(&self, index: usize) -> WideMove {
-        self[index]
-    }
 }
 
 /// A [`WideSink`] that only counts the moves it is given, never materialising
@@ -5817,6 +5776,13 @@ impl WideSink for WideCountSink {
 /// overflow — the generic analogue of the concrete [`MoveList`](crate::position),
 /// so the reusable-buffer perft recursion allocates no per-node `Vec`.
 ///
+/// This is the reusable buffer accepted by
+/// [`GenericPosition::legal_moves_into`](GenericPosition::legal_moves_into): a
+/// consumer that lists moves for many positions constructs one list with
+/// [`new`](Self::new) and hands it back each call, so the common (non-spilling)
+/// path allocates no heap memory at all — the allocation
+/// [`legal_moves`](GenericPosition::legal_moves) makes per call.
+///
 /// Move generation runs once per perft node; collecting each node's moves into a
 /// fresh `Vec<WideMove>` is a heap allocation (and free) at every node. This
 /// stores the first [`WideMoveList::INLINE`] moves in an inline `[WideMove; N]`
@@ -5827,8 +5793,8 @@ impl WideSink for WideCountSink {
 /// a `Copy` `u64`, so the buffer needs no `unsafe`, no `MaybeUninit`: the inline
 /// tail is value-initialised with a sentinel that is never read (only the first
 /// `inline_len` slots are exposed, each overwritten by a real push first).
-#[derive(Clone)]
-pub(crate) struct WideMoveList {
+#[derive(Clone, Debug)]
+pub struct WideMoveList {
     inline: [WideMove; Self::INLINE],
     inline_len: usize,
     spill: Vec<WideMove>,
@@ -5837,14 +5803,17 @@ pub(crate) struct WideMoveList {
 impl WideMoveList {
     /// The inline capacity. Covers the 218-move standard-chess maximum and the
     /// large-board variants' move counts with margin; rare overflow spills.
-    pub(crate) const INLINE: usize = 256;
+    pub const INLINE: usize = 256;
 
     /// A sentinel used to value-initialise the unused inline tail; never read.
     const NULL: WideMove = WideMove::null();
 
-    /// An empty list.
+    /// An empty list, ready to be filled by
+    /// [`GenericPosition::legal_moves_into`](GenericPosition::legal_moves_into)
+    /// and reused across calls.
     #[inline]
-    pub(crate) fn new() -> WideMoveList {
+    #[must_use]
+    pub fn new() -> WideMoveList {
         WideMoveList {
             inline: [Self::NULL; Self::INLINE],
             inline_len: 0,
@@ -5854,13 +5823,21 @@ impl WideMoveList {
 
     /// The number of moves in the list (inline plus spill).
     #[inline]
-    pub(crate) fn len(&self) -> usize {
+    #[must_use]
+    pub fn len(&self) -> usize {
         self.inline_len + self.spill.len()
+    }
+
+    /// Whether the list holds no moves.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inline_len == 0
     }
 
     /// Removes all moves, keeping the spill allocation for reuse.
     #[inline]
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.inline_len = 0;
         self.spill.clear();
     }
@@ -5869,13 +5846,39 @@ impl WideMoveList {
     /// is a tight loop over one contiguous slice — the shape the perft inner loop
     /// wants.
     #[inline]
-    pub(crate) fn for_each(&self, mut f: impl FnMut(WideMove)) {
+    pub fn for_each(&self, mut f: impl FnMut(WideMove)) {
         for &mv in &self.inline[..self.inline_len] {
             f(mv);
         }
         for &mv in &self.spill {
             f(mv);
         }
+    }
+
+    /// Iterates over the moves in push order.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = &WideMove> {
+        self.inline[..self.inline_len]
+            .iter()
+            .chain(self.spill.iter())
+    }
+
+    /// Collects the moves into a freshly allocated `Vec<WideMove>` — the boundary
+    /// conversion the owned-`Vec`
+    /// [`legal_moves`](GenericPosition::legal_moves) uses.
+    #[must_use]
+    pub fn into_vec(self) -> Vec<WideMove> {
+        let mut v = Vec::with_capacity(self.len());
+        v.extend_from_slice(&self.inline[..self.inline_len]);
+        v.extend(self.spill);
+        v
+    }
+}
+
+impl Default for WideMoveList {
+    #[inline]
+    fn default() -> WideMoveList {
+        WideMoveList::new()
     }
 }
 
@@ -6189,10 +6192,12 @@ fn back_rank<G: Geometry>(color: Color) -> u8 {
 
 impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Generates every legal move into a stack-backed [`WideMoveList`], dispatching
-    /// to the standard or the special generator exactly as
-    /// [`generate_into`](Self::generate_into) does. The reusable-buffer perft
-    /// recursion fills one such list per ply and reuses it across sibling nodes,
-    /// so it allocates no per-node `Vec`.
+    /// to the standard or the special generator by the same
+    /// [`uses_standard_path`](Self::uses_standard_path) split the public entry
+    /// points ([`legal_moves`](Self::legal_moves) /
+    /// [`legal_moves_into`](Self::legal_moves_into)) use. The reusable-buffer
+    /// perft recursion fills one such list per ply and reuses it across sibling
+    /// nodes, so it allocates no per-node `Vec`.
     #[inline]
     fn generate_list(&self, out: &mut WideMoveList) {
         if self.uses_standard_path() {
@@ -7018,6 +7023,72 @@ fn push_decimal(out: &mut String, mut n: u32) {
     }
 }
 
+/// A `System`-backed global allocator that tallies heap allocations on the
+/// current thread, letting a test assert an operation is allocation-free.
+///
+/// It is installed only for the crate's own unit-test binary (`#[cfg(test)]`),
+/// so it never touches the shipped library. Counting is per-thread (a
+/// `const`-initialised, non-allocating thread-local), so the count around a
+/// synchronous region reflects exactly that region's allocations regardless of
+/// other test threads running in parallel. Promoted from the benchmark's
+/// `compare/src/alloc.rs` technique, reduced to just what the zero-allocation
+/// regression test needs.
+#[cfg(test)]
+#[allow(unsafe_code)] // A global allocator can only be implemented `unsafe`.
+mod alloc_probe {
+    use core::alloc::{GlobalAlloc, Layout};
+    use core::cell::Cell;
+    use std::alloc::System;
+
+    thread_local! {
+        static ALLOCS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    pub(super) struct CountingAlloc;
+
+    // SAFETY: every method forwards to the process `System` allocator unchanged;
+    // the only added work is a non-allocating thread-local counter bump on the
+    // allocating entry points.
+    unsafe impl GlobalAlloc for CountingAlloc {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            let p = System.alloc(layout);
+            if !p.is_null() {
+                ALLOCS.with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            System.dealloc(ptr, layout);
+        }
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            let p = System.alloc_zeroed(layout);
+            if !p.is_null() {
+                ALLOCS.with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            let p = System.realloc(ptr, layout, new_size);
+            if !p.is_null() {
+                ALLOCS.with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL: CountingAlloc = CountingAlloc;
+
+    /// Runs `f` and returns its result alongside the number of heap allocations
+    /// it performed on the current thread.
+    pub(super) fn count_allocs<R>(f: impl FnOnce() -> R) -> (R, u64) {
+        let before = ALLOCS.with(Cell::get);
+        let r = f();
+        let after = ALLOCS.with(Cell::get);
+        (r, after.wrapping_sub(before))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -7195,5 +7266,88 @@ mod tests {
         walk_incremental_zobrist(&mut Xiangqi::startpos(), 2);
         walk_incremental_zobrist(&mut Minixiangqi::startpos(), 3);
         walk_incremental_zobrist(&mut Janggi::startpos(), 2);
+    }
+
+    /// Fills `list` via `legal_moves_into` and asserts its contents are exactly
+    /// the move set `legal_moves` returns — same moves, same order. The list is
+    /// passed in (not created here) so the caller can prove one buffer is reused
+    /// across positions without corruption.
+    fn assert_into_agrees<G: Geometry, V: WideVariant<G>>(
+        pos: &GenericPosition<G, V>,
+        list: &mut WideMoveList,
+    ) {
+        let via_vec = pos.legal_moves();
+        pos.legal_moves_into(list);
+        let mut via_list = Vec::with_capacity(list.len());
+        list.for_each(|mv| via_list.push(mv));
+        assert_eq!(
+            via_vec, via_list,
+            "legal_moves_into diverged from legal_moves"
+        );
+        assert_eq!(list.len(), via_vec.len());
+        assert_eq!(list.is_empty(), via_vec.is_empty());
+    }
+
+    /// Walks the legal-move tree to `depth`, asserting at every node that
+    /// `legal_moves_into` (into one reused `list`) agrees byte-for-byte with
+    /// `legal_moves`.
+    fn walk_into_agrees<G: Geometry, V: WideVariant<G>>(
+        pos: &mut GenericPosition<G, V>,
+        depth: u32,
+        list: &mut WideMoveList,
+    ) {
+        assert_into_agrees(pos, list);
+        if depth == 0 {
+            return;
+        }
+        for mv in pos.legal_moves() {
+            let undo = pos.apply_with_undo(&mv);
+            walk_into_agrees(pos, depth - 1, list);
+            pos.undo(undo);
+        }
+    }
+
+    #[test]
+    fn legal_moves_into_matches_legal_moves_standard() {
+        // One reused buffer across the whole shallow perft walk of two positions
+        // (startpos and Kiwipete, which offers captures, castling, and en passant
+        // immediately) — proving reuse does not corrupt the result.
+        let mut list = WideMoveList::new();
+        walk_into_agrees(&mut Pos::startpos(), 3, &mut list);
+        let mut kiwipete =
+            Pos::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .expect("valid");
+        walk_into_agrees(&mut kiwipete, 3, &mut list);
+    }
+
+    #[test]
+    fn legal_moves_into_is_allocation_free_while_vec_is_not() {
+        use super::alloc_probe::count_allocs;
+
+        let pos = Pos::startpos();
+        let mut list = WideMoveList::new();
+
+        // Warm up: the first movegen call lazily initialises the shared magic
+        // slider tables (a one-time allocation), and the first fill grows nothing
+        // further since the inline capacity lives in `list` itself. Measuring the
+        // *second* call isolates the per-call cost from that one-time setup.
+        pos.legal_moves_into(&mut list);
+
+        let ((), into_allocs) = count_allocs(|| pos.legal_moves_into(&mut list));
+        assert_eq!(
+            into_allocs, 0,
+            "legal_moves_into must not allocate on a non-spilling position"
+        );
+
+        // The Vec-returning convenience method, by contrast, allocates its result
+        // buffer every call — the cost `legal_moves_into` exists to avoid.
+        let (moves, vec_allocs) = count_allocs(|| pos.legal_moves());
+        assert!(
+            vec_allocs > 0,
+            "legal_moves (Vec) is expected to allocate its result"
+        );
+        // Both entry points produced the same 20 opening moves.
+        assert_eq!(moves.len(), 20);
+        assert_eq!(list.len(), 20);
     }
 }
