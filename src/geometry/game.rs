@@ -601,9 +601,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         let promotion = Self::role_count(board, mover, WideRole::Pawn)
             < Self::role_count(before, mover, WideRole::Pawn);
 
-        // Branch 1 (not ASEAN): the mover's King captured the last pawn and is now
-        // bare — start the count for the mover.
-        if rule != WideCountingRule::Asean
+        // Branch 1 (board-honour rules only): the mover's King captured the last
+        // pawn and is now bare — start the count for the mover. Skipped by the
+        // pieces-honour-only rules (ASEAN / Burmese), which count only a lone king.
+        if !Self::is_pieces_honour_only(rule)
             && captured_pawn
             && Self::total(board, mover) == 1
             && pawns == 0
@@ -620,7 +621,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             let limit = Self::count_limit(board, stm, rule);
             if limit != 0 {
                 c.limit = 2 * limit;
-                c.ply = if rule == WideCountingRule::Asean || Self::total(board, stm) > 1 {
+                c.ply = if Self::is_pieces_honour_only(rule) || Self::total(board, stm) > 1 {
                     0
                 } else {
                     2 * total_all
@@ -701,7 +702,51 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                     0
                 }
             }
+            WideCountingRule::Burmese => {
+                // Sittuyin (published Burmese counting): the same pieces-honour
+                // tiers as ASEAN (rook 16 / sin 44 / knight 64; the general/Met
+                // alone cannot mate and draws at once), but a lone king caught on
+                // one of the four centre squares (d4 / d5 / e4 / e5) is granted
+                // five extra moves — the count starts only after its fifth move —
+                // so the limits become 21 / 49 / 69. Fairy-Stockfish itself models
+                // Sittuyin as plain ASEAN and omits this exception.
+                if pawns > 0 || Self::total(board, side) > 1 {
+                    return 0;
+                }
+                let base = if rooks > 0 {
+                    16
+                } else if khons > 0 {
+                    44
+                } else if knights > 0 {
+                    64
+                } else {
+                    return 0;
+                };
+                if Self::king_on_centre(board, side) {
+                    base + 5
+                } else {
+                    base
+                }
+            }
         }
+    }
+
+    /// Whether `rule` counts only a **lone king** (pieces' honour only, no
+    /// board-honour phase and no board-honour count start) — ASEAN and Burmese.
+    fn is_pieces_honour_only(rule: WideCountingRule) -> bool {
+        matches!(rule, WideCountingRule::Asean | WideCountingRule::Burmese)
+    }
+
+    /// Whether `side`'s king stands on one of the four central squares (d4 / d5 /
+    /// e4 / e5 on 8x8) — the Sittuyin centre-square counting exception. The four
+    /// centre squares are the two middle files and the two middle ranks.
+    fn king_on_centre(board: &Board<G>, side: Color) -> bool {
+        let (cf0, cf1) = ((G::WIDTH - 1) / 2, G::WIDTH / 2);
+        let (cr0, cr1) = ((G::HEIGHT - 1) / 2, G::HEIGHT / 2);
+        board.pieces(side, WideRole::King).into_iter().any(|sq| {
+            let (f, r) = (sq.file(), sq.rank());
+            (f == cf0 || f == cf1) && (r == cr0 || r == cr1)
+        })
     }
 
     /// The number of pieces of color `color` on `board`.
@@ -733,7 +778,7 @@ mod tests {
     use super::*;
     use crate::geometry::variants::{
         Asean, Cambodian, Capablanca, Janggi, Makpong, Makruk, Minishogi, Minixiangqi, Shogi,
-        Xiangqi,
+        Sittuyin, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1088,6 +1133,53 @@ mod tests {
         let mut game = GenericGame::new(pos);
         let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
         assert_eq!(plies, Some(26), "FSF Cambodian draws on the 26th half-move");
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn sittuyin_pieces_honour_count_matches_asean_base() {
+        // Sittuyin (Burmese counting) shares ASEAN's pieces-honour tiers, so a
+        // K + Rook vs lone king endgame in which the counted king is NOT on a
+        // centre square behaves exactly like ASEAN: limit 16 moves
+        // (`countingLimit = 32`), the count starting from zero, so the draw fires
+        // when the ply exceeds 32 — the 34th half-move. (The black king shuffles
+        // a8<->a7, never touching the four central squares.)
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+            .expect("valid sittuyin fen");
+        let pos: Sittuyin = pos;
+        let mut game = GenericGame::new(pos);
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(
+            plies,
+            Some(34),
+            "Sittuyin base tier draws on the 34th half-move, exactly like ASEAN"
+        );
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn sittuyin_centre_square_grants_five_extra_moves() {
+        // Sittuyin's distinctive centre-square exception: a lone king caught on one
+        // of the four central squares (d4 / d5 / e4 / e5) when the count starts is
+        // granted five extra moves, so the K + Rook limit becomes 21 moves
+        // (`countingLimit = 42`) instead of 16. Here the black king sits on e5 (a
+        // centre square) at count-start — after White's first move — so the draw
+        // fires when the ply exceeds 42: the 44th half-move, ten plies later than
+        // the non-centre base case above. The rook shuffles c1<->c2 (never checking
+        // the e-file king) and the king shuffles e5<->e6.
+        let pos = GenericPosition::<_, _>::from_fen("8/8/8/4k3/8/8/8/2R3K1 w - - 0 1")
+            .expect("valid sittuyin fen");
+        let pos: Sittuyin = pos;
+        let mut game = GenericGame::new(pos);
+        // White Rc1<->c2 (2<->10); Black Ke5<->e6 (36<->44). No captures / checks.
+        let plies = play_until_over(&mut game, &[(2, 10), (36, 44), (10, 2), (44, 36)], 80);
+        assert_eq!(
+            plies,
+            Some(44),
+            "Sittuyin centre-square exception draws on the 44th half-move (limit 21)"
+        );
         assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
     }

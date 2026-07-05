@@ -268,6 +268,17 @@ impl WideVariant<Chess8x8> for SittuyinRules {
         false
     }
 
+    fn counting_rule() -> Option<crate::geometry::WideCountingRule> {
+        // Sittuyin's published Burmese counting endgame: a pieces-honour countdown
+        // once the counted side is a lone king (rook 16 / sin 44 / knight 64
+        // moves), with the Sittuyin centre-square exception granting five extra
+        // moves to a king caught on d4 / d5 / e4 / e5. Distinct from the plain
+        // ASEAN table Fairy-Stockfish uses for Sittuyin. Terminal-only, so perft is
+        // byte-identical (adjudicated by
+        // [`GenericGame`](crate::geometry::game::GenericGame)).
+        Some(crate::geometry::WideCountingRule::Burmese)
+    }
+
     // --- placement phase --------------------------------------------------
 
     fn has_placement() -> bool {
