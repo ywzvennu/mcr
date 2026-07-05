@@ -732,7 +732,8 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, Janggi, Makpong, Makruk, Minishogi, Minixiangqi, Shogi, Xiangqi,
+        Asean, Cambodian, Capablanca, Janggi, Makpong, Makruk, Minishogi, Minixiangqi, Shogi,
+        Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1134,6 +1135,89 @@ mod tests {
         let pos = DrawChess::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").expect("valid fen");
         assert_eq!(pos.end_reason(), Some(WideEndReason::InsufficientMaterial));
         assert_eq!(pos.outcome(), Some(WideOutcome::Draw));
+    }
+
+    // --- Western large boards: 50-move + threefold (#473) -----------------
+    //
+    // The standard-army large boards (Capablanca family) opt into both the
+    // move-count rule (`move_rule_plies() == Some(100)`) and threefold
+    // repetition (`tracks_repetition()`). Capablanca (10x8) stands in for the
+    // whole set: the plumbing is shared, so one representative exercise of each
+    // rule at the `GenericGame` level covers them all.
+
+    #[test]
+    fn capablanca_threefold_repetition_is_a_draw() {
+        // Two kings shuffle in place with static rooks on the a-file (present so
+        // the position is not an insufficient-material draw). The position recurs
+        // without progress and is drawn on its third occurrence.
+        // Cap10x8 index = rank*10 + file. Kf1 = 5, f2 = 15; kf8 = 75, f7 = 65.
+        let pos = GenericPosition::<_, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 0 1")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..2 {
+            play(&mut game, 5, 15); // K f1->f2
+            play(&mut game, 75, 65); // k f8->f7
+            play(&mut game, 15, 5); // K f2->f1
+            play(&mut game, 65, 75); // k f7->f8
+        }
+        assert_eq!(game.repetition_count(), 3);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn capablanca_fifty_move_rule_draws_at_the_game_level() {
+        // Halfmove clock at the 100-ply limit with legal moves available (a lone
+        // queen keeps the position out of the insufficient-material rule): the
+        // GenericGame reports a move-rule draw.
+        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 100 80")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let game = GenericGame::new(pos);
+        assert_eq!(game.end_reason(), Some(WideEndReason::MoveRule));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+        // One ply below the limit the game is still live.
+        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 99 80")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let game = GenericGame::new(pos);
+        assert_eq!(game.end_reason(), None);
+    }
+
+    #[test]
+    fn capablanca_move_clock_resets_on_pawn_move_and_captures() {
+        // A pawn push resets the clock; a plain king move only advances it.
+        // Pawn f5 = 45 -> f6 = 55; kings far apart so no check intervenes.
+        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/5P4/10/10/10/5K4 w - - 98 60")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.position().halfmove_clock(), 98);
+        play(&mut game, 45, 55); // pawn f5->f6: progress, clock resets
+        assert_eq!(game.position().halfmove_clock(), 0);
+        assert_eq!(game.end_reason(), None);
+
+        // A capture also resets the clock. White rook on a1 takes a black rook on
+        // a8 up the open a-file. Ra1 = 0, ra8 = 70.
+        let pos = GenericPosition::<_, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 40 30")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.position().halfmove_clock(), 40);
+        play(&mut game, 0, 70); // Rxa8: capture, clock resets
+        assert_eq!(game.position().halfmove_clock(), 0);
+
+        // A non-progress king move advances the clock instead of resetting it.
+        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 50 40")
+            .expect("valid capablanca fen");
+        let _: &Capablanca = &pos;
+        let mut game = GenericGame::new(pos);
+        play(&mut game, 5, 6); // K f1->g1: quiet, clock advances
+        assert_eq!(game.position().halfmove_clock(), 51);
     }
 
     // -- Incremental Zobrist key (issue #311) -----------------------------

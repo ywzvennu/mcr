@@ -70,6 +70,25 @@ pub struct ChancellorRules;
 const CHANCELLOR_START_PLACEMENT: &str = "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR";
 
 impl WideVariant<Chess9x9> for ChancellorRules {
+    /// The western **fifty-move rule**: a position whose halfmove clock has
+    /// reached 100 plies (50 full moves with no capture or pawn move) is a
+    /// [`WideEndReason::MoveRule`](crate::geometry::WideEndReason::MoveRule) draw,
+    /// matching Fairy-Stockfish's default `nMoveRule = 50` for this standard-army
+    /// large board. Adjudication-only (the clock never gates move generation), so
+    /// perft stays byte-identical.
+    fn move_rule_plies() -> Option<u16> {
+        Some(100)
+    }
+
+    /// Records a position history so the standard **threefold** repetition draw
+    /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
+    /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
+    /// level. History-dependent and never consulted by a bare
+    /// [`GenericPosition`](crate::geometry::GenericPosition), so perft is unchanged.
+    fn tracks_repetition() -> bool {
+        true
+    }
+
     fn starting_position() -> (Board<Chess9x9>, GenericState<Chess9x9>) {
         let board = Board::<Chess9x9>::from_fen_placement(CHANCELLOR_START_PLACEMENT)
             .expect("the Chancellor starting placement is valid on a 9x9 board");
