@@ -53,6 +53,25 @@ const AMAZON_START_PLACEMENT: &str = "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**
 pub struct AmazonRules;
 
 impl WideVariant<Chess8x8> for AmazonRules {
+    /// The western **fifty-move rule**: a position whose halfmove clock has
+    /// reached 100 plies (50 full moves with no capture or pawn move) is a
+    /// [`WideEndReason::MoveRule`](crate::geometry::WideEndReason::MoveRule) draw,
+    /// matching Fairy-Stockfish's default `nMoveRule = 50` for this standard-army
+    /// large board. Adjudication-only (the clock never gates move generation), so
+    /// perft stays byte-identical.
+    fn move_rule_plies() -> Option<u16> {
+        Some(100)
+    }
+
+    /// Records a position history so the standard **threefold** repetition draw
+    /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
+    /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
+    /// level. History-dependent and never consulted by a bare
+    /// [`GenericPosition`](crate::geometry::GenericPosition), so perft is unchanged.
+    fn tracks_repetition() -> bool {
+        true
+    }
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(AMAZON_START_PLACEMENT)
             .expect("the Amazon Chess starting placement is valid on an 8x8 board");
