@@ -4433,4 +4433,92 @@ mod tests {
         assert_eq!(ep.kind(), MoveKind::EnPassant);
         assert_eq!(pos.see(&ep), 0);
     }
+
+    #[test]
+    fn see_value_table_is_material_scaled() {
+        // SEE must weight a free capture by the *distinct material value* of the
+        // piece won, not a flat constant. Two undefended captures on the same
+        // (empty-around) square return different values only if `see_value` maps
+        // roles to their separate scores; a `see_value` collapsed to a single
+        // constant (0 or 1 for every role) cannot satisfy both literals. The
+        // assertions are hard-coded numbers (NOT `see_value(role)`, which would
+        // also be flattened by the same mutation and hide it).
+        let win_queen = Position::from_fen("3q4/8/8/8/8/8/8/3RK1k1 w - - 0 1").unwrap();
+        let take_q = win_queen.parse_uci("d1d8").unwrap();
+        assert!(take_q.is_capture());
+        assert_eq!(
+            win_queen.see(&take_q),
+            900,
+            "a free queen is worth exactly 900"
+        );
+
+        let win_knight = Position::from_fen("3n4/8/8/8/8/8/8/3RK1k1 w - - 0 1").unwrap();
+        let take_n = win_knight.parse_uci("d1d8").unwrap();
+        assert!(take_n.is_capture());
+        assert_eq!(
+            win_knight.see(&take_n),
+            320,
+            "a free knight is worth exactly 320"
+        );
+    }
+
+    #[test]
+    fn see_bishop_xray_reveals_slider_and_ignores_offline_bishops() {
+        // Diagonal x-ray swap-off on e5, exercising the bishop/queen re-add mask
+        // of `see_xray_attackers` and the loop's x-ray uncover.
+        //
+        // White Pd4 x Ne5 (+320). Black Pf6 recaptures on e5 (white loses the
+        // pawn). Vacating f6 uncovers the white Bg7 down the g7-f6-e5 diagonal —
+        // it was blocked at seed time — which recaptures the black pawn; black has
+        // no further attacker. Minimax net = +320 (white keeps the knight's value:
+        // pawn-for-pawn after the initial win). The black Ba7 sits on the a7-g1
+        // diagonal and never attacks e5, so it must NOT be pulled into the swap-off.
+        //
+        // This kills: the bishop-role x-ray mask `Bishop | Queen` collapsing to
+        // `Bishop & Queen` (empty -> no diagonal slider re-added, SEE reads 220),
+        // the `bishop_attacks(sq,occ) & bishop_like` filter degrading to `|`/`^`
+        // (which would splice in the off-diagonal Ba7 as a phantom attacker), the
+        // `xray & occ` re-add mask degrading to `|`/`^`, and the swap-off loop
+        // bound `depth+1 >= len` flipping to `<` (which truncates after one ply).
+        let pos = Position::from_fen("k7/6B1/5p2/4n3/3P4/b7/8/6K1 w - - 0 1").unwrap();
+        let cap = Move::new(Square::D4, Square::E5, MoveKind::Capture);
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), 320);
+    }
+
+    #[test]
+    fn see_rook_xray_battery_ignores_offline_rooks() {
+        // Orthogonal x-ray swap-off on e5 with a doubled white rook battery
+        // (Re1 behind Re2) against a single black defender (Re7), plus an off-line
+        // black rook on a3 that does not attack e5.
+        //
+        // Re1 x Pe5 (+100). If black Re7 recaptures, the rear white Re2 recaptures
+        // the black rook; black then has nothing, so black declines the recapture
+        // and white nets +100. The a3 rook is on rank 3, never bears on e5, so the
+        // rook-role x-ray term `rook_attacks(e5,occ) & rook_like` must exclude it;
+        // degrading that `&` to `|` would splice a3 in as a phantom black
+        // recapture and drop SEE to -400. Also kills the `xray & occ` re-add and
+        // the loop-bound flip on the rook side.
+        let pos = Position::from_fen("4k3/4r3/8/4p3/8/r7/4R3/4R1K1 w - - 0 1").unwrap();
+        let cap = Move::new(Square::E1, Square::E5, MoveKind::Capture);
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), 100);
+    }
+
+    #[test]
+    fn see_minimax_backpass_folds_the_previous_gain() {
+        // A minimal depth-1 swap-off that pins the back-pass recurrence
+        // `gain[d-1] = -max(-gain[d-1], gain[d])`. White Pd4 x Ne5 wins the knight
+        // (+320); black Pf6 makes the single recapture (white loses the pawn);
+        // white has no follow-up. The exchange is knight-for-pawn, SEE = +220.
+        //
+        // The back-pass must fold in the *previous* gain (`gain[d-1] = 320`): if
+        // the first `max` argument reads `gain[d+1]` (an untouched 0) the result
+        // collapses to 0, and if it reads `gain[d]` (the `/1` mutant) it flips to
+        // -220. Only the true recurrence yields +220.
+        let pos = Position::from_fen("6k1/8/5p2/4n3/3P4/8/8/6K1 w - - 0 1").unwrap();
+        let cap = Move::new(Square::D4, Square::E5, MoveKind::Capture);
+        assert!(cap.is_capture());
+        assert_eq!(pos.see(&cap), 220);
+    }
 }

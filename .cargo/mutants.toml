@@ -44,16 +44,24 @@
 #   * The provably-equivalent survivors — `|`->`^` on operands that share no set
 #     bits, where union and xor are identical — are pinned in `exclude_re` below
 #     with a per-case disjointness proof.
+#   * The `Position::see` swap-off battery is now CLEARED. A scoped sweep
+#     (`cargo mutants --file src/position.rs -F see`, the `Position::see` /
+#     `see_attackers` / `see_xray_attackers` / `see_value` / `see_least_valuable`
+#     family) went from 13 surviving mutants to 2, and those 2 are the provably
+#     equivalent overflow-guard arith mutants excluded below. The 11 real ones —
+#     the min-max back-pass fold (`gain[d-1]` read), the loop bound `>=`->`<`, the
+#     x-ray re-add `& occ` mask, the bishop/queen vs rook/queen x-ray role masks
+#     and their `& attacks` filters, and the `see_value` material table — are
+#     killed by four hand-verified swap-off pins in `position::tests` (each with a
+#     literal expected SEE value, NOT `see_value(role)`, so a flattened table
+#     cannot hide): `see_value_table_is_material_scaled`,
+#     `see_bishop_xray_reveals_slider_and_ignores_offline_bishops`,
+#     `see_rook_xray_battery_ignores_offline_rooks`,
+#     `see_minimax_backpass_folds_the_previous_gain`. These run under `--lib`.
 # What still blocks flipping `position.rs` into the enforcing list — a scoped
 # sweep (`cargo mutants --file src/position.rs -j2 --timeout 60`, ~660 mutants)
-# still leaves genuine survivors that need their own targeted tests, all OUTSIDE
-# the perft-reachable core:
-#   * `Position::see` swap-off internals — the min-max back-pass sign, the
-#     early-exit bound, the x-ray re-add mask, and the bishop/queen vs rook/queen
-#     x-ray role split. SEE is a heuristic never touched by perft, and its
-#     minimax is robust enough that many internal mutations leave the top-level
-#     SEE value unchanged for a given position, so each needs a bespoke,
-#     hand-verified swap-off position.
+# still leaves genuine survivors OUTSIDE both the perft-reachable core AND the now
+# -cleared SEE family, each needing its own targeted tests:
 #   * `Position::pseudo_into_with` (the SEPARATE make-move-filtered pseudo-legal
 #     generator used by variant rule layers, which the fast pin/check-mask perft
 #     path never calls) and the two `#[cfg(not(feature = "magic"))]` slider
@@ -62,13 +70,19 @@
 #   * A few remaining bit-twiddle survivors (`attacked_by_nonking`'s pawn NE/NW
 #     union — NOT disjoint, since two pawns can attack one square — and the
 #     `gen_pawn_pushes` shift).
-# Killing these needs a SEE swap-off test battery + pseudo-legal / no-magic
-# coverage, not the perft suites. Per-mutant cost is ~10-20 s incremental build +
-# a ~1 s test, so a full ~660-mutant sweep is ~30-40 min at -j2 (and locally the
-# copy-based runner exhausts a RAM-backed `/tmp`, so TMPDIR must point at real
-# disk); on CI, `--shard k/n` across jobs is the likely enabler once the
-# survivors above are killed. Until then `position.rs` stays OUT of `examine_globs`
-# so this ENFORCING job cannot go red on those known survivors.
+# Killing the rest needs pseudo-legal + no-magic coverage (a second no-magic test
+# pass for the `#[cfg(not(feature = "magic"))]` branches), not the perft suites.
+# Per-mutant cost is ~10-20 s incremental build + a ~1 s test, so a full
+# ~660-mutant sweep is ~30-40 min at -j2 (and locally the copy-based runner
+# exhausts a RAM-backed `/tmp`, so TMPDIR must point at real disk). Concrete
+# unblock plan: (1) add a no-magic (`--no-default-features` + needed features)
+# kill pass so the two slider branches are reachable; (2) add `pseudo_into_with`
+# + `attacked_by_nonking` NE|NW + `gen_pawn_pushes` shift pins the way the SEE
+# battery was done; (3) then flip `examine_globs` to include `src/position.rs`,
+# widen the test filter below to add `position::tests::` (still `--lib`), and run
+# the CI sweep as a `--shard k/n` matrix to keep per-job wall-clock bounded. Until
+# all three land `position.rs` stays OUT of `examine_globs` so this ENFORCING job
+# cannot go red on those known survivors.
 examine_globs = [
     "src/board.rs",
 ]
@@ -119,6 +133,18 @@ exclude_globs = [
 #     a target both ways at once).
 #   * Position::is_insufficient_material — the pawn|rook|queen and knight|bishop
 #     role unions; disjoint roles.
+# A SECOND equivalence class is the swap-off overflow guard in `Position::see`:
+#   * `depth + 1 >= gain.len()` (the `gain: [i32; 32]` bound) — `+`->`-` gives
+#     `depth - 1 >= 32` and `+`->`*` gives `depth * 1 >= 32`. `depth` counts the
+#     successive recaptures on one square, bounded by the pieces that can ever
+#     bear on it — at most ~16, always < 31 — so neither the original nor either
+#     mutant ever crosses the 32 threshold: the guard is unreachable defensive
+#     code and the loop always exits via the `None`-attacker break instead. All
+#     three variants are byte-for-byte identical in behaviour, so the two arith
+#     mutants are uncatchable equivalents (the `>=`->`<` mutant on the SAME line
+#     DOES fire early and is a real survivor — killed by the SEE swap-off tests,
+#     NOT excluded). `depth + 1` is the sole non-compound `+` in `Position::see`,
+#     so each regex names exactly that token.
 # NOTE: only the `Board::occupied` line is active today (board.rs is the enforcing
 # scope); the `Position::*` / `CastlingRights::*` lines are inert until position.rs
 # is broadened into `examine_globs`, and are recorded now so that sweep starts from
@@ -135,6 +161,8 @@ exclude_re = [
     'replace \| with \^ in Position::see_attackers',
     'replace \| with \^ in Position::see_xray_attackers',
     'replace \| with \^ in Position::is_insufficient_material',
+    'replace \+ with - in Position::see',
+    'replace \+ with \* in Position::see',
 ]
 
 # ---------------------------------------------------------------------------
