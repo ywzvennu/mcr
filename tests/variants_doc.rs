@@ -601,6 +601,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "7x7 Shogi with a hand and drops (up to two Swallows per file); mandatory two-rank promotion for the Swallow and Falcon only. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant torishogi`).",
         },
+        WideVariantId::Washogi => Meta {
+            display: "Wa Shogi (animal shogi, 11x11)",
+            pieces: "An animal-and-bird army of thirty-one kinds: the royal Crane King plus sixteen non-royal base pieces (Sparrow Pawn, Oxcart, Liberated Horse, Strutting Crow, Swooping Owl, Climbing Monkey, Flying Goose, Flying Cock, Blind Dog, Violent Stag, Violent Wolf, Swallow's Wings, Running Rabbit, Flying Falcon, and the never-promoting Treacherous Fox and Cloud Eagle) and fourteen distinct promoted forms (Golden Bird, Plodding Ox, Heavenly Horse, Flying Falcon, Cloud Eagle, Violent Stag, Swallow's Wings, Raiding Falcon, Violent Wolf, Gliding Swallow, Treacherous Fox, Tenacious Falcon, Roaming Boar, Bear's Eyes).",
+            rules: "11x11 Shogi-family game with a persistent hand and FSF-style captures-to-hand drops; captures bank unpromoted and flip sides, a dropped piece is always unpromoted, and a Sparrow Pawn or Oxcart may not be dropped on the last rank. Optional promotion for a move starting or ending in the furthest three ranks (forced for a Sparrow Pawn or Oxcart on the last rank); the Treacherous Fox, Cloud Eagle and Crane King never promote. Win by capturing the Crane King.",
+            oracle: "Rules-only (no FSF perft oracle): Fairy-Stockfish has no Wa Shogi variant and HaChu's perft is unreliable, so it is rules-validated (as for Alice / Fog-of-War / Bughouse) via hand-derived low-depth perft, property/unit tests, and attacker-consistency playouts.",
+        },
         WideVariantId::Xiangfu => Meta {
             display: "Xiang Fu (9x9 Xiangqi-themed drops)",
             pieces: "Champion (royal, ring-confined), Pupil (drop-only commoner), Horse, Chariot, Cannon, Crossbow (diagonal cannon), Bishop, and Mahout (non-jumping two-leaper).",
