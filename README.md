@@ -217,7 +217,8 @@ cargo run --release --manifest-path compare-fairy/Cargo.toml -- --build
 
 ```toml
 [dependencies]
-mcr = "0.3"
+# In development — not on crates.io yet; depend on it from git:
+mcr = { git = "https://github.com/ywzvennu/mcr" }
 ```
 
 Parse a FEN, generate legal moves, play one, and read the outcome:

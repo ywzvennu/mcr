@@ -668,10 +668,7 @@ impl Position {
     /// Renamed to `pinned_pieces` for parity with the fairy layer's
     /// [`GenericPosition::pinned_pieces`](crate::geometry::GenericPosition::pinned_pieces).
     #[must_use]
-    #[deprecated(
-        since = "0.3.1",
-        note = "renamed to `pinned_pieces` for parity with the fairy family"
-    )]
+    #[deprecated(note = "renamed to `pinned_pieces` for parity with the fairy family")]
     pub fn pinned(&self, color: Color) -> Bitboard {
         self.pinned_pieces(color)
     }
