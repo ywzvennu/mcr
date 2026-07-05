@@ -777,8 +777,8 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, Capablanca, Janggi, Makpong, Makruk, Minishogi, Minixiangqi, Shogi,
-        Sittuyin, Xiangqi,
+        Asean, Cambodian, CannonShogi, Capablanca, Janggi, Makpong, Makruk, Minishogi, Minixiangqi,
+        ShoShogi, Shogi, Sittuyin, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -856,6 +856,60 @@ mod tests {
         let pos = GenericPosition::<_, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
             .expect("valid shogi fen");
         let _: &Shogi = &pos;
+        let mut game = GenericGame::new(pos);
+        for _ in 0..3 {
+            play(&mut game, 17, 8); // R i2->i1+, checks a1
+            assert!(game.position().is_check());
+            play(&mut game, 0, 9); // K a1->a2
+            play(&mut game, 8, 17); // R i1->i2+, checks a2
+            assert!(game.position().is_check());
+            play(&mut game, 9, 0); // K a2->a1
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::PerpetualCheckLoss));
+        // White perpetually checked, so White loses: Black wins.
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: crate::Color::Black,
+            })
+        );
+    }
+
+    // --- Large / minor shogi sennichite (issue #471) ---------------------
+
+    #[test]
+    fn shoshogi_sennichite_is_a_draw() {
+        // Sho Shogi shares Shogi's 9x9 geometry and sennichite rule (fold 4). Two
+        // lone kings shuffling in place recur without check, so the fourth
+        // occurrence is a plain sennichite draw.
+        let pos = GenericPosition::<_, _>::from_fen("k8/9/9/9/9/9/9/9/4K4 w - - 0 1")
+            .expect("valid sho shogi fen");
+        let _: &ShoShogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 4, 13); // white K e1->e2
+            play(&mut game, 72, 63); // black K a9->a8
+            play(&mut game, 13, 4); // white K e2->e1
+            play(&mut game, 63, 72); // black K a8->a9
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn cannonshogi_perpetual_check_loses_for_the_checker() {
+        // Cannon Shogi shares Shogi's 9x9 geometry; its Rook still moves as a Rook.
+        // A White rook shuttling i1/i2 checks the lone black king along the a-file
+        // on every move, so the repetition is a perpetual check and White (the
+        // checker) loses. The rook stays out of the promotion zone so it never
+        // promotes and the position recurs exactly.
+        let pos = GenericPosition::<_, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
+            .expect("valid cannon shogi fen");
+        let _: &CannonShogi = &pos;
         let mut game = GenericGame::new(pos);
         for _ in 0..3 {
             play(&mut game, 17, 8); // R i2->i1+, checks a1

@@ -149,6 +149,19 @@ impl WideVariant<Cap10x8> for CapahouseRules {
             empty
         }
     }
+
+    /// Records a position history so the standard **threefold** repetition draw
+    /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
+    /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
+    /// level. This Capablanca + crazyhouse-drops hybrid inherits the western
+    /// repetition rule (three-fold plain draw, no perpetual-check exception), so
+    /// the `repetition_fold`, `repetition_draw_reason`, and
+    /// `perpetual_check_loses` defaults are already correct. History-dependent and
+    /// never consulted by a bare
+    /// [`GenericPosition`](crate::geometry::GenericPosition), so perft is unchanged.
+    fn tracks_repetition() -> bool {
+        true
+    }
 }
 
 impl CapahouseRules {
