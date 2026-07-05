@@ -25,8 +25,8 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use super::attacks::{
-    between, bishop_attacks_masked, king_attack_lines, king_attack_lines_diag_capped, line,
-    queen_attacks_masked, rook_attacks_masked, KingLineMasks,
+    between, bishop_attacks_masked, king_attack_lines, king_attack_lines_diag_capped, king_attacks,
+    line, queen_attacks_masked, rook_attacks_masked, KingLineMasks,
 };
 use super::role::WideRole;
 use super::variant::{ImpasseRule, RoyalSlider, WideEndReason, WideVariant};
@@ -506,15 +506,18 @@ impl<G: Geometry, V: WideVariant<G>> core::fmt::Debug for GenericPosition<G, V> 
 }
 
 /// The maximum number of distinct [`WideRole`] masks a single
-/// [`apply`](GenericPosition::apply) can touch: the moving piece's role, a
-/// captured piece's role, a promotion role, a castled rook (`Rook`), a Kyoto flip
-/// role, a Jieqi reveal role, and a gated reserve / hand role — at most eight.
-/// Recording each touched role mask's prior value, plus the two color masks, is
-/// enough to rebuild the board on [`undo`] by direct assignment, with no
-/// per-square role scan.
+/// [`apply`](GenericPosition::apply) can touch. Ordinary moves touch at most eight
+/// (the moving piece's role, a captured piece's role, a promotion role, a castled
+/// rook (`Rook`), a Kyoto flip role, a Jieqi reveal role, and a gated reserve /
+/// hand role). The Tenjiku **Fire Demon** area burn is the widest: the mover's
+/// role, an enemy displaced on the destination, and up to **eight** burned
+/// adjacent enemies — as many as ten touches, each possibly a distinct role. The
+/// bound therefore allows for that worst case. Recording each touched role mask's
+/// prior value, plus the two color masks, is enough to rebuild the board on
+/// [`undo`] by direct assignment, with no per-square role scan.
 ///
 /// [`undo`]: GenericPosition::undo
-const MAX_UNDO_ROLES: usize = 8;
+const MAX_UNDO_ROLES: usize = 12;
 
 /// The minimal record needed to reverse a single `apply`
 /// **in place** — the unmake half of the geometry layer's make/unmake, returned by
@@ -2797,7 +2800,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // byte-identical.
             let promotable =
                 (V::has_piece_promotion() || V::has_hand()) && V::role_can_promote(role);
+            // The Tenjiku Fire Demon: emit its Flying-Ox slides (and its igui) as
+            // area-burn moves whose adjacent-enemy burn is recomputed at apply-time,
+            // rather than the plain Quiet/Capture moves the generic path would emit.
+            // Gated behind `has_area_burn()` (default-off), so every other variant
+            // takes the generic path below and is byte-identical.
+            let is_area_burner = V::has_area_burn() && V::role_is_area_burner(role);
             for from in board.pieces(us, role) {
+                if is_area_burner {
+                    self.gen_fire_demon_moves(pseudo, from, role, us, occupied, their_pieces);
+                    continue;
+                }
                 // A board-aware role (the Janggi cannon, whose screen/target may
                 // not be a cannon and which may jump the palace diagonal; Chak's
                 // Quetzal cannon and move≠capture Soldier) computes its set from the
@@ -3039,6 +3052,53 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     pass_emitted = true;
                 }
             }
+        }
+    }
+
+    /// Generates one Tenjiku **Fire Demon**'s area-burn moves from `from`: every
+    /// Flying-Ox landing square is emitted as a
+    /// [`WideMoveKind::FireDemonMove`] `{ igui: false }` (its up-to-eight adjacent
+    /// enemies are burned — captured — at apply-time, in addition to any enemy the
+    /// slide displaces on the landing square itself), plus — when at least one enemy
+    /// stands adjacent to `from` — an *igui* `{ igui: true }` (`from == from`) that
+    /// burns in place without moving.
+    ///
+    /// The ordinary ride target set is `role_attacks` (the Flying-Ox vertical-Rook +
+    /// Bishop ride, blocked by the first piece, friendly-occupied squares removed):
+    /// this pass simply re-tags those squares as area-burn moves so the burn fires,
+    /// and adds the igui. A burn-nothing igui is **not** a move (matching the rule
+    /// that igui is a *capture*), so it is emitted only when there is a victim.
+    /// Runs only under [`WideVariant::has_area_burn`]; every other variant is
+    /// byte-identical.
+    fn gen_fire_demon_moves<S: WideSink>(
+        &self,
+        out: &mut S,
+        from: Square<G>,
+        role: WideRole,
+        us: Color,
+        occupied: Bitboard<G>,
+        their_pieces: Bitboard<G>,
+    ) {
+        let our_pieces = self.board.by_color(us);
+        // The Flying-Ox ride: any distance vertically or diagonally, blocked by the
+        // first piece; friendly-occupied landing squares are not legal targets.
+        let targets = V::role_attacks(role, us, from, occupied) & !our_pieces;
+        for to in targets {
+            out.push(WideMove::new(
+                from,
+                to,
+                WideMoveKind::FireDemonMove { igui: false },
+            ));
+        }
+        // Igui: burn the adjacent enemies in place. Only a move when at least one
+        // enemy is adjacent to burn (a burn-nothing igui is not a move).
+        let adjacent_enemies = king_attacks::<G>(from) & their_pieces;
+        if !adjacent_enemies.is_empty() {
+            out.push(WideMove::new(
+                from,
+                from,
+                WideMoveKind::FireDemonMove { igui: true },
+            ));
         }
     }
 
@@ -4222,6 +4282,28 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     }
                 }
             }
+            // A Fire Demon area burn removes an enemy standing on the destination
+            // (a slide-displacement capture) *and* every enemy on the up-to-eight
+            // squares adjacent to the destination. Record each victim's role so
+            // undo can restore it. (`is_capture()` is `false` for this dynamic-victim
+            // kind, so the generic capture touch above skips it — these are all its
+            // touches.) The mover's own role is already recorded above.
+            if let WideMoveKind::FireDemonMove { .. } = mv.kind() {
+                // The displacement capture on the landing square (only for a real
+                // slide — an igui's `to == from` holds the mover itself, already
+                // recorded).
+                if from != to {
+                    if let Some(captured) = self.board.role_at(to) {
+                        u.touch(captured, &self.board);
+                    }
+                }
+                let burn = king_attacks::<G>(to) & self.board.by_color(them);
+                for victim_sq in burn {
+                    if let Some(captured) = self.board.role_at(victim_sq) {
+                        u.touch(captured, &self.board);
+                    }
+                }
+            }
             if let Some(promo) = mv.kind().promotion() {
                 u.touch(promo, &self.board);
             }
@@ -4384,6 +4466,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // destination capture (`second_capture`); for a pass / igui,
                 // `to == from` is empty after the lift, so this simply lands the
                 // Lion back home.
+                self.board.set_piece(to, moving);
+            }
+            WideMoveKind::FireDemonMove { .. } => {
+                // A Tenjiku Fire Demon area burn: lift the demon, then BURN
+                // (capture) every enemy on the up-to-eight squares adjacent to the
+                // destination — recomputed here from `to` + board, respecting the
+                // board edges (`king_attacks` truncates off-board neighbours). A
+                // real slide additionally captures any enemy standing on the landing
+                // square by displacement; an igui (`from == to`) burns in place.
+                self.board.remove_known(from, moving);
+                // Whether the landing square held an enemy (a slide displacement
+                // capture). After the lift, `to` is empty for an igui, so this is
+                // read from the post-lift board and is naturally `false` there.
+                let dest_capture = self.board.piece_at(to).is_some();
+                let burn = king_attacks::<G>(to) & self.board.by_color(them);
+                for victim_sq in burn {
+                    if let Some(victim) = self.board.piece_at(victim_sq) {
+                        self.board.remove_known(victim_sq, victim);
+                    }
+                }
+                // The demon burns at least one enemy on any legal Fire Demon move
+                // (an igui is generated only with a victim; a slide is re-tagged as
+                // a burn move but may land with nothing to burn) — reset the clock
+                // whenever it actually removes a piece.
+                reset_clock = dest_capture || !burn.is_empty();
+                // `set_piece` clears any enemy on the landing square (the
+                // displacement capture) before landing the demon; for an igui the
+                // lifted `to == from` is empty, so this lands it back home.
                 self.board.set_piece(to, moving);
             }
         }
@@ -4577,7 +4687,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // `to` like any board move; the intermediate victim, if any, is cleared
             // with the destination bit. Chu Shogi has no crazyhouse promoted mask,
             // so this arm is inert there — it exists only for match exhaustiveness.
-            | WideMoveKind::LionMove { .. } => {
+            | WideMoveKind::LionMove { .. }
+            // A Fire Demon move carries the (never-promoted) demon's bit from `from`
+            // to `to` like any board move; its burned victims, if any, are cleared
+            // with the destination bit. Tenjiku has no crazyhouse promoted mask, so
+            // this arm is inert there — it exists only for match exhaustiveness.
+            | WideMoveKind::FireDemonMove { .. } => {
                 if self.promoted.contains(from) {
                     self.promoted.clear(from);
                     self.promoted.set(to);
@@ -5777,10 +5892,20 @@ fn multi_royal_move_off_lines<G: Geometry>(
     // origin/destination reasoning. So no Lion move is ever fast-accepted; each is
     // routed to the full make/unmake verify. (Gated behind `has_lion_moves`, so no
     // other variant ever produces one and this is inert for them.)
+    //
+    // A Fire Demon area burn removes every enemy adjacent to its *destination* —
+    // up to eight further squares, off the from/to pair, any of which may sit on a
+    // royal line and *unblock* an enemy slider onto our own king (burning an enemy
+    // that was shielding us). That self-exposure defeats the origin/destination
+    // reasoning, and an igui's from == to defeats it too, so no Fire Demon move is
+    // ever fast-accepted; each is routed to the full verify. (Gated behind
+    // `has_area_burn`, so inert for every other variant.)
     if kings.contains(from)
         || matches!(
             mv.kind(),
-            WideMoveKind::EnPassant | WideMoveKind::LionMove { .. }
+            WideMoveKind::EnPassant
+                | WideMoveKind::LionMove { .. }
+                | WideMoveKind::FireDemonMove { .. }
         )
     {
         return false;

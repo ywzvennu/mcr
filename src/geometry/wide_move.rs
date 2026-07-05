@@ -34,9 +34,10 @@
 //!   otherwise. Eight bits (wire-format v2, issue #448) — widened from seven when
 //!   the 128-role budget filled to make room for the jumbo shogi armies (Dai /
 //!   Tenjiku, #401 / #402).
-//! * **`kind`** (bits 24..28): the [`WideMoveKind`] tag. Four bits hold the nine
-//!   kinds in use with headroom for future fairy kinds (gating, duck-placement,
-//!   palace moves) beyond the codes used today.
+//! * **`kind`** (bits 24..28): the [`WideMoveKind`] tag. Four bits hold the ten
+//!   kinds in use (Quiet … Lion, plus the Tenjiku Fire Demon area-burn) with
+//!   headroom for future fairy kinds (gating, palace moves) beyond the codes used
+//!   today.
 //! * **`gate`** (bits 28..31): the Seirawan gating addendum. Bits 28..30 carry a
 //!   gated-reserve code (`0` = no gate, `1` = Hawk, `2` = Elephant); bit 30
 //!   selects, for a castling base move, whether the reserve gates onto the
@@ -123,6 +124,27 @@ pub enum WideMoveKind {
         /// two-step area move).
         second_capture: bool,
     },
+    /// A Tenjiku-Shogi **Fire Demon** area-burn move: the Fire Demon moves as a
+    /// Flying Ox (any distance vertically or diagonally) and then **burns**
+    /// (captures) *every* enemy piece on the up-to-eight squares adjacent to its
+    /// destination. It may also **igui** — burn in place without moving (`from ==
+    /// to`).
+    ///
+    /// The burn victim set is **deterministic from the destination and the board**
+    /// (all adjacent enemies), so — unlike the Lion's intermediate square — it need
+    /// *not* be stored in the move: the destination-capture and the adjacent-burn
+    /// victims are recomputed at apply-time. Only the [`igui`](WideMoveKind::FireDemonMove::igui)
+    /// flag is carried, and it is fully implied by `from == to`, so the packed word
+    /// keeps its whole high addendum `0` — every non-Tenjiku move is byte-identical.
+    ///
+    /// Emitted only by Tenjiku Shogi (default-off), so every other variant's packed
+    /// words are unchanged (this kind's tag code is otherwise never produced).
+    FireDemonMove {
+        /// Whether this is an *igui* (in-place burn, `from == to`) rather than a
+        /// Flying-Ox slide that then burns on arrival. Fully implied by `from ==
+        /// to`; carried here only for pattern-matching convenience.
+        igui: bool,
+    },
 }
 
 impl WideMoveKind {
@@ -198,6 +220,12 @@ const KIND_DROP: u32 = 8;
 // two capture flags live in a high-word addendum (bits 49..60), so every
 // non-Lion move — for which those bits are `0` — keeps a byte-identical word.
 const KIND_LION: u32 = 9;
+// The Tenjiku-Shogi Fire Demon area-burn move (default-off). It carries no
+// addendum at all: the burn victim set is recomputed at apply-time from the
+// destination + board, and the *igui* flag is implied by `from == to`. So its
+// packed word is a plain `from`/`to` base move with this tag and a `0` high word,
+// and every non-Tenjiku move (which never produces this tag) is byte-identical.
+const KIND_FIRE_DEMON: u32 = 10;
 
 const TO_SHIFT: u32 = 0;
 const FROM_SHIFT: u32 = 8;
@@ -211,7 +239,7 @@ const SQ_MASK: u32 = 0xff;
 // — widened from 7 bits (wire-format v2, issue #448) once the 128-role budget filled
 // and the jumbo shogi armies (Dai / Tenjiku, #401 / #402) needed room past index 127.
 // A 7-bit field truncated index 128 to `0` = Pawn, silently corrupting the word. The
-// kind field stays **4 bits** (codes `0..16`, ample for the nine kinds) and the kind /
+// kind field stays **4 bits** (codes `0..16`, ample for the ten kinds) and the kind /
 // gate fields each shift up one bit into the previously-unused high bits; the top
 // field (gate-on-rook) now sits at bit 30, leaving bit 31 free, so the whole high
 // (Duck / hand-gate / Lion) word from bit 32 is unchanged.
@@ -404,6 +432,17 @@ impl WideMove {
                 }
                 WideMove(base.0 | high)
             }
+            // A Fire Demon move carries no addendum: the burn victims are
+            // recomputed at apply-time and `igui` is implied by `from == to`. In
+            // debug builds we assert the caller kept that invariant.
+            WideMoveKind::FireDemonMove { igui } => {
+                debug_assert_eq!(
+                    igui,
+                    from == to,
+                    "a Fire Demon igui is exactly a from == to move",
+                );
+                WideMove::pack(from, to, 0, KIND_FIRE_DEMON)
+            }
         }
     }
 
@@ -579,6 +618,12 @@ impl WideMove {
             KIND_LION => WideMoveKind::LionMove {
                 first_capture: self.0 & LION_CAP1 != 0,
                 second_capture: self.0 & LION_CAP2 != 0,
+            },
+            // A Fire Demon move: `igui` is implied by `from == to` (a Flying-Ox
+            // slide always moves; an in-place burn does not), so it is recovered
+            // straight from the base squares — no addendum to read.
+            KIND_FIRE_DEMON => WideMoveKind::FireDemonMove {
+                igui: self.from_index() == self.to_index(),
             },
             // Any remaining code is a drop; codes are dense, so this only matches
             // KIND_DROP for values this crate produces.
@@ -1062,6 +1107,9 @@ impl WideMove {
                 }
                 WideMove(base.0 | high)
             }
+            // A Fire Demon move carries no addendum; `igui` is implied by the
+            // serialized `from == to`.
+            WideMoveKind::FireDemonMove { .. } => WideMove::pack(from, to, 0, KIND_FIRE_DEMON),
         };
         if let Some(mid) = lion_mid {
             mv = WideMove(
@@ -1398,6 +1446,50 @@ mod tests {
         let plain = WideMove::new(from, to, WideMoveKind::Capture);
         assert_eq!(plain.lion_mid_index(), None);
         assert_eq!(plain.0 & 0xffff_ffff_0000_0000, 0);
+    }
+
+    #[test]
+    fn fire_demon_move_round_trips_and_is_default_off() {
+        let from = Square::<Wide11x11>::new(50);
+        let to = Square::<Wide11x11>::new(72);
+        // A Flying-Ox slide that will burn on arrival (igui == false).
+        let slide = WideMove::new(from, to, WideMoveKind::FireDemonMove { igui: false });
+        assert_eq!(slide.from_index(), 50);
+        assert_eq!(slide.to_index(), 72);
+        assert_eq!(
+            slide.kind(),
+            WideMoveKind::FireDemonMove { igui: false },
+            "a from != to Fire Demon move decodes as a non-igui slide",
+        );
+        // is_capture() is a *static* property; a Fire Demon burn is dynamic (the
+        // victims are recomputed at apply-time), so the packed word reports no
+        // static capture.
+        assert!(!slide.is_capture());
+        assert!(!slide.is_drop());
+        assert_eq!(slide.promotion(), None);
+        // The whole high word is zero — byte-identical to the pre-Fire-Demon layout,
+        // exactly like every other non-addendum move.
+        assert_eq!(slide.0 & 0xffff_ffff_0000_0000, 0);
+        // No stray gate bits.
+        assert!(!slide.is_gating());
+
+        // An igui: from == to, burn in place. `igui` is recovered from from == to.
+        let igui = WideMove::new(from, from, WideMoveKind::FireDemonMove { igui: true });
+        assert_eq!(igui.from_index(), igui.to_index());
+        assert_eq!(igui.kind(), WideMoveKind::FireDemonMove { igui: true });
+        assert_eq!(igui.0 & 0xffff_ffff_0000_0000, 0);
+        // The two share a tag but differ in their base squares, so their words —
+        // and their UCI strings — stay distinct.
+        assert_ne!(slide.to_raw(), igui.to_raw());
+        assert_eq!(WideMove::from_raw(slide.to_raw()), slide);
+        assert_eq!(WideMove::from_raw(igui.to_raw()), igui);
+    }
+
+    #[test]
+    fn wide_move_stays_eight_bytes_with_fire_demon_kind() {
+        // Adding the Fire Demon kind uses a spare 4-bit tag code and no new
+        // addendum, so the packed word — and thus the move — is still eight bytes.
+        assert_eq!(core::mem::size_of::<WideMove>(), 8);
     }
 
     #[test]

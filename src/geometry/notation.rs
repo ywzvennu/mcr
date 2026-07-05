@@ -317,6 +317,26 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             push_square::<G>(&mut s, mid);
             s.push(if second_capture { 'x' } else { '-' });
             push_square::<G>(&mut s, to);
+        } else if let WideMoveKind::FireDemonMove { igui } = mv.kind() {
+            // A Tenjiku Fire Demon area-burn move. Its adjacent-enemy burn is
+            // implicit (recomputed at apply-time), marked here with a trailing `*`.
+            // An igui (`from == to`, burn in place) renders as the role token, `*`,
+            // and its own square — distinct from a Janggi pass (`--`). A slide
+            // renders as the role token, minimal disambiguation, the destination,
+            // and the `*` burn marker.
+            let role = self
+                .board()
+                .role_at(Square::<G>::new(from))
+                .unwrap_or(WideRole::Pawn);
+            push_role_token(&mut s, role);
+            if !igui {
+                let (same_file, same_rank, any_other) = self.disambig_flags(mv, role);
+                if any_other {
+                    self.push_disambiguation(&mut s, from, same_file, same_rank);
+                }
+            }
+            push_square::<G>(&mut s, to);
+            s.push('*');
         } else if from == to && !mv.is_drop() {
             // A Janggi pass: a legal null move. It carries no gate / promotion /
             // check decoration, so it renders as the bare token.

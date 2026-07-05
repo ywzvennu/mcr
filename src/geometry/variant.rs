@@ -343,6 +343,28 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         &[]
     }
 
+    /// Returns `true` if this variant fields a **Fire Demon** — the Tenjiku-Shogi
+    /// piece that, after its Flying-Ox move, **burns** (captures) every enemy on
+    /// the up-to-eight squares adjacent to its destination, and may **igui** (burn
+    /// in place). Default `false`; only Tenjiku overrides it. When `true`, the
+    /// multi-royal generator emits the Fire Demon's slides (and its igui) as
+    /// [`WideMoveKind::FireDemonMove`](super::WideMoveKind::FireDemonMove) moves
+    /// whose burn victims are recomputed at apply-time. Every other variant leaves
+    /// it `false`, so no such move is ever produced and their move generation is
+    /// byte-identical.
+    fn has_area_burn() -> bool {
+        false
+    }
+
+    /// Returns `true` if `role` is an **area burner** — a Fire Demon (Tenjiku's
+    /// [`WideRole::FireDemon`](super::WideRole::FireDemon)): a piece whose move is a
+    /// Flying-Ox slide that additionally burns every adjacent enemy, and which may
+    /// igui. Default `false`. Consulted only under
+    /// [`has_area_burn`](WideVariant::has_area_burn).
+    fn role_is_area_burner(_role: WideRole) -> bool {
+        false
+    }
+
     /// Returns `true` if this variant promotes by the **Chu-Shogi rule**: a piece
     /// may promote only when it *enters* the promotion zone from outside, or makes
     /// a *capture* on a move that begins inside the zone — never on a non-capturing

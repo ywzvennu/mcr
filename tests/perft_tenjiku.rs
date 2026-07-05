@@ -224,3 +224,185 @@ fn attackers_and_pins_consistency() {
         }
     }
 }
+
+// ===========================================================================
+// Fire Demon area-burn + igui (issue #477)
+// ===========================================================================
+//
+// Tenjiku's Fire Demon moves as a Flying Ox and then **burns** (captures) every
+// enemy on the up-to-eight squares adjacent to its destination, and may **igui**
+// (burn in place without moving). There is **no machine oracle** for this: HaChu
+// segfaults on `variant tenjiku` and, even where it runs, exercises captures only
+// at shallow depth. So the burn is validated by **hand-derived perft** on small,
+// fully-enumerable constructed positions, with the node counts derived below by
+// hand and pinned here. The FEN dialect uses `****I` / `****i` for the Fire Demon,
+// `P`/`p` for pawns, `K`/`k` for kings; rows run rank 16 (top) down to rank 1.
+
+use mcr::geometry::WideRole;
+use mcr::Color;
+
+/// Applies the unique legal move with UCI string `uci` from `fen`, returning the
+/// resulting position. Panics if no such legal move exists (so a test that names a
+/// move the generator does not produce fails loudly).
+fn after_move(fen: &str, uci: &str) -> Tenjiku {
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    let mv = pos
+        .parse_uci(uci)
+        .unwrap_or_else(|| panic!("`{uci}` is not a legal move from {fen}"));
+    pos.play(&mv)
+}
+
+/// `true` if `sq` (file, rank) holds an enemy (Black) piece in `pos`.
+fn black_at(pos: &Tenjiku, file: u8, rank: u8) -> bool {
+    let sq = Square::<Tenjiku16x16>::from_file_rank(file, rank).unwrap();
+    matches!(pos.board().piece_at(sq), Some(p) if p.color == Color::Black)
+}
+
+/// `true` if `sq` (file, rank) holds a White piece of `role` in `pos`.
+fn white_role_at(pos: &Tenjiku, file: u8, rank: u8, role: WideRole) -> bool {
+    let sq = Square::<Tenjiku16x16>::from_file_rank(file, rank).unwrap();
+    matches!(pos.board().piece_at(sq), Some(p) if p.color == Color::White && p.role == role)
+}
+
+/// **Hand-derived perft — igui multi-burn, displacement captures, friendly safety.**
+///
+/// Position (White to move):
+/// ```text
+///   White: Fire Demon h8=(7,7); King a1=(0,0); Pawns h7=(7,6), h9=(7,8).
+///   Black: King a8=(0,7); Pawns g7=(6,6), i7=(8,6), g9=(6,8), i9=(8,8).
+/// ```
+/// The friendly Pawns on h7 / h9 wall the demon's vertical ride; the four Black
+/// Pawns sit on its four diagonals. The Flying Ox rides vertically and diagonally
+/// only (never sideways), so the demon's moves are exactly:
+///
+/// * the four diagonal **displacement captures** g7, i7, g9, i9 (each blocked
+///   beyond the captured Pawn), and
+/// * the **igui** h8→h8 (available because there is at least one adjacent enemy).
+///
+/// Vertical up/down are walled by the friendly Pawns; sideways is not a Flying Ox
+/// direction. So the demon has **5** moves. The King has 3 (a2, b1, b2); the h9
+/// Pawn has 1 (h10); the h7 Pawn is blocked by the demon (0). **perft(1) = 5 + 3 +
+/// 1 = 9.**
+///
+/// For perft(2), Black always has its King's 5 corner-edge moves plus one move per
+/// surviving Pawn (each Pawn's forward square is empty). A Black Pawn is removed
+/// only when the demon's move burns / captures it:
+///
+/// * **igui h8h8** burns *all four* adjacent Black Pawns (the friendly h7/h9 Pawns
+///   are **not** burned) → 0 Pawns survive → 5 + 0 = **5** replies.
+/// * each **diagonal capture** (g7, i7, g9, i9) removes only the one displaced
+///   Pawn — the burn around the landing square reaches no *other* Pawn (they are a
+///   knight's-move apart) — so 3 survive → 5 + 3 = **8** replies, ×4 = 32.
+/// * the 3 King moves and the h9→h10 Pawn move remove no Black Pawn → 4 survive →
+///   5 + 4 = **9** replies, ×4 = 36.
+///
+/// **perft(2) = 5 + 32 + 36 = 73.** The igui's 5 vs. a quiet move's 9 is the burn's
+/// fingerprint: the missing 4 replies are exactly the four burned Pawns' moves.
+#[test]
+fn fire_demon_igui_burns_all_adjacent_perft() {
+    let fen = "16/16/16/16/16/16/16/6pPp7/k6****I8/6pPp7/16/16/16/16/16/K15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 9);
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 73);
+
+    // The igui (from == to) burns all four diagonal Black Pawns but not the two
+    // friendly Pawns walling the file.
+    let after = after_move(fen, "h8h8");
+    assert!(
+        white_role_at(&after, 7, 7, WideRole::FireDemon),
+        "demon stays on h8"
+    );
+    for (f, r) in [(6, 6), (8, 6), (6, 8), (8, 8)] {
+        assert!(
+            !black_at(&after, f, r),
+            "adjacent enemy at ({f},{r}) must be burned"
+        );
+    }
+    assert!(
+        white_role_at(&after, 7, 6, WideRole::Pawn),
+        "friendly h7 Pawn survives"
+    );
+    assert!(
+        white_role_at(&after, 7, 8, WideRole::Pawn),
+        "friendly h9 Pawn survives"
+    );
+    // A diagonal displacement capture removes only the displaced Pawn; the other
+    // three (a knight's move from the landing square) are untouched.
+    let after = after_move(fen, "h8g7");
+    assert!(
+        white_role_at(&after, 6, 6, WideRole::FireDemon),
+        "demon lands on g7"
+    );
+    assert!(black_at(&after, 8, 6) && black_at(&after, 6, 8) && black_at(&after, 8, 8));
+}
+
+/// **Hand-derived perft — arrival burn onto an *empty* square.**
+///
+/// Position (White to move):
+/// ```text
+///   White: Fire Demon h8=(7,7); King a1=(0,0);
+///          Pawns g7=(6,6), h7=(7,6), i7=(8,6) (wall the down/​down-diagonals),
+///          Pawn h10=(7,9) (walls the file above h9).
+///   Black: King a8=(0,7); Pawns g9=(6,8), i9=(8,8).
+/// ```
+/// The demon's moves are: vertical-up to the **empty** h9=(7,8) (walled beyond by
+/// the friendly h10 Pawn); the two diagonal **captures** g9, i9; and the **igui**
+/// h8→h8. That is **4** demon moves. Plus 3 King moves, and 3 Pawn moves (g7→g8,
+/// i7→i8, h10→h11; the h7 Pawn is blocked by the demon). **perft(1) = 4 + 3 + 3 =
+/// 10.**
+///
+/// The load-bearing move is **h8→h9**: the demon slides onto the *empty* h9 and its
+/// arrival burn removes **both** g9 and i9 — neither of which is the landing square,
+/// proving the burn captures non-displaced adjacent enemies. Black then has only its
+/// King (5 replies). By contrast:
+///
+/// * **h8g9** captures g9 by displacement; i9 (a knight's move from g9) survives → 6.
+/// * **h8i9** captures i9; g9 survives → 6.
+/// * **igui h8h8** burns both g9 and i9 → 5.
+/// * the 3 King and 3 Pawn moves remove no Black Pawn → both survive → 7 each = 42.
+///
+/// **perft(2) = 5 + 6 + 6 + 5 + 42 = 64.**
+#[test]
+fn fire_demon_arrival_burn_on_empty_square_perft() {
+    let fen = "16/16/16/16/16/16/7P8/6p1p7/k6****I8/6PPP7/16/16/16/16/16/K15 w - - 0 1";
+    let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 10);
+    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 64);
+
+    // Sliding onto the empty h9 burns both g9 and i9 (arrival burn, no displacement).
+    let after = after_move(fen, "h8h9");
+    assert!(
+        white_role_at(&after, 7, 8, WideRole::FireDemon),
+        "demon lands on h9"
+    );
+    assert!(!black_at(&after, 6, 8), "g9 must be burned on arrival");
+    assert!(!black_at(&after, 8, 8), "i9 must be burned on arrival");
+}
+
+/// The area burn truncates correctly at a board **corner**: a Fire Demon on a1 has
+/// only three on-board neighbours (b1, a2, b2), so its igui burns exactly those
+/// enemies and reaches no phantom off-board square.
+#[test]
+fn fire_demon_corner_igui_truncates_to_three_neighbours() {
+    // White Fire Demon a1=(0,0), King p1=(15,0) off every ray. Black King p16, and
+    // three Black Pawns on the demon's only neighbours b1=(1,0), a2=(0,1), b2=(1,1).
+    let fen = "15k/16/16/16/16/16/16/16/16/16/16/16/16/16/pp14/****Ip13K w - - 0 1";
+    let after = after_move(fen, "a1a1");
+    assert!(
+        white_role_at(&after, 0, 0, WideRole::FireDemon),
+        "demon stays on a1"
+    );
+    for (f, r) in [(1, 0), (0, 1), (1, 1)] {
+        assert!(
+            !black_at(&after, f, r),
+            "corner-adjacent enemy ({f},{r}) must be burned"
+        );
+    }
+}
+
+/// `size_of::<WideMove>() == 8` still holds after adding the `FireDemonMove` kind
+/// (it reuses a spare 4-bit tag code and carries no new addendum).
+#[test]
+fn wide_move_is_eight_bytes_with_fire_demon() {
+    assert_eq!(core::mem::size_of::<mcr::geometry::WideMove>(), 8);
+}

@@ -1216,15 +1216,19 @@ pub enum WideRole {
     // full (only four base letters free), so these are **fifth-tier overflow**
     // roles ([`is_overflow5`](WideRole::is_overflow5)) whose FEN token is the
     // [`OVERFLOW_PREFIX`] **quadrupled** (`****`) plus a recycled base letter whose
-    // case carries the colour. The three hardest powers — the Fire Demon's area
-    // "burn", the Generals' jump-capture, and the Lion-Hawk's compound Lion+range —
-    // are modelled to the honesty bar documented in the `tenjiku` module.
+    // case carries the colour. The Fire Demon's area "burn" is **fully modelled**
+    // (issue #477, via the dedicated
+    // [`FireDemonMove`](super::WideMoveKind::FireDemonMove) kind); the Generals'
+    // jump-capture and the Lion-Hawk's compound Lion+range are modelled to the
+    // honesty bar documented in the `tenjiku` module.
     /// Fire Demon (火鬼, Tenjiku Shogi) — moves as a Flying Ox (any distance
     /// vertically or diagonally, not sideways) and additionally "burns" (captures
     /// without moving onto) every enemy on the up-to-eight squares adjacent to its
-    /// destination. The area-burn is not packable into [`WideMove`](super::WideMove), so only the
-    /// Flying-Ox movement is modelled here (see the `tenjiku` module for the
-    /// documented gap). Does not promote. FEN token `****I` / `****i`.
+    /// destination, and may **igui** (burn in place without moving). Fully modelled
+    /// (issue #477): the burn victim set is deterministic from the destination +
+    /// board, so the Flying-Ox slides and the igui are emitted as
+    /// [`FireDemonMove`](super::WideMoveKind::FireDemonMove) moves and the burn is
+    /// recomputed at apply-time. Does not promote. FEN token `****I` / `****i`.
     FireDemon = 132,
     /// Great General (大将, Tenjiku Shogi) — slides any distance in all eight
     /// directions (a Free-King ride) and, on a capture, jumps over any lower-ranked
