@@ -76,9 +76,14 @@ fn startpos_cheap() {
 }
 
 #[test]
+fn startpos_depth4() {
+    check(STARTPOS, &[(4, 7147971)]);
+}
+
+#[test]
 #[ignore = "deep perft; run with --release --include-ignored"]
 fn startpos_deep() {
-    check(STARTPOS, &[(4, 7147971), (5, 402780823)]);
+    check(STARTPOS, &[(5, 402780823)]);
 }
 
 // -- Midgame (FSF-confirmed) ------------------------------------------------

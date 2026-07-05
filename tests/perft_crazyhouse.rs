@@ -33,7 +33,6 @@ fn middlegame_perft_2() {
 }
 
 #[test]
-#[ignore = "deep crazyhouse perft; run with --release -- --ignored"]
 fn middlegame_perft_3() {
     assert_eq!(perft(MIDDLEGAME, 3), 58057);
 }
@@ -60,7 +59,6 @@ fn drops_perft_2() {
 }
 
 #[test]
-#[ignore = "deep crazyhouse perft; run with --release -- --ignored"]
 fn drops_perft_3() {
     assert_eq!(perft(DROPS, 3), 88634);
 }
@@ -82,7 +80,6 @@ fn all_drop_types_perft_1() {
 }
 
 #[test]
-#[ignore = "deep crazyhouse perft; run with --release -- --ignored"]
 fn all_drop_types_perft_2() {
     assert_eq!(perft(ALL_DROP_TYPES, 2), 75353);
 }
@@ -103,7 +100,6 @@ fn promoted_perft_2() {
 }
 
 #[test]
-#[ignore = "deep crazyhouse perft; run with --release -- --ignored"]
 fn promoted_perft_3() {
     assert_eq!(perft(PROMOTED, 3), 5445);
 }

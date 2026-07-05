@@ -68,7 +68,7 @@ fn startpos_cheap() {
 }
 
 #[test]
-#[ignore = "deep perft; run with --release --include-ignored"]
+#[ignore = "deep perft (~16M nodes, slow in debug); run with --release --include-ignored"]
 fn startpos_deep() {
     // FSF grand `go perft` on the startpos.
     check(STARTPOS, &[(4, 15921643)]);
@@ -94,9 +94,11 @@ fn promote_to_captured_cheap() {
     check(PROMO, &[(1, 75), (2, 221), (3, 17459)]);
 }
 
+/// The per-PR depth-4 floor for Grand: the promote-to-captured position is only
+/// 72_092 nodes at depth 4, so it proves depth ≥4 in the default (debug) suite
+/// while the far heavier `startpos_deep` (~16M nodes) stays `#[ignore]`d.
 #[test]
-#[ignore = "deep perft; run with --release --include-ignored"]
-fn promote_to_captured_deep() {
+fn promote_to_captured_depth4() {
     // One ply deeper, still exercising the captured-restricted promotion set.
     check(PROMO, &[(4, 72092)]);
 }

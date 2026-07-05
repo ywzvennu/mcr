@@ -47,8 +47,8 @@ const CASES: &[PerftCase] = &[
     },
 ];
 
-/// The depth below which a `(depth, nodes)` pair runs in CI; deeper pairs are
-/// reserved for the `#[ignore]`d release sweep.
+/// The deepest `(depth, nodes)` pair that runs in CI; deeper pairs are reserved
+/// for the `#[ignore]`d release sweep.
 const CHEAP_DEPTH: u32 = 4;
 
 /// Asserts the published counts for `case` at the depths matching `keep`.
@@ -70,7 +70,7 @@ fn run_case(case: &PerftCase, keep: impl Fn(u32) -> bool) {
 #[test]
 fn racing_kings_perft_shallow() {
     for case in CASES {
-        run_case(case, |depth| depth < CHEAP_DEPTH);
+        run_case(case, |depth| depth <= CHEAP_DEPTH);
     }
 }
 
@@ -78,6 +78,6 @@ fn racing_kings_perft_shallow() {
 #[ignore = "deep perft; run with --release -- --ignored"]
 fn racing_kings_perft_deep() {
     for case in CASES {
-        run_case(case, |depth| depth >= CHEAP_DEPTH);
+        run_case(case, |depth| depth > CHEAP_DEPTH);
     }
 }

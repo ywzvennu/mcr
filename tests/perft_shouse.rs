@@ -145,9 +145,12 @@ fn drops_and_gates_deep_matches_fsf() {
     assert_eq!(gperft::<Chess8x8, _>(&pos, 4), 707_042_638);
 }
 
+/// Promoted-revert depth 4 is the S-House depth-≥4 per-PR floor: it is only
+/// 37_401 nodes, so it runs in the default (debug) suite. The much heavier
+/// startpos (depth 4 = 36.8M) and drops-and-gates (depth 4 = 707M) layers stay
+/// `#[ignore]`d for the release sweep.
 #[test]
-#[ignore = "deep perft; run with --include-ignored"]
-fn promoted_revert_deep_matches_fsf() {
+fn promoted_revert_depth4_matches_fsf() {
     check(&PROMOTED_REVERT_PERFT, 4);
 }
 

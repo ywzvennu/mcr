@@ -82,9 +82,14 @@ fn startpos_cheap() {
 }
 
 #[test]
+fn startpos_depth4() {
+    check(STARTPOS, &[(4, 719408)]);
+}
+
+#[test]
 #[ignore = "deep perft; run with --release --include-ignored"]
 fn startpos_deep() {
-    check(STARTPOS, &[(4, 719408), (5, 19839626)]);
+    check(STARTPOS, &[(5, 19839626)]);
 }
 
 // -- Check-win truncation, board move (FSF-confirmed) ------------------------

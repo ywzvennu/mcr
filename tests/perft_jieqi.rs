@@ -88,8 +88,11 @@ fn all_dark_startpos_cheap() {
     check(ALL_DARK_STARTPOS, &[(1, 44), (2, 1920), (3, 79666)]);
 }
 
+// The all-dark startpos depth-4 (3.29M nodes, ~26s in debug) is too slow for the
+// per-PR floor, so it stays `#[ignore]`d; the depth-≥4 floor for Jieqi is proved
+// by the lighter `revealed_middlegame_depth4` (1.78M nodes) below.
 #[test]
-#[ignore = "deep perft; run with --release --include-ignored"]
+#[ignore = "deep perft (~3.3M nodes, ~26s in debug); run with --release --include-ignored"]
 fn all_dark_startpos_deep() {
     check(ALL_DARK_STARTPOS, &[(4, 3290240), (5, 133312995)]);
 }
@@ -107,9 +110,14 @@ fn revealed_middlegame_cheap() {
 }
 
 #[test]
+fn revealed_middlegame_depth4() {
+    check(MID_REVEALED, &[(4, 1777662)]);
+}
+
+#[test]
 #[ignore = "deep perft; run with --release --include-ignored"]
 fn revealed_middlegame_deep() {
-    check(MID_REVEALED, &[(4, 1777662), (5, 67407683)]);
+    check(MID_REVEALED, &[(5, 67407683)]);
 }
 
 // -- Mixed dark + revealed reached by play: lockstep with Xiangqi -----------

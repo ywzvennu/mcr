@@ -40,6 +40,18 @@ fn perft_start_shallow() {
     check(START, &[(1, 20), (2, 400), (3, 8902), (4, 197326)]);
 }
 
+/// The shakmaty `atomic.perft` table only publishes the standard-castling atomic
+/// start through depth 4 (its depth-5 rows are all `atomic960-castle-*`
+/// positions, excluded above). This depth-5 pin was produced by the
+/// Fairy-Stockfish oracle (`UCI_Variant atomic`, `go perft 5`) — mcr already
+/// matches FSF/shakmaty node-for-node at depths 1–4, so it extends the per-PR
+/// atomic floor to depth 5.
+#[test]
+fn perft_start_depth5() {
+    // FSF-confirmed (UCI_Variant atomic, go perft 5): 4864979.
+    check(START, &[(5, 4864979)]);
+}
+
 // -- id programfox-1 (also id shakmaty-bench, identical position) ----------
 
 const PROGRAMFOX_1: &str = "rn2kb1r/1pp1p2p/p2q1pp1/3P4/2P3b1/4PN2/PP3PPP/R2QKB1R b KQkq - 0 1";

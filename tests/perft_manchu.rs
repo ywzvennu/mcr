@@ -88,9 +88,14 @@ fn startpos_cheap() {
 }
 
 #[test]
+fn startpos_depth4() {
+    check(STARTPOS, &[(4, 798554)]);
+}
+
+#[test]
 #[ignore = "deep perft; run with --release --include-ignored"]
 fn startpos_deep() {
-    check(STARTPOS, &[(4, 798554), (5, 17817159)]);
+    check(STARTPOS, &[(5, 17817159)]);
 }
 
 // -- Banner in the centre: rook + cannon + horse in the open (FSF-confirmed) --

@@ -11,9 +11,8 @@
 //! exercises the kingless white legality path, the first-rank double-push
 //! generation, and en-passant against a second-rank target.
 //!
-//! The cheap depths run in CI; the deepest published depth is `#[ignore]`d and
-//! meant to be run with `cargo test --release -- --ignored`. No numbers are
-//! invented.
+//! Every published depth (≤4) runs per-PR in the default suite — the counts are
+//! small enough that no layer needs `#[ignore]`ing. No numbers are invented.
 
 use mcr::{perft_variant, Color, Horde, Role, VariantId};
 
@@ -47,9 +46,10 @@ const CASES: &[PerftCase] = &[
     },
 ];
 
-/// The deepest CI depth: depths up to and including this run on every invocation;
-/// deeper ones are gated behind `#[ignore]`.
-const CI_MAX_DEPTH: u32 = 3;
+/// The deepest CI depth: depths up to and including this run on every invocation.
+/// All published horde reference depths (≤4) run per-PR; there is no deeper
+/// published layer to gate.
+const CI_MAX_DEPTH: u32 = 4;
 
 #[test]
 fn startpos_is_the_published_horde_start() {
@@ -75,21 +75,6 @@ fn perft_cheap_depths() {
             .unwrap_or_else(|e| panic!("id {}: failed to parse {:?}: {e:?}", case.id, case.fen));
         for &(depth, expected) in case.nodes {
             if depth > CI_MAX_DEPTH {
-                continue;
-            }
-            let got = perft_variant(&pos, depth);
-            assert_eq!(got, expected, "id {} perft({depth})", case.id);
-        }
-    }
-}
-
-#[test]
-#[ignore = "deep perft; run with --release -- --ignored"]
-fn perft_deep_depths() {
-    for case in CASES {
-        let pos: Horde = case.fen.parse().unwrap();
-        for &(depth, expected) in case.nodes {
-            if depth <= CI_MAX_DEPTH {
                 continue;
             }
             let got = perft_variant(&pos, depth);
