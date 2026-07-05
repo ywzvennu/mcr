@@ -1160,6 +1160,65 @@ mod tests {
         assert_eq!(game.outcome(), None);
     }
 
+    // --- Janggi perpetual check (issue #476) -----------------------------
+
+    #[test]
+    fn janggi_perpetual_check_loses_for_the_checker() {
+        // A White Chariot (Rook) shuttles i9/i10, checking the lone Black general
+        // along the rank on every White move; the general is driven between d10 and
+        // d9. Every White move is a check, so the repetition is a perpetual check and
+        // White (the checker) loses. The generals stand on different files
+        // (White e2, Black d-file) so they never face — a facing is not an ordinary
+        // check in Janggi (FSF `flyingGeneral = false`), so it could not be confused
+        // with a perpetual check anyway.
+        // Indices (9 wide): i9=80, i10=89 (Chariot); d10=84, d9=75 (general).
+        let pos = GenericPosition::<_, _>::from_fen("3k5/8R/9/9/9/9/9/9/4K4/9 w - - 0 1")
+            .expect("valid janggi fen");
+        let _: &Janggi = &pos;
+        let mut game = GenericGame::new(pos);
+        // Two full 4-ply cycles bring the start position to its third occurrence.
+        for _ in 0..2 {
+            play(&mut game, 80, 89); // R i9->i10+, checks d10
+            assert!(game.position().is_check());
+            play(&mut game, 84, 75); // k d10->d9
+            play(&mut game, 89, 80); // R i10->i9+, checks d9
+            assert!(game.position().is_check());
+            play(&mut game, 75, 84); // k d9->d10
+        }
+        assert_eq!(game.repetition_count(), 3);
+        assert_eq!(game.end_reason(), Some(WideEndReason::PerpetualCheckLoss));
+        // White perpetually checked, so White loses: Black wins.
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black,
+            })
+        );
+    }
+
+    #[test]
+    fn janggi_quiet_repetition_is_a_plain_draw() {
+        // Two lone generals shuffling within their palaces on *different* files (so
+        // they never face and neither ever checks): an ordinary three-fold
+        // repetition draws (FSF `nFoldValue = VALUE_DRAW`), not a perpetual-check
+        // loss. White general e2<->e3, Black general d10<->d9.
+        // e2=13, e3=22; d10=84, d9=75.
+        let pos = GenericPosition::<_, _>::from_fen("3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1")
+            .expect("valid janggi fen");
+        let _: &Janggi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..2 {
+            play(&mut game, 13, 22); // K e2->e3
+            play(&mut game, 84, 75); // k d10->d9
+            play(&mut game, 22, 13); // K e3->e2
+            play(&mut game, 75, 84); // k d9->d10
+        }
+        assert_eq!(game.repetition_count(), 3);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
     // --- Xiangqi perpetual chase -----------------------------------------
 
     #[test]

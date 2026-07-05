@@ -458,17 +458,40 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
         Some(2)
     }
 
-    // --- Bikjang + repetition (terminal only; perft unaffected) ------------
+    // --- Bikjang + repetition + perpetual check (terminal only; perft unaffected) ---
     //
-    // Both rules are adjudicated outside move generation (bikjang from the single
-    // position, repetition via [`GenericGame`](crate::geometry::game::GenericGame)),
-    // so perft is byte-identical.
+    // All three rules are adjudicated outside move generation (bikjang from the
+    // single position, repetition and perpetual check via
+    // [`GenericGame`](crate::geometry::game::GenericGame)), so perft is
+    // byte-identical. They mirror Fairy-Stockfish's default `janggi` variant:
+    // `bikjangRule = true`, `nFoldValue = VALUE_DRAW` (a plain three-fold repetition
+    // draws), and `perpetualCheckIllegal = true` (a perpetual checker loses).
 
     fn has_bikjang() -> bool {
         true
     }
 
     fn tracks_repetition() -> bool {
+        true
+    }
+
+    fn perpetual_check_loses() -> bool {
+        // Janggi (FSF `perpetualCheckIllegal = true`): a repetition forced by one
+        // side delivering **check** on every one of its moves through the cycle is a
+        // **loss** for that checking side; an ordinary (non-check) repetition still
+        // draws by the default three-fold count (`nFoldValue = VALUE_DRAW`). The
+        // adjudication lives in [`GenericGame`](crate::geometry::game::GenericGame),
+        // so move generation and perft are untouched.
+        //
+        // This composes cleanly with **bikjang** because a general **facing** is not
+        // an ordinary check in Janggi (`flyingGeneral = false`, so
+        // [`has_flying_general`](WideVariant::has_flying_general) is off and
+        // [`is_check`](crate::geometry::position::GenericPosition::is_check) never
+        // reports a facing): the perpetual-check detector keys on real checks only
+        // and never mistakes a bikjang for a perpetual check. A two-consecutive
+        // facing also fires the [`WideEndReason::Bikjang`] draw after only two plies,
+        // before any position can reach its third occurrence, so the bikjang draw is
+        // reached first on the passing lines that produce it.
         true
     }
 }
