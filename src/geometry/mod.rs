@@ -65,7 +65,7 @@ pub use game::{GenericGame, WideIllegalMove, COUNTING_LIMIT_PLIES};
 pub use notation::{WidePgn, WidePgnError, WidePgnResult, WideSanError};
 pub use position::{
     perft, perft_divide, GenericCastling, GenericGating, GenericPlacement, GenericPosition,
-    GenericState, Undo, WideFenError, WideOutcome,
+    GenericState, Undo, WideFenError, WideMoveList, WideOutcome,
 };
 pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use square::Square;
