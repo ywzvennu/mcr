@@ -63,8 +63,12 @@ fn drop_lab_cheap() {
     check(DROP_LAB, &[(1, 479), (2, 215443)]);
 }
 
+// Cannon Shogi is a Tier-D large-board exception to the per-PR depth-4 floor:
+// every position's depth-4 perft is large (startpos 13.4M, midgame 28.7M) and
+// ~95s in debug, so the depth-4 layer stays `#[ignore]`d for the release sweep.
+// The default suite proves depth ≤3 (startpos_cheap / midgame / drop_lab).
 #[test]
-#[ignore = "deep perft; run with --release --include-ignored"]
+#[ignore = "deep perft (~13.4M nodes, ~95s in debug); run with --release --include-ignored"]
 fn startpos_deep() {
     // FSF-confirmed: perft(4)=13406022, perft(5)=909545896.
     check(STARTPOS, &[(4, 13406022), (5, 909545896)]);

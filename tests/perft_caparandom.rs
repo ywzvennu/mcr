@@ -52,8 +52,7 @@ fn startpos_cheap() {
 }
 
 #[test]
-#[ignore = "deep perft; run with --release --include-ignored"]
-fn startpos_deep() {
+fn startpos_depth4() {
     check(STARTPOS, &[(4, 805128)]);
 }
 

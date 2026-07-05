@@ -64,11 +64,13 @@ fn startpos_perft_regression() {
 }
 
 /// A deeper mcr-only regression pin (perft(4) = 25400968). Not oracle-validated (a
-/// depth-4 HaChu cross-check is intractable) and ~25M nodes, so it is `#[ignore]`d
-/// to keep the default (debug) suite fast; run it explicitly, ideally in release:
+/// depth-4 HaChu cross-check is intractable) and ~25M nodes on the 15x15 board, so
+/// it is a Tier-D large-board exception to the per-PR depth-4 floor (#499): it is
+/// `#[ignore]`d to keep the default (debug) suite fast (the per-PR suite proves
+/// depth 3), and is run explicitly, ideally in release:
 /// `cargo test --release --test perft_dai -- --ignored`.
 #[test]
-#[ignore = "slow: ~25M-node depth-4 perft; run explicitly in release"]
+#[ignore = "slow: ~25M-node depth-4 perft on 15x15; run explicitly in release"]
 fn startpos_perft_depth4() {
     let pos = Dai::startpos();
     assert_eq!(perft::<Dai15x15, _>(&pos, 4), 25400968);
