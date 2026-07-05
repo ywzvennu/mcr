@@ -212,6 +212,19 @@ impl WideVariant<Chess8x8> for ShouseRules {
             empty
         }
     }
+
+    /// Records a position history so the standard **threefold** repetition draw
+    /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
+    /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
+    /// level. This Seirawan-gating + crazyhouse-drops hybrid inherits the western
+    /// repetition rule (three-fold plain draw, no perpetual-check exception), so
+    /// the `repetition_fold`, `repetition_draw_reason`, and
+    /// `perpetual_check_loses` defaults are already correct. History-dependent and
+    /// never consulted by a bare
+    /// [`GenericPosition`](crate::geometry::GenericPosition), so perft is unchanged.
+    fn tracks_repetition() -> bool {
+        true
+    }
 }
 
 /// S-House / Seirawan-house (8x8) as a [`GenericPosition`] over the 8x8

@@ -261,6 +261,31 @@ impl WideVariant<Minishogi5x5> for KyotoshogiRules {
             _ => None,
         }
     }
+
+    // --- Sennichite / perpetual check (default-off draw rules) -------------
+    //
+    // These affect only terminal adjudication in [`GenericGame`], never move
+    // generation, so perft is byte-identical.
+
+    fn tracks_repetition() -> bool {
+        true
+    }
+
+    fn repetition_fold() -> usize {
+        // Sennichite: the same position (including both hands) occurring a fourth
+        // time is a draw.
+        4
+    }
+
+    fn repetition_draw_reason() -> crate::geometry::WideEndReason {
+        crate::geometry::WideEndReason::Sennichite
+    }
+
+    fn perpetual_check_loses() -> bool {
+        // A sennichite brought about by perpetual check is a loss for the checking
+        // side.
+        true
+    }
 }
 
 /// Kyoto Shogi (5x5 flipping Shogi) as a [`GenericPosition`] over the 5x5

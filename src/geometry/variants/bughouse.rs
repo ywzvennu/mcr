@@ -151,6 +151,20 @@ impl WideVariant<Chess8x8> for BughouseRules {
             empty
         }
     }
+
+    /// Records a position history so the standard **threefold** repetition draw
+    /// ([`WideEndReason::Repetition`](crate::geometry::WideEndReason::Repetition),
+    /// fold 3) fires at the [`GenericGame`](crate::geometry::game::GenericGame)
+    /// level. Bughouse is modelled here as a single-board crazyhouse-style drop
+    /// game (no partner board), so it inherits the western repetition rule
+    /// (three-fold plain draw, no perpetual-check exception) and the
+    /// `repetition_fold`, `repetition_draw_reason`, and `perpetual_check_loses`
+    /// defaults are already correct. History-dependent and never consulted by a
+    /// bare [`GenericPosition`](crate::geometry::GenericPosition), so perft is
+    /// unchanged.
+    fn tracks_repetition() -> bool {
+        true
+    }
 }
 
 /// Bughouse (single-board) as a [`GenericPosition`] over the 8x8 [`Chess8x8`]
