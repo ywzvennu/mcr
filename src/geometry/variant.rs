@@ -95,6 +95,66 @@ pub enum WideCountingRule {
     Burmese,
 }
 
+/// The **impasse / jishogi (entering-king)** declaration rule a shogi-family
+/// variant uses — the "27-point rule" of modern Shogi.
+///
+/// When a king can no longer realistically be mated it marches into the far
+/// promotion zone; the game is then decided by a **piece-point declaration**
+/// rather than by checkmate. This type carries the parameters of that count so
+/// the terminal test in
+/// [`GenericPosition::end_reason`](super::position::GenericPosition::end_reason)
+/// is a pure position property (it needs no move history — only the board, the
+/// hands, and the promotion-zone geometry).
+///
+/// A variant opts in through [`WideVariant::impasse_rule`]; the default is `None`
+/// (no impasse), so every non-shogi variant is byte-identical and the rule is
+/// never evaluated. It is a **terminal-only** adjudication and is never consulted
+/// by move generation, so perft stays byte-identical.
+///
+/// ## The declaration (lishogi 27-point rule)
+///
+/// At the **start of the side-to-move's turn** that side wins outright if all of:
+///
+/// 1. its king is **not in check**;
+/// 2. its king stands **inside its own promotion zone** (the three farthest ranks);
+/// 3. it has at least [`min_pieces_in_zone`](Self::min_pieces_in_zone) of its
+///    **other** pieces (the king excluded) inside that zone; and
+/// 4. its **point count** reaches the per-side threshold —
+///    [`sente_threshold`](Self::sente_threshold) for the first player (mcr's
+///    [`Color::White`], drawn "Black"/☗ in Japanese usage) or
+///    [`gote_threshold`](Self::gote_threshold) for the second player.
+///
+/// The point count sums, over every one of the side's pieces that is either
+/// **inside its promotion zone** or **in hand** (the king counts for neither):
+/// [`big_piece_points`](Self::big_piece_points) for each Rook / Bishop and their
+/// promotions ([`big_roles`](Self::big_roles)), and
+/// [`small_piece_points`](Self::small_piece_points) for every other piece.
+///
+/// The rule is **win-only**: a side that cannot meet the threshold simply does not
+/// declare (there is no "declare and lose" branch), so a met declaration is
+/// reported as a decisive [`WideEndReason::Impasse`] for the side to move.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ImpasseRule {
+    /// The minimum number of the declaring side's **own** pieces (the king
+    /// excluded) that must stand inside its promotion zone. Shogi requires 10.
+    pub min_pieces_in_zone: u32,
+    /// The point threshold the **first player** must reach — mcr's
+    /// [`Color::White`], the uppercase side that moves first (Sente / ☗ in
+    /// Japanese usage). Shogi: 28 (the first-move advantage costs one extra point).
+    pub sente_threshold: u32,
+    /// The point threshold the **second player** must reach — mcr's
+    /// [`Color::Black`] (Gote / ☖). Shogi: 27.
+    pub gote_threshold: u32,
+    /// The point value of a "big" piece — a Rook or Bishop (promoted or not);
+    /// see [`big_roles`](Self::big_roles). Shogi: 5.
+    pub big_piece_points: u32,
+    /// The point value of every other counted (non-king) piece. Shogi: 1.
+    pub small_piece_points: u32,
+    /// The roles scored at [`big_piece_points`](Self::big_piece_points): the Rook,
+    /// the Bishop, and their promoted forms (Dragon King, Dragon Horse).
+    pub big_roles: &'static [WideRole],
+}
+
 /// The promotion configuration a variant exposes: which squares promote and to
 /// which roles. The default is standard chess — the last rank, promoting to
 /// knight, bishop, rook, or queen.
@@ -1610,6 +1670,19 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// Returns this variant's **impasse / jishogi (entering-king)** declaration
+    /// rule, or `None` if it has none. The default is `None`, so every non-shogi
+    /// variant is byte-identical and the rule is never evaluated. Standard Shogi
+    /// overrides it with the [`ImpasseRule`] describing the 27-point declaration.
+    ///
+    /// The rule is a **terminal-only** adjudication reported from the single
+    /// position via [`WideEndReason::Impasse`] (it needs no move history — only the
+    /// board, the hands, and the promotion-zone geometry), so move generation and
+    /// perft are untouched. See [`ImpasseRule`] for the exact declaration.
+    fn impasse_rule() -> Option<ImpasseRule> {
+        None
+    }
+
     /// Returns `true` if this variant adjudicates **perpetual chase** as a loss for
     /// the chasing side — the Xiangqi/AXF rule that a side which, on every move
     /// through a repeated cycle, attacks the **same kind of** unprotected (or
@@ -1835,6 +1908,13 @@ pub enum WideEndReason {
     /// rule) elapsed: [`move_rule_plies`](WideVariant::move_rule_plies) plies have
     /// passed with no capture or pawn move. Draw.
     MoveRule,
+    /// Shogi **impasse / jishogi (entering-king)**: at the start of its turn the
+    /// side to move met the point-count declaration — its king is in the promotion
+    /// zone (and not in check), it has enough other pieces in the zone, and its
+    /// [`impasse_rule`](WideVariant::impasse_rule) point total reaches the
+    /// per-side threshold. Decisive for the side to move (the declaring side).
+    /// Reported from the single position via [`WideVariant::impasse_rule`].
+    Impasse,
 }
 
 /// The standard-chess **insufficient-material** test, shared by the wide variants

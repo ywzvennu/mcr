@@ -29,7 +29,7 @@ use super::attacks::{
     queen_attacks_masked, rook_attacks_masked, KingLineMasks,
 };
 use super::role::WideRole;
-use super::variant::{RoyalSlider, WideEndReason, WideVariant};
+use super::variant::{ImpasseRule, RoyalSlider, WideEndReason, WideVariant};
 use super::zobrist;
 use super::{
     Bitboard, Board, GateRole, GateSquare, Geometry, Square, WideMove, WideMoveKind, WidePiece,
@@ -4779,6 +4779,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
             return Some(WideEndReason::VariantWin);
         }
+        // Impasse / jishogi (Shogi): at the start of its turn the side to move may
+        // **declare** the entering-king point count and win outright — its king has
+        // marched into the far promotion zone (and is not in check), it has enough
+        // other pieces in the zone, and its piece-point total reaches the per-side
+        // threshold. Gated behind the default-off [`WideVariant::impasse_rule`], so
+        // every non-shogi variant is byte-identical. A pure position property (no
+        // history), reported *before* the stalemate test so a declaring node is the
+        // win it is; `outcome` credits the side to move. The "not in check" clause
+        // means it can never mask a checkmate.
+        if let Some(rule) = V::impasse_rule() {
+            if !self.is_check() && self.impasse_declared(rule) {
+                return Some(WideEndReason::Impasse);
+            }
+        }
         let no_moves = self.legal_moves().is_empty();
         // Checkmate takes precedence over every draw rule below: a side with no
         // move while in check has lost, whatever the clocks or material say.
@@ -4859,6 +4873,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 };
                 WideOutcome::Decisive { winner }
             }
+            // Impasse / jishogi (Shogi): the side to move met the entering-king
+            // point-count declaration, so it wins outright.
+            WideEndReason::Impasse => WideOutcome::Decisive {
+                winner: self.state.turn,
+            },
             // Stalemate is a loss for the side to move in variants that say so
             // (Synochess); otherwise the usual draw.
             WideEndReason::Stalemate if V::stalemate_is_loss() => WideOutcome::Decisive {
@@ -4880,6 +4899,78 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             | WideEndReason::CountingDraw
             | WideEndReason::MoveRule => WideOutcome::Draw,
         })
+    }
+
+    /// Whether the **side to move** meets the impasse / jishogi (entering-king)
+    /// point-count declaration under `rule` — the conditions 2-4 of the lishogi
+    /// 27-point rule (the "king not in check" clause is applied by the caller, so
+    /// this never masks a checkmate):
+    ///
+    /// 2. the king stands inside its own promotion zone;
+    /// 3. at least [`ImpasseRule::min_pieces_in_zone`] of the side's **other** pieces
+    ///    (the king excluded) stand inside that zone; and
+    /// 4. the side's point total — [`ImpasseRule::big_piece_points`] for each Rook /
+    ///    Bishop and their promotions, [`ImpasseRule::small_piece_points`] for every
+    ///    other piece, summed over every piece inside the zone **or in hand** (the
+    ///    king counting for neither) — reaches the per-side threshold.
+    ///
+    /// A pure function of the board, the hands, and the promotion-zone geometry — no
+    /// move history — so it lives at the position level and never touches move
+    /// generation.
+    fn impasse_declared(&self, rule: ImpasseRule) -> bool {
+        let side = self.state.turn;
+        // (2) The king must be inside its own promotion zone.
+        let Some(king) = self.board.king_of(side) else {
+            return false;
+        };
+        if !V::in_promotion_zone(side, king.rank()) {
+            return false;
+        }
+        // (3)+(4, board part) Walk the side's own non-king pieces that stand inside
+        // the zone, tallying both the in-zone count and their points.
+        let kings = self.board.by_role(WideRole::King);
+        let own_non_king = self.board.by_color(side) & !kings;
+        let mut pieces_in_zone: u32 = 0;
+        let mut points: u32 = 0;
+        for square in own_non_king {
+            if !V::in_promotion_zone(side, square.rank()) {
+                continue;
+            }
+            pieces_in_zone += 1;
+            let role = self
+                .board
+                .role_at(square)
+                .expect("an occupied square carries a role");
+            points += if rule.big_roles.contains(&role) {
+                rule.big_piece_points
+            } else {
+                rule.small_piece_points
+            };
+        }
+        if pieces_in_zone < rule.min_pieces_in_zone {
+            return false;
+        }
+        // (4, hand part) Pieces in hand also score (but do not count toward the
+        // in-zone piece requirement). A captured big piece banks unpromoted, so the
+        // big/small split still keys off the held role.
+        for role in WideRole::ALL {
+            let held = u32::from(self.state.placement.count(side, role));
+            if held == 0 {
+                continue;
+            }
+            points += held
+                * if rule.big_roles.contains(&role) {
+                    rule.big_piece_points
+                } else {
+                    rule.small_piece_points
+                };
+        }
+        let threshold = match side {
+            // mcr's White is the first player (Sente / ☗); Black is Gote (☖).
+            Color::White => rule.sente_threshold,
+            Color::Black => rule.gote_threshold,
+        };
+        points >= threshold
     }
 
     // -- Repetition / draw helpers -----------------------------------------
