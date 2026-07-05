@@ -3979,4 +3979,461 @@ mod tests {
         assert_eq!(ep.kind(), MoveKind::EnPassant);
         assert_eq!(pos.see(&ep), see_value(Role::Pawn));
     }
+
+    // -- Reference-perft correctness pins ----------------------------------
+
+    #[test]
+    fn reference_perft_standard_positions() {
+        // Canonical Chess Programming Wiki perft node counts (external facts,
+        // not derived from mcr). Depths are kept shallow so the check runs in a
+        // fraction of a second while still exercising castling, en passant,
+        // promotion, pins, checks, and double checks end to end. A movegen bug
+        // that changes the legal-move set at any node moves one of these counts.
+        let cases: [(&str, &[(u32, u64)]); 6] = [
+            (
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                &[(1, 20), (2, 400), (3, 8902), (4, 197281)],
+            ),
+            (KIWIPETE, &[(1, 48), (2, 2039), (3, 97862)]),
+            (POS3, &[(1, 14), (2, 191), (3, 2812), (4, 43238)]),
+            (POS4, &[(1, 6), (2, 264), (3, 9467)]),
+            (POS5, &[(1, 44), (2, 1486), (3, 62379)]),
+            (POS6, &[(1, 46), (2, 2079), (3, 89890)]),
+        ];
+        for (fen, pins) in cases {
+            let pos = Position::from_fen(fen).unwrap();
+            for &(depth, expected) in pins {
+                assert_eq!(perft(&pos, depth), expected, "perft({depth}) for {fen}");
+            }
+        }
+    }
+
+    #[test]
+    fn reference_perft_variants() {
+        use crate::{perft_variant, AnyVariant, Chess960, VariantId};
+        // Published shakmaty / CPW reference counts for the variant rule layers
+        // that reuse the core `Position` machinery: horde's first-rank double
+        // pushes (`gen_horde_white_pawn_moves`), Chess960's arbitrary-file
+        // castling (`gen_castles_960`), atomic's blast (`remove_piece_tracked` /
+        // `restore_piece`), crazyhouse drops (`apply_drop_core`), and the
+        // relaxed FEN validation of antichess / racing kings (`validate_core`).
+        type VariantCase = (VariantId, &'static str, &'static [(u32, u64)]);
+        let family: [VariantCase; 7] = [
+            (
+                VariantId::Horde,
+                "rnbqkbnr/pppppppp/8/1PP2PP1/PPPPPPPP/PPPPPPPP/PPPPPPPP/PPPPPPPP w kq - 0 1",
+                &[(1, 8), (2, 128), (3, 1274)],
+            ),
+            (
+                VariantId::Atomic,
+                "rn2kb1r/1pp1p2p/p2q1pp1/3P4/2P3b1/4PN2/PP3PPP/R2QKB1R b KQkq - 0 1",
+                &[(1, 40), (2, 1238), (3, 45237)],
+            ),
+            (
+                VariantId::Antichess,
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+                &[(1, 20), (2, 400), (3, 8067)],
+            ),
+            (
+                VariantId::RacingKings,
+                "8/8/8/8/8/8/krbnNBRK/qrbnNBRQ w - - 0 1",
+                &[(1, 21), (2, 421), (3, 11264)],
+            ),
+            (
+                VariantId::Crazyhouse,
+                "2k5/8/8/8/8/8/8/4K3[Qn] w - -",
+                &[(1, 67), (2, 3083)],
+            ),
+            (
+                VariantId::KingOfTheHill,
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                &[(1, 20), (2, 400), (3, 8902)],
+            ),
+            (
+                VariantId::ThreeCheck,
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 3+3",
+                &[(1, 20), (2, 400), (3, 8902)],
+            ),
+        ];
+        for (id, fen, pins) in family {
+            let pos = AnyVariant::from_fen(id, fen).expect("valid variant FEN");
+            for &(depth, expected) in pins {
+                assert_eq!(
+                    pos.perft(depth),
+                    expected,
+                    "{id:?} perft({depth}) for {fen}"
+                );
+            }
+        }
+
+        // Chess960 arbitrary-file castling — CPW/Ethereal fischer.epd counts.
+        let c960: [(&str, &[(u32, u64)]); 2] = [
+            (
+                "bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9",
+                &[(1, 21), (2, 528), (3, 12189)],
+            ),
+            (
+                "2nnrbkr/p1qppppp/8/1ppb4/6PP/3PP3/PPP2P2/BQNNRBKR w HEhe - 1 9",
+                &[(1, 21), (2, 807), (3, 18002)],
+            ),
+        ];
+        for (fen, pins) in c960 {
+            let pos: Chess960 = fen.parse().expect("valid Chess960 FEN");
+            for &(depth, expected) in pins {
+                assert_eq!(
+                    perft_variant(&pos, depth),
+                    expected,
+                    "chess960 perft({depth}) for {fen}"
+                );
+            }
+        }
+    }
+
+    /// Perft-style tree walk that, at every node, asserts `make` reproduces the
+    /// copy-make `play` child byte-for-byte and that `unmake` restores the parent
+    /// byte-for-byte, returning the leaf count for a cross-check against `perft`.
+    fn walk_make_unmake(pos: &mut Position, depth: u32) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+        let mut nodes = 0;
+        for mv in pos.legal_moves() {
+            let expected = pos.play(&mv);
+            let parent = pos.clone();
+            let undo = pos.make(&mv);
+            assert_eq!(
+                *pos,
+                expected,
+                "make({mv:?}) != play from {}",
+                parent.to_fen()
+            );
+            nodes += walk_make_unmake(pos, depth - 1);
+            pos.unmake(&mv, undo);
+            assert_eq!(*pos, parent, "unmake({mv:?}) did not restore the parent");
+        }
+        nodes
+    }
+
+    #[test]
+    fn make_unmake_round_trips_and_matches_play() {
+        // Startpos to depth 3 and Kiwipete to depth 2: every made move must equal
+        // the `play` child and every unmade move must restore the exact parent,
+        // covering the quiet / capture / double-push / en-passant / castle /
+        // promotion arms of both `apply` and `unmake`. The leaf count is pinned to
+        // the reference `perft` so a symmetric make/play error cannot hide.
+        let mut start = Position::startpos();
+        assert_eq!(walk_make_unmake(&mut start, 3), 8902);
+        assert_eq!(start, Position::startpos());
+
+        let mut kp = Position::from_fen(KIWIPETE).unwrap();
+        let kp0 = kp.clone();
+        assert_eq!(walk_make_unmake(&mut kp, 2), 2039);
+        assert_eq!(kp, kp0);
+
+        // POS3 exercises rook/pawn endgame captures and promotions under check.
+        let mut p3 = Position::from_fen(POS3).unwrap();
+        let p30 = p3.clone();
+        assert_eq!(walk_make_unmake(&mut p3, 3), 2812);
+        assert_eq!(p3, p30);
+    }
+
+    #[test]
+    fn move_clocks_reset_and_increment_per_move_kind() {
+        // Perft is blind to the halfmove/fullmove clocks, so these transitions are
+        // pinned explicitly. A quiet non-pawn move increments the halfmove clock;
+        // a pawn move or a capture resets it to zero; the fullmove number advances
+        // only after Black moves.
+        let pos = Position::from_fen("4k3/8/8/8/8/5N2/4P3/4K3 w - - 7 20").unwrap();
+        // Quiet knight move: halfmove 7 -> 8, fullmove unchanged (White moved).
+        let quiet = pos.parse_uci("f3d4").unwrap();
+        assert_eq!(quiet.kind(), MoveKind::Quiet);
+        let after_quiet = pos.play(&quiet);
+        assert_eq!(after_quiet.halfmove_clock(), 8);
+        assert_eq!(after_quiet.fullmove_number(), 20);
+        assert_eq!(after_quiet.turn(), Color::Black);
+        // Black quiet king move: halfmove 8 -> 9, fullmove 20 -> 21.
+        let bquiet = after_quiet.parse_uci("e8d8").unwrap();
+        let after_black = after_quiet.play(&bquiet);
+        assert_eq!(after_black.halfmove_clock(), 9);
+        assert_eq!(after_black.fullmove_number(), 21);
+
+        // A pawn advance resets the halfmove clock from a nonzero value.
+        let pawn_pos = Position::from_fen("4k3/8/8/8/8/8/4P3/4K3 w - - 9 3").unwrap();
+        let pawn = pawn_pos.parse_uci("e2e3").unwrap();
+        assert_eq!(pawn_pos.play(&pawn).halfmove_clock(), 0);
+
+        // A capture resets the halfmove clock from a nonzero value.
+        let cap_pos = Position::from_fen("r3k3/8/8/8/8/8/8/R3K3 w - - 5 1").unwrap();
+        let cap = cap_pos.parse_uci("a1a8").unwrap();
+        assert!(cap.is_capture());
+        assert_eq!(cap_pos.play(&cap).halfmove_clock(), 0);
+
+        // A promotion (always a pawn move) resets the halfmove clock.
+        let promo_pos = Position::from_fen("8/4P3/8/8/8/8/8/k3K3 w - - 4 1").unwrap();
+        let promo = promo_pos.parse_uci("e7e8q").unwrap();
+        assert!(matches!(promo.kind(), MoveKind::Promotion { .. }));
+        assert_eq!(promo_pos.play(&promo).halfmove_clock(), 0);
+    }
+
+    // -- Error surfaces (Display / Error::source) --------------------------
+
+    #[test]
+    fn fen_error_display_messages_are_distinct_and_specific() {
+        // Each FenError variant renders its own specific message; a stubbed
+        // Display or a deleted match arm collapses these to the empty string or
+        // the wrong text.
+        let placement_err = Board::from_fen_placement("9/8/8/8/8/8/8/8").unwrap_err();
+        let cases: [(FenError, &str); 9] = [
+            (FenError::MissingField, "FEN is missing a required field"),
+            (
+                FenError::Placement(placement_err),
+                "invalid FEN piece placement:",
+            ),
+            (
+                FenError::BadTurn("x".to_owned()),
+                "invalid side-to-move field",
+            ),
+            (
+                FenError::BadCastling("Z".to_owned()),
+                "invalid or inconsistent castling field",
+            ),
+            (
+                FenError::BadEnPassant("e4".to_owned()),
+                "invalid en-passant field",
+            ),
+            (
+                FenError::BadNumber("q".to_owned()),
+                "invalid move-clock number",
+            ),
+            (
+                FenError::BadKings,
+                "position must have exactly one king per side",
+            ),
+            (
+                FenError::OppositeKingInCheck,
+                "the side not to move is in check",
+            ),
+            (
+                FenError::TrailingData,
+                "unexpected trailing data after FEN fields",
+            ),
+        ];
+        for (err, needle) in cases {
+            let shown = err.to_string();
+            assert!(
+                shown.contains(needle),
+                "FenError::{err:?} rendered {shown:?}, expected to contain {needle:?}"
+            );
+        }
+        // The value-bearing variants echo their offending field back verbatim.
+        assert!(FenError::BadTurn("qq".to_owned())
+            .to_string()
+            .contains("qq"));
+        assert!(FenError::BadEnPassant("zz".to_owned())
+            .to_string()
+            .contains("zz"));
+    }
+
+    #[test]
+    fn parse_uci_error_display_messages_are_distinct() {
+        assert_eq!(
+            ParseUciError::Malformed.to_string(),
+            "malformed UCI move string"
+        );
+        assert_eq!(
+            ParseUciError::Illegal.to_string(),
+            "UCI move is not legal in this position"
+        );
+        assert_ne!(
+            ParseUciError::Malformed.to_string(),
+            ParseUciError::Illegal.to_string()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn fen_error_source_chains_only_the_placement_cause() {
+        use std::error::Error;
+        let placement_err = Board::from_fen_placement("zz").unwrap_err();
+        // Only the Placement variant carries an underlying cause; every other
+        // variant is a leaf error.
+        assert!(FenError::Placement(placement_err).source().is_some());
+        assert!(FenError::MissingField.source().is_none());
+        assert!(FenError::BadKings.source().is_none());
+        assert!(FenError::TrailingData.source().is_none());
+    }
+
+    #[test]
+    fn castling_rights_debug_reports_each_rook_file() {
+        // The `Debug` impl names all four rook files; a stubbed formatter or a
+        // swapped field would drop or mislabel one. Standard rights put the rooks
+        // on a/h files.
+        let rights = Position::startpos().castling_rights();
+        let shown = format!("{rights:?}");
+        assert!(shown.contains("CastlingRights"));
+        for field in ["white_king", "white_queen", "black_king", "black_queen"] {
+            assert!(
+                shown.contains(field),
+                "debug missing field {field}: {shown}"
+            );
+        }
+        // No castling rights renders every file as `None`.
+        let none = format!("{:?}", CastlingRights::NONE);
+        assert_eq!(
+            none.matches("None").count(),
+            4,
+            "expected four None files: {none}"
+        );
+    }
+
+    // -- Auxiliary query / ordering helpers (non-perft-reachable) ----------
+    //
+    // The perft, make/unmake, and FEN pins above exercise the fast legal
+    // generator and the apply/unmake core. The helpers below are queried by the
+    // engine surface (legality checks, capture ordering, insufficient-material
+    // draws, the staged capture/quiet split, the pseudo-legal king-safety
+    // filter) but are NOT on the perft path, so they need their own behaviour
+    // pins. Each pins a value a mutation of the helper would change (see #445).
+
+    #[test]
+    fn is_empty_is_true_only_for_no_rights() {
+        // The standard start has every right; only the empty set is empty.
+        assert!(!Position::startpos().castling_rights().is_empty());
+        assert!(CastlingRights::NONE.is_empty());
+    }
+
+    #[test]
+    fn is_legal_matches_the_generated_move_set() {
+        let pos = Position::startpos();
+        // A generated move is legal; a geometrically-plausible but never-generated
+        // move (a pawn stepping two squares as a plain quiet) is not.
+        let e4 = pos.parse_uci("e2e4").unwrap();
+        assert!(pos.is_legal(&e4));
+        let bogus = Move::new(Square::E2, Square::E5, MoveKind::Quiet);
+        assert!(!pos.is_legal(&bogus));
+        // A move that leaves the own king in check is rejected: the e2 knight is
+        // pinned to the e1 king by the e8 rook, so stepping it off the file is not
+        // among the legal moves.
+        let pinned = Position::from_fen("k3r3/8/8/8/8/8/4N3/4K3 w - - 0 1").unwrap();
+        let expose = Move::new(Square::E2, Square::C3, MoveKind::Quiet);
+        assert!(!pinned.is_legal(&expose));
+    }
+
+    #[test]
+    fn victim_value_scores_by_captured_piece() {
+        // Ordinary capture scores the destination piece; a quiet move scores 0.
+        let pos = Position::from_fen("3rk3/8/8/8/8/8/8/3RK3 w - - 0 1").unwrap();
+        let cap = Move::new(Square::D1, Square::D8, MoveKind::Capture);
+        assert_eq!(pos.victim_value(&cap), see_value(Role::Rook));
+        let quiet = Move::new(Square::D1, Square::D4, MoveKind::Quiet);
+        assert_eq!(pos.victim_value(&quiet), 0);
+        // En passant scores a pawn even though the destination square is empty.
+        let ep_pos = Position::from_fen("4k3/8/8/2pP4/8/8/8/4K3 w - c6 0 1").unwrap();
+        let ep = ep_pos.parse_uci("d5c6").unwrap();
+        assert_eq!(ep.kind(), MoveKind::EnPassant);
+        assert_eq!(ep_pos.victim_value(&ep), see_value(Role::Pawn));
+    }
+
+    #[test]
+    fn undo_captured_records_the_victim_square() {
+        let mut pos = Position::from_fen("r3k3/8/8/8/8/8/8/R3K3 w - - 0 1").unwrap();
+        let cap = Move::new(Square::A1, Square::A8, MoveKind::Capture);
+        assert!(cap.is_capture());
+        let undo = pos.make(&cap);
+        let (_, sq) = undo.captured().expect("a capture must record its victim");
+        assert_eq!(sq, Square::A8);
+        // A quiet move records no capture.
+        let mut pos2 = Position::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        let quiet = Move::new(Square::E1, Square::D1, MoveKind::Quiet);
+        assert!(pos2.make(&quiet).captured().is_none());
+    }
+
+    #[test]
+    fn staged_captures_and_quiets_partition_the_legal_moves() {
+        // The staged generator's capture and quiet halves must together reproduce
+        // exactly `legal_moves` with no overlap: every capture is a capture and in
+        // the full set, every quiet is non-capturing and in the full set, and the
+        // two counts sum to the total. Stubbing either stage (or the FilterSink
+        // that classifies moves) breaks the partition.
+        for fen in [KIWIPETE, POS3, POS5] {
+            let pos = Position::from_fen(fen).unwrap();
+            let all = pos.legal_moves();
+            let mut caps = MoveList::new();
+            pos.legal_captures_into(&mut caps);
+            let caps = caps.into_vec();
+            let mut quiets = MoveList::new();
+            pos.legal_quiets_into(&mut quiets);
+            let quiets = quiets.into_vec();
+            assert!(
+                caps.iter().all(|m| m.is_capture() && all.contains(m)),
+                "captures must be capturing legal moves for {fen}"
+            );
+            assert!(
+                quiets.iter().all(|m| !m.is_capture() && all.contains(m)),
+                "quiets must be non-capturing legal moves for {fen}"
+            );
+            // Non-empty on both sides so a stubbed stage cannot pass vacuously.
+            assert!(!caps.is_empty(), "expected some captures for {fen}");
+            assert!(!quiets.is_empty(), "expected some quiets for {fen}");
+            assert_eq!(caps.len() + quiets.len(), all.len(), "partition for {fen}");
+        }
+    }
+
+    #[test]
+    fn move_keeps_king_safe_detects_self_check() {
+        // The black rook on e8 pins the white e2 knight to the e1 king: stepping
+        // the knight off the e-file exposes the king (unsafe), while a king step
+        // off the file is safe.
+        let pos = Position::from_fen("k3r3/8/8/8/8/8/4N3/4K3 w - - 0 1").unwrap();
+        let expose = Move::new(Square::E2, Square::C3, MoveKind::Quiet);
+        assert!(!pos.move_keeps_king_safe(&expose));
+        let safe = Move::new(Square::E1, Square::D1, MoveKind::Quiet);
+        assert!(pos.move_keeps_king_safe(&safe));
+    }
+
+    #[test]
+    fn insufficient_material_classifies_endgames() {
+        // Draws by insufficient material.
+        for fen in [
+            "4k3/8/8/8/8/8/8/4K3 w - - 0 1",    // K vs K
+            "4k3/8/8/8/8/8/8/3BK3 w - - 0 1",   // K+B vs K
+            "4k3/8/8/8/8/8/8/3NK3 w - - 0 1",   // K+N vs K
+            "4k3/8/8/8/8/8/8/1B1BK3 w - - 0 1", // K + two light-square bishops
+            "4k3/8/8/8/8/8/8/B1B1K3 w - - 0 1", // K + two dark-square bishops
+        ] {
+            let pos = Position::from_fen(fen).unwrap();
+            assert!(
+                pos.is_insufficient_material(),
+                "expected draw material: {fen}"
+            );
+        }
+        // Sufficient material (can mate, or not an automatic draw under FIDE).
+        for fen in [
+            "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1",  // K+P
+            "4k3/8/8/8/8/8/8/3RK3 w - - 0 1",   // K+R
+            "4k3/8/8/8/8/8/8/3QK3 w - - 0 1",   // K+Q
+            "4k3/8/8/8/8/8/8/1NN1K3 w - - 0 1", // K + two knights (helpmate exists)
+            "4k3/8/8/8/8/8/8/1BB1K3 w - - 0 1", // K + opposite-colored bishops
+        ] {
+            let pos = Position::from_fen(fen).unwrap();
+            assert!(
+                !pos.is_insufficient_material(),
+                "expected sufficient material: {fen}"
+            );
+        }
+    }
+
+    #[test]
+    fn see_en_passant_lifts_the_victim_from_the_occupancy() {
+        // White d5 pawn captures the c5 pawn en passant, landing on c6. The victim
+        // on c5 must be removed from the swap-off occupancy: only then does the
+        // black rook on c3 (until now blocked by the c5 pawn) x-ray up the c-file
+        // to recapture on c6, making the exchange an even pawn trade (SEE = 0). If
+        // the en-passant victim were left on the board, the rook would stay blocked,
+        // no recapture would be seen, and SEE would wrongly read a free pawn (+100).
+        let pos = Position::from_fen("4k3/8/8/2pP4/8/2r5/8/4K3 w - c6 0 1").unwrap();
+        let ep = pos.parse_uci("d5c6").unwrap();
+        assert_eq!(ep.kind(), MoveKind::EnPassant);
+        assert_eq!(pos.see(&ep), 0);
+    }
 }

@@ -774,6 +774,13 @@ mod tests {
     #[test]
     fn display_renders_standard_board() {
         let text = Board::standard().to_string();
+        // The ranks are newline-separated with NO trailing newline (the separator
+        // is written only *between* rows, `rank > 0`). `str::lines()` is blind to a
+        // trailing newline, so pin it directly.
+        assert!(
+            !text.ends_with('\n'),
+            "board Display must not end with a trailing newline"
+        );
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 8);
         // Rank 8 (black back rank) is at the top.
