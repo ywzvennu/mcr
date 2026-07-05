@@ -62,7 +62,8 @@ pub enum RoyalSlider {
     Queen,
 }
 
-/// Which **counting** endgame rule a variant uses (Makruk / Cambodian / ASEAN).
+/// Which **counting** endgame rule a variant uses (Makruk / Cambodian / ASEAN /
+/// Burmese).
 ///
 /// Each selects a distinct material-scaled countdown table — see
 /// [`GenericGame`](super::game::GenericGame), which reproduces Fairy-Stockfish's
@@ -83,6 +84,15 @@ pub enum WideCountingRule {
     /// counted side is a lone king and no pawns remain, with a 16 / 44 / 64-move
     /// limit by the superior side's strongest piece (rook / khon / knight).
     Asean,
+    /// Burmese (Sittuyin): pieces-honour only, with the same 16 / 44 / 64-move
+    /// tiers as ASEAN (rook / sin / knight — the general/Met alone cannot mate and
+    /// draws at once), but with Sittuyin's distinctive **centre-square exception**:
+    /// a lone king standing on one of the four central squares (d4 / d5 / e4 / e5)
+    /// when the count starts is granted five extra moves — the count begins only
+    /// after the king's fifth move — so the limits become 21 / 49 / 69. The
+    /// published Burmese counting; note Fairy-Stockfish itself models Sittuyin as
+    /// plain [`Asean`](WideCountingRule::Asean) and omits the centre exception.
+    Burmese,
 }
 
 /// The promotion configuration a variant exposes: which squares promote and to
