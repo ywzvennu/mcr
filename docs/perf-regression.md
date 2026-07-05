@@ -39,6 +39,15 @@ to paper over an accidental bloat. To refresh the numbers after an intended
 change, print them with a throwaway `WideVariantId::ALL` sweep (see the tests for
 the exact accessors).
 
+> **Note (issue #506):** ~95.5–96.1% of every position is the `WideRole::COUNT`-
+> wide role array plus the role-indexed pocket, so these ceilings are dominated by
+> the 146-role width. A spike into per-variant role-array sizing (whether that
+> width can be cut per variant) measured a large common-case memory ceiling but
+> found the ceiling *tightening* modest (worst-case variants own the high role
+> indices) and the shrink too invasive/risky to ship — while turning up a separate
+> 2–3× movegen throughput win from bounding the hot-path role loops. See
+> [`perf-role-array-spike.md`](perf-role-array-spike.md).
+
 ### Allocation — alloc-free wide perft (`src/geometry/position.rs`)
 
 - **`wide_perft_is_allocation_free_below_root`** — a fixed shallow perft
