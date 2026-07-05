@@ -39,15 +39,23 @@
 //!
 //! ## What is modelled vs. approximated (the honest partial)
 //!
-//! Tenjiku's three hardest powers are **captures**, out of reach at the validated
-//! depths; they are modelled to the tractable bar and documented here:
+//! Tenjiku's hardest powers are **captures**, out of reach at the machine-validated
+//! start-position depths; they are modelled to the tractable bar and documented
+//! here:
 //!
-//! * **Fire Demon** ([`WideRole::FireDemon`]) — its *movement* (any distance
-//!   vertically or diagonally, a Flying Ox) is exact. Its **area "burn"** — after
-//!   moving, it captures every enemy on the up-to-eight adjacent squares, and it
-//!   may also burn in place (igui) — is **not modelled**: a multi-square capture
-//!   cannot be packed into [`WideMove`](crate::geometry::WideMove) (which carries
-//!   one intermediate square).
+//! * **Fire Demon** ([`WideRole::FireDemon`]) — **fully modelled** (issue #477). It
+//!   moves as a Flying Ox (any distance vertically or diagonally — exact) and then
+//!   **burns** (captures) *every* enemy on the up-to-eight squares adjacent to its
+//!   destination, and it may **igui** (burn in place without moving). Because the
+//!   burn victim set is deterministic from the destination + board (all adjacent
+//!   enemies), it is not stored in the move: the Fire Demon's slides and its igui
+//!   are emitted as
+//!   [`WideMoveKind::FireDemonMove`](crate::geometry::WideMoveKind::FireDemonMove)
+//!   moves, and the burn is recomputed at apply-time. Igui is `from == to`, and it
+//!   is emitted only when there is an adjacent enemy to burn. There is **no machine
+//!   oracle** for the burn (HaChu exercises captures only at shallow depth and
+//!   segfaults on Tenjiku), so it is validated by **hand-derived perft** on
+//!   constructed capture positions — see `tests/perft_tenjiku.rs`.
 //! * **Jump-capturing Generals** ([`WideRole::GreatGeneral`],
 //!   [`WideRole::ViceGeneral`], [`WideRole::RookGeneral`],
 //!   [`WideRole::BishopGeneral`]) — their *slide* is exact. Their ability to
@@ -318,8 +326,10 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
                 Self::ray(color, sq, occ, &VERT) | attacks::king_attacks::<Tenjiku16x16>(sq)
             }
             // Flying Ox (promoted Vertical Mover) *and* the Fire Demon share the
-            // vertical-Rook + Bishop ride (the Fire Demon's area burn is
-            // documented-unmodelled; see the module docs).
+            // vertical-Rook + Bishop ride. This is the Fire Demon's *ride*; its
+            // area burn on arrival (and its igui) rides the dedicated
+            // `FireDemonMove` path in the generator and is applied on top of this
+            // target set (issue #477; see the module docs).
             WideRole::FlyingOx | WideRole::FireDemon => {
                 Self::ray(color, sq, occ, &VERT) | attacks::bishop_attacks::<Tenjiku16x16>(sq, occ)
             }
@@ -467,6 +477,18 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
     fn role_is_full_lion(role: WideRole) -> bool {
         // The Lion and the Lion-Hawk have full (all-direction) Lion power.
         matches!(role, WideRole::ChuLion | WideRole::LionHawk)
+    }
+
+    // --- Fire Demon area burn (igui + arrival burn) -----------------------
+
+    fn has_area_burn() -> bool {
+        true
+    }
+
+    fn role_is_area_burner(role: WideRole) -> bool {
+        // The Fire Demon is the sole area-burner: it slides as a Flying Ox and then
+        // burns every enemy adjacent to its destination, or igui-burns in place.
+        matches!(role, WideRole::FireDemon)
     }
 
     fn role_lion_lines(role: WideRole) -> &'static [(i8, i8)] {
@@ -864,8 +886,11 @@ mod tests {
         assert_eq!(got, indices(&want));
     }
 
-    /// A Fire Demon moves as a Flying Ox: vertical Rook plus Bishop, never sideways
-    /// (its area burn is documented-unmodelled).
+    /// A Fire Demon moves as a Flying Ox: vertical Rook plus Bishop, never sideways.
+    /// (Its area burn adds captures but no new *destinations*, so with no enemy on
+    /// the board the reachable-square set is exactly the Flying-Ox ride; the burn
+    /// itself is exercised by the dedicated burn tests below and in
+    /// `tests/perft_tenjiku.rs`.)
     #[test]
     fn fire_demon_moves_as_flying_ox() {
         let got = targets_from(
