@@ -578,11 +578,10 @@ impl WideVariant<Dai15x15> for DaiRules {
         royals.count() <= 1
     }
 
-    // --- Sennichite / perpetual check (default-off draw rules) -------------
+    // --- Sennichite / perpetual check / attack repetition (draw rules) -----
     //
     // These affect only terminal adjudication in [`GenericGame`], never move
-    // generation, so perft is byte-identical. The Chu/Dai attack-repetition
-    // ("chase") rule is out of scope here (tracked separately).
+    // generation, so perft is byte-identical.
 
     fn tracks_repetition() -> bool {
         true
@@ -601,6 +600,14 @@ impl WideVariant<Dai15x15> for DaiRules {
     fn perpetual_check_loses() -> bool {
         // A sennichite brought about by perpetual check is a loss for the checking
         // side.
+        true
+    }
+
+    fn attack_repetition_loses() -> bool {
+        // Dai shares Chu's large-shogi attack-repetition rule: at the fourth
+        // occurrence, a side that attacked enemy pieces (however futile) through the
+        // cycle while the other attacked nothing must deviate or lose. Adjudicated in
+        // [`GenericGame`]; see that module.
         true
     }
 }

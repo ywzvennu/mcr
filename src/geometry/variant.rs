@@ -1622,6 +1622,27 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if this variant adjudicates the **large-shogi
+    /// attack-repetition ("chase") rule** as a loss for the attacking side — the
+    /// Chu / Dai Shogi rule that, on top of sennichite, a side which keeps
+    /// **attacking** enemy pieces through the repeated cycle while the other side
+    /// attacks nothing must break the pattern or **lose** (chessvariants Chu
+    /// ruleset). The default is `false`. Consulted only when
+    /// [`tracks_repetition`](Self::tracks_repetition) is `true`; the detection lives
+    /// in [`GenericGame`](super::game::GenericGame), so move generation and perft
+    /// are untouched.
+    ///
+    /// This is distinct from the Xiangqi
+    /// [`perpetual_chase_loses`](Self::perpetual_chase_loses) rule: the large-shogi
+    /// test applies **no** value-superiority or protection filter — *any* threat on
+    /// *any* non-royal enemy piece counts ("however futile") — and adjudicates by
+    /// the **asymmetry** of who attacked, not by an FSF-style single-victim identity.
+    /// A variant enables at most one of the two chase models. Only Chu and Dai
+    /// override it.
+    fn attack_repetition_loses() -> bool {
+        false
+    }
+
     /// Returns `true` if the position is an **insufficient-material** draw for this
     /// variant. The default is `false` (no material draw is imposed — most fairy
     /// variants do not have one). Reported from the single position via
@@ -1791,6 +1812,17 @@ pub enum WideEndReason {
     /// [`GenericGame`](super::game::GenericGame), which resolves the winner from the
     /// recorded chase history.
     PerpetualChaseLoss,
+    /// A repetition was brought about by the **large-shogi attack-repetition
+    /// ("chase") rule** (Chu / Dai Shogi): through the repeated cycle one side
+    /// **attacked** enemy pieces (any threat on any non-royal, "however futile")
+    /// while the other side attacked nothing. That side (the attacker) **loses**;
+    /// decisive for the side being attacked. Reported by
+    /// [`GenericGame`](super::game::GenericGame), which resolves the loser from the
+    /// recorded per-move attack history. Distinct from
+    /// [`PerpetualCheckLoss`](Self::PerpetualCheckLoss) (which concerns the enemy
+    /// royal and is scored first) and from the Xiangqi
+    /// [`PerpetualChaseLoss`](Self::PerpetualChaseLoss) (a value/protection model).
+    AttackRepetitionLoss,
     /// Janggi **bikjang**: the two generals face each other down an open file with
     /// the side to move unable to break the confrontation. Draw. Reported from the
     /// single position via [`WideVariant::has_bikjang`].

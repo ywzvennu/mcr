@@ -4864,13 +4864,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             WideEndReason::Stalemate if V::stalemate_is_loss() => WideOutcome::Decisive {
                 winner: self.state.turn.opposite(),
             },
-            // The perpetual-check loss needs the move history to know which side
-            // was the checker, so it is resolved by
+            // The perpetual-check / chase / attack-repetition losses need the move
+            // history to know which side was the aggressor, so they are resolved by
             // [`GenericGame`](super::game::GenericGame), never produced here. A
-            // bare position cannot reach this arm; treat it as a draw defensively.
-            WideEndReason::PerpetualCheckLoss | WideEndReason::PerpetualChaseLoss => {
-                WideOutcome::Draw
-            }
+            // bare position cannot reach these arms; treat them as a draw defensively.
+            WideEndReason::PerpetualCheckLoss
+            | WideEndReason::PerpetualChaseLoss
+            | WideEndReason::AttackRepetitionLoss => WideOutcome::Draw,
             WideEndReason::Stalemate
             | WideEndReason::InsufficientMaterial
             | WideEndReason::VariantDraw
