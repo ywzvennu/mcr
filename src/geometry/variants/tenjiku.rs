@@ -70,12 +70,17 @@
 //!   `from → to` [`Capture`](crate::geometry::WideMoveKind::Capture) (only the landing
 //!   square is taken; the jumped pieces are untouched), so it needs no new move
 //!   representation. Emitted by the multi-royal generator's `gen_jump_general_moves`
-//!   pass, gated behind [`WideVariant::has_jump_captures`]. Two facets stay
-//!   approximated: a General's jump-*check* through a screen is not in the attack
-//!   model (king-safety uses the ordinary ride), and a Great General taken as a Lion
-//!   double-capture's / Fire Demon burn's *secondary* victim is not made immune. There
-//!   is **no machine oracle** (HaChu segfaults on Tenjiku), so the jump-captures are
-//!   validated by **hand-derived perft** — see `tests/perft_tenjiku.rs`.
+//!   pass, gated behind [`WideVariant::has_jump_captures`]. The two facets deferred
+//!   from #478 are now modelled (issue #491): a General's jump-*check* through a
+//!   screen **is** in the attack model — king-safety folds the jump into the
+//!   royal-attack query (`jump_general_checks`), so a move leaving one's own king in a
+//!   jump-check is illegal and a jump-check must be answered — and a Great General
+//!   removed as a Lion double-capture's / Fire Demon area-burn's *secondary* victim is
+//!   made immune too (those separate capture paths now honour
+//!   [`role_is_capture_immune`](TenjikuRules::role_is_capture_immune)). There is **no
+//!   machine oracle** (HaChu segfaults on Tenjiku), so the jump-captures, jump-checks,
+//!   and secondary-victim immunity are validated by **hand-derived perft** — see
+//!   `tests/perft_tenjiku.rs`.
 //! * **Lion / Lion-Hawk multi-move captures** — the Lion double-step, igui and
 //!   pass are modelled via the shared [`gen_lion_moves`](crate::geometry::GenericPosition)
 //!   pass exactly as in Chu/Dai. The Lion-Hawk ([`WideRole::LionHawk`]) adds
