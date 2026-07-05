@@ -37,8 +37,8 @@
 
 use crate::geometry::position::GenericState;
 use crate::geometry::{
-    Bitboard, Board, Chess8x8, GenericPosition, MakrukRules, PromotionConfig, Square, WideRole,
-    WideVariant,
+    Bitboard, Board, Chess8x8, GenericPosition, MakrukRules, PromotionConfig, Square,
+    WideCountingRule, WideRole, WideVariant,
 };
 use crate::Color;
 
@@ -91,6 +91,12 @@ impl WideVariant<Chess8x8> for MakpongRules {
     /// capture the lone checker — it may not flee. Every other hook is Makruk's.
     fn king_may_only_capture_checker() -> bool {
         true
+    }
+
+    fn counting_rule() -> Option<WideCountingRule> {
+        // Makpong keeps Makruk's counting endgame verbatim (terminal-only, so
+        // perft is byte-identical); its only rule change is king-safety.
+        <MakrukRules as WideVariant<Chess8x8>>::counting_rule()
     }
 }
 

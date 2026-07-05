@@ -732,7 +732,7 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, Janggi, Makruk, Minishogi, Minixiangqi, Shogi, Xiangqi,
+        Asean, Cambodian, Janggi, Makpong, Makruk, Minishogi, Minixiangqi, Shogi, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1010,6 +1010,28 @@ mod tests {
             plies,
             Some(28),
             "FSF pieces-honour draws on the 28th half-move"
+        );
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn makpong_pieces_honour_count_matches_makruk() {
+        // Makpong's only rule change from Makruk is king-safety (the king may not
+        // flee a check); the counting endgame must be inherited verbatim (issue
+        // #469). The same lone-king K + Rook position as the Makruk pieces-honour
+        // test, shuffled so no check ever arises, must draw on the identical 28th
+        // half-move — proving Makpong now forwards Makruk's `counting_rule`.
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+            .expect("valid makpong fen");
+        let pos: Makpong = pos;
+        let mut game = GenericGame::new(pos);
+        // c1=2, c2=10; a8=56, a7=48 (a quiet, non-checking shuffle).
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(
+            plies,
+            Some(28),
+            "Makpong pieces-honour draws on the 28th half-move, exactly like Makruk"
         );
         assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
