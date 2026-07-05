@@ -365,6 +365,61 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if this variant fields **range-jumping Generals** — Tenjiku
+    /// Shogi's Great / Vice / Rook / Bishop General, which slide as their base piece
+    /// (Free King / Bishop / Rook / Bishop) but, **when capturing**, may jump over
+    /// any number of consecutive *lower-ranked* pieces (friend or foe) in a straight
+    /// line to capture an enemy beyond, stopped only by an equal-or-higher-ranked
+    /// piece. Default `false`; only Tenjiku overrides it. When `true`, the
+    /// multi-royal generator runs an extra `gen_jump_general_moves` pass that emits
+    /// these jump-captures as ordinary single-victim
+    /// [`WideMoveKind::Capture`](super::WideMoveKind::Capture) moves (a jump-capture
+    /// removes only its landing square), and masks out captures forbidden by
+    /// [`role_is_capture_immune`](WideVariant::role_is_capture_immune). Every other
+    /// variant leaves it `false`, so no such move is produced and its move generation
+    /// is byte-identical.
+    fn has_jump_captures() -> bool {
+        false
+    }
+
+    /// The piece-value **rank** of `role` in the Tenjiku range-jump hierarchy. A
+    /// range-jumping General may jump over pieces of **strictly lower** rank only,
+    /// and is stopped by any piece of equal-or-higher rank. The hierarchy is: King /
+    /// Crown Prince = `4` (never jumped), Great General = `3`, Vice General = `2`,
+    /// Rook General / Bishop General = `1`, every other piece = `0`. Default `0`;
+    /// consulted only under [`has_jump_captures`](WideVariant::has_jump_captures).
+    fn role_jump_rank(_role: WideRole) -> u8 {
+        0
+    }
+
+    /// Returns `true` if `role` is a **range-jumping General** (Tenjiku's Great /
+    /// Vice / Rook / Bishop General). Default `false`. Consulted only under
+    /// [`has_jump_captures`](WideVariant::has_jump_captures).
+    fn role_is_jump_capturer(_role: WideRole) -> bool {
+        false
+    }
+
+    /// The straight-line directions along which `role`'s range-jump capture may
+    /// travel — the same lines as its ordinary slide (the Rook General's four
+    /// orthogonals, the Vice / Bishop General's four diagonals, the Great General's
+    /// eight). Every Tenjiku General is left-right *and* up-down symmetric, so these
+    /// are colour-independent. Empty for every other role. Consulted only under
+    /// [`has_jump_captures`](WideVariant::has_jump_captures).
+    fn role_jump_dirs(_role: WideRole) -> &'static [(i8, i8)] {
+        &[]
+    }
+
+    /// Returns `true` if `role` is **capture-immune** — capturable only by another
+    /// piece of the *same* role. Tenjiku's Great General is immune to every capture
+    /// except by an enemy Great General. Default `false`; consulted only under
+    /// [`has_jump_captures`](WideVariant::has_jump_captures), where the multi-royal
+    /// generator removes an immune enemy's square from the capture targets of every
+    /// mover of a different role (its ordinary slides / leaps and the range-jump
+    /// captures alike).
+    fn role_is_capture_immune(_role: WideRole) -> bool {
+        false
+    }
+
     /// Returns `true` if this variant promotes by the **Chu-Shogi rule**: a piece
     /// may promote only when it *enters* the promotion zone from outside, or makes
     /// a *capture* on a move that begins inside the zone — never on a non-capturing

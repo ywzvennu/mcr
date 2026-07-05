@@ -1231,22 +1231,22 @@ pub enum WideRole {
     /// recomputed at apply-time. Does not promote. FEN token `****I` / `****i`.
     FireDemon = 132,
     /// Great General (大将, Tenjiku Shogi) — slides any distance in all eight
-    /// directions (a Free-King ride) and, on a capture, jumps over any lower-ranked
-    /// piece in its path (jump-capture). Only the ordinary slide is modelled; the
-    /// jump-capture is documented in the `tenjiku` module. Does not promote. FEN
-    /// token `****G` / `****g`.
+    /// directions (a Free-King ride) and, on a capture, jumps over any number of
+    /// consecutive lower-ranked pieces to capture beyond (jump-capture, issue #478,
+    /// modelled). It is **un-capturable except by another Great General**. Rank 3 in
+    /// the jump hierarchy. Does not promote. FEN token `****G` / `****g`.
     GreatGeneral = 133,
-    /// Vice General (副将, Tenjiku Shogi) — like the Great General but on the four
-    /// diagonals only (a Bishop ride plus jump-capture). Does not promote. FEN token
-    /// `****V` / `****v`.
+    /// Vice General (副将, Tenjiku Shogi) — a Bishop ride plus the diagonal
+    /// jump-capture (issue #478, modelled). Rank 2 in the jump hierarchy. Does not
+    /// promote. FEN token `****V` / `****v`.
     ViceGeneral = 134,
-    /// Rook General (車将, Tenjiku Shogi) — jump-captures along the four orthogonals
-    /// (a Rook ride plus jump-capture). Promotes to a Great General. FEN token
-    /// `****R` / `****r`.
+    /// Rook General (車将, Tenjiku Shogi) — a Rook ride plus the orthogonal
+    /// jump-capture (issue #478, modelled). Rank 1 in the jump hierarchy. Promotes to
+    /// a Great General. FEN token `****R` / `****r`.
     RookGeneral = 135,
-    /// Bishop General (角将, Tenjiku Shogi) — jump-captures along the four diagonals
-    /// (a Bishop ride plus jump-capture). Promotes to a Vice General. FEN token
-    /// `****B` / `****b`.
+    /// Bishop General (角将, Tenjiku Shogi) — a Bishop ride plus the diagonal
+    /// jump-capture (issue #478, modelled). Rank 1 in the jump hierarchy. Promotes to
+    /// a Vice General. FEN token `****B` / `****b`.
     BishopGeneral = 136,
     /// Lion Hawk (獅鷹, Tenjiku Shogi) — full Lion power (the double King-step, igui
     /// and pass) in all eight directions, plus unlimited Bishop range along each
