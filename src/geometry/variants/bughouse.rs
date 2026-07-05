@@ -160,7 +160,7 @@ impl WideVariant<Chess8x8> for BughouseRules {
     /// (three-fold plain draw, no perpetual-check exception) and the
     /// `repetition_fold`, `repetition_draw_reason`, and `perpetual_check_loses`
     /// defaults are already correct. History-dependent and never consulted by a
-    /// bare [`GenericPosition`](crate::geometry::GenericPosition), so perft is
+    /// bare [`GenericPosition`], so perft is
     /// unchanged.
     fn tracks_repetition() -> bool {
         true

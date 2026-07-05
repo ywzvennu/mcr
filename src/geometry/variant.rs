@@ -357,7 +357,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     }
 
     /// Returns `true` if `role` is an **area burner** — a Fire Demon (Tenjiku's
-    /// [`WideRole::FireDemon`](super::WideRole::FireDemon)): a piece whose move is a
+    /// [`WideRole::FireDemon`]): a piece whose move is a
     /// Flying-Ox slide that additionally burns every adjacent enemy, and which may
     /// igui. Default `false`. Consulted only under
     /// [`has_area_burn`](WideVariant::has_area_burn).
