@@ -50,6 +50,31 @@
 //! ply, the same structural rule as perpetual check). These cover the dominant
 //! cases (a Chariot/Horse/Cannon harrying one piece) and agree with FSF on them.
 //!
+//! # Attack repetition (Chu / Dai large shogi)
+//!
+//! Chu and Dai Shogi layer a second chase model on sennichite
+//! ([`attack_repetition_loses`](WideVariant::attack_repetition_loses)): at the
+//! fourth occurrence, if through the repeated cycle **one side attacked** enemy
+//! pieces (any threat on any non-royal, "however futile") **and the other side
+//! attacked nothing**, the attacking side must break the pattern or **loses** — the
+//! chessvariants Chu ruleset's asymmetric attack rule. Perpetual **check** (an
+//! attack on the enemy royal) is a separate, higher-priority rule and is scored
+//! first; the attack test excludes the enemy King and Crown Prince.
+//!
+//! Two points differ from that source's letter, resolved deliberately (there is
+//! **no** machine oracle — HaChu only exercises captures at shallow depth and
+//! segfaults on Tenjiku — so these are hand-derived choices, not validated):
+//!
+//! * **Attack strength.** The test applies no value/protection filter (unlike the
+//!   Xiangqi chase above): the moved piece attacking *any* enemy non-royal counts.
+//! * **Ambiguous sub-cases fall back to the draw.** When **both** sides attacked in
+//!   the cycle, sources disagree (chessvariants forbids the repeating move outright;
+//!   others draw); mcr draws. The "one side started passing" sub-rule (Chu's Lion
+//!   `jitto` pass) is likewise **not** modelled here and draws. Only the
+//!   well-characterized one-sided-attack core is decisive. Tenjiku, whose repetition
+//!   convention is debated and unoracled, keeps only the base sennichite /
+//!   perpetual-check of issue #471 and does **not** enable this rule.
+//!
 //! # Bikjang (Janggi)
 //!
 //! The Janggi **bikjang** draw fires when the two generals face each other down an
@@ -102,10 +127,13 @@ struct HistoryEntry {
     /// Whether the side to move is in check here (i.e. the move that produced this
     /// position delivered check). Read back by the perpetual-check adjudication.
     in_check: bool,
-    /// Whether the move that produced this position was a qualifying **chase**
-    /// (Xiangqi). Read back by the perpetual-chase adjudication. Always `false` for
-    /// the seed entry and for variants without
-    /// [`perpetual_chase_loses`](WideVariant::perpetual_chase_loses).
+    /// Whether the move that produced this position was a qualifying
+    /// repetition-**attack** for the variant's chase model — the Xiangqi
+    /// value/protection [chase](WideVariant::perpetual_chase_loses), or the Chu/Dai
+    /// large-shogi [attack](WideVariant::attack_repetition_loses) on any non-royal
+    /// enemy piece. Read back by the perpetual-chase / attack-repetition
+    /// adjudication. Always `false` for the seed entry and for variants with neither
+    /// chase model.
     chase: bool,
     /// Whether the two generals **face** each other in this position (Janggi
     /// bikjang). Always `false` for variants without
@@ -241,8 +269,17 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             self.key ^= self.position.zobrist_board_delta(&undo)
                 ^ old_state
                 ^ self.position.zobrist_state_part();
-            let chase = V::perpetual_chase_loses()
-                && Self::chase_targets(&self.position, mv.from::<G>(), mv.to::<G>()).is_some();
+            // The `chase` flag records, per ply, the qualifying repetition-attack for
+            // whichever chase model this variant uses (a variant enables at most one):
+            // the Xiangqi value/protection chase, or the Chu/Dai large-shogi "attacks
+            // any non-royal" test.
+            let chase = if V::perpetual_chase_loses() {
+                Self::chase_targets(&self.position, mv.from::<G>(), mv.to::<G>()).is_some()
+            } else if V::attack_repetition_loses() {
+                Self::attacks_nonroyal(&self.position, mv.to::<G>())
+            } else {
+                false
+            };
             self.history.push(HistoryEntry {
                 key: self.key,
                 turn: self.position.turn(),
@@ -401,6 +438,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 ));
             }
         }
+        if V::attack_repetition_loses() {
+            if let Some(attacker) = self.attack_repetition_loser(first) {
+                // The attacking side must break the pattern or lose; the side it was
+                // attacking wins.
+                return Some((
+                    WideEndReason::AttackRepetitionLoss,
+                    WideOutcome::Decisive {
+                        winner: attacker.opposite(),
+                    },
+                ));
+            }
+        }
         Some((V::repetition_draw_reason(), WideOutcome::Draw))
     }
 
@@ -438,6 +487,57 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             (false, true) => Some(Color::Black),
             // Neither chased throughout, or (a mutual chase) both did: not a clean
             // perpetual chase — fall back to the ordinary repetition draw.
+            _ => None,
+        }
+    }
+
+    /// The side that must break the **large-shogi attack-repetition** (Chu / Dai
+    /// "chase") or lose — the side that **attacked** an enemy non-royal piece on at
+    /// least one of its moves through the repeated cycle starting at `first` while
+    /// the other side attacked on **none** of its moves — or `None` if the cycle is
+    /// not a clean one-sided attack.
+    ///
+    /// This is the chessvariants Chu ruleset's asymmetric test ("one side attacked
+    /// pieces with any of his moves, and the other doesn't"): an **OR** over each
+    /// side's moves, not the every-move **AND** of [`perpetual_chaser`] /
+    /// [`perpetual_checker`]. When neither side attacked (a quiet repetition) the
+    /// result is the ordinary sennichite draw; when **both** attacked — a case whose
+    /// exact adjudication is genuinely ambiguous across sources (chessvariants would
+    /// forbid the repeating move outright; other rule-sets differ) — mcr
+    /// conservatively also falls back to the draw rather than guess, so only the
+    /// well-characterized one-sided-attack core is decisive.
+    ///
+    /// [`perpetual_chaser`]: Self::perpetual_chaser
+    /// [`perpetual_checker`]: Self::perpetual_checker
+    fn attack_repetition_loser(&self, first: usize) -> Option<Color> {
+        let h = &self.history;
+        let last = h.len() - 1;
+        let mut white_moves = 0u32;
+        let mut black_moves = 0u32;
+        let mut white_attacked = false;
+        let mut black_attacked = false;
+        for i in first..last {
+            let attacked = h[i + 1].chase;
+            match h[i].turn {
+                Color::White => {
+                    white_moves += 1;
+                    white_attacked |= attacked;
+                }
+                Color::Black => {
+                    black_moves += 1;
+                    black_attacked |= attacked;
+                }
+            }
+        }
+        // A clean adjudication needs both sides to have moved in the cycle.
+        if white_moves == 0 || black_moves == 0 {
+            return None;
+        }
+        match (white_attacked, black_attacked) {
+            (true, false) => Some(Color::White),
+            (false, true) => Some(Color::Black),
+            // Neither attacked (quiet repetition → draw) or both attacked (ambiguous
+            // → draw): not a clean one-sided attack.
             _ => None,
         }
     }
@@ -531,6 +631,34 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             }
         }
         (!result.is_empty()).then_some(result)
+    }
+
+    // -- Attack-repetition detection (Chu / Dai large shogi) --------------------
+
+    /// Whether the moved piece now standing on `to` (having just produced `pos`,
+    /// whose side to move is the attacked side) **attacks at least one enemy
+    /// non-royal piece** — the Chu / Dai large-shogi "attack" test used by the
+    /// [attack-repetition rule](WideVariant::attack_repetition_loses).
+    ///
+    /// Unlike the Xiangqi [`chase_targets`](Self::chase_targets) test it applies
+    /// **no** value-superiority, protection, same-type, or moved-line filter: any
+    /// threat on any non-royal enemy piece counts ("however futile", per the
+    /// chessvariants Chu ruleset). The enemy **royals** (King and Crown Prince) are
+    /// excluded — an attack on a royal is a *check*, handled first and separately by
+    /// the [perpetual-check](WideVariant::perpetual_check_loses) rule.
+    fn attacks_nonroyal(pos: &GenericPosition<G, V>, to: Square<G>) -> bool {
+        let board = pos.board();
+        let victims = pos.turn();
+        let mover = victims.opposite();
+        let Some(moved_role) = board.role_at(to) else {
+            return false;
+        };
+        let occ = board.occupied();
+        let royals =
+            board.pieces(victims, WideRole::King) | board.pieces(victims, WideRole::CrownPrince);
+        let targets =
+            V::role_attacks(moved_role, mover, to, occ) & board.by_color(victims) & !royals;
+        !targets.is_empty()
     }
 
     /// Whether `attacker` attacking `victim` is a **value-superior** chase that
@@ -777,8 +905,8 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, CannonShogi, Capablanca, Janggi, Makpong, Makruk, Minishogi, Minixiangqi,
-        ShoShogi, Shogi, Sittuyin, Xiangqi,
+        Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, Janggi, Makpong, Makruk, Minishogi,
+        Minixiangqi, ShoShogi, Shogi, Sittuyin, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -1088,6 +1216,106 @@ mod tests {
         assert_eq!(game.repetition_count(), 3);
         assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    // --- Chu / Dai large-shogi attack repetition (issue #472) ------------
+    //
+    // Hand-derived cases only: there is no machine oracle for the chase rule
+    // (HaChu exercises captures at shallow depth and segfaults on Tenjiku), so
+    // these positions and verdicts are constructed and checked by hand against
+    // the chessvariants Chu ruleset.
+
+    #[test]
+    fn chu_attack_repetition_loses_for_the_attacker() {
+        // A White Rook (Chariot) on the d-file perpetually attacks a lone Black Gold
+        // that shuffles up and down the same file staying in the Rook's line, while
+        // the Gold's own moves attack nothing. Every White move re-attacks the Gold
+        // and no Black move attacks anything, so the fourth occurrence is a one-sided
+        // attack repetition and White (the attacker) LOSES rather than drawing by
+        // sennichite. The Rook never reaches the enemy King (Black Kl12, on the
+        // l-file) so it is not perpetual check; the kings are far apart so the Gold
+        // never checks either. No captures/promotions occur, so the position recurs.
+        // Chu is 12x12, index = rank*12 + file. Ra1-file: d1=3, d2=15. Gold: d5=51,
+        // d6=63. Kings: white a1=0, black l12=143.
+        let pos =
+            GenericPosition::<_, _>::from_fen("11k/12/12/12/12/12/12/3g8/12/12/12/K2R8 w - - 0 1")
+                .expect("valid chu fen");
+        let _: &Chu = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        // Three 4-ply cycles bring the start to its fourth occurrence (sennichite
+        // fold). Rook d1<->d2 re-attacks the Gold; the Gold flees d5<->d6.
+        for _ in 0..3 {
+            play(&mut game, 3, 15); // R d1->d2, attacks the Gold
+            assert!(!game.position().is_check());
+            play(&mut game, 51, 63); // g d5->d6 (flees, attacks nothing)
+            play(&mut game, 15, 3); // R d2->d1, attacks the Gold
+            assert!(!game.position().is_check());
+            play(&mut game, 63, 51); // g d6->d5 (flees, attacks nothing)
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::AttackRepetitionLoss));
+        // White perpetually attacked, so White loses: Black wins.
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black,
+            })
+        );
+    }
+
+    #[test]
+    fn chu_quiet_repetition_still_draws_by_sennichite() {
+        // The control: two lone kings shuffling in place, neither attacking anything.
+        // With no attacks on either side the attack-repetition rule does not fire and
+        // the fourth occurrence is a plain sennichite draw — exactly as before #472.
+        // White Ka1<->a2 (0<->12), Black Kl12<->l11 (143<->131).
+        let pos =
+            GenericPosition::<_, _>::from_fen("11k/12/12/12/12/12/12/12/12/12/12/K11 w - - 0 1")
+                .expect("valid chu fen");
+        let _: &Chu = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 0, 12); // K a1->a2
+            play(&mut game, 143, 131); // k l12->l11
+            play(&mut game, 12, 0); // K a2->a1
+            play(&mut game, 131, 143); // k l11->l12
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn dai_attack_repetition_loses_for_the_attacker() {
+        // Dai (15x15) shares Chu's attack-repetition rule. The same construction: a
+        // White Rook on the d-file perpetually attacks a lone Black Gold shuffling in
+        // its line while the Gold attacks nothing, so White loses at the fourth
+        // occurrence. index = rank*15 + file. d1=3, d2=18; Gold d8=108, d9=123;
+        // kings white a1=0, black o15=224. The Gold sits outside both five-rank
+        // promotion zones (ranks 6-10) so no promotion perturbs the cycle.
+        let pos = GenericPosition::<_, _>::from_fen(
+            "14k/15/15/15/15/15/15/3g11/15/15/15/15/15/15/K2R11 w - - 0 1",
+        )
+        .expect("valid dai fen");
+        let _: &Dai = &pos;
+        let mut game = GenericGame::new(pos);
+        for _ in 0..3 {
+            play(&mut game, 3, 18); // R d1->d2, attacks the Gold
+            play(&mut game, 108, 123); // g d8->d9 (flees, attacks nothing)
+            play(&mut game, 18, 3); // R d2->d1, attacks the Gold
+            play(&mut game, 123, 108); // g d9->d8 (flees, attacks nothing)
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::AttackRepetitionLoss));
+        assert_eq!(
+            game.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black,
+            })
+        );
     }
 
     // --- Makruk / Cambodian / ASEAN counting -----------------------------
