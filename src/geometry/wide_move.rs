@@ -1189,7 +1189,10 @@ mod tests {
     #[test]
     fn wide_move_is_eight_bytes() {
         // The base move occupies the low 32 bits; the high 32 carry the Duck
-        // addendum (zero for every non-Duck move).
+        // addendum (zero for every non-Duck move). This structural guard lives
+        // beside the type; the memory regression gate (issue #504) re-asserts the
+        // same `== 8` centrally in `geometry::any` alongside the other size
+        // ceilings, so a PR that widens the move fails whichever it runs first.
         assert_eq!(core::mem::size_of::<WideMove>(), 8);
     }
 

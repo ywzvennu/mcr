@@ -590,3 +590,29 @@ jobs:
           name: mutants-out
           path: mutants.out
           if-no-files-found: error
+
+  # Informational perf baseline (issue #504). Runs the criterion benches and
+  # prints their results so a maintainer can capture a timing/footprint baseline
+  # on demand. It is NON-BLOCKING and MANUAL-ONLY (`workflow_dispatch`): shared CI
+  # runners are too noisy for a stable wall-clock threshold, so timing is a
+  # documented manual A/B protocol (see `docs/perf-regression.md`), NOT a per-PR
+  # hard gate. The memory / alloc-free regression guards that DO run on every PR
+  # are cheap `#[test]`s in the `ci` job's `cargo test`, not here. The `footprint`
+  # bench additionally prints a per-variant size_of / allocation table to stderr.
+  perf-baseline:
+    name: perf-baseline (informational, manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Non-blocking: this captures a baseline for human inspection; it does not
+      # assert any threshold (runner timing is too noisy to gate on).
+      - name: Run benches (informational baseline)
+        run: cargo bench --all-features --bench perft --bench variants --bench footprint

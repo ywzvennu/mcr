@@ -162,6 +162,21 @@ macro_rules! wide_variants {
                         (core::mem::size_of::<$pos>(), core::mem::align_of::<$pos>()), )+
                 }
             }
+
+            /// The bit width of this variant's bitboard backing integer — `64`,
+            /// `128`, or `256`, the geometry's
+            /// [`Bits::BITS`](super::BitboardBacking::BITS). A static per-variant
+            /// fact that buckets variants by storage backing (a small board on a
+            /// `u64`, a large one on a `u128`, the widest on the two-limb `U256`)
+            /// without naming the geometry — the axis the per-backing
+            /// position-size regression ceiling groups by. Pairs with
+            /// [`position_footprint`](Self::position_footprint).
+            #[must_use]
+            pub const fn position_backing_bits(self) -> u32 {
+                match self {
+                    $( WideVariantId::$variant => <$pos>::BACKING_BITS, )+
+                }
+            }
         }
 
         impl core::fmt::Display for WideVariantId {
@@ -865,6 +880,98 @@ mod tests {
                 > WideVariantId::Seirawan.position_footprint().0,
             "Tenjiku (16x16 U256) is larger than Seirawan (8x8 u64)"
         );
+    }
+
+    // ---- Memory regression gate (issue #504) --------------------------------
+    //
+    // These are the cheap, compile-time-stable per-PR memory guards: they run on
+    // every `cargo test` at zero runtime cost and fail immediately if a type that
+    // is on the size-sensitive hot path (the runtime facade enum, the wide move,
+    // or any concrete position) grows past its current, deliberately-set ceiling.
+    // Each ceiling is a MEASURED current value; bumping one is allowed only as a
+    // conscious decision (see the per-test comment) — a change that grows a role
+    // array, a move word, or the facade fails here first, before it can silently
+    // regress the library's footprint. See `docs/perf-regression.md`.
+
+    /// The runtime facade [`AnyWideVariant`] is sized by its widest **inline**
+    /// arm (a `u128` position; the three U256 large-shogi arms are boxed, so they
+    /// do not inflate it — see the enum's storage note). This ceiling pins that
+    /// size so adding a variant, widening a position's inline state, or
+    /// un-boxing a large arm fails here.
+    ///
+    /// Current measured value: 2768 bytes. Raise this **only** deliberately, with
+    /// a justified reason (a genuinely needed larger arm) — never to paper over an
+    /// accidental bloat.
+    #[test]
+    fn any_wide_variant_size_ceiling() {
+        const CEILING: usize = 2768;
+        let actual = core::mem::size_of::<AnyWideVariant>();
+        assert!(
+            actual <= CEILING,
+            "size_of::<AnyWideVariant>() = {actual} exceeds the {CEILING}-byte \
+             ceiling; a size-sensitive type grew. Bump the ceiling only if the \
+             growth is justified (see docs/perf-regression.md)."
+        );
+    }
+
+    /// The wide move packs into a single `u64`. This centralizes the memory gate's
+    /// view of that guarantee (the structural guard also lives beside the type in
+    /// `wide_move.rs`); it is an exact `== 8`, not a ceiling — the packed layout
+    /// depends on the word being exactly eight bytes, so any change is a
+    /// deliberate wire-format decision, not a silent regression.
+    #[test]
+    fn wide_move_size_is_eight() {
+        assert_eq!(
+            core::mem::size_of::<WideMove>(),
+            8,
+            "WideMove must stay a packed u64 (8 bytes); see wide_move.rs"
+        );
+    }
+
+    /// Per-backing position-size ceiling: for each bitboard backing (`u64` /
+    /// `u128` / `U256`), the largest concrete position over that backing must stay
+    /// within its current measured size. Buckets every shipped variant by
+    /// [`WideVariantId::position_backing_bits`] and checks the max
+    /// [`position_footprint`](WideVariantId::position_footprint) size against a
+    /// per-backing ceiling — so growing any position's role array / inline state
+    /// past its geometry class's current widest fails here.
+    ///
+    /// Current measured maxima: u64 = 1528 (ai-wok), u128 = 2752 (cannonshogi),
+    /// U256 = 5168 (chu). Raise a ceiling only deliberately.
+    #[test]
+    fn per_backing_position_size_ceiling() {
+        // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
+        const CEILINGS: &[(u32, usize)] = &[(64, 1528), (128, 2752), (256, 5168)];
+        for &(bits, ceiling) in CEILINGS {
+            let mut max = 0usize;
+            let mut worst = "";
+            for &id in WideVariantId::ALL {
+                if id.position_backing_bits() != bits {
+                    continue;
+                }
+                let (size, _align) = id.position_footprint();
+                if size > max {
+                    max = size;
+                    worst = id.as_str();
+                }
+            }
+            assert!(
+                max <= ceiling,
+                "max {bits}-bit-backed position size = {max} ({worst}) exceeds the \
+                 {ceiling}-byte ceiling; a position over the {bits}-bit backing grew. \
+                 Bump the ceiling only deliberately (see docs/perf-regression.md)."
+            );
+        }
+        // Sanity: every backing bucket is actually populated, so a ceiling can
+        // never pass vacuously (e.g. if a backing's variants all disappeared).
+        for &(bits, _) in CEILINGS {
+            assert!(
+                WideVariantId::ALL
+                    .iter()
+                    .any(|id| id.position_backing_bits() == bits),
+                "no shipped variant uses the {bits}-bit backing; ceiling would be vacuous"
+            );
+        }
     }
 
     #[test]
