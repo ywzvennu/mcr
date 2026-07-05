@@ -147,6 +147,20 @@ macro_rules! wide_variants {
                     $( WideVariantId::$variant => $name, )+
                 }
             }
+
+            /// The `size_of` and `align_of`, in bytes, of this variant's concrete
+            /// [`GenericPosition`](super::GenericPosition) — the inline size the
+            /// matching [`AnyWideVariant`] arm holds (before the few widest arms
+            /// are boxed; see the enum's storage note). A static per-variant fact,
+            /// independent of any live position, so the memory-footprint benches
+            /// can report it across the whole registry without constructing one.
+            #[must_use]
+            pub const fn position_footprint(self) -> (usize, usize) {
+                match self {
+                    $( WideVariantId::$variant =>
+                        (core::mem::size_of::<$pos>(), core::mem::align_of::<$pos>()), )+
+                }
+            }
         }
 
         impl core::fmt::Display for WideVariantId {
@@ -237,6 +251,14 @@ macro_rules! wide_variants {
                 match self {
                     $( AnyWideVariant::$variant(_) => WideVariantId::$variant, )+
                 }
+            }
+
+            /// The `size_of` / `align_of` of the wrapped variant's concrete
+            /// [`GenericPosition`](super::GenericPosition), the forward of
+            /// [`WideVariantId::position_footprint`] for [`variant_id`](Self::variant_id).
+            #[must_use]
+            pub fn position_footprint(&self) -> (usize, usize) {
+                self.variant_id().position_footprint()
             }
 
             /// The wrapped variant's board dimensions `(width, height)` in
@@ -772,6 +794,29 @@ mod tests {
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
         assert_eq!(count, 69, "all 69 fairy variants are covered");
+    }
+
+    #[test]
+    fn position_footprint_reports_every_variant() {
+        for &id in WideVariantId::ALL {
+            let (size, align) = id.position_footprint();
+            assert!(size > 0, "{id} position has non-zero size");
+            assert!(align.is_power_of_two(), "{id} alignment is a power of two");
+            assert_eq!(size % align, 0, "{id} size is a multiple of its alignment");
+            // The static accessor agrees with the wrapped position's own size.
+            assert_eq!(
+                AnyWideVariant::startpos(id).position_footprint(),
+                (size, align),
+                "{id} instance footprint matches the id accessor"
+            );
+        }
+        // The U256-backed large-shogi boards are the widest positions and dwarf
+        // an 8x8 u64 arm.
+        assert!(
+            WideVariantId::Tenjiku.position_footprint().0
+                > WideVariantId::Seirawan.position_footprint().0,
+            "Tenjiku (16x16 U256) is larger than Seirawan (8x8 u64)"
+        );
     }
 
     #[test]
