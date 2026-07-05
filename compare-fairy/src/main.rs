@@ -80,6 +80,7 @@ mod variants;
 mod xboard;
 mod xiangfu;
 mod xiangqi;
+mod xiangqi_chase;
 
 use std::time::Instant;
 
@@ -96,6 +97,9 @@ struct Opts {
     full: bool,
     /// Run the differential fuzzer (issue #239) instead of the pinned corpus.
     difffuzz: bool,
+    /// Run the Xiangqi perpetual-chase cross-check (issue #475) instead of the
+    /// pinned corpus. Reuses `--seed` / `--games` / `--plies`.
+    xiangqi_chase: bool,
     /// Differential-fuzzer tunables (only meaningful when `difffuzz` is set).
     fuzz: difffuzz::Config,
     /// Run the HaChu large-shogi differential-oracle mode (issue #379) instead of
@@ -208,6 +212,26 @@ fn main() {
     // instead of the pinned corpus, and exit with its divergence count.
     if opts.difffuzz {
         let divergences = difffuzz::run(&mut engine, &located.bin, &opts.fuzz);
+        engine.quit();
+        if divergences > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // ---- Xiangqi perpetual-chase cross-check (issue #475) -----------------
+    // Node-for-node comparison of mcr's `chased()` port against FSF's `Chased:`
+    // display over seeded random Xiangqi games.
+    if opts.xiangqi_chase {
+        if let Ok(ini) = std::env::var("MCR_FSF_VARIANTS_INI") {
+            let _ = engine.load_variants(&ini);
+        }
+        let divergences = xiangqi_chase::run(
+            &mut engine,
+            opts.fuzz.seed,
+            opts.fuzz.games,
+            opts.fuzz.plies,
+        );
         engine.quit();
         if divergences > 0 {
             std::process::exit(1);
@@ -421,6 +445,7 @@ fn parse_args() -> Opts {
         build: false,
         full: false,
         difffuzz: false,
+        xiangqi_chase: false,
         fuzz: difffuzz::Config::default(),
         hachu: false,
         build_hachu: false,
@@ -436,6 +461,7 @@ fn parse_args() -> Opts {
                 o.build_hachu = true;
             }
             "--difffuzz" | "--fuzz" => o.difffuzz = true,
+            "--xiangqi-chase" => o.xiangqi_chase = true,
             "--seed" => o.fuzz.seed = parse_value(&mut args, "--seed", parse_seed),
             "--games" => o.fuzz.games = parse_value(&mut args, "--games", |s| s.parse().ok()),
             "--plies" => o.fuzz.plies = parse_value(&mut args, "--plies", |s| s.parse().ok()),
