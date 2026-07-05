@@ -1,120 +1,126 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to `mcr` are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
+**Status: in development — unversioned, not released.** `mcr` has never been
+published to crates.io and carries no version tag: the crate is `version =
+"0.0.0"` and `publish = false`. There are no release sections below; this file
+is a single running log of the current surface and recent changes. Depend on it
+from git, not a version number. A version and a `CHANGELOG` split into releases
+will come only when the API is deliberately frozen for a first release.
 
-**Status: 0.x — pre-1.0.** Under SemVer's 0.x rules a minor bump (`0.y`) may
-carry breaking changes; patch bumps (`0.y.z`) stay API-compatible. The public
-API is still maturing toward 1.0.
+The library is a clean-room chess **move-generation and rules library** at
+Fairy-Stockfish parity — rules and move generation only. There is **no search,
+no evaluation, no GUI, and no network play**; it is the foundation such tools
+build on, not one of them.
 
-## [Unreleased]
+## In development
 
-- Further engine milestones (M11–M13) are in progress and will land in later
-  releases; this section collects changes since 0.3.0.
-- **Chancellor chess** (`chancellor`) — standard western chess on a 9×9 board
-  (a new `Chess9x9` geometry) with a Rook + Knight Chancellor added to each back
-  rank, promotion including the Chancellor. Move generation verified node-for-node
-  against Fairy-Stockfish (`UCI_Variant chancellor`).
+### Variants
 
-## [0.3.0] — 2026-06-30
-
-First crates.io-ready release. `mcr` is a clean-room chess **move-generation and
-rules library** at Fairy-Stockfish parity — there is no search or evaluation,
-no GUI, and no network play. Highlights of the shipped surface:
-
-### Fairy-variant geometry layer
-
-- **47 fairy / pychess-class variants** on a parallel generic geometry layer
-  (`mcr::geometry`): `GenericPosition<G, V>` over a compile-time
-  `Geometry`-parametrised `Bitboard<G>` / `Square<G>`, with a per-variant
-  `WideVariant` rule layer. Boards span 3×4 up to 10×10 — Xiangqi, Shogi (and
-  Mini/Kyoto/Tori/Dobutsu/Gorogoro lines), Makruk, Capablanca, Grand, Shako,
-  Janggi, Seirawan, Spartan, Duck, Fog-of-War, and many more.
-- Runtime dispatch through `AnyWideVariant` / `WideVariantId`, alongside the
-  concrete-engine `AnyVariant` / `VariantId`.
-- Move generation verified node-for-node against
+- **79 registered variants** across two layers (the exhaustive, always-in-sync
+  list is generated into [`docs/variants.md`](docs/variants.md)):
+  - **9 on the concrete 8×8 engine** (`mcr::AnyVariant` / `VariantId`): standard
+    chess, Chess960, King of the Hill, Three-check, Racing Kings, Atomic,
+    Antichess, Horde, Crazyhouse.
+  - **~70 on the generic geometry layer** (`mcr::geometry`, `AnyWideVariant` /
+    `WideVariantId`): the Xiangqi/Janggi/Jieqi/Minixiangqi cannon family; the
+    Shogi family (Shogi, Mini/Sho/Tori/Kyoto/Dobutsu/Gorogoro+/EuroShogi/
+    Checkshogi/Cannon Shogi and the large shogis **Chu**, **Dai**, **Tenjiku**);
+    Makruk and cousins (Sittuyin, Cambodian/Ouk, ASEAN, Makpong, Karouk,
+    Ai-Wok); the Capablanca family (Capablanca, Grand, Gothic/Embassy/Janus,
+    Almost, Amazon, Chigorin, Seirawan, Grandhouse, Capahouse, S-House,
+    Chancellor 9×9); the pychess armies (Orda, Synochess, Shinobi, Ordamirror,
+    Empire, Khan's, Mansindam, Chak, Xiang Fu); Shatar, Shatranj, Dragon,
+    Knightmate, Hoppel-Poppel, Manchu, Shogun, Chennis, Courier, Centaur,
+    Caparandom, Placement, Judkins, Micro; and the imperfect-information /
+    standalone specials Alice, Fog of War, Bughouse, Duck, and Ataxx.
+- Board geometries from **3×4 up to 16×16** (Tenjiku fills a 256-square U256
+  board exactly); an 8-bit role field (wire-format v2) accommodates the
+  large-shogi piece sets.
+- **Validation:** move generation is verified node-for-node against
   [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish) where an
-  oracle exists, with the confirmed perft counts pinned in the test suite.
-- `make`/`unmake` (undo) on the wide hot path, incremental Zobrist hashing, and
-  a stable position key for the geometry layer.
-- SAN / UCI / PGN notation for the fairy geometry layer.
-- Draw, repetition, and adjudication rules wired through the wide layer.
-- **Ataxx** — a self-contained 7×7 stones game (clone / jump / flip), exposed
-  via the `ataxx` module; not a chess variant.
+  oracle exists, against **HaChu** source tables for the large shogis (which FSF
+  cannot run), and by hand-derived/brute-force means for the specials
+  (Alice, Fog of War, Bughouse, Jieqi, Ataxx). All confirmed perft counts are
+  pinned in the test suite.
+- **Known modeling approximations** (documented in each variant's module docs):
+  Tenjiku's Fire Demon area-burn/igui and the jump-capturing Generals'
+  jump-over-and-capture are not modeled (they cannot be packed into the current
+  `WideMove`); Janggi implements a faithful subset of the perpetual-chase rule.
 
-### Core & rules
+### Core & rules (concrete 8×8)
 
-- Board-geometry primitives: `Color`, `Role`, `Piece`, `File`, `Rank`,
-  `Square`, the `Bitboard` set type, and the `Board` piece-placement type.
-- A full standard-chess `Position` with legal move generation, in-place
-  `play_unchecked` / immutable `play`, six-field FEN, and UCI.
-- Perft node counters (`perft`, `perft_divide`), verified against published
-  reference counts and an independent engine.
-- Standard algebraic notation (SAN): `Position::san` / `parse_san`.
+- Board-geometry primitives — `Color`, `Role`, `Piece`, `File`, `Rank`,
+  `Square`, the `Bitboard` set type, the `Board` piece-placement type.
+- A full standard-chess `Position`: legal move generation, in-place
+  `play_unchecked` / immutable `play`, six-field FEN, UCI.
+- Perft node counters (`perft`, `perft_divide`) verified against published
+  reference counts and an independent generator.
+- Standard algebraic notation — `Position::san` / `parse_san`.
 - Incremental `Zobrist` hashing.
-- Game outcomes and draw detection: `Outcome`, precise `EndReason` labels,
-  repetition tracking, and the move-validating `Game` driver.
-- Eight perft-verified concrete-engine variants — Chess960, King of the Hill,
-  Three-check, Racing Kings, Atomic, Antichess, Horde, and Crazyhouse — as
-  `VariantPosition` types and through `AnyVariant` / `VariantId`, built on a
-  `Variant` trait with hooks for terminal conditions, legality, captures,
-  drops, FEN, and hashing.
+- Outcomes and draw detection — `Outcome`, precise `EndReason` labels, threefold/
+  fivefold repetition, fifty/seventy-five-move rules, insufficient material, and
+  the move-validating `Game` driver.
 
-### Formats & ecosystem
+### Notation & formats
 
-- Board-geometry primitives: `Color`, `Role`, `Piece`, `File`, `Rank`,
-  `Square`, the `Bitboard` set type, and the `Board` piece-placement type.
-- A full standard-chess `Position` with legal move generation, in-place
-  `play_unchecked` / immutable `play`, six-field FEN, and UCI.
-- Perft node counters (`perft`, `perft_divide`), verified against published
-  reference counts and an independent engine.
-- Standard algebraic notation (SAN): `Position::san` / `parse_san`.
-- Incremental `Zobrist` hashing.
-- Game outcomes and draw detection: `Outcome`, precise `EndReason` labels,
-  repetition tracking, and the move-validating `Game` driver.
+- SAN / UCI / PGN for both the concrete engine and the fairy geometry layer,
+  with lossless round-trip coverage across every variant.
+- Polyglot (`.bin`) opening-book reading (`book` module): the standard Polyglot
+  Zobrist key (`polyglot_key`), a `Book` reader with binary-search `lookup`,
+  move decoding (incl. the castling-as-king-takes-rook quirk and promotions),
+  and a `weighted_pick` helper.
+- EPD parsing/serialization and an EPD/perft suite runner.
+- Optional `serde` (behind the `serde` feature): public value types gain
+  `Serialize`/`Deserialize`; `Position`/`Board` round-trip as FEN and
+  `AnyVariant` as a `{ variant, fen }` pair.
 
-### Formats & ecosystem
+### Bindings & reach
 
-- Polyglot (`.bin`) opening-book reading in the `book` module: the standard
-  Polyglot Zobrist key (`polyglot_key`, separate from the internal `Zobrist`),
-  a `Book` reader (`from_bytes`, and `open` behind the `book` feature) with
-  binary-search `lookup`, Polyglot move decoding (`decode_move`, including the
-  castling-as-king-takes-rook quirk and promotions), and a `weighted_pick`
-  helper.
-- EPD and PGN parsing/serialization.
-- Optional `serde` support (behind the `serde` feature): the public value types
-  gain `Serialize` / `Deserialize`, with `Position` / `Board` round-tripping as
-  FEN and `AnyVariant` as a `{ variant, fen }` pair.
-- WASM, Python, and C-FFI bindings (in the sibling `bindings/` crates, not part
-  of the published library crate).
+- WASM, Python (pyo3), and C-FFI bindings in the sibling `bindings/` crates
+  (not part of the library crate), each under CI (build + smoke tests +
+  cbindgen header-drift check).
+- `no_std` (+`alloc`) support for the core and variants; a `mcr-uci` variant
+  perft/divide adapter binary; optional `rayon` parallel perft.
 
 ### Performance
 
 - Stack-allocated `MoveList`, allocation-free perft, packed 16-bit `Move`,
   compact `Position`, fast-legality generators for every variant, perft bulk
   leaf-counting, and bulk bitboard-shift pawn/king-danger generation.
-- Generic large-board engine (`GenericPosition<G, V>`) tuning: a stack-backed
-  reusable move buffer with allocation-free perft, perft bulk leaf-counting on
-  the standard single-king path (population counts in place of materialised move
-  lists), a scan-free make-move board mutation, closed-form / fill-based slider
-  line masks in place of per-square ray walks, and an inline pin set. The large
-  board variants stay perft byte-identical while running materially faster — the
-  10×8 Capablanca / 10×10 Grand / Shako hot paths.
-- Optional `magic` cargo feature: magic-bitboard sliders (default build keeps
+- Generic large-board engine tuning: a stack-backed reusable move buffer,
+  allocation-free perft, bulk leaf-counting, scan-free make-move mutation,
+  closed-form slider line masks, and an inline pin set — large boards stay perft
+  byte-identical while running materially faster. `AnyWideVariant` boxes only the
+  U256 (large-shogi) arm to keep its footprint small.
+- Optional `magic` cargo feature: magic-bitboard sliders (the default build keeps
   the lean hyperbola tables). With `magic`, move generation outperforms the
-  reference engine on every variant while the default build stays the leaner of
-  the two.
+  reference engine on every variant while the default build stays the leaner.
 
-### Tooling
+### Tooling & validation
 
-- criterion benchmarks; cargo-fuzz targets (FEN, UCI, SAN, movegen); a
-  comprehensive mcr-vs-reference comparison harness (CPU, memory, and
-  multi-hundred-position parity) and a Fairy-Stockfish differential harness,
-  both kept in separate, non-published crates. The GPL-fenced comparison crates
-  (`compare`, `compare-fairy`) and the `fuzz` targets are excluded from the
-  published package.
+- criterion benchmarks (incl. large-board U256 perft + `size_of` footprint);
+  cargo-fuzz targets (FEN, UCI, SAN, movegen, and wide-layer variants);
+  property tests across all wide variants (FEN/make-unmake/perft-children/
+  legal⊆pseudo-legal invariants).
+- A comprehensive mcr-vs-reference comparison harness (CPU, memory, multi-hundred
+  position parity) and a Fairy-Stockfish / HaChu differential harness — both in
+  separate, GPL-fenced, non-published crates (`compare`, `compare-fairy`),
+  excluded from the package alongside `fuzz`.
+- CI: fmt, clippy (`-D warnings`), the doc-gate, a scheduled rotating-seed
+  differential fuzzer, an enforcing `cargo-mutants` gate over `src/board.rs`, and
+  a line-coverage floor.
 
-[Unreleased]: https://github.com/ywzvennu/mcr/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/ywzvennu/mcr/releases/tag/v0.3.0
+### Recent notable additions
+
+- Large shogis **Dai** (15×15) and **Tenjiku** (16×16), validated against HaChu
+  source tables; the 8-bit role field / wire-format v2 that they required.
+- Western/regional long-tail: **Chancellor** (9×9), **Courier** (12×8),
+  **Caparandom**, **Centaur**, **Karouk** & **Ai-Wok**, **Judkins** (6×6) &
+  **Micro** (4×5) shogi, **EuroShogi** & **Checkshogi**, the Capablanca-family
+  **Almost/Amazon/Gothic/Embassy/Janus/Chigorin**.
+- Correctness fixes surfaced by the differential fuzzer / property tests /
+  variant audits: Synochess flying-general blocker handling, Wa/Tori pinned-leaper
+  check-evasion, S-House double-check gating, and notation round-trip
+  disambiguation for promoted/overflow-role drops.
