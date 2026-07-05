@@ -271,6 +271,43 @@ impl Engine {
         }
     }
 
+    /// Query the `chased` victim set (Fairy-Stockfish `st->chased`) after playing
+    /// `mv` from `fen`: sets the position + move, runs `d`, and parses the
+    /// `Chased: <sq> <sq> …` line into a sorted list of FSF square names. An
+    /// `isready`/`readyok` round-trip terminates the `d` block deterministically.
+    ///
+    /// Returns an empty vector when the `Chased:` line is empty (no chase).
+    pub fn chased(&mut self, fen: &str, mv: &str) -> Result<Vec<String>, String> {
+        self.send(&format!("position fen {fen} moves {mv}"))?;
+        self.send("d")?;
+        self.send("isready")?;
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let mut chased: Option<Vec<String>> = None;
+        loop {
+            if Instant::now() > deadline {
+                return Err("timed out waiting for \"readyok\" after `d`".to_string());
+            }
+            let mut line = String::new();
+            let n = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|e| format!("read failed: {e}"))?;
+            if n == 0 {
+                return Err("engine closed stdout during `d`".to_string());
+            }
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix("Chased:") {
+                let mut squares: Vec<String> =
+                    rest.split_whitespace().map(str::to_string).collect();
+                squares.sort();
+                chased = Some(squares);
+            }
+            if trimmed == "readyok" {
+                return Ok(chased.unwrap_or_default());
+            }
+        }
+    }
+
     /// Best-effort clean shutdown: send `quit` and reap the child.
     pub fn quit(mut self) {
         let _ = self.send("quit");

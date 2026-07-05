@@ -30,25 +30,38 @@
 //!
 //! Xiangqi additionally forbids perpetual **chase**
 //! ([`perpetual_chase_loses`](WideVariant::perpetual_chase_loses), the AXF rule):
-//! a side that, on **every** one of its moves through the repeated cycle, makes a
-//! qualifying *chase* — a fresh attack on an enemy piece that is either left
-//! **unprotected** or is **value-superior** to the attacker (a Horse / Cannon
-//! attacking a Chariot, or an Elephant / Advisor attacking a Chariot / Cannon /
-//! Horse) — loses, exactly as a perpetual checker does. Perpetual check is scored
-//! first; a mutual perpetual (both sides) is a draw. Otherwise the repetition is
-//! the ordinary [`repetition_draw_reason`](WideVariant::repetition_draw_reason)
+//! a side that chases *one and the same* enemy piece on **every** one of its moves
+//! through the repeated cycle loses, exactly as a perpetual checker does. A *chase*
+//! is a fresh attack on an enemy piece that is either left **unprotected** or is
+//! **value-superior** to the attacker (a Horse / Cannon attacking a Chariot, or an
+//! Elephant / Advisor attacking a Chariot / Cannon / Horse). Perpetual check is
+//! scored first; a mutual perpetual (both sides) is a draw. Otherwise the repetition
+//! is the ordinary [`repetition_draw_reason`](WideVariant::repetition_draw_reason)
 //! draw (Sennichite for Shogi, Repetition elsewhere).
 //!
-//! The chase detector reproduces Fairy-Stockfish's **direct-attack** chase
-//! (`Position::chased`): the moved piece's new attacks, the King / Soldier and
-//! same-type-mutual exclusions, the Rook / Cannon "attack along the moved line is
-//! not new" exclusion, the value-superior tiers, and the unprotected-victim test
-//! (defenders recomputed with the attacker lifted off the board). It is a faithful
-//! **subset**: it does not model FSF's discovered-attack chases, the impaired-horse
-//! and flying-general-pin refinements, or the exact single-victim identity tracked
-//! across the cycle (mcr instead requires a qualifying chase on **every** cycle
-//! ply, the same structural rule as perpetual check). These cover the dominant
-//! cases (a Chariot/Horse/Cannon harrying one piece) and agree with FSF on them.
+//! The detector ports Fairy-Stockfish's `Position::chased`. Modelled: the moved
+//! piece's **direct** new attacks *and* **discovered** attacks (vacating the origin
+//! unhobbles a Horse / opens an Elephant eye / extends a Chariot or Cannon line;
+//! filling the destination hands a Cannon a fresh screen); the King / Soldier and
+//! same-type-mutual exclusions, the latter with its **pinned-victim** and
+//! **impaired-horse** exceptions; the Rook / Cannon "attack along the moved line is
+//! not new" exclusion; the value-superior tiers; and the unprotected-victim test
+//! with **pinned defenders discounted**, the **flying-general pin**, and the
+//! flying-general king-recapture exception. Across the cycle the specific chased
+//! victim is tracked **per identity** — the intersection of the per-ply chased sets,
+//! each rewound through the intervening move (FSF `undo_move_board`) — so harrying a
+//! *different* piece each ply is not a perpetual chase.
+//!
+//! Two FSF details remain **unmodelled**, both strictly **conservative** (they only
+//! ever add chases FSF sees, so mcr under-reports and never produces a false chase
+//! loss): FSF keeps river-**crossed Soldiers** as chase victims (mcr excludes all
+//! Soldiers); and FSF's `pliesFromNull > 0` block — "fake roots" (a victim whose
+//! defender was pinned *this* move) and discovered *checks* that chase via the enemy
+//! General — needs the previous ply's king-blocker set, which this single-position
+//! query does not carry. Cross-checked node-for-node against the FSF binary's
+//! `chased()` (`Chased:` display) over thousands of random Xiangqi positions:
+//! agreement is otherwise exact, and every divergence is one of these two documented
+//! under-reports — never a false positive.
 //!
 //! # Attack repetition (Chu / Dai large shogi)
 //!
@@ -118,8 +131,13 @@ use crate::Color;
 pub const COUNTING_LIMIT_PLIES: u16 = 128;
 
 /// One recorded position in a [`GenericGame`]'s history.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct HistoryEntry {
+///
+/// Generic in `G` only because of the Xiangqi perpetual-**chase** fields
+/// ([`chased`](Self::chased) / [`chase_move`](Self::chase_move)), which record the
+/// per-ply victim set and move needed to track a *single victim's identity across
+/// the cycle* the way Fairy-Stockfish's `is_optional_game_end` does. Every other
+/// history-dependent rule reads only the scalar fields.
+struct HistoryEntry<G: Geometry> {
     /// The position's [`repetition_key`](GenericPosition::repetition_key).
     key: u64,
     /// The side to move at this position.
@@ -133,12 +151,49 @@ struct HistoryEntry {
     /// large-shogi [attack](WideVariant::attack_repetition_loses) on any non-royal
     /// enemy piece. Read back by the perpetual-chase / attack-repetition
     /// adjudication. Always `false` for the seed entry and for variants with neither
-    /// chase model.
+    /// chase model. For the Xiangqi chase this is exactly `!chased.is_empty()`.
     chase: bool,
+    /// Xiangqi perpetual chase (FSF `st->chased`): the set of enemy squares the move
+    /// that produced this position **chased** — a fresh value/protection attack on a
+    /// non-royal enemy piece. Empty for the seed, for non-chase variants, and for the
+    /// Chu/Dai attack model (which reads only [`chase`](Self::chase)). Carried so the
+    /// perpetual-chase adjudication can intersect the chased sets *of the same
+    /// physical victim* down the repeated cycle (per-victim identity).
+    chased: Bitboard<G>,
+    /// The move `(from, to)` (as square indices) that produced this position, or
+    /// `None` for the seed. Used to *rewind* a [`chased`](Self::chased) set across the
+    /// cycle (FSF `undo_move_board`) so a fleeing victim is followed as one piece.
+    /// Recorded only for the Xiangqi chase model; `None` otherwise.
+    chase_move: Option<(u8, u8)>,
     /// Whether the two generals **face** each other in this position (Janggi
     /// bikjang). Always `false` for variants without
     /// [`has_bikjang`](WideVariant::has_bikjang).
     facing: bool,
+}
+
+// Manual `Copy`/`Clone`/`Debug` (rather than `derive`) so the impls stay
+// unconditional in `G` — mirroring [`Bitboard`]/[`Square`] — and never leak a
+// spurious `G: Debug`/`G: Clone` bound onto [`GenericGame`].
+impl<G: Geometry> Copy for HistoryEntry<G> {}
+impl<G: Geometry> Clone for HistoryEntry<G> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<G: Geometry> core::fmt::Debug for HistoryEntry<G> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("HistoryEntry")
+            .field("key", &self.key)
+            .field("turn", &self.turn)
+            .field("in_check", &self.in_check)
+            .field("chase", &self.chase)
+            // `Bitboard<G>: Debug` needs `G::Bits: Debug`; print the victim count so
+            // this impl stays unconditional in `G`.
+            .field("chased_count", &self.chased.count())
+            .field("chase_move", &self.chase_move)
+            .field("facing", &self.facing)
+            .finish()
+    }
 }
 
 /// The Makruk / Cambodian / ASEAN counting state, mirroring Fairy-Stockfish's two
@@ -181,7 +236,7 @@ pub struct GenericGame<G: Geometry, V: WideVariant<G>> {
     position: GenericPosition<G, V>,
     /// The recorded history (oldest first, current last); empty unless the variant
     /// tracks repetition.
-    history: Vec<HistoryEntry>,
+    history: Vec<HistoryEntry<G>>,
     /// The counting state (Makruk / Cambodian / ASEAN); inert (`limit == 0`) unless
     /// the variant counts and a triggering position has been reached.
     counting: Counting,
@@ -210,6 +265,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 turn: position.turn(),
                 in_check: position.is_check(),
                 chase: false,
+                chased: Bitboard::EMPTY,
+                chase_move: None,
                 facing: V::has_bikjang() && position.is_facing_generals(),
             });
         }
@@ -269,12 +326,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             self.key ^= self.position.zobrist_board_delta(&undo)
                 ^ old_state
                 ^ self.position.zobrist_state_part();
-            // The `chase` flag records, per ply, the qualifying repetition-attack for
-            // whichever chase model this variant uses (a variant enables at most one):
-            // the Xiangqi value/protection chase, or the Chu/Dai large-shogi "attacks
-            // any non-royal" test.
+            // The `chase` flag (and, for the Xiangqi chase, the `chased` victim set)
+            // records, per ply, the qualifying repetition-attack for whichever chase
+            // model this variant uses (a variant enables at most one): the Xiangqi
+            // value/protection chase, or the Chu/Dai large-shogi "attacks any
+            // non-royal" test.
+            let (chased, chase_move) = if V::perpetual_chase_loses() {
+                let from = mv.from::<G>();
+                let to = mv.to::<G>();
+                // A capture leaves `to` occupied both before and after the move; used
+                // only to reconstruct the pre-move occupancy for discovered attacks.
+                let captured = before.role_at(to).is_some();
+                let chased = Self::chase_targets(&self.position, from, to, captured)
+                    .unwrap_or(Bitboard::EMPTY);
+                (chased, Some((from.index(), to.index())))
+            } else {
+                (Bitboard::EMPTY, None)
+            };
             let chase = if V::perpetual_chase_loses() {
-                Self::chase_targets(&self.position, mv.from::<G>(), mv.to::<G>()).is_some()
+                !chased.is_empty()
             } else if V::attack_repetition_loses() {
                 Self::attacks_nonroyal(&self.position, mv.to::<G>())
             } else {
@@ -285,6 +355,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
                 turn: self.position.turn(),
                 in_check: self.position.is_check(),
                 chase,
+                chased,
+                chase_move,
                 facing: V::has_bikjang() && self.position.is_facing_generals(),
             });
         } else {
@@ -304,6 +376,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
             return 0;
         }
         self.history.iter().filter(|e| e.key == self.key).count()
+    }
+
+    /// The enemy squares the **last move chased** — the Xiangqi perpetual-chase
+    /// victim set (Fairy-Stockfish `st->chased`): a fresh value/protection attack on
+    /// a non-royal enemy piece made by the side that just moved. Empty at the seed
+    /// position and for every variant without
+    /// [`perpetual_chase_loses`](WideVariant::perpetual_chase_loses).
+    ///
+    /// Exposed for analysis and for the Fairy-Stockfish chase cross-check; the
+    /// perpetual-chase adjudication consumes the same per-ply sets internally.
+    #[must_use]
+    pub fn chased_squares(&self) -> Vec<Square<G>> {
+        match self.history.last() {
+            Some(entry) => entry.chased.into_iter().collect(),
+            None => Vec::new(),
+        }
     }
 
     /// A stable 64-bit **Zobrist** position key for the current position — the same
@@ -453,41 +541,88 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         Some((V::repetition_draw_reason(), WideOutcome::Draw))
     }
 
-    /// The side that delivered a qualifying **chase** on **every** one of its moves
-    /// through the repeated cycle starting at `first` (the perpetual chaser), if
-    /// exactly one side did. The structural analogue of [`perpetual_checker`]: a
-    /// move made at position `i` chased iff the position at `i + 1` carries the
-    /// `chase` flag.
+    /// The **perpetual chaser** across the repeated cycle starting at `first` — the
+    /// side that chases *one and the same enemy piece* on **every** one of its moves
+    /// through the cycle — if exactly one side does; else `None` (a mutual chase or no
+    /// clean chase falls back to the repetition draw). The chaser loses.
+    ///
+    /// This mirrors Fairy-Stockfish's `is_optional_game_end` chase test rather than
+    /// the every-ply structural analogue of [`perpetual_checker`]. The distinction is
+    /// **per-victim identity**: FSF intersects the per-ply [`chased`](HistoryEntry::chased)
+    /// victim sets down the cycle, *rewinding* each through the intervening victim
+    /// move (`undo_move_board`) so a fleeing piece is followed as one identity. A side
+    /// that harries a *different* piece on each ply is therefore **not** a perpetual
+    /// chaser (mcr previously required only *some* chase on every ply, an over-broad
+    /// test that could adjudicate such a cycle as a loss). Intersecting sets can only
+    /// shrink the positive set, so this never introduces a new chase loss — it removes
+    /// the spurious multi-victim ones.
     ///
     /// [`perpetual_checker`]: Self::perpetual_checker
     fn perpetual_chaser(&self, first: usize) -> Option<Color> {
         let h = &self.history;
         let last = h.len() - 1;
-        let mut white_moves = 0u32;
-        let mut black_moves = 0u32;
-        let mut white_all_chase = true;
-        let mut black_all_chase = true;
-        for i in first..last {
-            let chased = h[i + 1].chase;
-            match h[i].turn {
-                Color::White => {
-                    white_moves += 1;
-                    white_all_chase &= chased;
-                }
-                Color::Black => {
-                    black_moves += 1;
-                    black_all_chase &= chased;
-                }
-            }
-        }
-        let white_perp = white_moves > 0 && white_all_chase;
-        let black_perp = black_moves > 0 && black_all_chase;
-        match (white_perp, black_perp) {
-            (true, false) => Some(Color::White),
-            (false, true) => Some(Color::Black),
-            // Neither chased throughout, or (a mutual chase) both did: not a clean
-            // perpetual chase — fall back to the ordinary repetition draw.
+        // The cycle spans `[first, last]` with `h[first]` and `h[last]` the same
+        // position (equal keys, so the same side to move) and an even number of plies
+        // between them. `stm` is that shared side to move; its opponent made the moves
+        // whose `chased` sets sit at the indices sharing `last`'s parity.
+        let stm = h[last].turn;
+        // The opponent (`~stm`) chases `stm`'s pieces on the plies at `last`'s parity
+        // (down to `first`); `stm` chases `~stm`'s pieces on the interleaving plies
+        // (down to `first + 1`). Each is the running intersection of the per-ply
+        // victim sets, rewound to a common frame — non-empty iff one victim was chased
+        // throughout.
+        let them_chase = self.cycle_chase(last, first);
+        let us_chase = self.cycle_chase(last - 1, first + 1);
+        let them = !them_chase.is_empty();
+        let us = !us_chase.is_empty();
+        match (them, us) {
+            // Only `~stm` (the opponent) kept chasing a fixed `stm` victim: `~stm` is
+            // the perpetual chaser and loses.
+            (true, false) => Some(stm.opposite()),
+            // Only `stm` kept chasing a fixed `~stm` victim: `stm` is the chaser.
+            (false, true) => Some(stm),
+            // Neither, or a mutual chase (both): fall back to the repetition draw.
             _ => None,
+        }
+    }
+
+    /// The intersection of the `chased` victim sets at plies `start, start - 2, …,
+    /// stop` (same parity), each **rewound** to `stop`'s frame through the victim
+    /// moves that separate consecutive terms — Fairy-Stockfish's per-victim
+    /// `undo_move_board(chased, move) & earlier_chased` accumulation.
+    ///
+    /// Between a chased ply `j` and the previous same-parity chased ply `j - 2` the
+    /// victim side made exactly one move, `h[j - 1].chase_move`; undoing it carries a
+    /// fleeing victim's square back one frame so it lines up with `h[j - 2].chased`.
+    /// A non-empty result names the victim(s) chased on *every* term as one identity.
+    fn cycle_chase(&self, start: usize, stop: usize) -> Bitboard<G> {
+        let h = &self.history;
+        let mut acc = h[start].chased;
+        let mut j = start;
+        while j >= stop + 2 {
+            acc = Self::undo_move_board(acc, h[j - 1].chase_move) & h[j - 2].chased;
+            if acc.is_empty() {
+                break;
+            }
+            j -= 2;
+        }
+        acc
+    }
+
+    /// Rewind a set of victim squares back across one move (Fairy-Stockfish's
+    /// `undo_move_board`): a bit sitting on the move's destination is the piece that
+    /// just moved, so send it back to the origin; every other bit is untouched. `None`
+    /// (the seed's absent move) is the identity.
+    fn undo_move_board(bb: Bitboard<G>, mv: Option<(u8, u8)>) -> Bitboard<G> {
+        let Some((from, to)) = mv else {
+            return bb;
+        };
+        let to_sq = Square::<G>::new(to);
+        if bb.contains(to_sq) {
+            let from_sq = Square::<G>::new(from);
+            (bb ^ Bitboard::from_square(to_sq)) | Bitboard::from_square(from_sq)
+        } else {
+            bb
         }
     }
 
@@ -581,56 +716,248 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
 
     /// The set of enemy squares the move `from -> to` (made in the position
     /// **before** `pos`, leaving `pos` with the chaser **not** to move) newly
-    /// **chases**, or `None` if it chases nothing — a faithful subset of
-    /// Fairy-Stockfish's `Position::chased` (direct attacks only).
+    /// **chases**, or `None` if it chases nothing — mcr's port of Fairy-Stockfish's
+    /// `Position::chased`. `captured` is whether the move captured (needed only to
+    /// reconstruct the pre-move occupancy for discovered attacks).
     ///
     /// `pos` is the position **after** the move: its side to move
     /// ([`turn`](GenericPosition::turn)) is the chased side (FSF `sideToMove`); the
-    /// chaser is the side that just moved. A chase is a *new* attack by the moved
-    /// piece on an enemy piece that is not a General or Soldier, is not of the moved
-    /// piece's own type, and is either **value-superior** to the attacker or left
-    /// **unprotected**.
+    /// chaser is the side that just moved. A chase is a *new* attack — **direct** (by
+    /// the moved piece) or **discovered** (unveiled by vacating `from`, or, for a
+    /// Cannon, by filling `to` with a fresh screen) — on an enemy piece that is not a
+    /// General or Soldier, is not a symmetric same-type attack, and is either
+    /// **value-superior** to the attacker or left **unprotected**.
+    ///
+    /// ## Fidelity vs FSF `chased()`
+    ///
+    /// Modelled: direct + discovered attacks; the stronger-piece value tiers; the
+    /// unprotected-victim test with **pinned defenders discounted** and the
+    /// **flying-general** king-recapture exception; the **flying-general pin**; and
+    /// the same-type exclusion with its **pinned-victim** and **impaired-horse**
+    /// exceptions. **Not** modelled (documented, conservative — they only ever *add*
+    /// FSF chases, so mcr under-reports rather than over-reports): FSF keeps
+    /// river-crossed Soldiers as victims (mcr excludes all Soldiers); and FSF's
+    /// `pliesFromNull > 0` block — "fake roots" (a victim newly pinned this move) and
+    /// discovered *checks* creating a chase via the enemy General — needs the previous
+    /// ply's king-blocker set, which this single-position query does not carry.
     fn chase_targets(
         pos: &GenericPosition<G, V>,
         from: Square<G>,
         to: Square<G>,
+        captured: bool,
     ) -> Option<Bitboard<G>> {
         let board = pos.board();
         let victims = pos.turn();
         let mover = victims.opposite();
-        let moved_role = board.role_at(to)?;
-        // Only non-King, non-Soldier movers create a direct chase (FSF).
-        if matches!(moved_role, WideRole::King | WideRole::Soldier) {
-            return None;
-        }
         let occ = board.occupied();
-        let mut attacks = V::role_attacks(moved_role, mover, to, occ) & board.by_color(victims);
-        // A Chariot / Cannon attack *along the moved line* is not a new attack.
-        if matches!(moved_role, WideRole::Rook | WideRole::Cannon) {
-            attacks &= !Self::move_line_mask(from, to);
-        }
-        // Exclude the enemy General and Soldiers (and so any check on the General).
-        attacks &=
-            !(board.pieces(victims, WideRole::King) | board.pieces(victims, WideRole::Soldier));
-        // A piece attacking an enemy piece of its **own** type is a mutual /
-        // symmetric attack, not a chase.
-        attacks &= !board.pieces(victims, moved_role);
 
-        let occ_without_attacker = occ ^ Bitboard::from_square(to);
-        let mut result = Bitboard::EMPTY;
-        for s in attacks {
-            let Some(victim_role) = board.role_at(s) else {
-                continue;
-            };
-            if Self::is_superior_chase(moved_role, victim_role)
-                || pos
-                    .attackers_to(s, victims, occ_without_attacker)
-                    .is_empty()
-            {
-                result |= Bitboard::from_square(s);
+        // Pinned victims: absolutely pinned to their own General, plus the
+        // flying-general pin (a lone victim piece sharing the chaser General's file
+        // with its own General is pinned by the threat of the generals facing).
+        let mut pins = pos.pinned_pieces(victims);
+        if V::has_flying_general() {
+            if let Some(chaser_king) = board.king_of(mover) {
+                let file_pieces = Self::file_mask(chaser_king.file()) & board.by_color(victims);
+                let victim_king = board.pieces(victims, WideRole::King);
+                let non_king = file_pieces & !victim_king;
+                if !(file_pieces & victim_king).is_empty() && non_king.count() <= 1 {
+                    pins |= non_king;
+                }
             }
         }
+
+        let mut result = Bitboard::EMPTY;
+
+        // Direct attacks by the moved piece (a General or Soldier never creates one).
+        if let Some(moved_role) = board.role_at(to) {
+            if !matches!(moved_role, WideRole::King | WideRole::Soldier) {
+                let mut attacks =
+                    V::role_attacks(moved_role, mover, to, occ) & board.by_color(victims);
+                // A Chariot / Cannon attack *along the moved line* is not a new attack.
+                if matches!(moved_role, WideRole::Rook | WideRole::Cannon) {
+                    attacks &= !Self::move_line_mask(from, to);
+                }
+                Self::add_chased(
+                    pos,
+                    victims,
+                    pins,
+                    occ,
+                    to,
+                    moved_role,
+                    attacks,
+                    &mut result,
+                );
+            }
+        }
+
+        // Discovered attacks: vacating `from` can unhobble a chaser Horse whose leg was
+        // `from`, open an Elephant eye, or extend a Chariot / Cannon line; filling `to`
+        // can hand a Cannon a fresh screen. Only genuinely *new* attacks count.
+        let occ_before = Self::occupancy_before(occ, from, to, captured);
+        let rays_from = V::role_attacks(WideRole::Rook, mover, from, Bitboard::EMPTY);
+        let rays_to = V::role_attacks(WideRole::Rook, mover, to, Bitboard::EMPTY);
+        let candidates = (Self::orthogonal_neighbors(from) & board.pieces(mover, WideRole::Horse))
+            | (Self::diagonal_neighbors(from) & board.pieces(mover, WideRole::XiangqiElephant))
+            | (rays_from
+                & (board.pieces(mover, WideRole::Cannon) | board.pieces(mover, WideRole::Rook)))
+            | (rays_to & board.pieces(mover, WideRole::Cannon));
+        for s in candidates {
+            let Some(role) = board.role_at(s) else {
+                continue;
+            };
+            let now = V::role_attacks(role, mover, s, occ);
+            let before = V::role_attacks(role, mover, s, occ_before);
+            let discoveries = board.by_color(victims) & now & !before;
+            if !discoveries.is_empty() {
+                Self::add_chased(pos, victims, pins, occ, s, role, discoveries, &mut result);
+            }
+        }
+
         (!result.is_empty()).then_some(result)
+    }
+
+    /// Fold the `attacks` of one attacker (on `attacker_sq`) into the chase `result`,
+    /// applying Fairy-Stockfish's `addChased` filters: drop the General and Soldiers;
+    /// add value-superior victims unconditionally; drop symmetric same-type attacks
+    /// (keeping impaired-horse and pinned exceptions); and add the rest only if left
+    /// unprotected once the attacker is lifted and pinned defenders are discounted (or
+    /// defended solely by a General barred from recapturing by the flying General).
+    #[allow(clippy::too_many_arguments)]
+    fn add_chased(
+        pos: &GenericPosition<G, V>,
+        victims: Color,
+        pins: Bitboard<G>,
+        occ: Bitboard<G>,
+        attacker_sq: Square<G>,
+        attacker_role: WideRole,
+        mut attacks: Bitboard<G>,
+        result: &mut Bitboard<G>,
+    ) {
+        // Nothing this attacker adds beyond what is already chased.
+        if (attacks & !*result).is_empty() {
+            return;
+        }
+        let board = pos.board();
+        let mover = victims.opposite();
+        // Exclude the enemy General and Soldiers (an attack on the General is a check,
+        // scored separately). See the fidelity note on crossed Soldiers.
+        attacks &=
+            !(board.pieces(victims, WideRole::King) | board.pieces(victims, WideRole::Soldier));
+
+        // Value-superior victims count regardless of protection (FSF's tiers).
+        match attacker_role {
+            WideRole::Horse | WideRole::Cannon => {
+                *result |= attacks & board.pieces(victims, WideRole::Rook);
+            }
+            WideRole::XiangqiElephant | WideRole::Advisor => {
+                *result |= attacks
+                    & (board.pieces(victims, WideRole::Rook)
+                        | board.pieces(victims, WideRole::Cannon)
+                        | board.pieces(victims, WideRole::Horse));
+            }
+            _ => {}
+        }
+
+        // Same-type attacks are mutual/symmetric and excluded — unless the attacker is
+        // an impaired Horse (a leg blocked, so the mirror strike may not exist) or the
+        // same-type victim is pinned.
+        if attacker_role == WideRole::Horse
+            && !(Self::diagonal_neighbors(attacker_sq) & occ).is_empty()
+        {
+            let mut horses = attacks & board.pieces(victims, WideRole::Horse);
+            while let Some(s) = horses.lsb() {
+                horses ^= Bitboard::from_square(s);
+                // The enemy Horse can strike back → mutual → excluded.
+                if V::role_attacks(WideRole::Horse, victims, s, occ).contains(attacker_sq) {
+                    attacks &= !Bitboard::from_square(s);
+                }
+            }
+        } else {
+            attacks &= !board.pieces(victims, attacker_role) | pins;
+        }
+
+        // The remainder count only if unprotected (attacker lifted, pinned defenders
+        // discounted), or defended solely by a General that cannot legally recapture
+        // because the flying General would then strike it.
+        let occ_wo = occ ^ Bitboard::from_square(attacker_sq);
+        let victim_king = board.pieces(victims, WideRole::King);
+        for s in attacks {
+            let roots = pos.attackers_to(s, victims, occ_wo) & !pins;
+            let unprotected = roots.is_empty();
+            let king_barred = V::has_flying_general()
+                && roots == victim_king
+                && Self::flying_general_bars_recapture(board, mover, s, occ_wo);
+            if unprotected || king_barred {
+                *result |= Bitboard::from_square(s);
+            }
+        }
+    }
+
+    /// Whether the chaser's General, along its own file/rank, reaches `s` under
+    /// `occ_wo` (the attacker lifted) — so a victim General recapturing on `s` would
+    /// expose itself to the flying General and therefore may not, leaving `s`
+    /// effectively unprotected. FSF's flying-general root exception.
+    fn flying_general_bars_recapture(
+        board: &Board<G>,
+        mover: Color,
+        s: Square<G>,
+        occ_wo: Bitboard<G>,
+    ) -> bool {
+        match board.king_of(mover) {
+            Some(chaser_king) => {
+                V::role_attacks(WideRole::Rook, mover, chaser_king, occ_wo).contains(s)
+            }
+            None => false,
+        }
+    }
+
+    /// The pre-move occupancy: put the mover back on `from`, and (when the move did
+    /// not capture) clear `to`. A capturing move leaves `to` occupied in both frames.
+    fn occupancy_before(
+        occ: Bitboard<G>,
+        from: Square<G>,
+        to: Square<G>,
+        captured: bool,
+    ) -> Bitboard<G> {
+        let from_bit = Bitboard::from_square(from);
+        if captured {
+            occ | from_bit
+        } else {
+            (occ & !Bitboard::from_square(to)) | from_bit
+        }
+    }
+
+    /// The four orthogonally adjacent squares of `sq` (an empty-board Wazir pattern).
+    fn orthogonal_neighbors(sq: Square<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for (df, dr) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            if let Some(n) = sq.offset(df, dr) {
+                bb |= Bitboard::from_square(n);
+            }
+        }
+        bb
+    }
+
+    /// The four diagonally adjacent squares of `sq` (an empty-board Ferz pattern).
+    fn diagonal_neighbors(sq: Square<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for (df, dr) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+            if let Some(n) = sq.offset(df, dr) {
+                bb |= Bitboard::from_square(n);
+            }
+        }
+        bb
+    }
+
+    /// The whole `file` as a bitboard, for the flying-general pin test.
+    fn file_mask(file: u8) -> Bitboard<G> {
+        let mut mask = Bitboard::EMPTY;
+        for rank in 0..G::HEIGHT {
+            if let Some(sq) = Square::<G>::from_file_rank(file, rank) {
+                mask |= Bitboard::from_square(sq);
+            }
+        }
+        mask
     }
 
     // -- Attack-repetition detection (Chu / Dai large shogi) --------------------
@@ -659,20 +986,6 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
         let targets =
             V::role_attacks(moved_role, mover, to, occ) & board.by_color(victims) & !royals;
         !targets.is_empty()
-    }
-
-    /// Whether `attacker` attacking `victim` is a **value-superior** chase that
-    /// counts regardless of protection (FSF's stronger-piece tiers): a Horse or
-    /// Cannon attacking a Chariot, or an Elephant or Advisor attacking a Chariot,
-    /// Cannon, or Horse.
-    fn is_superior_chase(attacker: WideRole, victim: WideRole) -> bool {
-        match attacker {
-            WideRole::Horse | WideRole::Cannon => victim == WideRole::Rook,
-            WideRole::XiangqiElephant | WideRole::Advisor => {
-                matches!(victim, WideRole::Rook | WideRole::Cannon | WideRole::Horse)
-            }
-            _ => false,
-        }
     }
 
     /// The rank or file the orthogonal move `from -> to` slides along — the squares
@@ -945,6 +1258,13 @@ mod tests {
     fn play<G: Geometry, V: WideVariant<G>>(game: &mut GenericGame<G, V>, from: u8, to: u8) {
         let mv = mv_by(game, from, to);
         game.play(&mv).expect("legal move");
+    }
+
+    /// The chased victim squares of the last move, as sorted square indices.
+    fn chased_indices<G: Geometry, V: WideVariant<G>>(game: &GenericGame<G, V>) -> Vec<u8> {
+        let mut v: Vec<u8> = game.chased_squares().iter().map(|s| s.index()).collect();
+        v.sort_unstable();
+        v
     }
 
     // --- Shogi sennichite ------------------------------------------------
@@ -1275,6 +1595,57 @@ mod tests {
         assert_eq!(game.repetition_count(), 3);
         assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn xiangqi_chase_of_two_different_victims_is_a_draw() {
+        // Per-victim identity (issue #475). A White Horse oscillates c4<->e5; from e5
+        // it chases the Chariot on g6, from c4 it chases the *other* Chariot on d6.
+        // So White makes a qualifying chase on **every** one of its plies — the old
+        // every-ply test would call this a perpetual chase and a loss — but never the
+        // *same* victim twice, so the FSF per-identity intersection is empty and it is
+        // an ordinary repetition **draw**. Black just shuffles its general in-palace
+        // (e10<->e9), chasing nothing. Kings on different files (no flying general).
+        // Indices (9 wide): c4=29, e5=40; d6=48, g6=51; e10=85, e9=76; i1 King.
+        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/3r2r2/9/2J6/9/9/8K w - - 0 1")
+            .expect("valid xiangqi fen");
+        let pos: Xiangqi = pos;
+        let mut game = GenericGame::new(pos);
+        // Each White ply chases a *different* Chariot — confirm the per-ply chase
+        // actually fires (so the draw is the identity rule, not an absence of chase).
+        play(&mut game, 29, 40); // J c4->e5, chases the Chariot on g6
+        assert_eq!(chased_indices(&game), vec![51]);
+        play(&mut game, 85, 76); // k e10->e9 (chases nothing)
+        assert!(chased_indices(&game).is_empty());
+        play(&mut game, 40, 29); // J e5->c4, chases the *other* Chariot on d6
+        assert_eq!(chased_indices(&game), vec![48]);
+        play(&mut game, 76, 85); // k e9->e10 (start position recurs, 2nd time)
+                                 // One more full cycle brings the start position to its third occurrence.
+        play(&mut game, 29, 40);
+        play(&mut game, 85, 76);
+        play(&mut game, 40, 29);
+        play(&mut game, 76, 85);
+        assert_eq!(game.repetition_count(), 3);
+        // No single victim was chased throughout, so it is a plain repetition draw —
+        // NOT a perpetual-chase loss.
+        assert_eq!(game.end_reason(), Some(WideEndReason::Repetition));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn xiangqi_discovered_chariot_attack_is_a_chase() {
+        // Discovered-attack chase (issue #475). A White Chariot on a1 is screened by
+        // its own Horse on c1. Moving the Horse c1->d3 unveils the Chariot's attack
+        // along rank 1 onto the unprotected Black Horse on e1 — a *discovered* chase
+        // the moved piece does not make directly (the Horse's own attack on e1 is a
+        // symmetric Horse-vs-Horse and excluded). FSF `chased()` reports e1; so must
+        // mcr. Indices: c1=2, d3=21, e1=4.
+        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/9/9/3K5/R1J1j4 w - - 0 1")
+            .expect("valid xiangqi fen");
+        let pos: Xiangqi = pos;
+        let mut game = GenericGame::new(pos);
+        play(&mut game, 2, 21); // J c1->d3, unveiling R a1 -> e1
+        assert_eq!(chased_indices(&game), vec![4]);
     }
 
     // --- Chu / Dai large-shogi attack repetition (issue #472) ------------

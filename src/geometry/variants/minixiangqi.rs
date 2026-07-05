@@ -289,6 +289,12 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
     fn perpetual_check_loses() -> bool {
         true
     }
+
+    // Minixiangqi deliberately does **not** set `perpetual_chase_loses` (issue #475):
+    // Fairy-Stockfish's `minixiangqi_variant()` enables `perpetualCheckIllegal` but
+    // leaves `chasingRule` at its `none` default (only full `xiangqi_variant()` sets
+    // `AXF_CHASING`), so the perpetual-chase rule applies to Xiangqi alone. mcr
+    // matches that: the default `perpetual_chase_loses() == false` is inherited here.
 }
 
 /// Minixiangqi as a [`GenericPosition`] over the 7x7 [`Minixiangqi7x7`] geometry.
