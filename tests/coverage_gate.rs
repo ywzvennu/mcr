@@ -110,6 +110,13 @@ enum DrawTest {
     Named(&'static str),
     /// The variant overrides a draw hook but no adjudication test exists yet —
     /// tracked debt removed by issue #498. The string names the untested hook(s).
+    ///
+    /// Issue #498 cleared the last of these, so the manifest constructs none today
+    /// (the pin [`EXPECTED_TODO498`] is `0`). The variant and its gate arm are kept
+    /// so a *future* variant that ships a draw hook ahead of its adjudication test
+    /// can be pinned as visible debt again rather than silently regressing the
+    /// `Named`/`None` binding.
+    #[allow(dead_code)]
     Todo498(&'static str),
 }
 
@@ -160,7 +167,7 @@ struct Required {
 /// Rows are in registry-declaration order (wide, then concrete, then Ataxx).
 const REQUIRED: &[Required] = &[
     // ---- Geometry-layer fairy variants (`WideVariantId::ALL`) ----------------
-    row(Game::Wide(WideVariantId::Aiwok), "perft_aiwok.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("counting_rule")),
+    row(Game::Wide(WideVariantId::Aiwok), "perft_aiwok.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("aiwok_pieces_honour_count_matches_makruk")),
     row(Game::Wide(WideVariantId::Alice), "perft_alice.rs", PerftOracle::HandDerived, 4, Difffuzz::Excluded("FSF has no alice variant (two-board teleport ruleset)"), DrawTest::None),
     row(Game::Wide(WideVariantId::Almost), "perft_almost.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Amazon), "perft_amazon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
@@ -172,10 +179,10 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Capahouse), "perft_capahouse.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Caparandom), "perft_caparandom.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Centaur), "perft_centaur.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
-    row(Game::Wide(WideVariantId::Chak), "perft_chak.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Todo498("stalemate_is_loss")),
+    row(Game::Wide(WideVariantId::Chak), "perft_chak.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Chancellor), "perft_chancellor.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::CheckShogi), "perft_checkshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("check_win_is_terminal")),
-    row(Game::Wide(WideVariantId::Chennis), "perft_chennis.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("stalemate_is_loss")),
+    row(Game::Wide(WideVariantId::Chennis), "perft_chennis.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Chigorin), "perft_chigorin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Chu), "perft_chu.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; FSF has no chu variant"), DrawTest::Named("chu_attack_repetition_loses_for_the_attacker")),
     row(Game::Wide(WideVariantId::Courier), "perft_courier.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
@@ -184,10 +191,10 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Dragon), "perft_dragon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Duck), "perft_duck.rs", PerftOracle::Fsf, 4, Difffuzz::Excluded("FSF counts duck placements differently (#189 harness artifact)"), DrawTest::None),
     row(Game::Wide(WideVariantId::Embassy), "perft_embassy.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
-    row(Game::Wide(WideVariantId::Empire), "perft_empire.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("stalemate_is_loss")),
-    row(Game::Wide(WideVariantId::EuroShogi), "perft_euroshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Empire), "perft_empire.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
+    row(Game::Wide(WideVariantId::EuroShogi), "perft_euroshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("euroshogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::FogOfWar), "perft_fogofwar.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
-    row(Game::Wide(WideVariantId::Gorogoro), "perft_gorogoro.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Gorogoro), "perft_gorogoro.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("gorogoro_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Gothic), "perft_gothic.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Grand), "perft_grand.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Grandhouse), "perft_grandhouse.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
@@ -195,17 +202,17 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Janggi), "perft_janggi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("janggi_bikjang_facing_generals_draw")),
     row(Game::Wide(WideVariantId::Janus), "perft_janus.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Jieqi), "perft_jieqi.rs", PerftOracle::HandDerived, 3, Difffuzz::Excluded("hidden-info Xiangqi; needs a per-position identity reveal, not a static dialect rewrite"), DrawTest::None),
-    row(Game::Wide(WideVariantId::Judkins), "perft_judkins.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Judkins), "perft_judkins.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("judkins_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Karouk), "perft_karouk.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("giving_check_wins")),
-    row(Game::Wide(WideVariantId::Khans), "perft_khans.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("stalemate_is_loss")),
+    row(Game::Wide(WideVariantId::Khans), "perft_khans.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Knightmate), "perft_knightmate.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
-    row(Game::Wide(WideVariantId::Kyotoshogi), "perft_kyotoshogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Kyotoshogi), "perft_kyotoshogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("kyotoshogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Makpong), "perft_makpong.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("makpong_pieces_honour_count_matches_makruk")),
     row(Game::Wide(WideVariantId::Makruk), "perft_makruk.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("makruk_pieces_honour_count_matches_fsf")),
     row(Game::Wide(WideVariantId::Manchu), "perft_manchu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Mansindam), "perft_mansindam.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
-    row(Game::Wide(WideVariantId::Micro), "perft_micro.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
-    row(Game::Wide(WideVariantId::Minishogi), "perft_minishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Micro), "perft_micro.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("micro_sennichite_is_a_draw")),
+    row(Game::Wide(WideVariantId::Minishogi), "perft_minishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("minishogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Minixiangqi), "perft_minixiangqi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("minixiangqi_threefold_repetition_is_a_draw")),
     row(Game::Wide(WideVariantId::Opulent), "perft_opulent.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Orda), "perft_orda.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
@@ -217,7 +224,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Shatranj), "perft_shatranj.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("bared_king_loses")),
     row(Game::Wide(WideVariantId::Shinobi), "perft_shinobi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Shogi), "perft_shogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("shogi_sennichite_is_a_draw")),
-    row(Game::Wide(WideVariantId::Shogun), "perft_shogun.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Shogun), "perft_shogun.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("shogun_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::ShoShogi), "perft_shoshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("shoshogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Shouse), "perft_shouse.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Sittuyin), "perft_sittuyin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("sittuyin_pieces_honour_count_matches_asean_base")),
@@ -225,8 +232,8 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Synochess), "perft_synochess.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Tencubed), "perft_tencubed.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Tenjiku), "perft_tenjiku.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; HaChu crashes on 16x16 and FSF has no tenjiku"), DrawTest::Named("tenjiku_one_sided_attack_repetition_draws")),
-    row(Game::Wide(WideVariantId::Tori), "perft_torishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
-    row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerived, 3, Difffuzz::Excluded("no FSF wa-shogi and HaChu's perft is unreliable — rules-only"), DrawTest::Todo498("perpetual_check_loses,repetition_draw_reason")),
+    row(Game::Wide(WideVariantId::Tori), "perft_torishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("tori_sennichite_is_a_draw")),
+    row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerived, 3, Difffuzz::Excluded("no FSF wa-shogi and HaChu's perft is unreliable — rules-only"), DrawTest::Named("washogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Xiangfu), "perft_xiangfu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Xiangqi), "perft_xiangqi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("xiangqi_perpetual_chase_loses_for_the_chaser")),
     // ---- Concrete 8x8 engine variants (`VariantId::ALL`) ---------------------
@@ -251,7 +258,7 @@ const REQUIRED: &[Required] = &[
 /// the enforced-once-filled draw-rule debt that issue #498 removes. Pinned so the
 /// debt cannot silently grow (a new variant with an untested draw hook must either
 /// add a test or bump this count deliberately).
-const EXPECTED_TODO498: usize = 14;
+const EXPECTED_TODO498: usize = 0;
 
 /// The by-design difffuzz exclusion count (Alice, Duck, Jieqi + the HaChu-only
 /// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi) — the `7` in the

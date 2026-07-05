@@ -279,3 +279,28 @@ impl WideVariant<Chess8x8> for KhansRules {
 /// the piece movements, the soldier's forced promotion to a Khan, and the flag-win
 /// rule.
 pub type Khans = GenericPosition<Chess8x8, KhansRules>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::position::WideOutcome;
+
+    /// Stalemate is scored as a **loss** for the side to move (FSF
+    /// `stalemateValue = loss`, issue #498). The lone Black king on a8 (its far
+    /// corner — rank 8 is not the rank-1 flag goal) has no legal move and is not in
+    /// check, boxed by White's standard-army queen b6 and king c7. Black is
+    /// stalemated, so Black loses and White wins. (Standard chess would call this a
+    /// draw.)
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos = Khans::from_fen("k7/2K5/1Q6/8/8/8/8/8 b - - 0 1").expect("valid khans FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+}

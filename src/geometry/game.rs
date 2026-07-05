@@ -1256,8 +1256,9 @@ impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame
 mod tests {
     use super::*;
     use crate::geometry::variants::{
-        Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, Janggi, Makpong, Makruk, Minishogi,
-        Minixiangqi, ShoShogi, Shogi, Sittuyin, Tenjiku, Xiangqi,
+        Aiwok, Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, EuroShogi, Gorogoro, Janggi,
+        Judkins, Kyotoshogi, Makpong, Makruk, Micro, Minishogi, Minixiangqi, ShoShogi, Shogi,
+        Shogun, Sittuyin, Tenjiku, Tori, Washogi, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -2003,6 +2004,225 @@ mod tests {
         );
         assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    #[test]
+    fn aiwok_pieces_honour_count_matches_makruk() {
+        // Ai-Wok is Makruk with the Met replaced by the Ai-Wok, and it forwards
+        // Makruk's `counting_rule` verbatim (issue #498). The same lone-king
+        // K + Rook pieces-honour endgame as the Makruk test — limit 16 full moves
+        // (`countingLimit = 32`), the count starting from the piece total
+        // (`countingPly = 6`) — must therefore draw on the identical 28th half-move,
+        // proving Ai-Wok inherits Makruk's counting terminal.
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+            .expect("valid aiwok fen");
+        let pos: Aiwok = pos;
+        let mut game = GenericGame::new(pos);
+        // c1=2, c2=10; a8=56, a7=48 (a quiet, non-mating shuffle).
+        let plies = play_until_over(&mut game, &[(2, 10), (56, 48), (10, 2), (48, 56)], 60);
+        assert_eq!(
+            plies,
+            Some(28),
+            "Ai-Wok pieces-honour draws on the 28th half-move, exactly like Makruk"
+        );
+        assert_eq!(game.end_reason(), Some(WideEndReason::CountingDraw));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+    }
+
+    // --- Minor / mini shogi sennichite (issue #498) ----------------------
+    //
+    // Each of these variants overrides `repetition_draw_reason` to
+    // `Sennichite` with a four-fold `repetition_fold`; two lone kings shuffling
+    // in place recur without ever checking, so the fourth occurrence is a plain
+    // sennichite draw. Index = rank * width + file.
+
+    #[test]
+    fn euroshogi_sennichite_is_a_draw() {
+        // Euro Shogi is 8x8. Black king a8 = 56, White king e1 = 4; a quiet
+        // king shuffle recurs to a four-fold sennichite draw.
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
+            .expect("valid euroshogi fen");
+        let _: &EuroShogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 4, 12); // white K e1->e2
+            play(&mut game, 56, 48); // black K a8->a7
+            play(&mut game, 12, 4); // white K e2->e1
+            play(&mut game, 48, 56); // black K a7->a8
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn gorogoro_sennichite_is_a_draw() {
+        // Gorogoro is 5 wide x 6 tall. Black king a6 = 25, White king c1 = 2.
+        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/5/2K2[] w - - 0 1")
+            .expect("valid gorogoro fen");
+        let _: &Gorogoro = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 7); // white K c1->c2
+            play(&mut game, 25, 20); // black K a6->a5
+            play(&mut game, 7, 2); // white K c2->c1
+            play(&mut game, 20, 25); // black K a5->a6
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn judkins_sennichite_is_a_draw() {
+        // Judkins Shogi is 6x6. Black king a6 = 30, White king c1 = 2.
+        let pos = GenericPosition::<_, _>::from_fen("k5/6/6/6/6/2K3[] w - - 0 1")
+            .expect("valid judkins fen");
+        let _: &Judkins = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 8); // white K c1->c2
+            play(&mut game, 30, 24); // black K a6->a5
+            play(&mut game, 8, 2); // white K c2->c1
+            play(&mut game, 24, 30); // black K a5->a6
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn kyotoshogi_sennichite_is_a_draw() {
+        // Kyoto Shogi is 5x5. Black king a5 = 20, White king c1 = 2. The kings
+        // never flip (only non-royal pieces toggle form on a move), so a lone-king
+        // shuffle recurs cleanly to a four-fold sennichite draw.
+        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
+            .expect("valid kyotoshogi fen");
+        let _: &Kyotoshogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 7); // white K c1->c2
+            play(&mut game, 20, 15); // black K a5->a4
+            play(&mut game, 7, 2); // white K c2->c1
+            play(&mut game, 15, 20); // black K a4->a5
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn micro_sennichite_is_a_draw() {
+        // Micro Shogi is 4 wide x 5 tall. Black king d5 = 19, White king a1 = 0
+        // (kept on opposite files three apart, so neither ever checks).
+        let pos =
+            GenericPosition::<_, _>::from_fen("3k/4/4/4/K3[] w - - 0 1").expect("valid micro fen");
+        let _: &Micro = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 0, 4); // white K a1->a2
+            play(&mut game, 19, 15); // black K d5->d4
+            play(&mut game, 4, 0); // white K a2->a1
+            play(&mut game, 15, 19); // black K d4->d5
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn minishogi_sennichite_is_a_draw() {
+        // Minishogi (5x5) shares Shogi's sennichite (fold 4). Black king a5 = 20,
+        // White king c1 = 2.
+        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
+            .expect("valid minishogi fen");
+        let _: &Minishogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 7); // white K c1->c2
+            play(&mut game, 20, 15); // black K a5->a4
+            play(&mut game, 7, 2); // white K c2->c1
+            play(&mut game, 15, 20); // black K a4->a5
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn shogun_sennichite_is_a_draw() {
+        // Shogun Chess is 8x8 and scores a four-fold repetition as sennichite.
+        // Black king a8 = 56, White king e1 = 4.
+        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
+            .expect("valid shogun fen");
+        let _: &Shogun = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 4, 12); // white K e1->e2
+            play(&mut game, 56, 48); // black K a8->a7
+            play(&mut game, 12, 4); // white K e2->e1
+            play(&mut game, 48, 56); // black K a7->a8
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn tori_sennichite_is_a_draw() {
+        // Tori Shogi is 7x7; its royal is a plain King (`k`). Black king a7 = 42,
+        // White king d1 = 3.
+        let pos = GenericPosition::<_, _>::from_fen("k6/7/7/7/7/7/3K3[] w - - 0 1")
+            .expect("valid tori fen");
+        let _: &Tori = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 3, 10); // white K d1->d2
+            play(&mut game, 42, 35); // black K a7->a6
+            play(&mut game, 10, 3); // white K d2->d1
+            play(&mut game, 35, 42); // black K a6->a7
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn washogi_sennichite_is_a_draw() {
+        // Wa Shogi is 11x11; the royal Crane King is a plain King (`k`). Black king
+        // i11 = 118, White king c1 = 2 (files far apart, no check).
+        let pos =
+            GenericPosition::<_, _>::from_fen("8k2/11/11/11/11/11/11/11/11/11/2K8[] w - - 0 1")
+                .expect("valid washogi fen");
+        let _: &Washogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 13); // white K c1->c2
+            play(&mut game, 118, 107); // black K i11->i10
+            play(&mut game, 13, 2); // white K c2->c1
+            play(&mut game, 107, 118); // black K i10->i11
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
     }
 
     // --- Generic move-rule + insufficient material (opt-in test variant) --

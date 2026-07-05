@@ -425,6 +425,7 @@ pub type Chak = GenericPosition<Shogi9x9, ChakRules>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::position::WideOutcome;
 
     /// The canonical start FEN round-trips through mcr's FEN I/O.
     #[test]
@@ -433,6 +434,26 @@ mod tests {
         assert_eq!(
             pos.to_fen(),
             "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1"
+        );
+    }
+
+    /// Stalemate is scored as a **loss** for the side to move (FSF
+    /// `stalemateValue = loss`, issue #498). The lone Black king on a9 (its far
+    /// corner — rank 9 is outside the Black promotion half 1-5, so it stays a
+    /// plain king) has no legal move and is not in check: a White Rook on i8 sweeps
+    /// the whole (unobstructed) rank 8 to seal the a8/b8 escapes and a White
+    /// Vulture (knight) on c7 covers b9, while a9 itself is unattacked. Black is
+    /// stalemated, so Black loses and White wins.
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos = Chak::from_fen("k8/8R/2N6/9/9/9/9/9/4K4 b - - 0 1").expect("valid chak FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
         );
     }
 }

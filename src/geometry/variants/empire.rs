@@ -397,4 +397,21 @@ mod tests {
             })
         );
     }
+
+    /// Stalemate is scored as a **loss** for the side to move (issue #498). The
+    /// White king on a1 (its own back rank, not the rank-8 flag goal) has no legal
+    /// move and is not in check — boxed by Black's standard-army queen b3 and king
+    /// c2 — so White loses and Black wins. (Standard chess would call this a draw.)
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos = Empire::from_fen("8/8/8/8/8/1q6/2k5/K7 w - - 0 1").expect("valid FEN");
+        assert!(pos.legal_moves().is_empty(), "White has no legal move");
+        assert!(!pos.is_check(), "White is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::Black
+            })
+        );
+    }
 }
