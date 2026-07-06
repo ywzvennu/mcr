@@ -28,11 +28,11 @@ use super::{
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
     Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
     Knightmate, Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Modern, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways,
-    Perfect, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi,
-    Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori,
-    Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome,
-    WideVariant, Xiangfu, Xiangqi,
+    Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback,
+    Pawnsideways, Perfect, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi,
+    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku,
+    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
+    WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -808,6 +808,7 @@ wide_variants! {
     Minishogi, Minishogi, Minishogi, "minishogi";
     Minixiangqi, Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
     Modern, Modern, Modern, "modern";
+    Newzealand, Newzealand, Newzealand, "newzealand";
     Nightrider, Nightrider, Nightrider, "nightrider";
     Nocastle, Nocastle, Nocastle, "nocastle";
     Opulent, Opulent, Opulent, "opulent";
@@ -982,7 +983,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 86, "all 86 fairy variants are covered");
+        assert_eq!(count, 87, "all 87 fairy variants are covered");
     }
 
     #[test]
@@ -1032,7 +1033,7 @@ mod tests {
     /// arm) — never to paper over an accidental bloat.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        const CEILING: usize = 2800;
+        const CEILING: usize = 2816;
         let actual = core::mem::size_of::<AnyWideVariant>();
         assert!(
             actual <= CEILING,
@@ -1064,17 +1065,16 @@ mod tests {
     /// per-backing ceiling — so growing any position's role array / inline state
     /// past its geometry class's current widest fails here.
     ///
-    /// Current measured maxima: u64 = 1544 (ai-wok), u128 = 2784 (cannonshogi),
-    /// U256 = 5232 (chu) — each 16 / 32 / 64 bytes above the pre-Grasshopper values
-    /// (1528 / 2752 / 5168), the two extra per-role slots the Grasshopper and
-    /// Nightrider roles' [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->148
-    /// bump adds to every board's role array (one bitboard per backing width per
-    /// role). Raise a ceiling only
-    /// deliberately.
+    /// Current measured maxima: u64 = 1560 (ai-wok), u128 = 2800 (cannonshogi),
+    /// U256 = 5264 (chu) — above the pre-Grasshopper values (1528 / 2752 / 5168), the
+    /// extra per-role slots the Grasshopper, Nightrider and New Zealand ROOKNI roles'
+    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->149 bump adds to every
+    /// board's role array (one bitboard per backing width per role, plus alignment
+    /// padding). Raise a ceiling only deliberately.
     #[test]
     fn per_backing_position_size_ceiling() {
         // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
-        const CEILINGS: &[(u32, usize)] = &[(64, 1544), (128, 2784), (256, 5232)];
+        const CEILINGS: &[(u32, usize)] = &[(64, 1560), (128, 2800), (256, 5264)];
         for &(bits, ceiling) in CEILINGS {
             let mut max = 0usize;
             let mut worst = "";
@@ -1415,6 +1415,12 @@ mod tests {
             WideVariantId::Minixiangqi,
             Minixiangqi,
             AnyWideVariant::Minixiangqi,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Newzealand,
+            Newzealand,
+            AnyWideVariant::Newzealand,
             2
         );
         agrees_with_typed!(

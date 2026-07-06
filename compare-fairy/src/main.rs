@@ -67,6 +67,7 @@ mod mansindam;
 mod minishogi;
 mod minixiangqi;
 mod modern;
+mod newzealand;
 mod nightrider;
 mod nocastle;
 mod opulent;
@@ -433,6 +434,11 @@ fn main() {
     // Nightrider chess is a FSF built-in (no variants.ini needed), like perfect: it
     // rides the same generic 8x8 engine as standard chess with the knights replaced
     // by riding Nightriders (its knight-ray king safety takes the full-verify path).
+    // New Zealand chess is a FSF built-in (no variants.ini needed), like perfect: it
+    // rides the same generic 8x8 engine as standard chess with the rook / knight
+    // replaced by the ROOKNI / KNIROO capture-swap pieces (whose move≠capture split
+    // is handled on the ordinary single-king king-safety path).
+    let newzealand_mismatches = newzealand::run(&mut engine, opts.full);
     let nightrider_mismatches = nightrider::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
@@ -534,6 +540,7 @@ fn main() {
         + legan_mismatches
         + perfect_mismatches
         + grasshopper_mismatches
+        + newzealand_mismatches
         + nightrider_mismatches
         + xiangqi_mismatches
         + manchu_mismatches

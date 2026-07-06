@@ -231,6 +231,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Minishogi), "perft_minishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("minishogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Minixiangqi), "perft_minixiangqi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("minixiangqi_threefold_repetition_is_a_draw")),
     row(Game::Wide(WideVariantId::Modern), "perft_modern.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
+    row(Game::Wide(WideVariantId::Newzealand), "perft_newzealand.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Nightrider), "perft_nightrider.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Nocastle), "perft_nocastle.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Opulent), "perft_opulent.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),

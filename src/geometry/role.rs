@@ -1322,6 +1322,34 @@ pub enum WideRole {
     /// **fifth-tier overflow role**: its FEN token is `****N` / `****n`; the harness
     /// maps `****n → n`.
     Nightrider = 147,
+
+    // --- New Zealand chess capture-swap rook (8x8) ----------------------------
+    //
+    // New Zealand chess (FSF built-in `newzealand`) is standard chess with the Rook
+    // and Knight removed and two capture-swap pieces added: the **ROOKNI** (moves
+    // like a rook, captures like a knight) and the **KNIROO** (moves like a knight,
+    // captures like a rook). The KNIROO is exactly the Orda [`WideRole::Lancer`]
+    // (FSF `kniroo`), reused as-is; the ROOKNI is its inverse and needs this new
+    // role. FSF spells the ROOKNI `r` (already the Rook here) and the KNIROO `n`
+    // (already the Knight); every single-letter base plus the `*` / `**` / `=` /
+    // `***` overflow banks are exhausted, so the ROOKNI is a **fifth-tier overflow
+    // role** ([`is_overflow5`](WideRole::is_overflow5)). Its FSF mnemonic `r` is
+    // taken in that tier by the [`WideRole::RookGeneral`], so it recycles the free
+    // base letter `k` (the "roo**k**ni" mnemonic), distinct from the bare
+    // [`WideRole::King`] `k` by the `****` prefix (exactly as the fifth-tier
+    // Nightrider's `n` collides with the Knight); the `compare-fairy` harness maps
+    // `****k → r` when driving New Zealand chess.
+    /// Rookni (FSF `rookni` letter `r`, Betza `mRcN`) — **moves like a rook** (any
+    /// number of squares along a rank or file to an **empty** square) but **captures
+    /// like a knight** (only the eight 2-1 leaps). Its quiet rook slides are
+    /// non-capturing and ride
+    /// [`quiet_only_targets`](super::WideVariant::quiet_only_targets); its only
+    /// capturing / checking squares are the knight jumps
+    /// ([`role_attacks`](super::WideVariant::role_attacks)), so it gives check by a
+    /// knight-attack and — being a knight-capturer — cannot pin. The inverse of the
+    /// KNIROO ([`WideRole::Lancer`]). (New Zealand chess.) A **fifth-tier overflow
+    /// role**: its FEN token is `****K` / `****k`; the harness maps `****k → r`.
+    Rookni = 148,
 }
 
 impl WideRole {
@@ -1348,7 +1376,7 @@ impl WideRole {
     /// #441 for the budget audit and the widening design. Do **not** grow this past
     /// `256` without another field widening (a fresh wire-format version bump
     /// touching `super::binary` and [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 148;
+    pub const COUNT: usize = 149;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1500,6 +1528,7 @@ impl WideRole {
         WideRole::Dog,
         WideRole::Grasshopper,
         WideRole::Nightrider,
+        WideRole::Rookni,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1877,6 +1906,12 @@ impl WideRole {
             // prefix the board FEN I/O adds. The `compare-fairy` harness maps
             // `****n → n` when driving Nightrider chess.
             WideRole::Nightrider => 'n',
+            // New Zealand chess ROOKNI — a fifth-tier overflow role. FSF spells it
+            // `r`, already the fifth-tier RookGeneral's base, so it recycles the free
+            // base letter `k` (the "roo**k**ni" mnemonic — already the King's bare
+            // letter, distinct here by the `****` prefix the board FEN I/O adds). The
+            // `compare-fairy` harness maps `****k → r` when driving New Zealand chess.
+            WideRole::Rookni => 'k',
         }
     }
 
@@ -2339,6 +2374,7 @@ impl WideRole {
                 | WideRole::MultiGeneral
                 | WideRole::Dog
                 | WideRole::Nightrider
+                | WideRole::Rookni
         )
     }
 
@@ -2369,6 +2405,9 @@ impl WideRole {
             // Nightrider chess: recycles the FSF nightrider mnemonic `n`, free within
             // the `****` fifth tier; the harness maps `****n → n`.
             'n' => Some(WideRole::Nightrider),
+            // New Zealand chess ROOKNI: recycles the free fifth-tier base `k` (FSF's
+            // `r` being the RookGeneral's here); the harness maps `****k → r`.
+            'k' => Some(WideRole::Rookni),
             _ => None,
         }
     }
@@ -2583,6 +2622,7 @@ impl fmt::Display for WideRole {
             WideRole::Dog => "dog",
             WideRole::Grasshopper => "grasshopper",
             WideRole::Nightrider => "nightrider",
+            WideRole::Rookni => "rookni",
         })
     }
 }
