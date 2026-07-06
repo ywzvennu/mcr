@@ -26,22 +26,22 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Piece | FEN | Type | Move ≠ capture |
 |---|---|---|---|
 | King | `k` | leaper / stepper | no |
-| SparrowPawn | `b` | leaper / stepper | no |
-| Oxcart | `d` | slider | no |
-| LiberatedHorse | `f` | slider | no |
-| StruttingCrow | `g` | leaper / stepper | no |
-| SwoopingOwl | `h` | leaper / stepper | no |
-| ClimbingMonkey | `j` | leaper / stepper | no |
-| FlyingGoose | `k` | leaper / stepper | no |
-| FlyingCock | `l` | leaper / stepper | no |
-| BlindDog | `m` | leaper / stepper | no |
-| ViolentStag | `n` | leaper / stepper | no |
-| ViolentWolf | `o` | leaper / stepper | no |
-| SwallowsWings | `q` | slider | no |
-| RunningRabbit | `r` | slider | no |
-| FlyingFalcon | `t` | slider | no |
-| TreacherousFox | `u` | leaper / stepper | no |
-| CloudEagle | `v` | slider | no |
+| SparrowPawn | `**b` | leaper / stepper | no |
+| Oxcart | `**d` | slider | no |
+| LiberatedHorse | `**f` | slider | no |
+| StruttingCrow | `**g` | leaper / stepper | no |
+| SwoopingOwl | `**h` | leaper / stepper | no |
+| ClimbingMonkey | `**j` | leaper / stepper | no |
+| FlyingGoose | `**k` | leaper / stepper | no |
+| FlyingCock | `**l` | leaper / stepper | no |
+| BlindDog | `**m` | leaper / stepper | no |
+| ViolentStag | `**n` | leaper / stepper | no |
+| ViolentWolf | `**o` | leaper / stepper | no |
+| SwallowsWings | `**q` | slider | no |
+| RunningRabbit | `**r` | slider | no |
+| FlyingFalcon | `**t` | slider | no |
+| TreacherousFox | `**u` | leaper / stepper | no |
+| CloudEagle | `**v` | slider | no |
 
 ### King (`k`)
 
@@ -49,100 +49,100 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### SparrowPawn (`b`)
+### SparrowPawn (`**b`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward (+0,+1)
 
-### Oxcart (`d`)
+### Oxcart (`**d`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
 
-### LiberatedHorse (`f`)
+### LiberatedHorse (`**f`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): backward (+0,-1), forward (+0,+1)
 
-### StruttingCrow (`g`)
+### StruttingCrow (`**g`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward (+0,+1), back-right (+1,-1)
 
-### SwoopingOwl (`h`)
+### SwoopingOwl (`**h`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward (+0,+1), back-right (+1,-1)
 
-### ClimbingMonkey (`j`)
+### ClimbingMonkey (`**j`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+1), backward (+0,-1), forward (+0,+1), forward-right (+1,+1)
 
-### FlyingGoose (`k`)
+### FlyingGoose (`**k`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+1), backward (+0,-1), forward (+0,+1), forward-right (+1,+1)
 
-### FlyingCock (`l`)
+### FlyingCock (`**l`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: left (-1,+0), forward-left (-1,+1), right (+1,+0), forward-right (+1,+1)
 
-### BlindDog (`m`)
+### BlindDog (`**m`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: left (-1,+0), forward-left (-1,+1), backward (+0,-1), right (+1,+0), forward-right (+1,+1)
 
-### ViolentStag (`n`)
+### ViolentStag (`**n`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### ViolentWolf (`o`)
+### ViolentWolf (`**o`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), right (+1,+0), forward-right (+1,+1)
 
-### SwallowsWings (`q`)
+### SwallowsWings (`**q`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), right (+1,+0)
   - single step / leap: backward (+0,-1), forward (+0,+1)
 
-### RunningRabbit (`r`)
+### RunningRabbit (`**r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), back-right (+1,-1), forward-right (+1,+1)
 
-### FlyingFalcon (`t`)
+### FlyingFalcon (`**t`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
   - single step / leap: forward (+0,+1)
 
-### TreacherousFox (`u`)
+### TreacherousFox (`**u`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### CloudEagle (`v`)
+### CloudEagle (`**v`)
 
 - Type: slider
 - Moves & captures:

@@ -29,10 +29,10 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | King | `k` | leaper / stepper | no |
 | Kheshig | `w` | leaper / stepper | no |
-| Serpent | `s` | leaper / stepper | no |
-| Quetzal | `q` | whole-board attacker | no |
-| ChakSoldier | `p` | whole-board attacker | no |
-| Temple | `o` | leaper / stepper | no |
+| Serpent | `*s` | leaper / stepper | no |
+| Quetzal | `*q` | whole-board attacker | no |
+| ChakSoldier | `*p` | whole-board attacker | no |
+| Temple | `*o` | leaper / stepper | no |
 
 ### Knight (`n`)
 
@@ -58,23 +58,23 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), back-left (-1,-1), left (-1,+0), forward-left (-1,+1), forward-left (-1,+2), backward (+0,-1), forward (+0,+1), back-right (+1,-2), back-right (+1,-1), right (+1,+0), forward-right (+1,+1), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### Serpent (`s`)
+### Serpent (`*s`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Quetzal (`q`)
+### Quetzal (`*q`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
 
-### ChakSoldier (`p`)
+### ChakSoldier (`*p`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
 
-### Temple (`o`)
+### Temple (`*o`)
 
 - Type: leaper / stepper
 - Immobile on an empty board (no step sampled).

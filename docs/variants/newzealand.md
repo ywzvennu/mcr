@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
 | Lancer | `f` | slider | yes |
-| Rookni | `k` | leaper / stepper | yes |
+| Rookni | `****k` | leaper / stepper | yes |
 
 ### Pawn (`p`)
 
@@ -66,7 +66,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Captures / gives check:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### Rookni (`k`)
+### Rookni (`****k`)
 
 - Type: leaper / stepper
 - **Move ≠ capture** — the two geometries differ.

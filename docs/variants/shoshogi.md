@@ -33,7 +33,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Silver | `s` | leaper / stepper | no |
 | Gold | `g` | leaper / stepper | no |
 | Lance | `l` | slider | no |
-| DrunkElephant | `e` | leaper / stepper | no |
+| DrunkElephant | `**e` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -84,7 +84,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
 
-### DrunkElephant (`e`)
+### DrunkElephant (`**e`)
 
 - Type: leaper / stepper
 - Moves & captures:

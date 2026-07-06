@@ -29,9 +29,9 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | Cannon | `c` | leaper / stepper | no |
 | Horse | `j` | leaper / stepper | no |
-| BishopCannon | `c` | leaper / stepper | no |
-| Champion | `k` | leaper / stepper | no |
-| Mahout | `m` | leaper / stepper | no |
+| BishopCannon | `=c` | leaper / stepper | no |
+| Champion | `=k` | leaper / stepper | no |
+| Mahout | `=m` | leaper / stepper | no |
 
 ### Bishop (`b`)
 
@@ -57,19 +57,19 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), forward-left (-1,+2), back-right (+1,-2), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### BishopCannon (`c`)
+### BishopCannon (`=c`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Champion (`k`)
+### Champion (`=k`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Mahout (`m`)
+### Mahout (`=m`)
 
 - Type: leaper / stepper
 - Moves & captures:

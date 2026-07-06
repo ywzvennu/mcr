@@ -33,19 +33,19 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Silver | `s` | leaper / stepper | no |
 | Gold | `g` | leaper / stepper | no |
 | Lance | `l` | slider | no |
-| Dragon | `r` | slider | no |
-| DragonHorse | `b` | slider | no |
-| DrunkElephant | `e` | leaper / stepper | no |
-| CopperGeneral | `c` | leaper / stepper | no |
-| FerociousLeopard | `l` | leaper / stepper | no |
-| BlindTiger | `t` | leaper / stepper | no |
-| GoBetween | `g` | leaper / stepper | no |
-| ReverseChariot | `r` | slider | no |
-| SideMover | `i` | slider | no |
-| VerticalMover | `v` | slider | no |
-| Kirin | `k` | leaper / stepper | no |
-| Phoenix | `p` | leaper / stepper | no |
-| ChuLion | `n` | leaper / stepper | no |
+| Dragon | `+r` | slider | no |
+| DragonHorse | `+b` | slider | no |
+| DrunkElephant | `**e` | leaper / stepper | no |
+| CopperGeneral | `***c` | leaper / stepper | no |
+| FerociousLeopard | `***l` | leaper / stepper | no |
+| BlindTiger | `***t` | leaper / stepper | no |
+| GoBetween | `***g` | leaper / stepper | no |
+| ReverseChariot | `***r` | slider | no |
+| SideMover | `***i` | slider | no |
+| VerticalMover | `***v` | slider | no |
+| Kirin | `***k` | leaper / stepper | no |
+| Phoenix | `***p` | leaper / stepper | no |
+| ChuLion | `***n` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -96,85 +96,85 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
 
-### Dragon (`r`)
+### Dragon (`+r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### DragonHorse (`b`)
+### DragonHorse (`+b`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### DrunkElephant (`e`)
+### DrunkElephant (`**e`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### CopperGeneral (`c`)
+### CopperGeneral (`***c`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+1), backward (+0,-1), forward (+0,+1), forward-right (+1,+1)
 
-### FerociousLeopard (`l`)
+### FerociousLeopard (`***l`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### BlindTiger (`t`)
+### BlindTiger (`***t`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### GoBetween (`g`)
+### GoBetween (`***g`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: backward (+0,-1), forward (+0,+1)
 
-### ReverseChariot (`r`)
+### ReverseChariot (`***r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): backward (+0,-1), forward (+0,+1)
 
-### SideMover (`i`)
+### SideMover (`***i`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), right (+1,+0)
   - single step / leap: backward (+0,-1), forward (+0,+1)
 
-### VerticalMover (`v`)
+### VerticalMover (`***v`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): backward (+0,-1), forward (+0,+1)
   - single step / leap: left (-1,+0), right (+1,+0)
 
-### Kirin (`k`)
+### Kirin (`***k`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Phoenix (`p`)
+### Phoenix (`***p`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### ChuLion (`n`)
+### ChuLion (`***n`)
 
 - Type: leaper / stepper
 - Moves & captures:

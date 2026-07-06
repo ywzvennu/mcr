@@ -119,6 +119,15 @@ pub struct PieceRules {
     /// The role's lowercase FEN letter (overflow roles report the recycled base
     /// letter; the board FEN adds the `*` / `**` / `=` prefix).
     pub fen_char: char,
+    /// The role's **fully-prefixed** lowercase board FEN token — the token the
+    /// board FEN I/O actually writes for this piece, so overflow roles are
+    /// unambiguous. It is [`WideRole::board_token_prefix`] followed by `fen_char`:
+    /// `"n"` for the Knight but `"****n"` for the Nightrider and `"****k"` for the
+    /// New Zealand Rookni (both of which recycle a base letter for `fen_char`).
+    /// Derived from the same prefix logic the board FEN writer
+    /// ([`Board::to_fen_placement`](super::Board::to_fen_placement)) uses, so it can
+    /// never disagree with the on-board spelling.
+    pub board_token: String,
     /// Whether the role slides (its attack set is blocked along rays),
     /// [`WideVariant::role_is_slider`].
     pub is_slider: bool,
@@ -594,6 +603,7 @@ fn derive_piece<G: Geometry, V: WideVariant<G>>(role: WideRole, board: &Board<G>
         role,
         name: alloc::format!("{role:?}"),
         fen_char: role.char(),
+        board_token: alloc::format!("{}{}", role.board_token_prefix(), role.char()),
         is_slider: V::role_is_slider(role),
         hopper,
         board_dependent,

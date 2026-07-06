@@ -31,7 +31,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
-| Grasshopper | `j` | screen hopper | no |
+| Grasshopper | `***j` | screen hopper | no |
 
 ### Pawn (`p`)
 
@@ -70,7 +70,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Grasshopper (`j`)
+### Grasshopper (`***j`)
 
 - Type: screen hopper
 - Move/capture is occupancy-dependent (needs a screen); not sampled on an empty board.

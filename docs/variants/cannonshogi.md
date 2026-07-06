@@ -34,9 +34,9 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Gold | `g` | leaper / stepper | no |
 | Cannon | `c` | leaper / stepper | no |
 | Lance | `l` | slider | no |
-| RookCannon | `a` | screen hopper | no |
-| BishopCannon | `c` | leaper / stepper | no |
-| BishopHopper | `i` | screen hopper | no |
+| RookCannon | `=a` | screen hopper | no |
+| BishopCannon | `=c` | leaper / stepper | no |
+| BishopHopper | `=i` | screen hopper | no |
 
 ### Pawn (`p`)
 
@@ -93,18 +93,18 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
 
-### RookCannon (`a`)
+### RookCannon (`=a`)
 
 - Type: screen hopper
 - Move/capture is occupancy-dependent (needs a screen); not sampled on an empty board.
 
-### BishopCannon (`c`)
+### BishopCannon (`=c`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### BishopHopper (`i`)
+### BishopHopper (`=i`)
 
 - Type: screen hopper
 - Move/capture is occupancy-dependent (needs a screen); not sampled on an empty board.

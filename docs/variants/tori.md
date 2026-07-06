@@ -26,12 +26,12 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Piece | FEN | Type | Move ≠ capture |
 |---|---|---|---|
 | King | `k` | leaper / stepper | no |
-| Swallow | `y` | leaper / stepper | no |
-| ToriFalcon | `a` | leaper / stepper | no |
-| Crane | `k` | leaper / stepper | no |
-| LeftQuail | `v` | slider | no |
-| RightQuail | `r` | slider | no |
-| Pheasant | `z` | leaper / stepper | no |
+| Swallow | `*y` | leaper / stepper | no |
+| ToriFalcon | `*a` | leaper / stepper | no |
+| Crane | `*k` | leaper / stepper | no |
+| LeftQuail | `*v` | slider | no |
+| RightQuail | `*r` | slider | no |
+| Pheasant | `*z` | leaper / stepper | no |
 
 ### King (`k`)
 
@@ -39,39 +39,39 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Swallow (`y`)
+### Swallow (`*y`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward (+0,+1)
 
-### ToriFalcon (`a`)
+### ToriFalcon (`*a`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Crane (`k`)
+### Crane (`*k`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### LeftQuail (`v`)
+### LeftQuail (`*v`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1), back-right (+1,-1)
   - single step / leap: back-left (-1,-1)
 
-### RightQuail (`r`)
+### RightQuail (`*r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward (+0,+1)
   - single step / leap: back-right (+1,-1)
 
-### Pheasant (`z`)
+### Pheasant (`*z`)
 
 - Type: leaper / stepper
 - Moves & captures:

@@ -34,8 +34,8 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Lancer | `f` | slider | yes |
 | Kheshig | `w` | leaper / stepper | no |
 | Archer | `y` | slider | yes |
-| Khan | `t` | leaper / stepper | yes |
-| KhanSoldier | `s` | leaper / stepper | yes |
+| Khan | `=t` | leaper / stepper | yes |
+| KhanSoldier | `=s` | leaper / stepper | yes |
 
 ### Pawn (`p`)
 
@@ -98,7 +98,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Captures / gives check:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Khan (`t`)
+### Khan (`=t`)
 
 - Type: leaper / stepper
 - **Move ≠ capture** — the two geometries differ.
@@ -107,7 +107,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Captures / gives check:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### KhanSoldier (`s`)
+### KhanSoldier (`=s`)
 
 - Type: leaper / stepper
 - **Move ≠ capture** — the two geometries differ.

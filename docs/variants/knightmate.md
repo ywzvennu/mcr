@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
-| Commoner | `u` | leaper / stepper | no |
+| Commoner | `*u` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -63,7 +63,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), forward-left (-1,+2), back-right (+1,-2), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### Commoner (`u`)
+### Commoner (`*u`)
 
 - Type: leaper / stepper
 - Moves & captures:

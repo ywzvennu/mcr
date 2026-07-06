@@ -29,8 +29,8 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
-| KnightBishop | `h` | slider | yes |
-| BishopKnight | `b` | leaper / stepper | yes |
+| KnightBishop | `*h` | slider | yes |
+| BishopKnight | `*b` | leaper / stepper | yes |
 
 ### Pawn (`p`)
 
@@ -57,7 +57,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### KnightBishop (`h`)
+### KnightBishop (`*h`)
 
 - Type: slider
 - **Move ≠ capture** — the two geometries differ.
@@ -66,7 +66,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Captures / gives check:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### BishopKnight (`b`)
+### BishopKnight (`*b`)
 
 - Type: leaper / stepper
 - **Move ≠ capture** — the two geometries differ.
