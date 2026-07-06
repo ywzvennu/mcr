@@ -142,6 +142,11 @@ impl ChennisRules {
 }
 
 impl WideVariant<Chennis7x7> for ChennisRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 73;
+
     fn starting_position() -> (Board<Chennis7x7>, GenericState<Chennis7x7>) {
         let board = Board::<Chennis7x7>::from_fen_placement(CHENNIS_PLACEMENT)
             .expect("the Chennis starting placement is valid on a 7x7 board");

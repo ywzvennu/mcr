@@ -156,6 +156,11 @@ impl EmpireRules {
 }
 
 impl WideVariant<Chess8x8> for EmpireRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 40;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(EMPIRE_START_PLACEMENT)
             .expect("the Empire starting placement is valid on an 8x8 board");

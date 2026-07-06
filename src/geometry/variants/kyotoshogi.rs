@@ -134,6 +134,11 @@ impl KyotoshogiRules {
 }
 
 impl WideVariant<Minishogi5x5> for KyotoshogiRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 27;
+
     fn starting_position() -> (Board<Minishogi5x5>, GenericState<Minishogi5x5>) {
         let board = Board::<Minishogi5x5>::from_fen_placement(KYOTOSHOGI_PLACEMENT)
             .expect("the Kyoto Shogi starting placement is valid on a 5x5 board");

@@ -165,6 +165,11 @@ const FERZ: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 const WAZIR: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
 impl WideVariant<Chu12x12> for ChuRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 127;
+
     fn starting_position() -> (Board<Chu12x12>, GenericState<Chu12x12>) {
         let board = Board::<Chu12x12>::from_fen_placement(CHU_PLACEMENT)
             .expect("the Chu Shogi starting placement is valid on a 12x12 board");

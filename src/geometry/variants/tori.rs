@@ -296,6 +296,11 @@ impl ToriRules {
 }
 
 impl WideVariant<Tori7x7> for ToriRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 57;
+
     fn starting_position() -> (Board<Tori7x7>, GenericState<Tori7x7>) {
         let board = Board::<Tori7x7>::from_fen_placement(TORI_PLACEMENT)
             .expect("the Tori Shogi starting placement is valid on a 7x7 board");

@@ -225,6 +225,11 @@ const EIGHT_DIRS: [(i8, i8); 8] = [
 ];
 
 impl WideVariant<Tenjiku16x16> for TenjikuRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 146;
+
     fn starting_position() -> (Board<Tenjiku16x16>, GenericState<Tenjiku16x16>) {
         let board = Board::<Tenjiku16x16>::from_fen_placement(TENJIKU_PLACEMENT)
             .expect("the Tenjiku Shogi starting placement is valid on a 16x16 board");

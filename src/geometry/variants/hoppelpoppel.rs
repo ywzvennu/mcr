@@ -105,6 +105,11 @@ const HOPPELPOPPEL_START_PLACEMENT: &str = "r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPP
 pub struct HoppelPoppelRules;
 
 impl WideVariant<Chess8x8> for HoppelPoppelRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 42;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(HOPPELPOPPEL_START_PLACEMENT)
             .expect("the Hoppel-Poppel starting placement is valid on an 8x8 board");

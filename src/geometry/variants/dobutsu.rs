@@ -151,6 +151,11 @@ impl DobutsuRules {
 }
 
 impl WideVariant<Dobutsu3x4> for DobutsuRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 24;
+
     fn starting_position() -> (Board<Dobutsu3x4>, GenericState<Dobutsu3x4>) {
         let board = Board::<Dobutsu3x4>::from_fen_placement(DOBUTSU_PLACEMENT)
             .expect("the Dobutsu starting placement is valid on a 3x4 board");

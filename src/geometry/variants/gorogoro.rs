@@ -171,6 +171,11 @@ impl GorogoroRules {
 }
 
 impl WideVariant<Gorogoro5x6> for GorogoroRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 27;
+
     fn starting_position() -> (Board<Gorogoro5x6>, GenericState<Gorogoro5x6>) {
         let board = Board::<Gorogoro5x6>::from_fen_placement(GOROGORO_PLACEMENT)
             .expect("the Gorogoro starting placement is valid on a 5x6 board");

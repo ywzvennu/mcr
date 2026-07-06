@@ -70,6 +70,11 @@ const CAPAHOUSE_START_PLACEMENT: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPPP
 const KINGSIDE: usize = 0;
 
 impl WideVariant<Cap10x8> for CapahouseRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 12;
+
     fn starting_position() -> (Board<Cap10x8>, GenericState<Cap10x8>) {
         let board = Board::<Cap10x8>::from_fen_placement(CAPAHOUSE_START_PLACEMENT)
             .expect("the Capahouse starting placement is valid on a 10x8 board");

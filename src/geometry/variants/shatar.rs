@@ -87,6 +87,11 @@ const SHATAR_START_PLACEMENT: &str = "rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNB
 const FERZ_OFFSETS: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
 impl WideVariant<Chess8x8> for ShatarRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 16;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(SHATAR_START_PLACEMENT)
             .expect("the Shatar starting placement is valid on an 8x8 board");

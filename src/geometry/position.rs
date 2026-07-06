@@ -610,6 +610,33 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// without naming the geometry.
     pub const BACKING_BITS: u32 = <G::Bits as BitboardBacking>::BITS;
 
+    /// This variant's [`WideVariant::ROLE_SPAN`] — the number of leading
+    /// [`WideRole`]s the movegen loops iterate for `V`. Re-exported here so the
+    /// type-erased [`AnyWideVariant`](super::AnyWideVariant) registry and the
+    /// `role_span_covers_all_fieldable_roles` meta-test can read it without naming
+    /// `V`.
+    pub const ROLE_SPAN: usize = V::ROLE_SPAN;
+
+    /// The highest [`WideRole`] index this position **currently** fields — the
+    /// largest index with a non-empty board bitboard or a non-zero hand tally,
+    /// across both colors — scanning the full [`WideRole::ALL`] set (not the
+    /// bounded span). Used only by the `role_span_covers_all_fieldable_roles`
+    /// meta-test to walk a variant and prove no reachable position ever fields a
+    /// role at or beyond [`ROLE_SPAN`](Self::ROLE_SPAN).
+    #[cfg(test)]
+    pub(crate) fn max_fielded_role_index(&self) -> usize {
+        let mut max = 0;
+        for role in WideRole::ALL {
+            let present = !self.board.by_role(role).is_empty()
+                || self.state.placement.count(Color::White, role) > 0
+                || self.state.placement.count(Color::Black, role) > 0;
+            if present {
+                max = role.index();
+            }
+        }
+        max
+    }
+
     /// Builds a position from a board and state directly.
     #[must_use]
     #[inline]
@@ -817,7 +844,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     ) -> Bitboard<G> {
         let b = &self.board;
         let mut result = Bitboard::EMPTY;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             let pieces = b.pieces(attacker, role);
             if pieces.is_empty() {
                 continue;
@@ -900,7 +927,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[must_use]
     fn jump_general_checks(&self, king: Square<G>, by: Color) -> bool {
         let board = &self.board;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if !V::role_is_jump_capturer(role) {
                 continue;
             }
@@ -1040,7 +1067,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     pub(crate) fn attacked_by(&self, by: Color, occupied: Bitboard<G>) -> Bitboard<G> {
         let b = &self.board;
         let mut attacked = Bitboard::EMPTY;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             for from in b.pieces(by, role) {
                 attacked |= V::role_attacks(role, by, from, occupied);
             }
@@ -1074,7 +1101,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // (a rook does not pin on a diagonal, a bishop not on a file); we check
         // by asking whether the slider, on an *empty* board, would reach the
         // king square — i.e. the line is in its movement geometry.
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if !V::role_is_slider(role) {
                 continue;
             }
@@ -1447,7 +1474,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // capture `gen_pawn_moves` path below. Every other variant keeps the Pawn
         // on the dedicated pawn generator, byte-identically.
         let pawn_is_stepper = V::pawn_is_stepper();
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if role == WideRole::King || (role == WideRole::Pawn && !pawn_is_stepper) {
                 continue;
             }
@@ -1668,7 +1695,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // Non-pawn pieces (including the king): attack set minus friendly pieces
         // and minus the duck square. The duck is in neither color mask so it is
         // never a friendly piece nor a capture target.
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if role == WideRole::Pawn {
                 continue;
             }
@@ -1776,7 +1803,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // test then projects only these from each royal square rather than
         // looping every `WideRole`. A scratch position drives make/unmake in
         // place.
-        let attackers = EnemyAttackers::new(&self.board, them);
+        let attackers = EnemyAttackers::new::<G, V>(&self.board, them);
 
         // Fast-accept filter (issue #183). When the side is **not currently in
         // duple check** — at least one of its kings is unattacked now — a move
@@ -2022,7 +2049,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         plane_occ: Bitboard<G>,
     ) -> Bitboard<G> {
         let mut danger = Bitboard::EMPTY;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             for from in self.board.pieces(by, role) & plane_mask {
                 danger |= V::role_attacks(role, by, from, plane_occ);
             }
@@ -2317,7 +2344,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // The enemy roles in play, computed once for the whole node: the verify
         // test then projects only these from the king square rather than looping
         // every `WideRole`. A scratch position drives make/unmake in place.
-        let attackers = EnemyAttackers::new(&self.board, us.opposite());
+        let attackers = EnemyAttackers::new::<G, V>(&self.board, us.opposite());
 
         // Fast-accept filter (issue #193). When our king is **not currently in
         // check**, a move that touches no line through the king — its origin and
@@ -2896,7 +2923,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let capture_immune_enemies = if V::has_jump_captures() {
             let them = us.opposite();
             let mut mask = Bitboard::EMPTY;
-            for role in WideRole::ALL {
+            for &role in &WideRole::ALL[..V::ROLE_SPAN] {
                 if V::role_is_capture_immune(role) {
                     mask |= board.pieces(them, role);
                 }
@@ -2905,7 +2932,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             Bitboard::EMPTY
         };
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             // The Berolina Hoplite is always handled by its own emitter below. A
             // standard chess Pawn (double push, diagonal capture, en passant) is
             // handled by the straight-push pawn generator below; only a **forward
@@ -3107,7 +3134,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // has both a Lion and a Lion-Hawk — does not produce duplicate passes that
         // would collide on the `--` pass notation and break SAN round-tripping.
         let mut pass_emitted = false;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             let full = V::role_is_full_lion(role);
             let lines = V::role_lion_lines(role);
             if !full && lines.is_empty() {
@@ -3307,7 +3334,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     fn gen_jump_general_moves<S: WideSink>(&self, out: &mut S, us: Color) {
         let board = &self.board;
         let their_pieces = board.by_color(us.opposite());
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if !V::role_is_jump_capturer(role) {
                 continue;
             }
@@ -3679,7 +3706,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // its promoted form (FSF `dropPromoted`). Default-off, so every other hand
         // variant emits a single base-form drop per square and stays byte-identical.
         let drops_can_promote = V::drops_can_promote();
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if self.state.placement.count(us, role) == 0 {
                 continue;
             }
@@ -3758,7 +3785,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// non-empty.
     fn generate_placement_into<S: WideSink>(&self, out: &mut S) {
         let us = self.state.turn;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if self.state.placement.count(us, role) == 0 {
                 continue;
             }
@@ -3843,8 +3870,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// and the king are never gated (FSF), and a role absent from the hand emits no
     /// gate.
     fn append_hand_gating_moves<S: WideSink>(&self, out: &mut S, us: Color, eligible: Bitboard<G>) {
-        let roles: Vec<WideRole> = WideRole::ALL
-            .into_iter()
+        let roles: Vec<WideRole> = WideRole::ALL[..V::ROLE_SPAN]
+            .iter()
+            .copied()
             .filter(|&r| {
                 r != WideRole::Pawn && r != WideRole::King && self.state.placement.count(us, r) > 0
             })
@@ -4070,7 +4098,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             .with(ep);
         // Any enemy slider that now attacks the king through the freed squares
         // makes the capture illegal. We test every enemy sliding role.
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if !V::role_is_slider(role) {
                 continue;
             }
@@ -5359,7 +5387,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // (4, hand part) Pieces in hand also score (but do not count toward the
         // in-zone piece requirement). A captured big piece banks unpromoted, so the
         // big/small split still keys off the held role.
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             let held = u32::from(self.state.placement.count(side, role));
             if held == 0 {
                 continue;
@@ -5416,7 +5444,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     fn zobrist_board_part(&self) -> u64 {
         let mut hash = 0u64;
         for color in Color::ALL {
-            for role in WideRole::ALL {
+            for &role in &WideRole::ALL[..V::ROLE_SPAN] {
                 for sq in self.board.pieces(color, role) {
                     hash ^= zobrist::piece_key(color, role, sq.index());
                 }
@@ -5458,7 +5486,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
 
         for color in Color::ALL {
-            for role in WideRole::ALL {
+            for &role in &WideRole::ALL[..V::ROLE_SPAN] {
                 let count = s.placement.count(color, role);
                 if count > 0 {
                     hash ^= zobrist::hand_key(color, role, count);
@@ -6053,10 +6081,14 @@ struct EnemyAttackers {
 
 impl EnemyAttackers {
     /// Records every role color `by` has at least one piece of on `board`.
-    fn new<G: Geometry>(board: &Board<G>, by: Color) -> EnemyAttackers {
+    ///
+    /// Only the variant's own [`ROLE_SPAN`](WideVariant::ROLE_SPAN) prefix of
+    /// [`WideRole::ALL`] is scanned; every role past it is always empty for `V`,
+    /// so the shorter scan is byte-identical to iterating the full role set.
+    fn new<G: Geometry, V: WideVariant<G>>(board: &Board<G>, by: Color) -> EnemyAttackers {
         let mut roles = [WideRole::King; WideRole::COUNT];
         let mut len = 0;
-        for role in WideRole::ALL {
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
             if !board.pieces(by, role).is_empty() {
                 roles[len] = role;
                 len += 1;
