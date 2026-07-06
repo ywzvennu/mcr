@@ -31,60 +31,55 @@
 # unviable, with the single provably-equivalent `Board::occupied` `|`->`^`
 # (white|black occupancy, disjoint) excluded via `exclude_re` below.
 #
-# TODO(#445): broaden the enforcing scope toward `src/position.rs`. Progress so
-# far (this issue):
-#   * In-module `#[cfg(test)]` pins were added to `position.rs` so its movegen /
-#     make-unmake / FEN / apply core is already survivor-free under the fast
-#     `--lib` suite — the reference-perft node counts (standard + variants +
-#     Chess960), the make==play / unmake-restores round-trip walk, the move-clock
-#     transitions, and targeted unit tests for `is_legal`, `victim_value`,
-#     `is_insufficient_material`, the staged capture/quiet split, `Undo::captured`,
-#     `move_keeps_king_safe`, and an en-passant SEE swap-off. So the perft path
-#     needs NO integration-suite widening: `--lib` stays sufficient (see below).
-#   * The provably-equivalent survivors — `|`->`^` on operands that share no set
-#     bits, where union and xor are identical — are pinned in `exclude_re` below
-#     with a per-case disjointness proof.
-#   * The `Position::see` swap-off battery is now CLEARED. A scoped sweep
-#     (`cargo mutants --file src/position.rs -F see`, the `Position::see` /
-#     `see_attackers` / `see_xray_attackers` / `see_value` / `see_least_valuable`
-#     family) went from 13 surviving mutants to 2, and those 2 are the provably
-#     equivalent overflow-guard arith mutants excluded below. The 11 real ones —
-#     the min-max back-pass fold (`gain[d-1]` read), the loop bound `>=`->`<`, the
-#     x-ray re-add `& occ` mask, the bishop/queen vs rook/queen x-ray role masks
-#     and their `& attacks` filters, and the `see_value` material table — are
-#     killed by four hand-verified swap-off pins in `position::tests` (each with a
-#     literal expected SEE value, NOT `see_value(role)`, so a flattened table
-#     cannot hide): `see_value_table_is_material_scaled`,
+# `src/position.rs` — the core `Position` type: pseudo-legal + fast pin/check-mask
+# legal movegen, make/unmake, FEN parse/serialize, SEE, and the atomic/horde/
+# antichess fast paths. Swept with cargo-mutants 27.1.0 to ZERO real survivors and
+# folded into the enforcing scope by #445. How the coverage is achieved WITHOUT the
+# integration perft suites (so the per-mutant run stays the fast `--lib` suite):
+#   * In-module `#[cfg(test)]` pins cover the movegen / make-unmake / FEN / apply
+#     core — reference-perft node counts (standard + variants + Chess960), the
+#     make==play / unmake-restores round-trip walk, the move-clock transitions, and
+#     unit tests for `is_legal`, `victim_value`, `is_insufficient_material`, the
+#     staged capture/quiet split, `Undo::captured`, `move_keeps_king_safe`, and
+#     en-passant SEE. The variant fast paths are covered by the in-crate
+#     `variant::*` `#[cfg(test)]` suites (e.g. `variant::atomic::tests`,
+#     exercising `atomic_noncapture_legal_into` / `attacked_by_nonking` /
+#     `gen_pawn_pushes`) and the `variant::legal_subset_pseudo` proptest (legal ⊆
+#     pseudo over nine variants, exercising `pseudo_into_with`).
+#   * The `Position::see` swap-off battery is CLEARED (#496): four hand-verified
+#     swap-off pins (`see_value_table_is_material_scaled`,
 #     `see_bishop_xray_reveals_slider_and_ignores_offline_bishops`,
 #     `see_rook_xray_battery_ignores_offline_rooks`,
-#     `see_minimax_backpass_folds_the_previous_gain`. These run under `--lib`.
-# What still blocks flipping `position.rs` into the enforcing list — a scoped
-# sweep (`cargo mutants --file src/position.rs -j2 --timeout 60`, ~660 mutants)
-# still leaves genuine survivors OUTSIDE both the perft-reachable core AND the now
-# -cleared SEE family, each needing its own targeted tests:
-#   * `Position::pseudo_into_with` (the SEPARATE make-move-filtered pseudo-legal
-#     generator used by variant rule layers, which the fast pin/check-mask perft
-#     path never calls) and the two `#[cfg(not(feature = "magic"))]` slider
-#     branches in `atomic_noncapture_legal_into` (dead code under the
-#     `--all-features` run, so uncatchable without a second no-magic pass).
-#   * A few remaining bit-twiddle survivors (`attacked_by_nonking`'s pawn NE/NW
-#     union — NOT disjoint, since two pawns can attack one square — and the
-#     `gen_pawn_pushes` shift).
-# Killing the rest needs pseudo-legal + no-magic coverage (a second no-magic test
-# pass for the `#[cfg(not(feature = "magic"))]` branches), not the perft suites.
-# Per-mutant cost is ~10-20 s incremental build + a ~1 s test, so a full
-# ~660-mutant sweep is ~30-40 min at -j2 (and locally the copy-based runner
-# exhausts a RAM-backed `/tmp`, so TMPDIR must point at real disk). Concrete
-# unblock plan: (1) add a no-magic (`--no-default-features` + needed features)
-# kill pass so the two slider branches are reachable; (2) add `pseudo_into_with`
-# + `attacked_by_nonking` NE|NW + `gen_pawn_pushes` shift pins the way the SEE
-# battery was done; (3) then flip `examine_globs` to include `src/position.rs`,
-# widen the test filter below to add `position::tests::` (still `--lib`), and run
-# the CI sweep as a `--shard k/n` matrix to keep per-job wall-clock bounded. Until
-# all three land `position.rs` stays OUT of `examine_globs` so this ENFORCING job
-# cannot go red on those known survivors.
+#     `see_minimax_backpass_folds_the_previous_gain`), each asserting a literal SEE
+#     value so a flattened `see_value` table cannot hide.
+#   * The pseudo-legal generator (#445): `pseudo_into_with`'s kingless-white guard
+#     is pinned by `pseudo_kingless_white_has_no_first_rank_double` (kills the
+#     `&&`->`||` mutant that would route a `white_first_rank_double = false` side
+#     to the horde bulk path) and `horde_bulk_pawn_path_matches_per_pawn_generator`
+#     (a byte-equal parity check of `gen_horde_white_pawn_moves` against the
+#     per-pawn `gen_pawn_moves(.., white_first_rank_double = true)` — which also
+#     backs the equivalent-`==`->`!=` exclusion below).
+#   * The residual survivors are all EITHER provably-equivalent bit-op / arithmetic
+#     mutants (excluded in `exclude_re` with a per-case proof) OR mutations that
+#     land in `#[cfg(not(feature = "magic"))]` slider branches that are DEAD under
+#     the `--all-features` (magic) build this job uses — structurally uncatchable
+#     by any test in this build, and line-excluded with justification below. Their
+#     `#[cfg(feature = "magic")]` mirrors ARE in scope and caught. A second
+#     no-magic mutants pass (which WOULD kill the dead branches directly) was
+#     deliberately NOT added: it would double CI build cost for two role-split
+#     loops the magic mirrors already pin.
+# Why the test filter stays `--lib` (NOT the full integration suite): a full-suite
+# baseline builds ~99 integration test binaries (~18 min cold), so a per-mutant
+# integration rebuild costs minutes — hundreds of hours across the ~850-mutant
+# board+position scope, which would make this scheduled job hang rather than gate.
+# The fast `--lib` suite MINUS the slow geometry proptests (`-- --skip geometry`,
+# ~1 s vs ~126 s) was verified to catch every real position.rs mutant, so it is
+# both sufficient AND tractable. Locally the copy-based runner exhausts a RAM-backed
+# `/tmp`, so TMPDIR must point at real disk; the CI job shards the scope with
+# `--shard k/N` (see ci.yml) to keep each shard's wall-clock bounded.
 examine_globs = [
     "src/board.rs",
+    "src/position.rs",
 ]
 
 # Everything not in `examine_globs` is implicitly out of scope; `exclude_globs`
@@ -145,13 +140,15 @@ exclude_globs = [
 #     DOES fire early and is a real survivor — killed by the SEE swap-off tests,
 #     NOT excluded). `depth + 1` is the sole non-compound `+` in `Position::see`,
 #     so each regex names exactly that token.
-# NOTE: only the `Board::occupied` line is active today (board.rs is the enforcing
-# scope); the `Position::*` / `CastlingRights::*` lines are inert until position.rs
-# is broadened into `examine_globs`, and are recorded now so that sweep starts from
-# a justified baseline. They are deliberately NOT function-broad where a function
-# also has a NON-disjoint `|` (e.g. `attacked_by_nonking`'s pawn NE|NW union is a
-# real survivor, not excluded), and never touch the `|`->`&` variants, which DO
-# change behaviour.
+# NOTE: with #445, BOTH `src/board.rs` and `src/position.rs` are in `examine_globs`,
+# so every line below is now ACTIVE (load-bearing: without it the enforcing job
+# reports an uncatchable equivalent — or a dead cfg'd-out mutant — as a survivor).
+# The patterns are deliberately NOT function-broad where a function also has a
+# NON-disjoint `|` or a real, caught token (e.g. `attacked_by_nonking`'s pawn NE|NW
+# union IS a real survivor, killed by tests, not excluded; the magic-branch `&`
+# masks are real and caught) — those are line-anchored so a function-broad regex
+# can never silently hide them. The `|`->`&` variants are never excluded: they DO
+# change behaviour and are caught.
 exclude_re = [
     'replace \| with \^ in Board::occupied',
     'replace \| with \^ in CastlingRights::from_rook_files',
@@ -163,31 +160,95 @@ exclude_re = [
     'replace \| with \^ in Position::is_insufficient_material',
     'replace \+ with - in Position::see',
     'replace \+ with \* in Position::see',
+    # --- #445: further provably-equivalent `|`->`^` disjoint-union survivors on
+    # the position.rs pseudo/atomic/danger paths (function-broad is SAFE here —
+    # every plain `|` in each named function is a union of disjoint operands, so
+    # `^` == `|`; see the per-function proof block above the array):
+    'replace \| with \^ in Position::atomic_noncapture_legal_into',
+    'replace \| with \^ in Position::gen_slider_moves',
+    # More disjoint-union `|`->`^` equivalents on the fast legal / pin / ep paths:
+    #   * generate_into_with_castles — `checkers | between(king, checker)`: the
+    #     single checker is an endpoint, never in the strictly-between ray, so the
+    #     two are disjoint (same shape as the atomic check-mask above).
+    #   * compute_pins — `rook-role | queen-role` and `bishop-role | queen-role`
+    #     (a square holds one role), and `rook_pinners | bishop_pinners` (a pinner
+    #     lies on exactly one king ray — orthogonal XOR diagonal — so the two
+    #     pinner sets are disjoint).
+    #   * ep_is_legal — the same rook|queen / bishop|queen disjoint role unions.
+    # Each function's ONLY plain `|` tokens are these disjoint unions, so
+    # function-broad is safe (NB: `gen_castles`/`gen_castles_960`'s `king_path |
+    # rook_path` OVERLAP, so those `|`->`^` are REAL and are deliberately NOT here).
+    'replace \| with \^ in Position::generate_into_with_castles',
+    'replace \| with \^ in Position::compute_pins',
+    'replace \| with \^ in Position::ep_is_legal',
+    # attacked_by is MIXED like attacked_by_nonking — its pawn NE|NW union (lines
+    # 1512/1513) is a NON-disjoint real survivor caught by tests, so only the
+    # disjoint bishop|queen / rook|queen role unions are line-anchored here:
+    'src/position\.rs:1524:54: replace \| with \^ in Position::attacked_by',
+    'src/position\.rs:1528:50: replace \| with \^ in Position::attacked_by',
+    # pseudo_into_with's kingless-side guard `white_first_rank_double && us ==
+    # Color::White` (line 1101): the `==`->`!=` mutant is EQUIVALENT. The guard is
+    # reached only for a kingless side to move; flipping it merely switches a
+    # kingless white horde side between the bulk `gen_horde_white_pawn_moves` and
+    # the per-pawn `gen_pawn_moves(.., white_first_rank_double = true)` (the else
+    # branch forwards the flag), which emit byte-identical move sets — pinned by
+    # `horde_bulk_pawn_path_matches_per_pawn_generator`. (The `&&`->`||` mutant on
+    # the SAME line IS real — it routes a `white_first_rank_double = false` side to
+    # the horde path — and is caught by `pseudo_kingless_white_has_no_first_rank_double`.)
+    'src/position\.rs:1101:49: replace == with != in Position::pseudo_into_with',
+    # gen_pawn_pushes double-push stride `2 * forward` with `forward` ∈ {+1,-1}:
+    # `2 * forward` == `2 / forward` for both values, so `*`->`/` is equivalent
+    # (the `*`->`+` sibling on the same token IS real and is caught, not excluded).
+    'replace \* with / in Position::gen_pawn_pushes',
+    # attacked_by_nonking is MIXED — its pawn NE|NW union (lines 1479/1480) is a
+    # NON-disjoint real survivor that IS caught by tests, so these two are
+    # line-anchored to the disjoint role-unions only (bishop|queen, rook|queen):
+    'src/position\.rs:1487:54: replace \| with \^ in Position::attacked_by_nonking',
+    'src/position\.rs:1491:50: replace \| with \^ in Position::attacked_by_nonking',
+    # --- #445: `#[cfg(not(feature = "magic"))]` slider branches, DEAD under the
+    # `--all-features` (magic) build the enforcing job uses: the mutated tokens
+    # are cfg'd out, so every such mutant compiles to a byte-identical binary and
+    # is structurally uncatchable by ANY test in this build. Their `#[cfg(feature
+    # = "magic")]` mirrors (same role-split emit logic) ARE in scope and caught.
+    # Line-anchored because each function ALSO has real, caught `&`/`|=` tokens in
+    # its magic branch that a function-broad regex would wrongly hide; a line
+    # drift merely re-surfaces the dead mutant as a survivor and reddens the gate
+    # (self-correcting), it cannot silently weaken it.
+    'src/position\.rs:1410:29: replace \|= with &= in Position::atomic_noncapture_legal_into',
+    'src/position\.rs:1413:29: replace \|= with &= in Position::atomic_noncapture_legal_into',
+    'src/position\.rs:1415:\d+: replace & with [|^] in Position::atomic_noncapture_legal_into',
+    'src/position\.rs:2052:29: replace \|= with &= in Position::gen_slider_moves',
+    'src/position\.rs:2055:29: replace \|= with &= in Position::gen_slider_moves',
+    'src/position\.rs:2057:\d+: replace & with [|^] in Position::gen_slider_moves',
+    'src/position\.rs:2057:41: delete ! in Position::gen_slider_moves',
 ]
 
 # ---------------------------------------------------------------------------
 # Test run per mutant: the fast LIB unit tests only.
 # ---------------------------------------------------------------------------
 # cargo-mutants re-runs `cargo test` for every mutant. The enforcing scope
-# (`src/board.rs`) is exercised entirely by the crate's in-module `#[cfg(test)]`
-# unit tests, so the run is restricted to the library target (`--lib`) AND to
-# that module's own tests (`board::tests::`, minus the same-named geometry
-# module): `board.rs` was verified to have 0 survivors under this scope, and
-# skipping the ~99 integration test binaries — and the unrelated heavier module
-# suites (e.g. `position`'s reference-perft pins, which a `board` mutant that
-# corrupts core indexing can send into a long/looping run) — keeps each
-# per-mutant run fast and the enforcing sweep tractable on shared CI.
+# (`src/board.rs` + `src/position.rs`) is exercised entirely by the crate's
+# in-module `#[cfg(test)]` unit tests — the board/position pins AND the
+# `variant::*::tests` + `variant::legal_subset_pseudo` suites that drive the
+# atomic/horde/antichess fast paths and the pseudo-legal generator — so the run is
+# restricted to the library target (`--lib`), skipping the ~99 integration test
+# binaries. It ALSO skips the `geometry` module's tests (`-- --skip geometry`):
+# those are exhaustive attack-table proptests that take ~126 s (vs ~1 s for the
+# rest of the lib suite) and cover no board/position rules logic, so excluding
+# them keeps each per-mutant run about a second and the whole sweep tractable.
+# Both modules were verified to reach 0 real survivors under exactly this filter.
 # `--all-features` is passed so feature-gated paths (the `magic` attack table,
 # `parallel`, `serde`) are also built, matching the all-features test gate.
 #
-# NOTE for #445: the test filter is deliberately per-module. `position.rs`'s
-# perft coverage was likewise added as IN-MODULE `#[cfg(test)]` pins
-# (reference-perft node counts + make/unmake round-trips) rather than left to the
-# integration perft suites, so when `position.rs` is broadened into
-# `examine_globs` the filter widens to `position::tests::` (still `--lib`), never
-# needing the ~99-binary integration build per mutant.
+# NOTE for #445: the filter stays `--lib` on PURPOSE, NOT the full non-ignored
+# (integration) suite. A full-suite baseline builds every integration perft binary
+# (~18 min cold), making a per-mutant integration rebuild cost minutes — hundreds
+# of hours across this scope, i.e. a hung scheduled job rather than a gate. The
+# `--lib` (minus geometry) suite was verified survivor-equivalent for both modules
+# here, so it is both sufficient and fast. `position.rs`'s coverage was added as
+# in-module / in-crate `#[cfg(test)]` pins precisely so this holds.
 test_tool = "cargo"
-additional_cargo_test_args = ["--all-features", "--lib", "board::tests::", "--", "--skip", "geometry"]
+additional_cargo_test_args = ["--all-features", "--lib", "--", "--skip", "geometry"]
 
 # ---------------------------------------------------------------------------
 # Timeouts: keep per-mutant runs bounded.

@@ -4521,4 +4521,140 @@ mod tests {
         assert!(cap.is_capture());
         assert_eq!(pos.see(&cap), 220);
     }
+
+    /// Collects the UCI strings of the moves a generator pushes into a list, for
+    /// the pseudo-legal generators exercised below.
+    fn ucis_of(gen: impl FnOnce(&mut MoveList)) -> Vec<String> {
+        let mut list = MoveList::new();
+        gen(&mut list);
+        list.into_vec().iter().map(|m| m.to_uci()).collect()
+    }
+
+    /// A kingless white side (which antichess reaches once the king is captured
+    /// or promoted away) taking the STANDARD pseudo path advances a first-rank
+    /// pawn a single square only: the horde first-rank *double* is exclusive to
+    /// [`Position::pseudo_into_horde`]. The kingless-white guard in
+    /// `pseudo_into_with` is `white_first_rank_double && us == Color::White`; with
+    /// `white_first_rank_double` false here, degrading the `&&` to `||` wrongly
+    /// routes this side through the horde bulk generator and emits the a1a3 double.
+    #[test]
+    fn pseudo_kingless_white_has_no_first_rank_double() {
+        // Black king on e8, a lone white pawn on a1, everything else empty; white
+        // to move but with no king of its own.
+        let board = Board::from_fen_placement("4k3/8/8/8/8/8/8/P7").unwrap();
+        let pos = Position::from_fields(board, Color::White, CastlingRights::NONE, None, 0, 1);
+        let ucis = ucis_of(|out| pos.pseudo_into(out));
+        assert!(
+            ucis.contains(&"a1a2".to_string()),
+            "the single push must be present: {ucis:?}"
+        );
+        assert!(
+            !ucis.contains(&"a1a3".to_string()),
+            "the standard pseudo path must not emit a horde first-rank double: {ucis:?}"
+        );
+    }
+
+    /// The horde pseudo path ([`Position::pseudo_into_horde`],
+    /// `white_first_rank_double = true`) lets a kingless white side's first-rank
+    /// pawn advance two squares — a plain quiet, no en-passant target. This pins
+    /// the horde bulk generator [`Position::gen_horde_white_pawn_moves`] end to
+    /// end via the public pseudo entry point.
+    #[test]
+    fn pseudo_horde_white_first_rank_double() {
+        let board = Board::from_fen_placement("4k3/8/8/8/8/8/8/P7").unwrap();
+        let pos = Position::from_fields(board, Color::White, CastlingRights::NONE, None, 0, 1);
+        let ucis = ucis_of(|out| pos.pseudo_into_horde(out));
+        assert!(
+            ucis.contains(&"a1a2".to_string()),
+            "the single push must be present: {ucis:?}"
+        );
+        assert!(
+            ucis.contains(&"a1a3".to_string()),
+            "the horde first-rank double must be present: {ucis:?}"
+        );
+    }
+
+    /// The two kingless-white pawn generators emit the SAME pseudo-legal set.
+    ///
+    /// `pseudo_into_with`'s kingless branch routes a horde-style white side either
+    /// through the bulk [`Position::gen_horde_white_pawn_moves`] (the horde perft
+    /// hot path) or, when its `us == Color::White` guard is not taken, through the
+    /// per-pawn [`Position::gen_pawn_moves`] with `white_first_rank_double = true`
+    /// (the else branch passes the flag through). The bulk path is a performance
+    /// rewrite of the per-pawn "source of truth", so both must produce byte-equal
+    /// move sets. This parity is what makes the `== Color::White` -> `!= …` mutant
+    /// on that guard a provably-equivalent survivor (excluded in mutants.toml with
+    /// this test as the load-bearing evidence), and it independently kills any
+    /// mutant in EITHER generator that would break the agreement.
+    ///
+    /// The position is deliberately rich: a first-rank pawn (a1: single + the
+    /// horde first-rank double), a start-rank pawn (b2: single + double), a
+    /// promotion pawn (c7: quiet promotions on c8 and capturing promotions on the
+    /// d8 knight), and an en-passant taker (e5 x d6, black having just played
+    /// d7-d5) — so every pawn move class the two paths share is exercised.
+    #[test]
+    fn horde_bulk_pawn_path_matches_per_pawn_generator() {
+        let board = Board::from_fen_placement("3n3k/2P5/8/3pP3/8/8/1P6/P7").unwrap();
+        let pos = Position::from_fields(
+            board,
+            Color::White,
+            CastlingRights::NONE,
+            Some(Square::D6),
+            0,
+            1,
+        );
+        let occupied = pos.board.occupied();
+        let their_pieces = pos.board.by_color(Color::Black);
+
+        let bulk = {
+            let mut list = MoveList::new();
+            pos.gen_horde_white_pawn_moves(&mut list, occupied, their_pieces);
+            let mut v: Vec<String> = list.into_vec().iter().map(|m| m.to_uci()).collect();
+            v.sort();
+            v
+        };
+        let per_pawn = {
+            let mut list = MoveList::new();
+            pos.gen_pawn_moves(
+                &mut list,
+                Color::White,
+                occupied,
+                their_pieces,
+                Bitboard::FULL,
+                &Pins::EMPTY,
+                Square::A1,
+                true,
+                false,
+            );
+            let mut v: Vec<String> = list.into_vec().iter().map(|m| m.to_uci()).collect();
+            v.sort();
+            v
+        };
+
+        assert_eq!(
+            bulk, per_pawn,
+            "the horde bulk pawn generator must match the per-pawn generator"
+        );
+        // Non-vacuous: the shared set covers pushes, doubles, promotions, and ep.
+        assert!(
+            bulk.contains(&"a1a3".to_string()),
+            "first-rank double: {bulk:?}"
+        );
+        assert!(
+            bulk.contains(&"b2b4".to_string()),
+            "start-rank double: {bulk:?}"
+        );
+        assert!(
+            bulk.contains(&"e5d6".to_string()),
+            "en-passant taker: {bulk:?}"
+        );
+        assert!(
+            bulk.iter().any(|m| m == "c7c8q"),
+            "quiet promotion: {bulk:?}"
+        );
+        assert!(
+            bulk.iter().any(|m| m == "c7d8q"),
+            "capturing promotion: {bulk:?}"
+        );
+    }
 }

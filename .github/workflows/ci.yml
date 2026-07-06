@@ -620,21 +620,27 @@ jobs:
   # builds+tests once per mutant.
   #
   # ENFORCING over a proven-clean subset. `.cargo/mutants.toml` scopes the run to
-  # `src/board.rs` — the 8x8 piece-placement module, swept to zero surviving
-  # mutants — and runs the fast `--lib` unit suite per mutant. With that scope
-  # pinned survivor-free, the `|| true` is dropped so a NEW survivor (a change to
-  # `board.rs` behaviour that its unit tests fail to catch) fails the job. The
-  # enforcing scope is intentionally narrow; broadening it to the movegen/rules
-  # modules (`position.rs`, the geometry layer) is tracked in #445. Groundwork
-  # for `position.rs` has landed (in-module perft/make-unmake/helper pins + the
-  # equivalent-mutant `exclude_re` in `.cargo/mutants.toml`), but a scoped sweep
-  # still leaves genuine survivors in the SEE swap-off, the pseudo-legal
-  # generator, and the no-magic slider paths, so it stays OUT of `examine_globs`
-  # until those are killed (see the TODO(#445) block in the mutants config).
+  # `src/board.rs` (the 8x8 piece-placement module) AND `src/position.rs` (the core
+  # `Position` movegen / make-unmake / FEN / SEE / atomic-horde-antichess fast
+  # paths) — both swept to zero real surviving mutants (#445) — and runs the fast
+  # `--lib` unit suite (minus the slow geometry proptests) per mutant. With the
+  # scope pinned survivor-free, the `|| true` is dropped so a NEW survivor (a rules
+  # change its unit tests fail to catch) fails the job. Broadening further (the
+  # geometry layer, the variant rule modules) remains future work.
+  #
+  # SHARDED: the board+position scope is ~850 mutants; a single job at the fast
+  # per-mutant cost would run well over an hour, so the work is split with
+  # cargo-mutants' `--shard k/N` into a matrix of N jobs (round-robin, so each
+  # shard gets a balanced mix). Each shard is independently enforcing; `fail-fast:
+  # false` lets every shard report so one survivor does not mask others.
   mutants:
-    name: mutants (cargo-mutants, enforcing on src/board.rs)
+    name: mutants (enforcing on board.rs + position.rs) shard ${{ matrix.shard }}
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['0/8', '1/8', '2/8', '3/8', '4/8', '5/8', '6/8', '7/8']
     steps:
       - uses: actions/checkout@v7
 
@@ -647,13 +653,15 @@ jobs:
       - name: Install cargo-mutants
         uses: taiki-e/install-action@cargo-mutants
 
-      # Reads `.cargo/mutants.toml` (scope + `--all-features --lib board::tests::`
-      # test args + timeouts + equivalent-mutant excludes). `--no-shuffle` keeps
-      # the report order stable; `-j 2` parallelises within the runner. The
-      # explicit tight `--timeout`/`--build-timeout` bound any mutant that spins a
-      # test into a (near-)infinite loop (e.g. `from_fen_placement`'s loop counter
-      # made non-advancing) so it dies in ~60 s instead of waiting out a
-      # baseline-derived bound.
+      # Reads `.cargo/mutants.toml` (scope + `--all-features --lib -- --skip
+      # geometry` test args + timeouts + equivalent-mutant excludes). `--shard
+      # k/N` runs only this matrix job's slice of the generated mutants; `-j 2`
+      # parallelises within the runner. The explicit tight `--timeout`/
+      # `--build-timeout` bound any mutant that spins a test into a
+      # (near-)infinite loop (e.g. `from_fen_placement`'s loop counter made
+      # non-advancing) so it dies in ~60 s instead of waiting out a
+      # baseline-derived bound. (`--no-shuffle` is omitted: sharding needs the
+      # default post-shard randomisation to balance each shard.)
       #
       # cargo-mutants exit codes: 0 = every mutant caught; 3 = one or more mutants
       # *timed out*; 2 = one or more mutants *survived* (MISSED). A timeout is a
@@ -661,17 +669,18 @@ jobs:
       # so exit 3 is an acceptable pass; but a MISSED mutant must fail the job.
       # This gate therefore fails iff `missed.txt` is non-empty OR the run errors
       # for any reason other than a timeout. This is NOT `|| true`: a real
-      # surviving mutant still fails. (The 60 s bound is ~60x the sub-second
-      # baseline test, so a timeout here means a genuine infinite loop, never a
-      # merely-slow — and thus possibly-surviving — test.)
-      - name: cargo-mutants (enforcing)
+      # surviving mutant still fails. (The 90 s bound is ~5x the ~18 s baseline
+      # test — the `--lib` suite now also runs the position/variant pins and the
+      # `legal ⊆ pseudo` proptest — so a timeout here means a genuine infinite
+      # loop, never a merely-slow but possibly-surviving test.)
+      - name: cargo-mutants (enforcing, shard ${{ matrix.shard }})
         run: |
           set +e
-          cargo mutants --no-shuffle -j 2 --timeout 60 --build-timeout 300
+          cargo mutants -j 2 --timeout 90 --build-timeout 300 --shard '${{ matrix.shard }}'
           code=$?
           set -e
           if [ -s mutants.out/missed.txt ]; then
-            echo "::error::cargo-mutants found surviving (MISSED) mutants:"
+            echo "::error::cargo-mutants found surviving (MISSED) mutants in shard ${{ matrix.shard }}:"
             cat mutants.out/missed.txt
             exit 1
           fi
@@ -683,7 +692,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mutants-out
+          name: mutants-out-shard-${{ strategy.job-index }}
           path: mutants.out
           if-no-files-found: error
 
