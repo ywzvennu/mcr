@@ -245,6 +245,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Synochess), "perft_synochess.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Tencubed), "perft_tencubed.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Tenjiku), "perft_tenjiku.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("HaChu-only large shogi; HaChu crashes on 16x16 and FSF has no tenjiku"), DrawTest::Named("tenjiku_one_sided_attack_repetition_draws")),
+    row(Game::Wide(WideVariantId::Threekings), "perft_threekings.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("threekings_losing_a_king_loses")),
     row(Game::Wide(WideVariantId::Tori), "perft_torishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("tori_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF wa-shogi; HaChu's wa-shogi is a different ruleset (51 vs 57 start moves) — independent brute force is the second source"), DrawTest::Named("washogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Xiangfu), "perft_xiangfu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
