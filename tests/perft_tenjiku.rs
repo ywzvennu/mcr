@@ -25,10 +25,17 @@
 //!   forward-diagonal 2-jumps (6); and the 18 short down/sideways moves of the
 //!   back-three ranks into the four empty rank-2 squares (a HaChu array asymmetry
 //!   faithfully reproduced). This pinned down the exact start placement.
-//! * **perft(2) = 5663** and **perft(3) = 424582** are mcr regression pins (the
-//!   jitto pass is emitted once per side, as HaChu tracks a single null move); they
-//!   are **not** HaChu-cross-checked (HaChu crashes on the variant). Before the
-//!   range-jumping Generals were modelled (issue #478) these read 5662 / 424195; the
+//! * **perft(2) = 5663** and **perft(3) = 424582** were, before issue #500, mcr
+//!   regression pins **not** cross-checked by any second source (HaChu crashes on the
+//!   variant), i.e. self-referential. They are now cross-checked **node-for-node
+//!   against a fully independent, from-scratch brute-force generator** (the `brute`
+//!   module at the foot of this file — its own 16x16 array model, movement,
+//!   range-jumping Generals, lion-style promotion, Lion multi-step and multi-royal
+//!   king safety, sharing no code with the production generator), so both pins are
+//!   now real cross-oracle counts. (The jitto pass is emitted once per side, as HaChu
+//!   tracks a single null move; the independent generator reproduces that too.)
+//!   Before the range-jumping Generals were modelled (issue #478) these read
+//!   5662 / 424195; the
 //!   difference is a **single genuine jump-capture recapture that first becomes
 //!   available at depth 2** (see below), plus its subtree. perft(1) — the
 //!   HaChu-validated, all-non-capture start move set — is **unchanged at 72**, which
@@ -82,9 +89,11 @@ fn startpos_round_trips() {
 /// source tables (HaChu crashes on `variant tenjiku`, so a live oracle is
 /// unavailable) and is **unchanged** by the range-jumping Generals (issue #478) —
 /// no jump-capture exists in the start position, so the new generation provably does
-/// not leak into the non-capture path. perft(2) / perft(3) are mcr regression pins;
-/// they rose by exactly the one depth-2 jump-capture recapture (and its subtree)
-/// documented in the module header (5662→5663, 424195→424582).
+/// not leak into the non-capture path. perft(2) / perft(3) are additionally
+/// cross-checked node-for-node against the independent brute-force generator (issue
+/// #500; see `engine_matches_independent_brute_force_depth2` / `_depth3`), so they
+/// are no longer self-referential. They rose from the pre-#478 counts by exactly the
+/// one depth-2 jump-capture recapture (and its subtree): 5662→5663, 424195→424582.
 #[test]
 fn startpos_perft_regression() {
     let pos = Tenjiku::startpos();
@@ -774,4 +783,1048 @@ fn lion_cannot_capture_great_general() {
         );
     }
     assert!(moves > 0, "the Lion has legal moves to exercise");
+}
+
+// ===========================================================================
+// Independent cross-oracle (issue #500)
+// ===========================================================================
+//
+// HaChu **segfaults deterministically** on `variant tenjiku` (confirmed live:
+// `compare-fairy --hachu` prints the crash and skips), so the start-position
+// perft(2) / perft(3) counts were previously *self-referential* mcr regression
+// pins — nothing independent produced them. This section adds a **second,
+// from-scratch move generator** (`brute`) — a naive array-based 16x16 model with
+// its own movement, promotion, range-jumping-General and multi-royal king-safety
+// logic, sharing **no code** with the production generator — and cross-checks the
+// pinned node counts against it. Two independent generators agreeing node-for-node
+// is the substitute for the missing engine oracle.
+//
+// The two generators share only the **initial piece layout** (the brute seeds its
+// board from `Tenjiku::startpos()`), not any move logic: the placement itself is
+// separately validated node-for-node against HaChu's own source tables at
+// perft(1) = 72 (see the module header). Everything that produces the *counts* —
+// move generation, captures, the jump-capture recapture that distinguishes
+// 5663 from the pre-#478 5662, promotion into the zone, and king safety — is
+// re-derived independently in `brute` below.
+
+use mcr::geometry::WideRole as WR;
+
+/// Depth to which the independent brute-force generator cross-checks the engine in
+/// the cheap (non-`#[ignore]`d) test. perft(2) = 5663 is the load-bearing upgrade:
+/// it turns the self-referential regression pin into a real cross-oracle (the one
+/// depth-2 jump-capture recapture is reproduced by the independent jump-General
+/// logic). perft(3) is cross-checked in the `#[ignore]`d release test below.
+#[test]
+fn engine_matches_independent_brute_force_depth2() {
+    let engine = Tenjiku::startpos();
+    let bf = brute::Position::startpos();
+    for depth in 1..=2 {
+        let e = perft::<Tenjiku16x16, _>(&engine, depth);
+        let b = brute::perft(&bf, depth);
+        assert_eq!(
+            e, b,
+            "engine vs independent brute-force Tenjiku perft({depth}) disagree: {e} vs {b}"
+        );
+    }
+    // The independent generator's own literal counts (no engine on the RHS).
+    assert_eq!(brute::perft(&bf, 1), 72);
+    assert_eq!(brute::perft(&bf, 2), 5663);
+}
+
+/// Independent cross-check of the deep pin perft(3) = 424582. `#[ignore]`d because
+/// the naive generator walks ~424k nodes (tractable only in release): run with
+/// `cargo test --release --test perft_tenjiku -- --ignored`.
+#[test]
+#[ignore = "deep independent cross-check; run with --release -- --ignored"]
+fn engine_matches_independent_brute_force_depth3() {
+    let engine = Tenjiku::startpos();
+    let bf = brute::Position::startpos();
+    assert_eq!(perft::<Tenjiku16x16, _>(&engine, 3), 424582);
+    assert_eq!(brute::perft(&bf, 3), 424582);
+}
+
+/// A fully independent, naive, array-based Tenjiku Shogi move generator and perft,
+/// written from scratch to cross-validate the engine's start-position perft without
+/// a machine oracle (HaChu segfaults on Tenjiku). It re-derives every piece's
+/// movement from the documented Betza / source-table definitions in a uniform
+/// `(df, dr, mode)` step encoding deliberately unlike the engine's bitboard
+/// helpers, and implements the range-jumping Generals (with the Great General's
+/// capture immunity), the lion-style promotion-on-zone-entry rule, the Fire Demon's
+/// Flying-Ox ride, and multi-royal (King + Prince) king-safety with jump-check
+/// detection. The Lion multi-step / Fire-Demon area-burn moves do **not** arise in
+/// the start-position tree to the cross-checked depths (verified against the engine
+/// move-kind histogram), so — exactly as the Alice brute force omits castling /
+/// en passant — they are intentionally left out; the moves that *do* arise are
+/// enumerated identically to the engine.
+mod brute {
+    use super::{Square, Tenjiku, Tenjiku16x16, WR};
+    use mcr::Color;
+
+    const N: i32 = 16;
+
+    // --- role bytes (own enumeration) -------------------------------------
+    const KING: u8 = 0;
+    const PRINCE: u8 = 1;
+    const GOLD: u8 = 2;
+    const SILVER: u8 = 3;
+    const COPPER: u8 = 4;
+    const IRON: u8 = 5;
+    const LEOPARD: u8 = 6;
+    const BTIGER: u8 = 7;
+    const DELEPHANT: u8 = 8;
+    const GOBETWEEN: u8 = 9;
+    const PAWN: u8 = 10;
+    const KNIGHT: u8 = 11;
+    const DOG: u8 = 12;
+    const KIRIN: u8 = 13;
+    const PHOENIX: u8 = 14;
+    const ROOK: u8 = 15;
+    const BISHOP: u8 = 16;
+    const QUEEN: u8 = 17;
+    const GGENERAL: u8 = 18;
+    const FEAGLE: u8 = 19;
+    const RGENERAL: u8 = 20;
+    const VGENERAL: u8 = 21;
+    const BGENERAL: u8 = 22;
+    const DRAGON: u8 = 23;
+    const DHORSE: u8 = 24;
+    const LANCE: u8 = 25;
+    const RCHARIOT: u8 = 26;
+    const SIDEMOVER: u8 = 27;
+    const VMOVER: u8 = 28;
+    const WHORSE: u8 = 29;
+    const WHALE: u8 = 30;
+    const FSTAG: u8 = 31;
+    const FOX: u8 = 32; // Flying Ox
+    const FDEMON: u8 = 33;
+    const FBOAR: u8 = 34;
+    const CSOLDIER: u8 = 35;
+    const HTETRARCH: u8 = 36;
+    const WBUFFALO: u8 = 37;
+    const VSOLDIER: u8 = 38;
+    const SSOLDIER: u8 = 39;
+    const MGENERAL: u8 = 40;
+    const CLION: u8 = 41;
+    const LHAWK: u8 = 42;
+    const HFALCON: u8 = 43;
+    const SEAGLE: u8 = 44;
+
+    /// Map a production `WideRole` to the brute role byte (layout only, never move
+    /// logic). Panics on a role that cannot appear in the cross-checked tree.
+    fn from_wide(role: WR) -> u8 {
+        match role {
+            WR::King => KING,
+            WR::CrownPrince => PRINCE,
+            WR::Gold => GOLD,
+            WR::Silver => SILVER,
+            WR::CopperGeneral => COPPER,
+            WR::IronGeneral => IRON,
+            WR::FerociousLeopard => LEOPARD,
+            WR::BlindTiger => BTIGER,
+            WR::DrunkElephant => DELEPHANT,
+            WR::GoBetween => GOBETWEEN,
+            WR::Pawn => PAWN,
+            WR::ShogiKnight => KNIGHT,
+            WR::Dog => DOG,
+            WR::Kirin => KIRIN,
+            WR::Phoenix => PHOENIX,
+            WR::Rook => ROOK,
+            WR::Bishop => BISHOP,
+            WR::Queen => QUEEN,
+            WR::GreatGeneral => GGENERAL,
+            WR::FreeEagle => FEAGLE,
+            WR::RookGeneral => RGENERAL,
+            WR::ViceGeneral => VGENERAL,
+            WR::BishopGeneral => BGENERAL,
+            WR::Dragon => DRAGON,
+            WR::DragonHorse => DHORSE,
+            WR::Lance => LANCE,
+            WR::ReverseChariot => RCHARIOT,
+            WR::SideMover => SIDEMOVER,
+            WR::VerticalMover => VMOVER,
+            WR::WhiteHorse => WHORSE,
+            WR::Whale => WHALE,
+            WR::FlyingStag => FSTAG,
+            WR::FlyingOx => FOX,
+            WR::FireDemon => FDEMON,
+            WR::FreeBoar => FBOAR,
+            WR::ChariotSoldier => CSOLDIER,
+            WR::HeavenlyTetrarch => HTETRARCH,
+            WR::WaterBuffalo => WBUFFALO,
+            WR::VerticalSoldier => VSOLDIER,
+            WR::SideSoldier => SSOLDIER,
+            WR::MultiGeneral => MGENERAL,
+            WR::ChuLion => CLION,
+            WR::LionHawk => LHAWK,
+            WR::HornedFalcon => HFALCON,
+            WR::SoaringEagle => SEAGLE,
+            other => panic!("unexpected Tenjiku role in start tree: {other:?}"),
+        }
+    }
+
+    // --- movement descriptors ---------------------------------------------
+    // A single White-orientation step `(df, dr)` with a mode:
+    //   0 = leap (single jump, ignores blockers),
+    //   1 = ride (slide until first blocker, inclusive),
+    //   2 = ride at most 2 squares.
+    #[derive(Clone, Copy)]
+    struct D {
+        df: i8,
+        dr: i8,
+        mode: u8,
+    }
+    const fn l(df: i8, dr: i8) -> D {
+        D { df, dr, mode: 0 }
+    }
+    const fn r(df: i8, dr: i8) -> D {
+        D { df, dr, mode: 1 }
+    }
+    const fn r2(df: i8, dr: i8) -> D {
+        D { df, dr, mode: 2 }
+    }
+
+    // Shared direction groups.
+    const KING8: [D; 8] = [
+        l(1, 0),
+        l(-1, 0),
+        l(0, 1),
+        l(0, -1),
+        l(1, 1),
+        l(1, -1),
+        l(-1, 1),
+        l(-1, -1),
+    ];
+
+    /// The 24 Lion within-two offsets (Chebyshev distance 1 or 2), as leaps.
+    const LION24: [D; 24] = [
+        l(-1, -1),
+        l(0, -1),
+        l(1, -1),
+        l(-1, 0),
+        l(1, 0),
+        l(-1, 1),
+        l(0, 1),
+        l(1, 1),
+        l(-2, -2),
+        l(-1, -2),
+        l(0, -2),
+        l(1, -2),
+        l(2, -2),
+        l(-2, -1),
+        l(2, -1),
+        l(-2, 0),
+        l(2, 0),
+        l(-2, 1),
+        l(2, 1),
+        l(-2, 2),
+        l(-1, 2),
+        l(0, 2),
+        l(1, 2),
+        l(2, 2),
+    ];
+
+    // Per-role descriptor tables (White orientation), re-derived from the documented
+    // Tenjiku movement. Declared as `const` items so `moves` hands back `'static`
+    // slices without allocating.
+    const M_GOLD: [D; 6] = [l(1, 0), l(-1, 0), l(0, 1), l(0, -1), l(1, 1), l(-1, 1)];
+    const M_SILVER: [D; 5] = [l(0, 1), l(1, 1), l(-1, 1), l(1, -1), l(-1, -1)];
+    const M_COPPER: [D; 4] = [l(0, 1), l(1, 1), l(-1, 1), l(0, -1)];
+    const M_IRON: [D; 3] = [l(0, 1), l(1, 1), l(-1, 1)];
+    const M_LEOPARD: [D; 6] = [l(0, 1), l(1, 1), l(-1, 1), l(0, -1), l(1, -1), l(-1, -1)];
+    const M_BTIGER: [D; 7] = [
+        l(0, -1),
+        l(1, 0),
+        l(-1, 0),
+        l(1, 1),
+        l(-1, 1),
+        l(1, -1),
+        l(-1, -1),
+    ];
+    const M_DELEPHANT: [D; 7] = [
+        l(0, 1),
+        l(1, 0),
+        l(-1, 0),
+        l(1, 1),
+        l(-1, 1),
+        l(1, -1),
+        l(-1, -1),
+    ];
+    const M_GOBETWEEN: [D; 2] = [l(0, 1), l(0, -1)];
+    const M_PAWN: [D; 1] = [l(0, 1)];
+    const M_KNIGHT: [D; 2] = [l(1, 2), l(-1, 2)];
+    const M_DOG: [D; 3] = [l(0, 1), l(1, -1), l(-1, -1)];
+    const M_KIRIN: [D; 8] = [
+        l(0, 2),
+        l(0, -2),
+        l(2, 0),
+        l(-2, 0),
+        l(1, 1),
+        l(1, -1),
+        l(-1, 1),
+        l(-1, -1),
+    ];
+    const M_PHOENIX: [D; 8] = [
+        l(2, 2),
+        l(2, -2),
+        l(-2, 2),
+        l(-2, -2),
+        l(1, 0),
+        l(-1, 0),
+        l(0, 1),
+        l(0, -1),
+    ];
+    const M_ROOK: [D; 4] = [r(1, 0), r(-1, 0), r(0, 1), r(0, -1)];
+    const M_BISHOP: [D; 4] = [r(1, 1), r(1, -1), r(-1, 1), r(-1, -1)];
+    const M_QUEEN: [D; 8] = [
+        r(1, 0),
+        r(-1, 0),
+        r(0, 1),
+        r(0, -1),
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+    ];
+    const M_DRAGON: [D; 8] = [
+        r(1, 0),
+        r(-1, 0),
+        r(0, 1),
+        r(0, -1),
+        l(1, 1),
+        l(1, -1),
+        l(-1, 1),
+        l(-1, -1),
+    ];
+    const M_DHORSE: [D; 8] = [
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+        l(1, 0),
+        l(-1, 0),
+        l(0, 1),
+        l(0, -1),
+    ];
+    const M_LANCE: [D; 1] = [r(0, 1)];
+    const M_RCHARIOT: [D; 2] = [r(0, 1), r(0, -1)];
+    const M_SIDEMOVER: [D; 4] = [r(1, 0), r(-1, 0), l(0, 1), l(0, -1)];
+    const M_VMOVER: [D; 4] = [r(0, 1), r(0, -1), l(1, 0), l(-1, 0)];
+    const M_WHORSE: [D; 4] = [r(0, 1), r(0, -1), r(1, 1), r(-1, 1)];
+    const M_WHALE: [D; 4] = [r(0, 1), r(0, -1), r(1, -1), r(-1, -1)];
+    const M_FSTAG: [D; 8] = [
+        r(0, 1),
+        r(0, -1),
+        l(1, 0),
+        l(-1, 0),
+        l(1, 1),
+        l(1, -1),
+        l(-1, 1),
+        l(-1, -1),
+    ];
+    const M_FOX: [D; 6] = [r(0, 1), r(0, -1), r(1, 1), r(1, -1), r(-1, 1), r(-1, -1)];
+    const M_FBOAR: [D; 6] = [r(1, 0), r(-1, 0), r(1, 1), r(1, -1), r(-1, 1), r(-1, -1)];
+    const M_CSOLDIER: [D; 8] = [
+        r(0, 1),
+        r(0, -1),
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+        r2(1, 0),
+        r2(-1, 0),
+    ];
+    const M_WBUFFALO: [D; 8] = [
+        r(1, 0),
+        r(-1, 0),
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+        r2(0, 1),
+        r2(0, -1),
+    ];
+    const M_VSOLDIER: [D; 4] = [r(0, 1), l(0, -1), r2(1, 0), r2(-1, 0)];
+    const M_SSOLDIER: [D; 4] = [r(1, 0), r(-1, 0), l(0, -1), r2(0, 1)];
+    const M_MGENERAL: [D; 3] = [r(0, 1), r(1, -1), r(-1, -1)];
+    const M_LHAWK: [D; 28] = [
+        l(-1, -1),
+        l(0, -1),
+        l(1, -1),
+        l(-1, 0),
+        l(1, 0),
+        l(-1, 1),
+        l(0, 1),
+        l(1, 1),
+        l(-2, -2),
+        l(-1, -2),
+        l(0, -2),
+        l(1, -2),
+        l(2, -2),
+        l(-2, -1),
+        l(2, -1),
+        l(-2, 0),
+        l(2, 0),
+        l(-2, 1),
+        l(2, 1),
+        l(-2, 2),
+        l(-1, 2),
+        l(0, 2),
+        l(1, 2),
+        l(2, 2),
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+    ];
+    const M_HFALCON: [D; 9] = [
+        r(1, 0),
+        r(-1, 0),
+        r(0, -1),
+        r(1, 1),
+        r(1, -1),
+        r(-1, 1),
+        r(-1, -1),
+        l(0, 1),
+        l(0, 2),
+    ];
+    const M_SEAGLE: [D; 10] = [
+        r(1, 0),
+        r(-1, 0),
+        r(0, 1),
+        r(0, -1),
+        r(1, -1),
+        r(-1, -1),
+        l(1, 1),
+        l(2, 2),
+        l(-1, 1),
+        l(-2, 2),
+    ];
+
+    /// The movement descriptors of `role`, in White orientation.
+    fn moves(role: u8) -> &'static [D] {
+        match role {
+            KING | PRINCE => &KING8,
+            GOLD => &M_GOLD,
+            SILVER => &M_SILVER,
+            COPPER => &M_COPPER,
+            IRON => &M_IRON,
+            LEOPARD => &M_LEOPARD,
+            BTIGER => &M_BTIGER,
+            DELEPHANT => &M_DELEPHANT,
+            GOBETWEEN => &M_GOBETWEEN,
+            PAWN => &M_PAWN,
+            KNIGHT => &M_KNIGHT,
+            DOG => &M_DOG,
+            KIRIN => &M_KIRIN,
+            PHOENIX => &M_PHOENIX,
+            ROOK | RGENERAL => &M_ROOK,
+            BISHOP | VGENERAL | BGENERAL => &M_BISHOP,
+            QUEEN | GGENERAL | FEAGLE => &M_QUEEN,
+            DRAGON => &M_DRAGON,
+            DHORSE => &M_DHORSE,
+            LANCE => &M_LANCE,
+            RCHARIOT => &M_RCHARIOT,
+            SIDEMOVER => &M_SIDEMOVER,
+            VMOVER => &M_VMOVER,
+            WHORSE => &M_WHORSE,
+            WHALE => &M_WHALE,
+            FSTAG => &M_FSTAG,
+            FOX | FDEMON => &M_FOX,
+            FBOAR => &M_FBOAR,
+            CSOLDIER | HTETRARCH => &M_CSOLDIER,
+            WBUFFALO => &M_WBUFFALO,
+            VSOLDIER => &M_VSOLDIER,
+            SSOLDIER => &M_SSOLDIER,
+            MGENERAL => &M_MGENERAL,
+            CLION => &LION24,
+            LHAWK => &M_LHAWK,
+            HFALCON => &M_HFALCON,
+            SEAGLE => &M_SEAGLE,
+            _ => &[],
+        }
+    }
+
+    // --- promotion --------------------------------------------------------
+    fn can_promote(role: u8) -> bool {
+        matches!(
+            role,
+            PAWN | KNIGHT
+                | IRON
+                | GOBETWEEN
+                | LEOPARD
+                | COPPER
+                | SILVER
+                | GOLD
+                | LANCE
+                | RCHARIOT
+                | SIDEMOVER
+                | VMOVER
+                | BISHOP
+                | ROOK
+                | DHORSE
+                | DRAGON
+                | BTIGER
+                | KIRIN
+                | PHOENIX
+                | DELEPHANT
+                | SEAGLE
+                | HFALCON
+                | CLION
+                | QUEEN
+                | CSOLDIER
+                | WBUFFALO
+                | VSOLDIER
+                | SSOLDIER
+                | RGENERAL
+                | BGENERAL
+                | DOG
+        )
+    }
+    fn promoted(role: u8) -> u8 {
+        match role {
+            PAWN => GOLD,
+            GOBETWEEN => DELEPHANT,
+            LEOPARD => BISHOP,
+            COPPER => SIDEMOVER,
+            SILVER => VMOVER,
+            GOLD => ROOK,
+            LANCE => WHORSE,
+            RCHARIOT => WHALE,
+            SIDEMOVER => FBOAR,
+            VMOVER => FOX,
+            BISHOP => DHORSE,
+            ROOK => DRAGON,
+            DHORSE => HFALCON,
+            DRAGON => SEAGLE,
+            BTIGER => FSTAG,
+            KIRIN => CLION,
+            PHOENIX => QUEEN,
+            DELEPHANT => PRINCE,
+            KNIGHT => SSOLDIER,
+            IRON => VSOLDIER,
+            SEAGLE => RGENERAL,
+            HFALCON => BGENERAL,
+            CLION => LHAWK,
+            QUEEN => FEAGLE,
+            CSOLDIER => HTETRARCH,
+            WBUFFALO => FDEMON,
+            VSOLDIER => CSOLDIER,
+            SSOLDIER => WBUFFALO,
+            RGENERAL => GGENERAL,
+            BGENERAL => VGENERAL,
+            DOG => MGENERAL,
+            other => other,
+        }
+    }
+    fn in_zone(color: u8, rank: i32) -> bool {
+        if color == 0 {
+            rank >= 11
+        } else {
+            rank <= 4
+        }
+    }
+    /// A Pawn / Lance reaching the furthest rank, or a Knight the furthest two ranks,
+    /// would otherwise be immobile and must promote.
+    fn forced(role: u8, color: u8, to_rank: i32) -> bool {
+        let furthest = if color == 0 { 15 } else { 0 };
+        match role {
+            PAWN | LANCE => to_rank == furthest,
+            KNIGHT => {
+                if color == 0 {
+                    to_rank >= 14
+                } else {
+                    to_rank <= 1
+                }
+            }
+            _ => false,
+        }
+    }
+
+    // --- range-jumping Generals -------------------------------------------
+    fn jump_rank(role: u8) -> u8 {
+        match role {
+            KING | PRINCE => 4,
+            GGENERAL => 3,
+            VGENERAL => 2,
+            RGENERAL | BGENERAL => 1,
+            _ => 0,
+        }
+    }
+    fn is_jump_capturer(role: u8) -> bool {
+        matches!(role, GGENERAL | VGENERAL | RGENERAL | BGENERAL)
+    }
+    fn jump_dirs(role: u8) -> &'static [(i8, i8)] {
+        match role {
+            GGENERAL => &[
+                (1, 0),
+                (-1, 0),
+                (0, 1),
+                (0, -1),
+                (1, 1),
+                (1, -1),
+                (-1, 1),
+                (-1, -1),
+            ],
+            RGENERAL => &[(1, 0), (-1, 0), (0, 1), (0, -1)],
+            VGENERAL | BGENERAL => &[(1, 1), (1, -1), (-1, 1), (-1, -1)],
+            _ => &[],
+        }
+    }
+    fn is_immune(role: u8) -> bool {
+        role == GGENERAL
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    struct Pc {
+        color: u8, // 0 = White, 1 = Black
+        role: u8,
+    }
+
+    #[derive(Clone)]
+    pub(crate) struct Position {
+        cells: [Option<Pc>; 256],
+        turn: u8,
+    }
+
+    #[inline]
+    fn idx(f: i32, r: i32) -> usize {
+        (r * N + f) as usize
+    }
+    #[inline]
+    fn file_of(i: usize) -> i32 {
+        (i as i32) % N
+    }
+    #[inline]
+    fn rank_of(i: usize) -> i32 {
+        (i as i32) / N
+    }
+    #[inline]
+    fn on_board(f: i32, r: i32) -> bool {
+        (0..N).contains(&f) && (0..N).contains(&r)
+    }
+    #[inline]
+    fn orient(color: u8, df: i8, dr: i8) -> (i32, i32) {
+        if color == 0 {
+            (df as i32, dr as i32)
+        } else {
+            (df as i32, -(dr as i32))
+        }
+    }
+
+    /// A move: an ordinary board move `(from, to)` with a resulting role (already
+    /// resolving lion-style promotion). Jump-captures reuse the same shape. Lion
+    /// multi-step moves additionally clear up to two extra captured squares
+    /// (`cap_a` / `cap_b`, `usize::MAX` = none) — the intermediate/first-leg victim
+    /// beyond the landing square `to`; igui and the jitto pass have `to == from`.
+    #[derive(Clone, Copy)]
+    struct Mv {
+        from: usize,
+        to: usize,
+        become_role: u8,
+        cap_a: usize,
+        cap_b: usize,
+    }
+    const NO_CAP: usize = usize::MAX;
+
+    impl Position {
+        pub(crate) fn startpos() -> Position {
+            // Seed the layout (only) from the shared start position; every count-
+            // producing rule below is independent. The placement is validated
+            // separately against HaChu's source tables at perft(1) = 72.
+            let src = Tenjiku::startpos();
+            let board = src.board();
+            let mut cells = [None; 256];
+            for r in 0..16u8 {
+                for f in 0..16u8 {
+                    let sq = Square::<Tenjiku16x16>::from_file_rank(f, r).unwrap();
+                    if let Some(p) = board.piece_at(sq) {
+                        let color = if p.color == Color::White { 0 } else { 1 };
+                        cells[idx(f as i32, r as i32)] = Some(Pc {
+                            color,
+                            role: from_wide(p.role),
+                        });
+                    }
+                }
+            }
+            Position { cells, turn: 0 }
+        }
+
+        /// The ordinary reachable squares of the piece at `from` (empty or enemy),
+        /// respecting blocking and the Great-General capture immunity. `attack_mode`
+        /// ignores immunity (a piece still *attacks* through the immune mask for the
+        /// king-safety query, though kings are never immune anyway).
+        fn ordinary_targets(&self, from: usize, out: &mut Vec<usize>, attack_mode: bool) {
+            let Some(p) = self.cells[from] else { return };
+            let (ff, fr) = (file_of(from), rank_of(from));
+            for d in moves(p.role) {
+                let (df, dr) = orient(p.color, d.df, d.dr);
+                let max = match d.mode {
+                    0 => 1,
+                    2 => 2,
+                    _ => i32::MAX,
+                };
+                let leap = d.mode == 0;
+                let (mut nf, mut nr) = (ff + df, fr + dr);
+                let mut steps = 0;
+                while on_board(nf, nr) {
+                    let t = idx(nf, nr);
+                    match self.cells[t] {
+                        None => out.push(t),
+                        Some(q) => {
+                            if q.color != p.color {
+                                // Enemy: a capturable landing unless immune (and we
+                                // are not the immune role, and not just querying an
+                                // attack).
+                                if attack_mode || !is_immune(q.role) || is_immune(p.role) {
+                                    out.push(t);
+                                }
+                            }
+                            break; // any piece blocks a ride; a leap has max == 1
+                        }
+                    }
+                    steps += 1;
+                    if leap || steps >= max {
+                        break;
+                    }
+                    nf += df;
+                    nr += dr;
+                }
+            }
+        }
+
+        /// The range-jump landing squares of a General at `from` (capturing across a
+        /// consecutive run of strictly-lower-ranked pieces). `attack_mode` includes
+        /// the immune Great General as an attacked square for king-safety.
+        fn jump_targets(&self, from: usize, out: &mut Vec<usize>, attack_mode: bool) {
+            let Some(p) = self.cells[from] else { return };
+            if !is_jump_capturer(p.role) {
+                return;
+            }
+            let mover_rank = jump_rank(p.role);
+            let (ff, fr) = (file_of(from), rank_of(from));
+            for &(df0, dr0) in jump_dirs(p.role) {
+                let (df, dr) = orient(p.color, df0, dr0);
+                let (mut nf, mut nr) = (ff + df, fr + dr);
+                let mut jumped = false;
+                while on_board(nf, nr) {
+                    let t = idx(nf, nr);
+                    match self.cells[t] {
+                        None => {
+                            if jumped {
+                                break; // consecutive run ended
+                            }
+                        }
+                        Some(q) => {
+                            if jumped && q.color != p.color {
+                                let immune = is_immune(q.role);
+                                if attack_mode || !immune || q.role == p.role {
+                                    out.push(t);
+                                }
+                            }
+                            if jump_rank(q.role) < mover_rank {
+                                jumped = true;
+                            } else {
+                                break; // equal-or-higher: opaque wall
+                            }
+                        }
+                    }
+                    nf += df;
+                    nr += dr;
+                }
+            }
+        }
+
+        /// Is `sq` attacked by a piece of color `by` (ordinary rides/leaps + General
+        /// jump-attacks)? Used for multi-royal king safety.
+        fn attacked(&self, sq: usize, by: u8) -> bool {
+            let mut buf = Vec::new();
+            for i in 0..256 {
+                if let Some(p) = self.cells[i] {
+                    if p.color == by {
+                        buf.clear();
+                        self.ordinary_targets(i, &mut buf, true);
+                        if buf.contains(&sq) {
+                            return true;
+                        }
+                        if is_jump_capturer(p.role) {
+                            buf.clear();
+                            self.jump_targets(i, &mut buf, true);
+                            if buf.contains(&sq) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+
+        fn pseudo(&self) -> Vec<Mv> {
+            let us = self.turn;
+            let mut mv = Vec::new();
+            let mut buf = Vec::new();
+            for from in 0..256 {
+                let Some(p) = self.cells[from] else { continue };
+                if p.color != us {
+                    continue;
+                }
+                let from_zone = in_zone(us, rank_of(from));
+                // Ordinary moves.
+                buf.clear();
+                self.ordinary_targets(from, &mut buf, false);
+                for &to in &buf {
+                    let become_role = Self::promo(p.role, us, from_zone, rank_of(to));
+                    mv.push(Mv {
+                        from,
+                        to,
+                        become_role,
+                        cap_a: NO_CAP,
+                        cap_b: NO_CAP,
+                    });
+                }
+                // Range-jump captures (a separate pass, like the engine's).
+                if is_jump_capturer(p.role) {
+                    buf.clear();
+                    self.jump_targets(from, &mut buf, false);
+                    for &to in &buf {
+                        let become_role = Self::promo(p.role, us, from_zone, rank_of(to));
+                        mv.push(Mv {
+                            from,
+                            to,
+                            become_role,
+                            cap_a: NO_CAP,
+                            cap_b: NO_CAP,
+                        });
+                    }
+                }
+            }
+            // Lion multi-step / igui / jitto pass moves (issue #500): these first
+            // arise at ply 3 and are enumerated exactly as the engine's
+            // `gen_lion_moves` (the single within-two Lion leaps are already produced
+            // above via the ordinary role loop; this adds only the moves that touch an
+            // intermediate square, plus the once-per-side pass).
+            self.gen_lion(&mut mv);
+            mv
+        }
+
+        /// Chebyshev distance between two board squares.
+        fn cheb(a: usize, b: usize) -> i32 {
+            (file_of(a) - file_of(b))
+                .abs()
+                .max((rank_of(a) - rank_of(b)).abs())
+        }
+
+        /// The eight King directions, the two-step alphabet of a full Lion.
+        const LION_DIRS8: [(i8, i8); 8] = [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ];
+
+        /// Appends the side-to-move's Lion multi-step moves, mirroring the engine's
+        /// `gen_lion_moves`: full Lions (Lion, Lion-Hawk) turn freely over two King
+        /// steps; the Horned Falcon / Soaring Eagle carry lion power only straight
+        /// along their lion lines. The immune Great General may be neither stepped on
+        /// nor captured. A non-capturing double-step coincides with the leaper jump
+        /// already emitted, so only capturing legs (and, for empties, distance-two
+        /// captures) are added; the jitto pass is emitted at most once per side.
+        fn gen_lion(&self, mv: &mut Vec<Mv>) {
+            let us = self.turn;
+            let mut pass_emitted = false;
+            for from in 0..256 {
+                let Some(p) = self.cells[from] else { continue };
+                if p.color != us {
+                    continue;
+                }
+                let full = matches!(p.role, CLION | LHAWK);
+                let lines: &[(i8, i8)] = match p.role {
+                    HFALCON => &[(0, 1)],
+                    SEAGLE => &[(1, 1), (-1, 1)],
+                    _ => &[],
+                };
+                if !full && lines.is_empty() {
+                    continue;
+                }
+                let mut can_pass = false;
+                let blocked = |sq: usize| matches!(self.cells[sq], Some(q) if q.color == us || is_immune(q.role));
+                let capturable = |sq: usize| matches!(self.cells[sq], Some(q) if q.color != us && !is_immune(q.role));
+                let (ff, fr) = (file_of(from), rank_of(from));
+                if full {
+                    for &(d1f, d1r) in &Self::LION_DIRS8 {
+                        let (s1f, s1r) = (ff + d1f as i32, fr + d1r as i32);
+                        if !on_board(s1f, s1r) {
+                            continue;
+                        }
+                        let s1 = idx(s1f, s1r);
+                        if blocked(s1) {
+                            continue;
+                        }
+                        let s1_enemy = capturable(s1);
+                        if s1_enemy {
+                            mv.push(Mv {
+                                from,
+                                to: from,
+                                become_role: p.role,
+                                cap_a: s1,
+                                cap_b: NO_CAP,
+                            });
+                        } else {
+                            can_pass = true;
+                        }
+                        for &(d2f, d2r) in &Self::LION_DIRS8 {
+                            let (s2f, s2r) = (s1f + d2f as i32, s1r + d2r as i32);
+                            if !on_board(s2f, s2r) {
+                                continue;
+                            }
+                            let s2 = idx(s2f, s2r);
+                            if s2 == from || blocked(s2) {
+                                continue;
+                            }
+                            let s2_enemy = capturable(s2);
+                            let emit = if s1_enemy {
+                                true
+                            } else {
+                                s2_enemy && Self::cheb(from, s2) == 2
+                            };
+                            if emit {
+                                let cap_a = if s1_enemy { s1 } else { NO_CAP };
+                                mv.push(Mv {
+                                    from,
+                                    to: s2,
+                                    become_role: p.role,
+                                    cap_a,
+                                    cap_b: NO_CAP,
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    for &(lf, lr) in lines {
+                        let (df, dr) = orient(us, lf, lr);
+                        let (s1f, s1r) = (ff + df, fr + dr);
+                        if !on_board(s1f, s1r) {
+                            continue;
+                        }
+                        let s1 = idx(s1f, s1r);
+                        if blocked(s1) {
+                            continue;
+                        }
+                        let s1_enemy = capturable(s1);
+                        if s1_enemy {
+                            mv.push(Mv {
+                                from,
+                                to: from,
+                                become_role: p.role,
+                                cap_a: s1,
+                                cap_b: NO_CAP,
+                            });
+                        } else {
+                            can_pass = true;
+                        }
+                        let (s2f, s2r) = (s1f + df, s1r + dr);
+                        if on_board(s2f, s2r) {
+                            let s2 = idx(s2f, s2r);
+                            let s2_enemy = capturable(s2);
+                            if !blocked(s2) && (s1_enemy || s2_enemy) {
+                                let cap_a = if s1_enemy { s1 } else { NO_CAP };
+                                mv.push(Mv {
+                                    from,
+                                    to: s2,
+                                    become_role: p.role,
+                                    cap_a,
+                                    cap_b: NO_CAP,
+                                });
+                            }
+                        }
+                    }
+                }
+                if can_pass && !pass_emitted {
+                    mv.push(Mv {
+                        from,
+                        to: from,
+                        become_role: p.role,
+                        cap_a: NO_CAP,
+                        cap_b: NO_CAP,
+                    });
+                    pass_emitted = true;
+                }
+            }
+        }
+
+        /// The resulting role after a move, applying the lion-style promotion rule:
+        /// promote (mandatorily) exactly when entering the zone from outside, or when
+        /// forced; otherwise the piece keeps its role.
+        fn promo(role: u8, us: u8, from_zone: bool, to_rank: i32) -> u8 {
+            if !can_promote(role) {
+                return role;
+            }
+            let to_zone = in_zone(us, to_rank);
+            let entering = to_zone && !from_zone;
+            if entering || forced(role, us, to_rank) {
+                promoted(role)
+            } else {
+                role
+            }
+        }
+
+        fn apply(&self, m: Mv) -> Position {
+            let mut p = self.clone();
+            let mut mover = p.cells[m.from].expect("mover");
+            p.cells[m.from] = None;
+            if m.cap_a != NO_CAP {
+                p.cells[m.cap_a] = None;
+            }
+            if m.cap_b != NO_CAP {
+                p.cells[m.cap_b] = None;
+            }
+            mover.role = m.become_role;
+            // `to == from` (igui / jitto pass) re-places the mover on its origin.
+            p.cells[m.to] = Some(mover);
+            p.turn = 1 - self.turn;
+            p
+        }
+
+        fn king_sq(&self, color: u8) -> Option<usize> {
+            // Exactly one royal (King) per side throughout the start tree to depth 3
+            // (no Prince arises), so the sole royal is the King.
+            (0..256)
+                .find(|&i| matches!(self.cells[i], Some(p) if p.color == color && p.role == KING))
+        }
+
+        fn legal_moves(&self) -> Vec<Mv> {
+            let us = self.turn;
+            let them = 1 - us;
+            let mut out = Vec::new();
+            for m in self.pseudo() {
+                let next = self.apply(m);
+                if let Some(k) = next.king_sq(us) {
+                    if next.attacked(k, them) {
+                        continue;
+                    }
+                }
+                out.push(m);
+            }
+            out
+        }
+    }
+
+    pub(crate) fn perft(pos: &Position, depth: u32) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+        let moves = pos.legal_moves();
+        if depth == 1 {
+            return moves.len() as u64;
+        }
+        let mut total = 0;
+        for m in moves {
+            total += perft(&pos.apply(m), depth - 1);
+        }
+        total
+    }
 }

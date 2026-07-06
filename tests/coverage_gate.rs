@@ -74,6 +74,14 @@ enum PerftOracle {
     HaChu,
     /// Hand-derived low-depth counts (no external engine implements the variant).
     HandDerived,
+    /// Cross-checked node-for-node against a **second, fully independent in-repo
+    /// generator** — two from-scratch implementations agreeing at the declared depth,
+    /// the substitute for a missing engine oracle (issue #500). Used by the
+    /// oracle-less variants whose perft would otherwise be self-referential: Alice
+    /// and Wa Shogi (independent brute-force in their `tests/perft_*.rs`) and Tenjiku
+    /// (independent 16x16 generator cross-checking the otherwise self-referential
+    /// perft(2)/(3), HaChu segfaulting on the variant).
+    HandDerivedX2,
     /// Pinned against the shared EPD perft corpus. Part of the declared oracle
     /// vocabulary; no shipped variant selects it as its primary oracle today.
     #[allow(dead_code)]
@@ -168,7 +176,7 @@ struct Required {
 const REQUIRED: &[Required] = &[
     // ---- Geometry-layer fairy variants (`WideVariantId::ALL`) ----------------
     row(Game::Wide(WideVariantId::Aiwok), "perft_aiwok.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("aiwok_pieces_honour_count_matches_makruk")),
-    row(Game::Wide(WideVariantId::Alice), "perft_alice.rs", PerftOracle::HandDerived, 4, Difffuzz::Excluded("FSF has no alice variant (two-board teleport ruleset)"), DrawTest::None),
+    row(Game::Wide(WideVariantId::Alice), "perft_alice.rs", PerftOracle::HandDerivedX2, 4, Difffuzz::Excluded("FSF has no alice variant (two-board teleport ruleset)"), DrawTest::None),
     row(Game::Wide(WideVariantId::Almost), "perft_almost.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Amazon), "perft_amazon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Asean), "perft_asean.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("asean_pieces_honour_count_matches_fsf")),
@@ -186,7 +194,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Chigorin), "perft_chigorin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Chu), "perft_chu.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; FSF has no chu variant"), DrawTest::Named("chu_attack_repetition_loses_for_the_attacker")),
     row(Game::Wide(WideVariantId::Courier), "perft_courier.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
-    row(Game::Wide(WideVariantId::Dai), "perft_dai.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; FSF has no dai variant"), DrawTest::Named("dai_attack_repetition_loses_for_the_attacker")),
+    row(Game::Wide(WideVariantId::Dai), "perft_dai.rs", PerftOracle::HaChu, 3, Difffuzz::Excluded("HaChu-only large shogi; FSF has no dai variant"), DrawTest::Named("dai_attack_repetition_loses_for_the_attacker")),
     row(Game::Wide(WideVariantId::Dobutsu), "perft_dobutsu.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Dragon), "perft_dragon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Duck), "perft_duck.rs", PerftOracle::Fsf, 4, Difffuzz::Excluded("FSF counts duck placements differently (#189 harness artifact)"), DrawTest::None),
@@ -231,9 +239,9 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Spartan), "perft_spartan.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Synochess), "perft_synochess.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Tencubed), "perft_tencubed.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
-    row(Game::Wide(WideVariantId::Tenjiku), "perft_tenjiku.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; HaChu crashes on 16x16 and FSF has no tenjiku"), DrawTest::Named("tenjiku_one_sided_attack_repetition_draws")),
+    row(Game::Wide(WideVariantId::Tenjiku), "perft_tenjiku.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("HaChu-only large shogi; HaChu crashes on 16x16 and FSF has no tenjiku"), DrawTest::Named("tenjiku_one_sided_attack_repetition_draws")),
     row(Game::Wide(WideVariantId::Tori), "perft_torishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("tori_sennichite_is_a_draw")),
-    row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerived, 3, Difffuzz::Excluded("no FSF wa-shogi and HaChu's perft is unreliable — rules-only"), DrawTest::Named("washogi_sennichite_is_a_draw")),
+    row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF wa-shogi; HaChu's wa-shogi is a different ruleset (51 vs 57 start moves) — independent brute force is the second source"), DrawTest::Named("washogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Xiangfu), "perft_xiangfu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Xiangqi), "perft_xiangqi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("xiangqi_perpetual_chase_loses_for_the_chaser")),
     // ---- Concrete 8x8 engine variants (`VariantId::ALL`) ---------------------

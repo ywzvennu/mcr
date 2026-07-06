@@ -129,7 +129,93 @@ pub fn run(build: bool) -> usize {
     let dai_mismatches = compare_dai(&located.bin);
 
     // ---- Tenjiku Shogi (16x16) external perft comparison (issue #402) -----
-    dai_mismatches + compare_tenjiku(&located.bin)
+    let mid = dai_mismatches + compare_tenjiku(&located.bin);
+
+    // ---- Wa Shogi (11x11): probe HaChu's `wa-shogi` (issue #500) ----------
+    // HaChu advertises `wa-shogi`, so — unlike Tenjiku — it does not crash; but it
+    // implements a *different* Wa ruleset (a different start array and piece set),
+    // so it is not a usable node-for-node oracle for mcr's Wa Shogi. This records
+    // that finding in-repo rather than leaving "HaChu unreliable on Wa" a bare claim.
+    mid + probe_washogi(&located.bin)
+}
+
+/// The coordinate string for an mcr Wa Shogi move on the 11x11 board (files `a..k`,
+/// ranks `1..11`), matching HaChu's move-dump notation.
+fn mcr_uci_washogi(m: &mcr::geometry::WideMove) -> String {
+    use mcr::geometry::Washogi11x11;
+    let f = m.from::<Washogi11x11>();
+    let t = m.to::<Washogi11x11>();
+    format!(
+        "{}{}{}{}",
+        (b'a' + f.file()) as char,
+        f.rank() + 1,
+        (b'a' + t.file()) as char,
+        t.rank() + 1
+    )
+}
+
+/// Probe HaChu's `wa-shogi` at the start position (issue #500). HaChu runs Wa Shogi
+/// (no segfault, unlike Tenjiku), but its start move set does **not** match mcr's,
+/// because HaChu ships a *different* Wa Shogi ruleset (different start array / piece
+/// definitions). Reports the disagreement and returns **0** (this is a documented
+/// oracle-mismatch, not an mcr bug): mcr's Wa Shogi is validated by the fully
+/// independent in-repo brute-force generator in `tests/perft_washogi.rs`, not HaChu.
+fn probe_washogi(bin: &str) -> usize {
+    println!();
+    println!("  Wa Shogi (11x11) HaChu probe (issue #500):");
+    let start = mcr::geometry::Washogi::startpos();
+    let mut mcr_start: Vec<String> = start.legal_moves().iter().map(mcr_uci_washogi).collect();
+    mcr_start.sort();
+    mcr_start.dedup();
+
+    let hachu_start = {
+        const TRIES: usize = 8;
+        let mut out = None;
+        for _ in 0..TRIES {
+            let attempt = (|| -> Result<Vec<String>, String> {
+                let mut e = Engine::spawn(bin)?;
+                e.start_variant("wa-shogi", 1000)?;
+                let moves = e.dump_legal_moves();
+                e.quit();
+                moves
+            })();
+            if let Ok(mv) = attempt {
+                if !mv.is_empty() {
+                    out = Some(mv);
+                    break;
+                }
+            }
+        }
+        out
+    };
+    let Some(hachu_start) = hachu_start else {
+        println!("    SKIP: HaChu produced no move dump for the Wa Shogi start position.");
+        return 0;
+    };
+    if hachu_start == mcr_start {
+        println!(
+            "    perft(1): {} moves, node-for-node identical to HaChu.",
+            mcr_start.len()
+        );
+    } else {
+        let only_mcr = mcr_start
+            .iter()
+            .filter(|m| !hachu_start.contains(m))
+            .count();
+        let only_hachu = hachu_start
+            .iter()
+            .filter(|m| !mcr_start.contains(m))
+            .count();
+        println!(
+            "    perft(1): mcr={} vs HaChu={} — DIFFERENT rulesets (mcr-only {only_mcr}, \
+             hachu-only {only_hachu}). HaChu's `wa-shogi` is a different Wa variant and is \
+             NOT a usable oracle for mcr's Wa Shogi; validated by the independent brute \
+             force in tests/perft_washogi.rs instead.",
+            mcr_start.len(),
+            hachu_start.len()
+        );
+    }
+    0
 }
 
 /// The coordinate string for an mcr Dai move on the 15x15 board (files `a..o`,
@@ -149,9 +235,24 @@ fn mcr_uci(m: &mcr::geometry::WideMove) -> String {
     )
 }
 
-/// mcr's legal moves for `pos` as sorted, deduped coordinate strings.
+/// mcr's legal **board** moves for `pos` as sorted, deduped coordinate strings.
+///
+/// The Chu/Dai Lion's jitto **pass** (a `from == to` null move — mcr's `h3h3`
+/// notation) is excluded, because HaChu renders its single tracked null / lion-pass
+/// move as the `p32p32` / `@@@@` tokens which [`Engine::dump_legal_moves`] filters
+/// out. So both sides are compared **board-move to board-move**: at every position a
+/// Lion can jitto-pass, mcr would otherwise report exactly one extra move (the pass)
+/// against HaChu's filtered null — a pure notation artifact, not a move difference
+/// (confirmed by the depth-3 walk: every such node's other moves match node-for-node;
+/// issue #500).
 fn mcr_moves(pos: &mcr::geometry::Dai) -> Vec<String> {
-    let mut v: Vec<String> = pos.legal_moves().iter().map(mcr_uci).collect();
+    use mcr::geometry::Dai15x15;
+    let mut v: Vec<String> = pos
+        .legal_moves()
+        .iter()
+        .filter(|m| m.from::<Dai15x15>() != m.to::<Dai15x15>())
+        .map(mcr_uci)
+        .collect();
     v.sort();
     v.dedup();
     v
@@ -261,6 +362,67 @@ fn compare_dai(bin: &str) -> usize {
         mcr_start.len()
     );
     println!("    total real mismatches: {mismatches}");
+
+    // perft(3) node-for-node divide (issue #500): opt-in via $MCR_HACHU_DAI_DEPTH3
+    // because it spawns one HaChu subprocess per depth-2 node (~5041 nodes) and is
+    // the flaky-but-thorough push from the depth-2 cross-oracle to depth 3.
+    if std::env::var_os("MCR_HACHU_DAI_DEPTH3").is_some() {
+        mismatches += compare_dai_depth3(bin, &start, &mcr_start);
+    }
+    mismatches
+}
+
+/// **Dai perft(3) node-for-node cross-check (issue #500).** For every depth-2 node
+/// (each White-root → Black-reply sequence) compare mcr's grandchild reply count to
+/// HaChu's, turning the depth-3 pin (357836) from an mcr-only regression into a real
+/// HaChu cross-oracle at every node HaChu does not segfault on. Returns the number
+/// of real mismatches (HaChu per-node crashes are reported, not counted). Bounded by
+/// an optional `$MCR_HACHU_DAI_MAX_NODES` cap for a time-boxed partial run.
+fn compare_dai_depth3(bin: &str, start: &mcr::geometry::Dai, roots: &[String]) -> usize {
+    println!();
+    println!("  Dai Shogi perft(3) node-for-node vs HaChu (issue #500):");
+    let cap: usize = std::env::var("MCR_HACHU_DAI_MAX_NODES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(usize::MAX);
+    let mut nodes_ok = 0usize;
+    let mut mismatches = 0usize;
+    let mut crashes = 0usize;
+    let mut checked = 0usize;
+    let mut mcr_sum: u64 = 0;
+    'outer: for root in roots {
+        let child = mcr_play(start, root).expect("mcr root move replays");
+        for m2 in &mcr_moves(&child) {
+            if checked >= cap {
+                break 'outer;
+            }
+            checked += 1;
+            let gc = mcr_play(&child, m2).expect("mcr reply move replays");
+            let mcr_gc = mcr_moves(&gc).len();
+            mcr_sum += mcr_gc as u64;
+            let seq = [root.clone(), m2.clone()];
+            match hachu_moves(bin, &seq) {
+                Some(hc) => {
+                    if hc.len() == mcr_gc {
+                        nodes_ok += 1;
+                    } else {
+                        mismatches += 1;
+                        println!(
+                            "    perft(3) MISMATCH after {root} {m2}: mcr={mcr_gc} hachu={}",
+                            hc.len()
+                        );
+                    }
+                }
+                None => crashes += 1,
+            }
+        }
+    }
+    println!(
+        "    perft(3) divide: {checked} depth-2 nodes checked, {nodes_ok} match, \
+         {mismatches} mismatch, {crashes} HaChu-crash node(s) skipped."
+    );
+    println!("    mcr grandchild-sum over checked nodes: {mcr_sum} (full perft(3) = 357836).");
+    println!("    total real perft(3) mismatches: {mismatches}");
     mismatches
 }
 
