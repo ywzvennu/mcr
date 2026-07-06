@@ -152,6 +152,7 @@ impl WideVariant<Chess8x8> for SpartanRules {
             fullmove_number: 1,
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
+            petrified: crate::geometry::Bitboard::EMPTY,
         };
         (board, state)
     }

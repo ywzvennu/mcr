@@ -595,6 +595,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess with double step and en passant. The king castles on the standard files, but the queen-side castle is performed with the a-file Chancellor (the king-side castle uses the ordinary h-file Rook). A pawn promotes on the last rank to Amazon, Chancellor, Archbishop, Queen, Rook, Bishop, or Knight. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant perfect`).",
         },
+        WideVariantId::Petrified => Meta {
+            display: "Petrified chess (8x8)",
+            pieces: "Standard chess army with a pawn that may also step sideways (`p`/`P`); the king is a pseudo-royal Commoner (`k`/`K`).",
+            rules: "Pawn-sideways chess (a pawn may take a single quiet sideways step) with two additions. When a Queen, Rook, Bishop, or Knight makes a capture it is turned to stone on its destination: the piece is removed and the square becomes an inert colorless wall (`*`) that blocks sliders and can never move, capture, be captured, or give check; a capturing pawn is not petrified. The king is a Commoner — not checkmated, but a side loses when its Commoner is captured or goes extinct; because capturing would petrify it, the Commoner may never capture, so it never attacks and two Commoners may stand adjacent. Standard castling, en passant, and the fifty-move rule apply.",
+            oracle: "Fairy-Stockfish (`UCI_Variant petrified`).",
+        },
         WideVariantId::Placement => Meta {
             display: "Placement (Pre-Chess, 8x8)",
             pieces: "Standard chess army; the eight non-pawn pieces start off the board, in hand.",

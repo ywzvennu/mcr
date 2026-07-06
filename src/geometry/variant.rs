@@ -1428,6 +1428,48 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Petrified chess (turn-to-stone on capture, default OFF) ----------
+
+    /// Returns `true` if this variant has the **petrify-on-capture** mechanic: a
+    /// piece whose role [petrifies](Self::role_petrifies) is "turned to stone" on
+    /// the square it captures on — it is removed from the board and the square
+    /// becomes an inert, colorless wall recorded in
+    /// [`GenericState::petrified`](super::position::GenericState::petrified). A wall
+    /// blocks sliding pieces and cannot be moved onto or captured, and it neither
+    /// attacks, defends, nor gives check.
+    ///
+    /// The default is `false`. While it is `false` the petrified mask stays empty,
+    /// no square ever enters the wall occupancy or is masked out of a move's
+    /// targets, no capture petrifies its mover, and the FEN carries no `*` — so
+    /// every other variant produces byte-identical moves, state, and FEN to a build
+    /// without the petrify mechanic. Only [`Petrified`](super::variants::petrified)
+    /// overrides this to `true`.
+    fn has_petrify() -> bool {
+        false
+    }
+
+    /// Returns `true` if a piece of `role` **turns to stone** when it makes a
+    /// capture (petrified chess). Consulted only when [`has_petrify`](Self::has_petrify)
+    /// is `true`; the default is `false` for every role, so no piece ever
+    /// petrifies. Petrified chess returns `true` for the Queen, Rook, Bishop, and
+    /// Knight (a capturing Pawn is **not** petrified, and the pseudo-royal Commoner
+    /// can never capture, so it never petrifies).
+    fn role_petrifies(role: WideRole) -> bool {
+        let _ = role;
+        false
+    }
+
+    /// Returns `true` if the side's royal (pseudo-royal) piece may **not** make a
+    /// capture, and correspondingly does **not** itself attack, defend, or give
+    /// check — the petrified-chess Commoner, which would petrify (and so lose its
+    /// royalty) if it captured. Consulted only on the multi-royal path; the default
+    /// is `false`, so every other variant's king attacks and captures normally and
+    /// is byte-identical. Only [`Petrified`](super::variants::petrified) overrides
+    /// this to `true`.
+    fn royal_cannot_capture() -> bool {
+        false
+    }
+
     // --- Alice chess two-board transfer (default OFF) ---------------------
 
     /// Returns `true` if this variant is **Alice chess**: the game is played over
@@ -2520,6 +2562,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             fullmove_number: 1,
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
+            petrified: crate::geometry::Bitboard::EMPTY,
         };
         (board, state)
     }

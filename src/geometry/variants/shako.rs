@@ -142,6 +142,7 @@ impl WideVariant<Grand10x10> for ShakoRules {
             fullmove_number: 1,
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
+            petrified: crate::geometry::Bitboard::EMPTY,
         };
         (board, state)
     }

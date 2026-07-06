@@ -125,6 +125,8 @@ struct Keys {
     alice: [u64; MAX_SQUARES],
     /// One key per crazyhouse promoted-mask square.
     promoted: [u64; MAX_SQUARES],
+    /// One key per petrified-chess wall square.
+    petrified: [u64; MAX_SQUARES],
 }
 
 /// Fills a `[u64; N]` table with successive generator outputs.
@@ -273,6 +275,13 @@ impl Keys {
         fill_range!(&mut state, alice, DAI_SQUARES, MAX_SQUARES);
         fill_range!(&mut state, promoted, DAI_SQUARES, MAX_SQUARES);
 
+        // Petrified-chess wall keys. Drawn dead last, after every historical and
+        // extension-tier draw above, so every other table — and thus every other
+        // variant's Zobrist keys — stays byte-for-byte identical. Petrified chess is
+        // an 8x8 variant, but the whole square range is filled for uniformity.
+        let mut petrified = [0u64; MAX_SQUARES];
+        fill!(&mut state, petrified);
+
         Keys {
             pieces,
             black_to_move,
@@ -284,6 +293,7 @@ impl Keys {
             duck,
             alice,
             promoted,
+            petrified,
         }
     }
 }
@@ -375,4 +385,10 @@ pub(crate) fn alice_key(square: u8) -> u64 {
 #[inline]
 pub(crate) fn promoted_key(square: u8) -> u64 {
     KEYS.promoted[square as usize]
+}
+
+/// The key for a petrified-chess wall square.
+#[inline]
+pub(crate) fn petrified_key(square: u8) -> u64 {
+    KEYS.petrified[square as usize]
 }

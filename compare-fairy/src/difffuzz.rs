@@ -858,6 +858,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::newzealand::to_fsf_dialect,
     },
+    // Petrified chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — pawnsideways plus
+    // turn-to-stone captures and a pseudo-royal Commoner — spelled identically in
+    // mcr and FSF (the Commoner is `k`/`K` and petrify walls are `*` in both), so
+    // the FEN passes through unchanged.
+    Spec {
+        id: WideVariantId::Petrified,
+        fsf: "petrified",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

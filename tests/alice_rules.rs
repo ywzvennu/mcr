@@ -48,6 +48,7 @@ fn build(
         fullmove_number: 1,
         consecutive_passes: 0,
         board_b,
+        petrified: Bitboard::EMPTY,
     };
     Alice::from_parts(board, state)
 }
