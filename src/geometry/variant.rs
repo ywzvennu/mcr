@@ -1352,6 +1352,39 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    // --- Full per-move king-safety verification (default OFF) ---------------
+
+    /// Returns `true` if this variant must verify **every** move by make/unmake
+    /// king-safety re-test, disabling the geometry fast-accepts that the standard
+    /// legality path relies on. The default is `false`, so every other variant keeps
+    /// its existing generator and is byte-identical.
+    ///
+    /// The standard single-king path enforces king safety with **line-based** pins
+    /// ([`compute_pins`](super::position::GenericPosition) via the `line` / `between`
+    /// rays) and a **line-based** check-interposition mask, and the cannon-family
+    /// verify path adds a rank/file/diagonal **fast-accept** that skips the
+    /// make/unmake re-test for a move off every line through the king. All three
+    /// assume that *every* attack on the king travels the king's rank, file, or a
+    /// diagonal — true for sliders, cannons, and the flying general, but **false for
+    /// a riding leaper whose rays are not board lines**. A Nightrider (Betza `NN`)
+    /// rides **knight-rays**: `line` / `between` are empty for a knight-ray, so its
+    /// pins and interpositions are invisible to the line machinery, and every
+    /// knight-ray blocker sits off all four king lines, so the fast-accept would
+    /// wrongly accept a move that unblocks a Nightrider check.
+    ///
+    /// A variant with such a piece opts in here. The position generator then routes
+    /// it to the per-move verify generator with the fast-accept **forced off**, so
+    /// every pseudo-legal move is authoritatively re-tested by
+    /// [`king_safe_after`](super::position::GenericPosition), whose reverse
+    /// projection of each role's own (occupancy-aware, symmetric) attack set already
+    /// sees a knight-ray rider correctly. This is the general escape hatch for any
+    /// future riding-leaper whose attack geometry is not a board line; it is
+    /// deliberately independent of [`has_cannons`](WideVariant::has_cannons) so a
+    /// plain single-king army (no cannon, palace, or flying general) can use it.
+    fn needs_full_verify() -> bool {
+        false
+    }
+
     // --- Makpong king-may-not-flee-check (default OFF) --------------------
 
     /// Returns `true` if this variant forbids the king from **fleeing** a check:

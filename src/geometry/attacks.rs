@@ -392,6 +392,49 @@ pub fn lance_attacks<G: Geometry>(
     file_ray & forward
 }
 
+/// Returns the squares a **Nightrider** on `sq` attacks given the `occupied` set:
+/// it rides each of the eight knight directions, taking successive equal
+/// knight-leaps outward until it steps off the board or meets a piece, including
+/// the first occupant on each ray (a capture) but nothing beyond it.
+///
+/// A Nightrider is the **riding** generalisation of the knight (Betza `NN`): from
+/// `sq` it makes one knight-leap `(±1,±2)` / `(±2,±1)` and may then continue in the
+/// **same** direction by repeating that leap — `(1,2)`, then `(2,4)`, `(3,6)`, … —
+/// so long as every intermediate landing square is empty. The ride along a
+/// direction stops at (and includes) the first occupied square, exactly as a
+/// slider stops at the first blocker on its ray; the caller masks out friendly
+/// occupants. On an unobstructed board it reaches every square a whole number of
+/// equal knight-steps from `sq`. Edges are respected — a leap off the board simply
+/// ends that ray, and the offsets never wrap. The pattern is geometrically
+/// symmetric (a Nightrider on `a` attacks `b` iff a Nightrider on `b` attacks `a`
+/// under the same occupancy), so `attackers_to` reverse-projects it directly.
+///
+/// ```
+/// use mcr::geometry::{attacks::nightrider_attacks, Bitboard, Chess8x8, Square};
+/// // A Nightrider on a1 rides the (1,2) ray across an empty board: b3, c5, d7.
+/// let bb = nightrider_attacks::<Chess8x8>(Square::new(0), Bitboard::EMPTY);
+/// assert!(bb.contains(Square::new(17))); // b3
+/// assert!(bb.contains(Square::new(34))); // c5
+/// assert!(bb.contains(Square::new(51))); // d7
+/// ```
+#[must_use]
+pub fn nightrider_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let mut bb = Bitboard::EMPTY;
+    for &(df, dr) in &KNIGHT_OFFSETS {
+        let mut cur = sq.offset(df, dr);
+        while let Some(dest) = cur {
+            bb.set(dest);
+            // Stop at the first piece on the ray (included as a capture target);
+            // an empty landing square lets the ride continue one more knight-leap.
+            if occupied.contains(dest) {
+                break;
+            }
+            cur = dest.offset(df, dr);
+        }
+    }
+    bb
+}
+
 // ---------------------------------------------------------------------------
 // Orthogonal ray masks + nearest-occupant bit-scan (cannon / king-line path).
 // ---------------------------------------------------------------------------

@@ -28,11 +28,11 @@ use super::{
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
     Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
     Knightmate, Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect,
-    Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
-    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo,
-    Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant,
-    Xiangfu, Xiangqi,
+    Minixiangqi, Modern, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways,
+    Perfect, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi,
+    Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori,
+    Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome,
+    WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -808,6 +808,7 @@ wide_variants! {
     Minishogi, Minishogi, Minishogi, "minishogi";
     Minixiangqi, Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
     Modern, Modern, Modern, "modern";
+    Nightrider, Nightrider, Nightrider, "nightrider";
     Nocastle, Nocastle, Nocastle, "nocastle";
     Opulent, Opulent, Opulent, "opulent";
     Orda, Orda, Orda, "orda";
@@ -981,7 +982,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 85, "all 85 fairy variants are covered");
+        assert_eq!(count, 86, "all 86 fairy variants are covered");
     }
 
     #[test]
@@ -1031,7 +1032,7 @@ mod tests {
     /// arm) — never to paper over an accidental bloat.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        const CEILING: usize = 2784;
+        const CEILING: usize = 2800;
         let actual = core::mem::size_of::<AnyWideVariant>();
         assert!(
             actual <= CEILING,
@@ -1063,16 +1064,17 @@ mod tests {
     /// per-backing ceiling — so growing any position's role array / inline state
     /// past its geometry class's current widest fails here.
     ///
-    /// Current measured maxima: u64 = 1536 (ai-wok), u128 = 2768 (cannonshogi),
-    /// U256 = 5200 (chu) — each 8 / 16 / 32 bytes above the pre-Grasshopper values
-    /// (1528 / 2752 / 5168), the one extra per-role slot the Grasshopper's
-    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->147 bump adds to every
-    /// board's role array (one bitboard per backing width). Raise a ceiling only
+    /// Current measured maxima: u64 = 1544 (ai-wok), u128 = 2784 (cannonshogi),
+    /// U256 = 5232 (chu) — each 16 / 32 / 64 bytes above the pre-Grasshopper values
+    /// (1528 / 2752 / 5168), the two extra per-role slots the Grasshopper and
+    /// Nightrider roles' [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->148
+    /// bump adds to every board's role array (one bitboard per backing width per
+    /// role). Raise a ceiling only
     /// deliberately.
     #[test]
     fn per_backing_position_size_ceiling() {
         // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
-        const CEILINGS: &[(u32, usize)] = &[(64, 1536), (128, 2768), (256, 5200)];
+        const CEILINGS: &[(u32, usize)] = &[(64, 1544), (128, 2784), (256, 5232)];
         for &(bits, ceiling) in CEILINGS {
             let mut max = 0usize;
             let mut worst = "";
@@ -1413,6 +1415,12 @@ mod tests {
             WideVariantId::Minixiangqi,
             Minixiangqi,
             AnyWideVariant::Minixiangqi,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Nightrider,
+            Nightrider,
+            AnyWideVariant::Nightrider,
             2
         );
         agrees_with_typed!(WideVariantId::Orda, Orda, AnyWideVariant::Orda, 2);

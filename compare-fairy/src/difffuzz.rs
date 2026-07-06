@@ -836,6 +836,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::grasshopper::fen_to_fsf,
     },
+    // Nightrider chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess with the
+    // knights replaced by riding Nightriders — so it takes its own dialect rewrite
+    // (Nightrider `****n`->`n`).
+    Spec {
+        id: WideVariantId::Nightrider,
+        fsf: "nightrider",
+        needs_ini: false,
+        dialect: crate::nightrider::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
