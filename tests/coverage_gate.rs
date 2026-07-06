@@ -215,6 +215,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Judkins), "perft_judkins.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("judkins_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Karouk), "perft_karouk.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("giving_check_wins")),
     row(Game::Wide(WideVariantId::Khans), "perft_khans.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
+    row(Game::Wide(WideVariantId::Kinglet), "perft_kinglet.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("kinglet_last_pawn_loss")),
     row(Game::Wide(WideVariantId::Knightmate), "perft_knightmate.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Kyotoshogi), "perft_kyotoshogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("kyotoshogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Makpong), "perft_makpong.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("makpong_pieces_honour_count_matches_makruk")),

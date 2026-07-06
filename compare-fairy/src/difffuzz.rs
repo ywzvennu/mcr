@@ -715,6 +715,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Kinglet chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as Extinction above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in spelled identically to mcr
+    // (standard-chess letters — the king is a non-royal Commoner spelled `k`, a
+    // *rule* difference, not a letter one), so it takes the `identity` dialect.
+    Spec {
+        id: WideVariantId::Kinglet,
+        fsf: "kinglet",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

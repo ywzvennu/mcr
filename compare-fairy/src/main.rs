@@ -50,6 +50,7 @@ mod hoppelpoppel;
 mod janggi;
 mod jieqi;
 mod khans;
+mod kinglet;
 mod knightmate;
 mod kyotoshogi;
 mod locate;
@@ -377,6 +378,10 @@ fn main() {
     let extinction_mismatches = extinction::run(&mut engine, opts.full);
     // Three kings chess is a FSF built-in (no variants.ini needed), like extinction.
     let threekings_mismatches = threekings::run(&mut engine, opts.full);
+    // Kinglet chess is a FSF built-in (no variants.ini needed), like extinction: it
+    // rides the same generic engine (non-royal Commoner king, Commoner-only pawn
+    // promotion, pawn-extinction terminal).
+    let kinglet_mismatches = kinglet::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -467,6 +472,7 @@ fn main() {
         + modern_mismatches
         + extinction_mismatches
         + threekings_mismatches
+        + kinglet_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
