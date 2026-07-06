@@ -870,6 +870,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Los Alamos chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in (6x6, no bishops), spelled
+    // identically in mcr and FSF — the army is the standard-chess letters minus the
+    // bishop, so the FEN passes through unchanged.
+    Spec {
+        id: WideVariantId::Losalamos,
+        fsf: "losalamos",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

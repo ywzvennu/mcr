@@ -60,6 +60,7 @@ mod kyotoshogi;
 mod legan;
 mod locate;
 mod locate_hachu;
+mod losalamos;
 mod makpong;
 mod makruk;
 mod manchu;
@@ -422,6 +423,10 @@ fn main() {
     // diagonal move, two-orthogonal capture — and an L-shaped corner promotion
     // region; no double step, en passant, or castling).
     let legan_mismatches = legan::run(&mut engine, opts.full);
+    // Los Alamos chess is a FSF built-in (no variants.ini needed): the 1956 6x6
+    // MANIAC chess with no bishops, on a new 6x6 generic geometry — the standard
+    // army minus the bishop, no castling, no pawn double-step, and no en passant.
+    let losalamos_mismatches = losalamos::run(&mut engine, opts.full);
     // Perfect chess is a FSF built-in (no variants.ini needed), like georgian: it
     // rides the same generic 8x8 engine as standard chess with the Chancellor,
     // Archbishop, and Amazon compounds added (the queen side castles with the
@@ -543,6 +548,7 @@ fn main() {
         + pawnback_mismatches
         + georgian_mismatches
         + legan_mismatches
+        + losalamos_mismatches
         + perfect_mismatches
         + petrified_mismatches
         + grasshopper_mismatches

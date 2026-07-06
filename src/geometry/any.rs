@@ -27,7 +27,7 @@ use super::{
     Chigorin, Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi,
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
     Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
-    Knightmate, Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
+    Knightmate, Kyotoshogi, Legan, Losalamos, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback,
     Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
     Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed,
@@ -800,6 +800,7 @@ wide_variants! {
     Knightmate, Knightmate, Knightmate, "knightmate";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
     Legan, Legan, Legan, "legan";
+    Losalamos, Losalamos, Losalamos, "losalamos", "losalamoschess", "los-alamos";
     Makpong, Makpong, Makpong, "makpong";
     Makruk, Makruk, Makruk, "makruk";
     Manchu, Manchu, Manchu, "manchu", "manchuchess";
@@ -984,7 +985,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 88, "all 88 fairy variants are covered");
+        assert_eq!(count, 89, "all 89 fairy variants are covered");
     }
 
     #[test]
@@ -1396,6 +1397,12 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Legan, Legan, AnyWideVariant::Legan, 2);
+        agrees_with_typed!(
+            WideVariantId::Losalamos,
+            Losalamos,
+            AnyWideVariant::Losalamos,
+            2
+        );
         agrees_with_typed!(WideVariantId::Makpong, Makpong, AnyWideVariant::Makpong, 2);
         agrees_with_typed!(WideVariantId::Makruk, Makruk, AnyWideVariant::Makruk, 2);
         agrees_with_typed!(WideVariantId::Manchu, Manchu, AnyWideVariant::Manchu, 2);

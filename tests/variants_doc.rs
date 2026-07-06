@@ -493,6 +493,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Each side attacks toward the opposite corner. Pieces move as in standard chess; the pawn moves one square diagonally toward the far corner (up-left for White, down-right for Black) and captures one square along either orthogonal of that diagonal (north or west for White, south or east for Black). No double step, no en passant, no castling. Pawns promote (Q/R/B/N) on an L-shaped corner region — {a8,b8,c8,d8,a7,a6,a5} for White, {e1,f1,g1,h1,h2,h3,h4} for Black — so promotion can occur off the last rank. The fifty-move rule and threefold repetition are standard. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant legan`).",
         },
+        WideVariantId::Losalamos => Meta {
+            display: "Los Alamos chess (6x6, no bishops)",
+            pieces: "Standard chess army minus the Bishop: Rook, Knight, Queen, King, and Pawn (back rank R N Q K N R, six pawns a side).",
+            rules: "The 1956 MANIAC-I 6x6 chess. Pieces move as in standard chess on the smaller board; no castling, no pawn double-step, and no en passant. Pawns promote on the far rank to Queen, Rook, or Knight (never a Bishop). The fifty-move rule and threefold repetition are standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant losalamos`).",
+        },
         WideVariantId::Makpong => Meta {
             display: "Makpong (Defensive Chess)",
             pieces: "Makruk army: Rook, Knight, Khon (silver), Met (ferz), King, single-step promote-to-Met pawns.",
