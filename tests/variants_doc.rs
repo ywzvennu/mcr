@@ -541,6 +541,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess widened to a 9x9 board with an added Archbishop; standard castling (king on the e-file, rooks on the a/i files), double step, en passant, and promotion to Queen/Rook/Bishop/Knight/Archbishop. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant modern`).",
         },
+        WideVariantId::Newzealand => Meta {
+            display: "New Zealand chess (8x8)",
+            pieces: "Standard chess army with the Rook and Knight swapped for two capture-swap pieces — the ROOKNI (mcr overflow `****k`/`****K`; moves like a rook, captures like a knight) and the KNIROO (mcr `f`/`F`, the Orda Lancer; moves like a knight, captures like a rook).",
+            rules: "Standard 8x8 chess with the double step, en passant, the fifty-move rule, and castling using the corner ROOKNI as the rook; a pawn promotes on the last rank to Queen, ROOKNI, Bishop, or KNIROO. The ROOKNI gives knight-checks (and cannot pin); the KNIROO checks and pins along rook lines. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant newzealand`).",
+        },
         WideVariantId::Nightrider => Meta {
             display: "Nightrider chess (8x8)",
             pieces: "Standard chess army with the knights replaced by Nightriders (mcr overflow `****n`/`****N`) — a knight that rides, repeating its leap in the same knight-direction over empty squares until blocked.",
