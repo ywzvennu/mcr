@@ -517,6 +517,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "A deployment phase drops the back-rank pieces onto the first rank (bishops on opposite colours), conferring castling rights, then normal chess (castling, en passant, promotion) follows. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant placement`).",
         },
+        WideVariantId::Pocketknight => Meta {
+            display: "Pocket Knight chess (8x8)",
+            pieces: "Standard chess army plus one extra Knight in hand per side.",
+            rules: "Standard 8x8 chess (castling, double step, en passant, promotion to Queen/Rook/Bishop/Knight) with one Knight in each side's pocket, droppable onto any empty square as a move; captures are not banked, so the pocket is a one-shot reserve. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant pocketknight`).",
+        },
         WideVariantId::Seirawan => Meta {
             display: "Seirawan chess (S-Chess, 8x8)",
             pieces: "Standard chess army plus a reserve Hawk (Bishop + Knight) and Elephant (Rook + Knight), one of each per side.",

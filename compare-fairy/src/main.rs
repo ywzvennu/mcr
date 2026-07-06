@@ -63,6 +63,7 @@ mod opulent;
 mod orda;
 mod ordamirror;
 mod placement;
+mod pocketknight;
 mod seirawan;
 mod shako;
 mod shatar;
@@ -338,6 +339,10 @@ fn main() {
     // Placement (Pre-Chess) is a FSF built-in (no variants.ini needed), like
     // sittuyin; it rides the same generic engine's deployment phase.
     let placement_mismatches = placement::run(&mut engine, opts.full);
+    // Pocket Knight is a FSF built-in (no variants.ini needed), like placement: it
+    // rides the same generic engine's hand + drop mechanic (one pocket Knight per
+    // side, captures never banked).
+    let pocketknight_mismatches = pocketknight::run(&mut engine, opts.full);
     // Bughouse is a FSF built-in (no variants.ini needed): on a single board it is
     // crazyhouse with the hand fed externally (FSF `twoBoards`), so `go perft` is
     // meaningful and the standard piece letters need no translation.
@@ -435,6 +440,7 @@ fn main() {
         + fogofwar_mismatches
         + sittuyin_mismatches
         + placement_mismatches
+        + pocketknight_mismatches
         + bughouse_mismatches
         + spartan_mismatches
         + shako_mismatches

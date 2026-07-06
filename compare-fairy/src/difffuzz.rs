@@ -494,6 +494,15 @@ const SPECS: &[Spec] = &[
         dialect: identity,
     },
     Spec {
+        // Pocket Knight: standard chess with one Knight in hand per side. mcr and
+        // FSF spell it with the identical standard-chess letters (the Knight banked
+        // as `N`/`n` in the `[Nn]` holdings bracket), so the dialect is identity.
+        id: WideVariantId::Pocketknight,
+        fsf: "pocketknight",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         id: WideVariantId::Seirawan,
         fsf: "seirawan",
         needs_ini: false,
