@@ -50,7 +50,9 @@
 //! * **Castling ignores attacked squares.** The castling-rich position keeps
 //!   `O-O` / `O-O-O` even when the king passes through an attacked square.
 
-use mcr::geometry::{perft as gperft, Chess8x8, FogOfWar, Square, WideMoveKind};
+use mcr::geometry::{
+    perft as gperft, Bitboard, Chess8x8, FogOfWar, Square, WideMoveKind, WideRole,
+};
 use mcr::Color;
 
 /// The Fog of War starting FEN, confirmed against FSF's `UCI_Variant fogofwar`.
@@ -215,6 +217,148 @@ fn visibility_is_per_side_asymmetric() {
         sees(fen, Color::Black, 3, 6),
         "Black sees d7 (king neighbor)"
     );
+}
+
+/// The square `(f, r)` if it is on the 8x8 board, else `None`.
+fn on_board(f: i8, r: i8) -> Option<Square<Chess8x8>> {
+    if (0..8).contains(&f) && (0..8).contains(&r) {
+        Square::<Chess8x8>::from_file_rank(f as u8, r as u8)
+    } else {
+        None
+    }
+}
+
+/// Marks each single-step offset from `from` that lands on the board.
+fn add_steps(from: Square<Chess8x8>, offsets: &[(i8, i8)], vis: &mut Bitboard<Chess8x8>) {
+    let (f, r) = (from.file() as i8, from.rank() as i8);
+    for &(df, dr) in offsets {
+        if let Some(t) = on_board(f + df, r + dr) {
+            vis.set(t);
+        }
+    }
+}
+
+/// Marks each sliding ray from `from`, stopping on (and including) the first
+/// occupied square — so a capturable blocker is visible but nothing behind it.
+fn add_rays(
+    from: Square<Chess8x8>,
+    dirs: &[(i8, i8)],
+    occ: Bitboard<Chess8x8>,
+    vis: &mut Bitboard<Chess8x8>,
+) {
+    let (f0, r0) = (from.file() as i8, from.rank() as i8);
+    for &(df, dr) in dirs {
+        let (mut f, mut r) = (f0 + df, r0 + dr);
+        while let Some(t) = on_board(f, r) {
+            vis.set(t);
+            if occ.contains(t) {
+                break;
+            }
+            f += df;
+            r += dr;
+        }
+    }
+}
+
+/// An **independent** recomputation of `color`'s fog view: its own occupied
+/// squares plus every square any of its pieces attacks (standard chess attack
+/// patterns, honouring blockers), built from scratch here so the equality check
+/// against [`FogOfWar::visible_squares`] is a genuine cross-check rather than a
+/// restatement of the same code.
+fn ref_visible(pos: &FogOfWar, color: Color) -> Bitboard<Chess8x8> {
+    const DIAG: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
+    const ORTHO: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    const KNIGHT: [(i8, i8); 8] = [
+        (1, 2),
+        (2, 1),
+        (2, -1),
+        (1, -2),
+        (-1, -2),
+        (-2, -1),
+        (-2, 1),
+        (-1, 2),
+    ];
+    const KING: [(i8, i8); 8] = [
+        (1, 0),
+        (-1, 0),
+        (0, 1),
+        (0, -1),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ];
+
+    let board = pos.board();
+    let occ = board.occupied();
+    // Own pieces are always visible.
+    let mut vis = board.by_color(color);
+    for sq in board.by_color(color) {
+        let piece = board
+            .piece_at(sq)
+            .expect("an occupied square holds a piece");
+        match piece.role {
+            WideRole::Pawn => {
+                // Pawns are visible along their two forward capture diagonals.
+                let dir = if color == Color::White { 1 } else { -1 };
+                add_steps(sq, &[(1, dir), (-1, dir)], &mut vis);
+            }
+            WideRole::Knight => add_steps(sq, &KNIGHT, &mut vis),
+            WideRole::King => add_steps(sq, &KING, &mut vis),
+            WideRole::Bishop => add_rays(sq, &DIAG, occ, &mut vis),
+            WideRole::Rook => add_rays(sq, &ORTHO, occ, &mut vis),
+            WideRole::Queen => {
+                add_rays(sq, &DIAG, occ, &mut vis);
+                add_rays(sq, &ORTHO, occ, &mut vis);
+            }
+            other => panic!("unexpected role {other:?} in a Fog of War position"),
+        }
+    }
+    vis
+}
+
+/// Exhaustive fog view-consistency (issue #501): for a set of positions and
+/// **both** colours, [`FogOfWar::visible_squares`] equals *exactly* that side's
+/// own pieces plus every square its pieces attack — cross-checked against the
+/// independent [`ref_visible`] recomputation. Every own piece is visible, no own
+/// piece is fogged (hidden squares stay hidden), and computing the view never
+/// mutates the underlying full position.
+#[test]
+fn fog_view_reveals_exactly_attacked_and_occupied_squares() {
+    let fens = [
+        STARTPOS,
+        KIWIPETE,
+        IN_CHECK,
+        CASTLING,
+        // A rook eyeing an enemy knight through empty squares (a capturable blocker).
+        "4k3/8/8/n7/8/8/8/R3K3 w - - 0 1",
+    ];
+    for fen in fens {
+        let pos = FogOfWar::from_fen(fen).expect("valid Fog of War FEN");
+        let before = pos.to_fen();
+        for color in [Color::White, Color::Black] {
+            let got = pos.visible_squares(color);
+            let want = ref_visible(&pos, color);
+            assert_eq!(got, want, "fog view for {color:?} in {fen}");
+            // Own pieces are always visible; hidden squares hold none of them.
+            let own = pos.board().by_color(color);
+            assert_eq!(
+                got & own,
+                own,
+                "the whole {color:?} army is visible in {fen}"
+            );
+            assert!(
+                (!got & own).is_empty(),
+                "no {color:?} piece is fogged in {fen}",
+            );
+        }
+        // Computing views is read-only: the full position is byte-identical.
+        assert_eq!(
+            pos.to_fen(),
+            before,
+            "visible_squares must not mutate the position ({fen})",
+        );
+    }
 }
 
 #[test]

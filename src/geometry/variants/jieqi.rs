@@ -566,4 +566,127 @@ mod tests {
             assert_eq!(jq, xq, "Jieqi vs Xiangqi perft at depth {depth}");
         }
     }
+
+    // -- The hidden-piece reveal layer (issue #501) -------------------------
+
+    /// [`WideVariant::reveal_on_move`] reveals **only** a face-down [`WideRole::Dark`]
+    /// piece, and reveals it to exactly its [`home_role`]; an already-concrete
+    /// (face-up) role never re-reveals (`None`). This is the reveal transition the
+    /// make-move path applies, checked over every square.
+    #[test]
+    fn reveal_on_move_reveals_dark_to_home_role_only() {
+        for sq in all_squares() {
+            // A face-down piece reveals to the Xiangqi piece native to its square.
+            assert_eq!(
+                JieqiRules::reveal_on_move(WideRole::Dark, sq),
+                home_role(sq),
+                "Dark at {sq:?} reveals to its home role",
+            );
+            // An already-revealed (concrete) piece is never re-revealed.
+            for role in [
+                WideRole::Rook,
+                WideRole::Horse,
+                WideRole::XiangqiElephant,
+                WideRole::Advisor,
+                WideRole::Cannon,
+                WideRole::Soldier,
+                WideRole::King,
+            ] {
+                assert_eq!(
+                    JieqiRules::reveal_on_move(role, sq),
+                    None,
+                    "concrete {role:?} at {sq:?} does not re-reveal",
+                );
+            }
+        }
+    }
+
+    /// Playing a face-down piece's **first move** reveals it on the board: the
+    /// piece that lands on the destination is its concrete [`home_role`], no longer
+    /// [`WideRole::Dark`]. Checked for *every* legal first move of a dark piece
+    /// from the all-dark startpos.
+    #[test]
+    fn first_move_reveals_the_dark_piece_on_the_board() {
+        let start = Jieqi::startpos();
+        let mut revealed_any = false;
+        for mv in start.legal_moves() {
+            let from = mv.from::<Xiangqi9x10>();
+            let Some(piece) = start.board().piece_at(from) else {
+                continue;
+            };
+            if piece.role != WideRole::Dark {
+                continue;
+            }
+            let expected = home_role(from).expect("a dark piece stands on a home square");
+            let after = start.play(&mv);
+            let to = mv.to::<Xiangqi9x10>();
+            let landed = after
+                .board()
+                .piece_at(to)
+                .expect("the moved piece occupies its destination");
+            assert_eq!(
+                landed.role, expected,
+                "dark piece at {from:?} reveals to {expected:?} on its first move",
+            );
+            assert_ne!(
+                landed.role,
+                WideRole::Dark,
+                "the piece at {to:?} is face-up after moving",
+            );
+            revealed_any = true;
+        }
+        assert!(
+            revealed_any,
+            "the all-dark startpos has dark first moves to reveal",
+        );
+    }
+
+    /// The identity reveals of a side's face-down army are a **legal
+    /// draw-without-replacement** from that side's hidden [`Pool`]: each revealed
+    /// role is still present in the remaining pool when it is drawn, and drawing
+    /// every reveal empties the pool exactly (multiset conservation). This ties the
+    /// on-board reveal to the seeded pool model — a revealed piece is always a legal
+    /// draw from the remaining pool.
+    #[test]
+    fn identity_reveals_are_legal_draws_that_exhaust_the_pool() {
+        // Remove `role` from `pool` via the first expansion slot of its kind (the
+        // cumulative remaining count of the kinds that precede it), asserting it was
+        // drawable — i.e. that the reveal is a legal draw from the remaining pool.
+        fn draw_role(pool: &mut Pool, role: WideRole) -> bool {
+            let mut index = 0usize;
+            for &(kind, _) in HIDDEN_ARMY.iter() {
+                if kind == role {
+                    break;
+                }
+                index += pool.count(kind);
+            }
+            pool.count(role) > 0 && pool.draw_at(index) == Some(role)
+        }
+
+        let board = *Jieqi::startpos().board();
+        for color in [Color::White, Color::Black] {
+            let mut pool = Pool::full();
+            let mut drawn = 0usize;
+            for sq in all_squares() {
+                let Some(piece) = board.piece_at(sq) else {
+                    continue;
+                };
+                if piece.role != WideRole::Dark || piece.color != color {
+                    continue;
+                }
+                let reveal = home_role(sq).expect("a dark piece has a home role");
+                assert!(
+                    pool.count(reveal) > 0,
+                    "reveal {reveal:?} for {color:?} must be a legal draw from the remaining pool",
+                );
+                assert!(draw_role(&mut pool, reveal), "drawing {reveal:?} succeeds");
+                drawn += 1;
+            }
+            assert_eq!(drawn, HIDDEN_POOL_SIZE, "{color:?} hides a full army");
+            assert!(
+                pool.is_empty(),
+                "the identity reveals exhaust {color:?}'s pool exactly",
+            );
+        }
+    }
 }

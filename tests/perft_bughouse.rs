@@ -38,7 +38,7 @@
 //! The deep layers are `#[ignore]`d so `cargo test` stays fast — run them with
 //! `cargo test --release --test perft_bughouse -- --include-ignored`.
 
-use mcr::geometry::{perft as gperft, Bughouse, Chess8x8, WideRole};
+use mcr::geometry::{perft as gperft, Bughouse, Chess8x8, Square, WideRole};
 use mcr::Color;
 
 /// The Bughouse starting FEN, confirmed against FSF — standard array, empty hand.
@@ -282,4 +282,117 @@ fn hand_round_trips_through_fen() {
     assert!(fen.contains("[Q]"), "injected Queen rides the FEN: {fen}");
     let reparsed = Bughouse::from_fen(&fen).expect("re-rendered FEN parses");
     assert_eq!(reparsed.hand_count(Color::White, WideRole::Queen), 1);
+}
+
+// --- 2-board linkage / cross-board hand transfer (issue #501) -------------
+
+/// The **cross-board hand mechanic** a single board's perft never exercises: a
+/// capture on one board delivers the taken piece (reverted to its base role, in
+/// the partner's colour) to the *partner* board's hand, where it becomes
+/// droppable — while the capturing board's own hand stays empty. This drives the
+/// full server linkage end to end across two [`Bughouse`] positions: capture on
+/// board A -> [`inject_into_hand`](Bughouse::inject_into_hand) on board B -> drop
+/// on board B.
+#[test]
+fn two_board_capture_delivers_to_the_partner_board() {
+    // Board A: White captures a Black pawn (e4xd5). Nothing banks locally.
+    let mut board_a = Bughouse::from_fen(CAPTURE).expect("FEN parses");
+    let d5 = Square::<Chess8x8>::from_file_rank(3, 4).unwrap();
+    let victim = board_a
+        .board()
+        .piece_at(d5)
+        .expect("a black pawn stands on d5");
+    assert_eq!(
+        (victim.color, victim.role),
+        (Color::Black, WideRole::Pawn),
+        "the captured piece is a black pawn",
+    );
+    let exd5 = board_a
+        .legal_moves()
+        .into_iter()
+        .find(|m| m.to_uci::<Chess8x8>() == "e4d5")
+        .expect("e4xd5 is legal");
+    board_a = board_a.play(&exd5);
+    for role in [
+        WideRole::Pawn,
+        WideRole::Knight,
+        WideRole::Bishop,
+        WideRole::Rook,
+        WideRole::Queen,
+    ] {
+        assert_eq!(
+            board_a.hand_count(Color::White, role),
+            0,
+            "board A banks nothing"
+        );
+        assert_eq!(board_a.hand_count(Color::Black, role), 0);
+    }
+
+    // Server routing: the captured piece crosses to the partner board B, where the
+    // partner is to move and drops it as their own colour (partners play opposite
+    // colours, so the delivered piece keeps the captured piece's base role/colour).
+    let mut board_b = Bughouse::from_fen("4k3/8/8/8/8/8/8/4K3[] b - - 0 1").expect("FEN parses");
+    assert!(
+        board_b.legal_moves().iter().all(|m| !m.is_drop()),
+        "board B has no reserves before delivery",
+    );
+    board_b.inject_into_hand(Color::Black, WideRole::Pawn);
+    assert_eq!(board_b.hand_count(Color::Black, WideRole::Pawn), 1);
+
+    // The delivered pawn is now droppable on the partner board, and dropping it
+    // consumes the reserve and yields a legal continuation.
+    let drop = board_b
+        .legal_moves()
+        .into_iter()
+        .find(|m| m.is_drop() && m.drop_role() == Some(WideRole::Pawn))
+        .expect("the delivered pawn is droppable on the partner board");
+    let after = board_b.play(&drop);
+    assert_eq!(
+        after.hand_count(Color::Black, WideRole::Pawn),
+        0,
+        "the drop consumes the delivered reserve",
+    );
+    assert!(
+        !after.legal_moves().is_empty(),
+        "the partner board plays on after the drop",
+    );
+}
+
+/// A captured **promoted** piece is demoted to a Pawn *at the transfer site* — the
+/// partner board receives a Pawn, never the promoted piece. Single-board Bughouse
+/// never banks captures, so it does not track a crazyhouse promoted mask
+/// ([`WideVariant::demotes_promoted_captures`] is `false`); the demotion is
+/// therefore the server's responsibility, modelled here — delivering a captured
+/// promoted Queen injects a Pawn, so the partner can only ever drop the Pawn.
+#[test]
+fn promoted_capture_is_demoted_to_a_pawn_on_transfer() {
+    // The server, knowing the captured Queen reached the board by promotion,
+    // delivers a Pawn rather than the promoted Queen.
+    let captured_role = WideRole::Queen;
+    let was_promoted = true;
+    let delivered = if was_promoted {
+        WideRole::Pawn
+    } else {
+        captured_role
+    };
+
+    let mut board_b = Bughouse::from_fen("4k3/8/8/8/8/8/8/4K3[] w - - 0 1").expect("FEN parses");
+    board_b.inject_into_hand(Color::White, delivered);
+    assert_eq!(
+        board_b.hand_count(Color::White, WideRole::Queen),
+        0,
+        "a promoted capture never delivers a Queen",
+    );
+    assert_eq!(
+        board_b.hand_count(Color::White, WideRole::Pawn),
+        1,
+        "the promoted piece is demoted to a Pawn on transfer",
+    );
+    assert!(
+        board_b
+            .legal_moves()
+            .into_iter()
+            .any(|m| m.is_drop() && m.drop_role() == Some(WideRole::Pawn)),
+        "the demoted pawn is droppable on the partner board",
+    );
 }
