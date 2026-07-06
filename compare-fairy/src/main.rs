@@ -58,6 +58,7 @@ mod manchu;
 mod mansindam;
 mod minishogi;
 mod minixiangqi;
+mod nocastle;
 mod opulent;
 mod orda;
 mod ordamirror;
@@ -357,6 +358,8 @@ fn main() {
     // `UCI_Variant shogun`.
     let shogun_mismatches = shogun::run(&mut engine, opts.full);
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
+    // No-castle chess is a FSF built-in (no variants.ini needed), like knightmate.
+    let nocastle_mismatches = nocastle::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -441,6 +444,7 @@ fn main() {
         + shinobi_mismatches
         + shogun_mismatches
         + knightmate_mismatches
+        + nocastle_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

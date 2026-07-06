@@ -487,6 +487,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "7x7 Xiangqi with a palace but no river (soldiers step sideways from the start) and the flying-general rule. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant minixiangqi`).",
         },
+        WideVariantId::Nocastle => Meta {
+            display: "No-castle chess (8x8)",
+            pieces: "Standard chess army.",
+            rules: "Standard 8x8 chess with castling disabled — neither side may ever castle; double step, en passant, and promotion to Queen/Rook/Bishop/Knight are standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant nocastle`).",
+        },
         WideVariantId::Opulent => Meta {
             display: "Opulent chess (10x10)",
             pieces: "Standard sliders plus an augmented Knight (Knight + Wazir), Chancellor, Archbishop, Wizard (Camel + Ferz), and Lion (Ferz + Dabbaba + Threeleaper).",
