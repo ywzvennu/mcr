@@ -1297,6 +1297,31 @@ pub enum WideRole {
     /// prefix `***` plus the recycled base letter `j` (mcr's own `g` names the Gold
     /// and every overflow `g` slot is taken); FSF spells it `g`.
     Grasshopper = 146,
+
+    // --- Nightrider (fairy riding-leaper, 8x8) --------------------------------
+    //
+    // Nightrider chess (FSF built-in `nightrider`) is standard chess with the
+    // knights replaced by **Nightriders** (Betza `NN`): a knight that may *ride* —
+    // repeat its leap in the same direction over empty intermediate squares until
+    // blocked (see [`attacks::nightrider_attacks`](super::attacks::nightrider_attacks)).
+    // Unlike every other rider here it rides **knight-rays**, not a rank / file /
+    // diagonal, so the line-based pin / interposition machinery cannot express its
+    // king-safety; its variant instead rides the per-move full-verify path
+    // ([`WideVariant::needs_full_verify`](super::WideVariant::needs_full_verify)),
+    // whose `king_safe_after` reverse-projects the symmetric ride directly. FSF
+    // spells it `n` (already the Knight here), and every single-letter base plus the
+    // `*` / `**` / `=` / `***` overflow banks are exhausted, so it is a **fifth-tier
+    // overflow role** ([`is_overflow5`](WideRole::is_overflow5)): its FEN token is
+    // the [`OVERFLOW_PREFIX`] **quadrupled** (`****`) plus the recycled FSF mnemonic
+    // `n`, `****N` (white) / `****n` (black); the `compare-fairy` harness maps
+    // `****n → n` when driving Nightrider chess.
+    /// Nightrider (FSF `nightrider` letter `n`, Betza `NN`) — a **riding knight**:
+    /// it leaps like a knight and may continue in the same knight-direction over
+    /// empty squares until blocked, capturing the first piece on each ray. Moves and
+    /// captures alike (a symmetric riding leaper). (Nightrider chess.) A
+    /// **fifth-tier overflow role**: its FEN token is `****N` / `****n`; the harness
+    /// maps `****n → n`.
+    Nightrider = 147,
 }
 
 impl WideRole {
@@ -1318,12 +1343,12 @@ impl WideRole {
     ///
     /// At `COUNT == 147` there are **109** free slots left, ample headroom past the
     /// jumbo shogi armies (issue #402 Tenjiku added the fourteen roles `132..=145`)
-    /// and the Grasshopper (`146`), which #448 widened the field to unblock. Before
+    /// and the Nightrider (`147`), which #448 widened the field to unblock. Before
     /// #448 the field was 7 bits (a 128-role ceiling, one slot from full); see issue
     /// #441 for the budget audit and the widening design. Do **not** grow this past
     /// `256` without another field widening (a fresh wire-format version bump
     /// touching `super::binary` and [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 147;
+    pub const COUNT: usize = 148;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1474,6 +1499,7 @@ impl WideRole {
         WideRole::MultiGeneral,
         WideRole::Dog,
         WideRole::Grasshopper,
+        WideRole::Nightrider,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1844,6 +1870,13 @@ impl WideRole {
             // base letter and the board FEN I/O adds the `***`. The `compare-fairy`
             // harness maps `***j` to FSF's `g` when driving Grasshopper chess.
             WideRole::Grasshopper => 'j',
+            // Nightrider — a fifth-tier overflow role. It recycles the FSF
+            // nightrider mnemonic `n` (already the Knight's bare letter, and taken in
+            // every lower overflow bank: `*n` ShogiKnight, `**n` ViolentStag, `=n`
+            // PromotedFlyingGoose, `***n` ChuLion); distinct here by the `****`
+            // prefix the board FEN I/O adds. The `compare-fairy` harness maps
+            // `****n → n` when driving Nightrider chess.
+            WideRole::Nightrider => 'n',
         }
     }
 
@@ -2305,6 +2338,7 @@ impl WideRole {
                 | WideRole::SideSoldier
                 | WideRole::MultiGeneral
                 | WideRole::Dog
+                | WideRole::Nightrider
         )
     }
 
@@ -2332,6 +2366,9 @@ impl WideRole {
             's' => Some(WideRole::SideSoldier),
             'm' => Some(WideRole::MultiGeneral),
             'd' => Some(WideRole::Dog),
+            // Nightrider chess: recycles the FSF nightrider mnemonic `n`, free within
+            // the `****` fifth tier; the harness maps `****n → n`.
+            'n' => Some(WideRole::Nightrider),
             _ => None,
         }
     }
@@ -2545,6 +2582,7 @@ impl fmt::Display for WideRole {
             WideRole::MultiGeneral => "multi-general",
             WideRole::Dog => "dog",
             WideRole::Grasshopper => "grasshopper",
+            WideRole::Nightrider => "nightrider",
         })
     }
 }

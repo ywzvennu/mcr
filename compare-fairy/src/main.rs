@@ -67,6 +67,7 @@ mod mansindam;
 mod minishogi;
 mod minixiangqi;
 mod modern;
+mod nightrider;
 mod nocastle;
 mod opulent;
 mod orda;
@@ -429,6 +430,10 @@ fn main() {
     // grasshoppers added (no pawn double step / en passant), and takes the
     // hurdle-dependent king-safety verify path.
     let grasshopper_mismatches = grasshopper::run(&mut engine, opts.full);
+    // Nightrider chess is a FSF built-in (no variants.ini needed), like perfect: it
+    // rides the same generic 8x8 engine as standard chess with the knights replaced
+    // by riding Nightriders (its knight-ray king safety takes the full-verify path).
+    let nightrider_mismatches = nightrider::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -529,6 +534,7 @@ fn main() {
         + legan_mismatches
         + perfect_mismatches
         + grasshopper_mismatches
+        + nightrider_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

@@ -541,6 +541,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess widened to a 9x9 board with an added Archbishop; standard castling (king on the e-file, rooks on the a/i files), double step, en passant, and promotion to Queen/Rook/Bishop/Knight/Archbishop. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant modern`).",
         },
+        WideVariantId::Nightrider => Meta {
+            display: "Nightrider chess (8x8)",
+            pieces: "Standard chess army with the knights replaced by Nightriders (mcr overflow `****n`/`****N`) — a knight that rides, repeating its leap in the same knight-direction over empty squares until blocked.",
+            rules: "Standard 8x8 chess with double step, en passant, castling, and the fifty-move rule; a pawn promotes on the last rank to Queen, Rook, Bishop, or Nightrider. The Nightrider gives check and pins along its knight-rays, so king safety takes the per-move full-verify path. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant nightrider`).",
+        },
         WideVariantId::Nocastle => Meta {
             display: "No-castle chess (8x8)",
             pieces: "Standard chess army.",

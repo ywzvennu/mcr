@@ -1284,6 +1284,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             || V::multi_royal()
             || V::has_cannons()
             || V::has_flying_general()
+            || V::needs_full_verify()
             || V::supports_gating()
             || V::has_hand()
             || (V::has_placement() && self.state.placement.any(self.state.turn));
@@ -1305,7 +1306,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.generate_placement_into(out);
         } else if V::multi_royal() {
             self.generate_multi_royal_into(out);
-        } else if V::has_cannons() || V::has_flying_general() {
+        } else if V::has_cannons() || V::has_flying_general() || V::needs_full_verify() {
+            // The per-move make/unmake verify generator. Besides the cannon-royal
+            // family it also carries any variant that opts into full verification
+            // ([`needs_full_verify`](WideVariant::needs_full_verify)) — a riding
+            // leaper (the Nightrider) whose knight-ray attacks the line-based pin /
+            // interposition machinery cannot express. The fast-accept is forced off
+            // there (see `generate_cannon_verify_into`), so every move is
+            // authoritatively re-tested by `king_safe_after`.
             self.generate_cannon_verify_into(out);
         } else {
             // The standard path with the gating / drop addenda a count sink
@@ -2476,7 +2484,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // lines does not resolve a facing check, so it cannot be accepted without
         // the full per-move facing verify. Default-off elsewhere.
         let facing_check = V::restricts_facing_general() && generals_face::<G>(&self.board);
-        let must_verify_all = in_check || facing_check;
+        // A variant that opts into full verification (`needs_full_verify` — a
+        // riding leaper whose knight-ray threats the geometry fast-accept cannot
+        // reason about) disables the fast-accept entirely: every move falls through
+        // to the authoritative `king_safe_after` re-test below. For every other
+        // variant this is `in_check || facing_check` exactly as before, so their
+        // fast-accept and produced move set stay byte-identical.
+        let must_verify_all = in_check || facing_check || V::needs_full_verify();
 
         // Flag-rank "campmate" (Synochess): a king may not step **onto** its own
         // goal rank while the enemy king already occupies that rank (the flag is
