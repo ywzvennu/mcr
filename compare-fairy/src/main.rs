@@ -83,6 +83,7 @@ mod synochess;
 mod tencubed;
 mod threekings;
 mod tori;
+mod torpedo;
 mod uci;
 mod variants;
 mod xboard;
@@ -382,6 +383,10 @@ fn main() {
     // rides the same generic engine (non-royal Commoner king, Commoner-only pawn
     // promotion, pawn-extinction terminal).
     let kinglet_mismatches = kinglet::run(&mut engine, opts.full);
+    // Torpedo chess is a FSF built-in (no variants.ini needed), like kinglet: it
+    // rides the same generic 8x8 engine (standard chess with the pawn double-step
+    // allowed from any rank).
+    let torpedo_mismatches = torpedo::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -473,6 +478,7 @@ fn main() {
         + extinction_mismatches
         + threekings_mismatches
         + kinglet_mismatches
+        + torpedo_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

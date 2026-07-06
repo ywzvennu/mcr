@@ -4026,7 +4026,6 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
         let forward: i8 = if us.is_white() { 1 } else { -1 };
-        let start_rank = V::double_push_rank(us);
         // The legal promotion targets, materialised **lazily**. The default reads
         // only the static promotion config (every existing variant); Grand chess
         // overrides it to a board-dependent set recomputed from the live board.
@@ -4067,13 +4066,50 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                             out.push(WideMove::new(from, one, WideMoveKind::Quiet));
                         }
                     }
-                    if from.rank() == start_rank {
+                    if V::pawn_may_double_push_from(from.rank(), us) {
                         if let Some(two) = from.offset(0, 2 * forward) {
                             if !occupied.contains(two)
                                 && check_mask.contains(two)
                                 && pin_line.contains(two)
                             {
-                                out.push(WideMove::new(from, two, WideMoveKind::DoublePawnPush));
+                                if V::in_promotion_zone(us, two.rank()) {
+                                    // A double-step that lands on the promotion zone
+                                    // (only reachable when the double-step is allowed
+                                    // from a non-standard rank — torpedo) promotes,
+                                    // exactly like a single push onto the last rank:
+                                    // it emits one move per promotion role and sets no
+                                    // en-passant target (the pawn promotes rather than
+                                    // skipping a capturable square). For every standard
+                                    // variant the double-step lands two ranks up from
+                                    // the start rank, never in the promotion zone, so
+                                    // this branch is dead and their movegen is
+                                    // byte-identical.
+                                    let roles = promo_roles
+                                        .get_or_insert_with(|| V::promotion_targets(us, board));
+                                    for &role in roles.iter() {
+                                        out.push(WideMove::new(
+                                            from,
+                                            two,
+                                            WideMoveKind::Promotion {
+                                                role,
+                                                capture: false,
+                                            },
+                                        ));
+                                    }
+                                    if !V::promotion_is_forced(us, two.rank()) {
+                                        out.push(WideMove::new(
+                                            from,
+                                            two,
+                                            WideMoveKind::DoublePawnPush,
+                                        ));
+                                    }
+                                } else {
+                                    out.push(WideMove::new(
+                                        from,
+                                        two,
+                                        WideMoveKind::DoublePawnPush,
+                                    ));
+                                }
                             }
                         }
                     }
