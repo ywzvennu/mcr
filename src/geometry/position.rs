@@ -4281,8 +4281,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
         }
 
-        // En passant.
-        if let Some(ep) = self.state.ep_square {
+        // En passant. A variant without en passant (`has_en_passant() == false`,
+        // e.g. Georgian) never records an ep target and offers no ep capture even if
+        // a parsed FEN carried one; every other variant keeps `has_en_passant()`
+        // `true`, so this guard is inert and byte-identical.
+        if let Some(ep) = self.state.ep_square.filter(|_| V::has_en_passant()) {
             // The en-passant landing square is normally empty (the enemy pawn
             // skipped it), but in Duck chess the neutral Duck may sit on it; the
             // duck is part of `occupied`, so a blocked ep square forbids the
@@ -4948,7 +4951,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 // en-passant arm can find it. An ordinary pawn skips the square
                 // straight ahead and leaves `ep_captured` clear (byte-identical).
                 let forward: i8 = if us.is_white() { 1 } else { -1 };
-                if V::pawn_is_berolina() {
+                if !V::has_en_passant() {
+                    // A variant without en passant (e.g. Georgian) still lets the
+                    // pawn advance two squares, but records no ep target, so the
+                    // reply can never capture en passant and the FEN ep field stays
+                    // `-`.
+                } else if V::pawn_is_berolina() {
                     let df = (to.file() as i8) - (from.file() as i8);
                     let df = df.signum();
                     self.state.ep_square = from.offset(df, forward);

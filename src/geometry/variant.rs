@@ -582,6 +582,22 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         true
     }
 
+    /// Returns `true` if this variant offers **en passant**. The default is
+    /// `true`, matching standard chess and every existing variant, so this hook is
+    /// inert and their move generation is byte-identical: a double pawn push sets
+    /// the skipped square as the en-passant target, and an enemy pawn may capture
+    /// it on the reply.
+    ///
+    /// A variant overrides it to `false` to remove en passant entirely — the pawn
+    /// **double step still happens** (a pawn may advance two squares), but no
+    /// en-passant target is recorded (so the FEN's ep field stays `-`) and no
+    /// en-passant capture is ever generated. Only
+    /// [`Georgian`](super::variants::Georgian) sets it `false`, matching
+    /// Fairy-Stockfish's `enPassantRegion = 0` for that variant.
+    fn has_en_passant() -> bool {
+        true
+    }
+
     /// Returns the 0-based rank on which `color`'s king and castling rooks
     /// start — the rank a castle moves along.
     ///

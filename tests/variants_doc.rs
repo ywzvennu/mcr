@@ -385,6 +385,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess movement, castling, en passant, and promotion but no check: a side may leave its king attacked, and capturing the enemy king wins; the per-player fog is a view layer only.",
             oracle: "Fairy-Stockfish (`UCI_Variant fogofwar`): the deterministic movegen perft-matches FSF; the fog is a view layer, not part of perft.",
         },
+        WideVariantId::Georgian => Meta {
+            display: "Georgian Chess (8x8)",
+            pieces: "Amazon Chess army — the standard chess army with the Queen replaced by an Amazon (Queen + Knight, mcr Angel).",
+            rules: "Amazon Chess with no castling and no en passant: the pawn double step stays but sets no en-passant target, and neither side may castle; with no Queen a pawn promotes to Amazon, Rook, Bishop, or Knight. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant georgian`).",
+        },
         WideVariantId::Gorogoro => Meta {
             display: "Gorogoro Shogi Plus (5x6)",
             pieces: "Shogi minus Rook and Bishop — King, Gold and Silver Generals, Knight, Lance, Pawn — with a Lance and Knight starting in hand.",

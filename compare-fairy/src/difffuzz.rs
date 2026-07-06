@@ -775,6 +775,19 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Georgian chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — the Amazon army with no
+    // castling and no en passant — so it shares Amazon's `**a`/`**A` overflow
+    // token and takes the `amazon_to_fsf` dialect; the removed castling/en passant
+    // are *rule* differences, not letter ones (the FEN ep field is simply always
+    // `-`).
+    Spec {
+        id: WideVariantId::Georgian,
+        fsf: "georgian",
+        needs_ini: false,
+        dialect: amazon_to_fsf,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
