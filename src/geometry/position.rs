@@ -4176,6 +4176,29 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
             }
 
+            // Sideways quiet step (pawn-sideways chess). A sideways pawn may also
+            // step one square left or right along its own rank onto an **empty**
+            // square. It is quiet-only (never a capture), stays on the same rank
+            // (so it can never reach the promotion zone) and is not an attack, so
+            // it gives no check and — being a plain `Quiet` — creates no
+            // en-passant target. Default-off (`pawn_moves_sideways()` is `false`),
+            // so every ordinary-pawn variant skips this and is byte-identical. The
+            // same `check_mask` / `pin_line` guards as the forward push apply, so a
+            // pinned pawn may only step sideways along its pin line (which a
+            // same-rank step almost never satisfies) and pins are handled for free.
+            if V::pawn_moves_sideways() {
+                for df in [-1i8, 1] {
+                    if let Some(side) = from.offset(df, 0) {
+                        if !occupied.contains(side)
+                            && check_mask.contains(side)
+                            && pin_line.contains(side)
+                        {
+                            out.push(WideMove::new(from, side, WideMoveKind::Quiet));
+                        }
+                    }
+                }
+            }
+
             // Captures (and capturing promotions). The capture squares come from
             // [`role_attacks`](WideVariant::role_attacks): the two forward diagonals
             // for an ordinary pawn, the single square straight ahead for a Berolina

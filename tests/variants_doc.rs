@@ -541,6 +541,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Symmetric horde mirror; no castling, single-step pawns; a pawn promotes to Lancer, Kheshig, Archer, or Falcon; flag-win (campmate) when a king reaches the far rank. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant ordamirror`).",
         },
+        WideVariantId::Pawnsideways => Meta {
+            display: "Pawn-sideways chess (8x8)",
+            pieces: "Standard chess army with a pawn that may also step sideways (`p`/`P`).",
+            rules: "Standard 8x8 chess in which a pawn, in addition to its ordinary moves, may make a single quiet step sideways (one square left or right along its own rank) onto an empty square. The forward push, initial forward double step, diagonal capture, en passant (off the forward double step only), and promotion to Queen/Rook/Bishop/Knight are all standard; a sideways step never captures, never promotes, gives no check, and creates no en-passant target. Castling and the fifty-move rule are standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant pawnsideways`).",
+        },
         WideVariantId::Placement => Meta {
             display: "Placement (Pre-Chess, 8x8)",
             pieces: "Standard chess army; the eight non-pawn pieces start off the board, in hand.",

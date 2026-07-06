@@ -751,6 +751,19 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Pawn-sideways chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in spelled identically to mcr
+    // (standard-chess letters — the pawn simply gains an extra sideways quiet step,
+    // a *rule* difference, not a letter one), so it takes the `identity` dialect. A
+    // sideways step never creates an en-passant target, and the ordinary forward
+    // double-step ep is spelled identically in both engines.
+    Spec {
+        id: WideVariantId::Pawnsideways,
+        fsf: "pawnsideways",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

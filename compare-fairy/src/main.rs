@@ -67,6 +67,7 @@ mod nocastle;
 mod opulent;
 mod orda;
 mod ordamirror;
+mod pawnsideways;
 mod placement;
 mod pocketknight;
 mod seirawan;
@@ -392,6 +393,10 @@ fn main() {
     // rides the same generic engine (the inverted diagonal-move / straight-capture
     // pawn, standard everything else).
     let berolina_mismatches = berolina::run(&mut engine, opts.full);
+    // Pawn-sideways chess is a FSF built-in (no variants.ini needed), like berolina:
+    // it rides the same generic 8x8 engine (standard chess with the pawn allowed an
+    // extra sideways quiet step).
+    let pawnsideways_mismatches = pawnsideways::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -485,6 +490,7 @@ fn main() {
         + kinglet_mismatches
         + torpedo_mismatches
         + berolina_mismatches
+        + pawnsideways_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
