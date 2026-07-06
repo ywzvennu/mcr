@@ -231,6 +231,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Opulent), "perft_opulent.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Orda), "perft_orda.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Ordamirror), "perft_ordamirror.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
+    row(Game::Wide(WideVariantId::Pawnsideways), "perft_pawnsideways.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Placement), "perft_placement.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Pocketknight), "perft_pocketknight.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Seirawan), "perft_seirawan.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),

@@ -89,13 +89,13 @@ pub use variants::{
     Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk,
     MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Micro, MicroRules, Minishogi,
     MinishogiRules, Minixiangqi, MinixiangqiRules, Modern, ModernRules, Nocastle, NocastleRules,
-    Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules,
-    Pocketknight, PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
-    ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
-    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules,
-    Threekings, ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules,
-    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Pawnsideways,
+    PawnsidewaysRules, Placement, PlacementRules, Pocketknight, PocketknightRules, Seirawan,
+    SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj, ShatranjRules, Shinobi,
+    ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
+    ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
+    Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules, Tori, ToriRules,
+    Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

@@ -28,10 +28,10 @@ use super::{
     FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
     HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi,
     Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent,
-    Orda, Ordamirror, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi,
-    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku,
-    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
-    WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Orda, Ordamirror, Pawnsideways, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
+    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed,
+    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
+    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -807,6 +807,7 @@ wide_variants! {
     Opulent, Opulent, Opulent, "opulent";
     Orda, Orda, Orda, "orda";
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
+    Pawnsideways, Pawnsideways, Pawnsideways, "pawnsideways", "pawn-sideways";
     Placement, Placement, Placement, "placement";
     Pocketknight, Pocketknight, Pocketknight, "pocketknight", "pocket-knight";
     Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
@@ -973,7 +974,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 78, "all 78 fairy variants are covered");
+        assert_eq!(count, 79, "all 79 fairy variants are covered");
     }
 
     #[test]
@@ -1387,6 +1388,12 @@ mod tests {
             WideVariantId::Ordamirror,
             Ordamirror,
             AnyWideVariant::Ordamirror,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Pawnsideways,
+            Pawnsideways,
+            AnyWideVariant::Pawnsideways,
             2
         );
         agrees_with_typed!(

@@ -748,6 +748,27 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if this variant's [`WideRole::Pawn`] is a **sideways pawn** —
+    /// an ordinary chess pawn that may **also** take a single quiet step sideways
+    /// (one square left or right along its own rank onto an empty square). Every
+    /// other pawn behaviour is standard: it still pushes straight forward, takes
+    /// the initial forward double step, captures diagonally forward, is subject to
+    /// en passant, and promotes on the last rank. The sideways step is *quiet only*
+    /// (it can never capture), stays on the same rank (so it can never promote and
+    /// never creates an en-passant target), and is not an attack (so it gives no
+    /// check).
+    ///
+    /// The default is `false`, so every other variant keeps the ordinary pawn and
+    /// its move generation is byte-identical. Only
+    /// [`Pawnsideways`](super::variants::Pawnsideways) sets it `true`. Because the
+    /// sideways step is not in [`role_attacks`](WideVariant::role_attacks), king
+    /// safety, checks, and en passant are all unaffected.
+    ///
+    /// [`WideRole::Pawn`]: super::role::WideRole::Pawn
+    fn pawn_moves_sideways() -> bool {
+        false
+    }
+
     /// Returns the squares a piece of `role` of `color` on `sq` may move to but
     /// **never capture on** — non-capturing "quiet-only" steps that the role's
     /// [`role_attacks`](WideVariant::role_attacks) set deliberately omits (so they
