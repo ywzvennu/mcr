@@ -7,8 +7,8 @@
 //! Alice ruleset**, and cross-checked by a fully **independent brute-force Alice
 //! move generator** written from scratch in this file (a separate array-based
 //! position model with its own naive movegen and plane-restricted king-safety).
-//! Two independent implementations agreeing on every node count to depth 4 is the
-//! substitute for the missing perft oracle.
+//! Two independent implementations agreeing on every node count to **depth 4**
+//! (non-`#[ignore]`d, issue #500) is the substitute for the missing perft oracle.
 //!
 //! ## How the shallow numbers are derived
 //!
@@ -25,8 +25,8 @@
 //!   the near-empty board B usually has *more* mobility there than on board A,
 //!   while a few board-A moves become illegal when their transfer square is
 //!   occupied on board B. These counts are produced **identically** by the engine
-//!   and by the independent brute-force generator below (depths 1–4 in the cheap
-//!   test; the deep layers are `#[ignore]`d).
+//!   and by the independent brute-force generator below (depths 1–4, all
+//!   non-`#[ignore]`d; only the engine-only perft(5) is `#[ignore]`d).
 //!
 //! Castling, promotion, and en passant never occur in the start-position tree at
 //! these depths, so the brute force — which implements the core two-board
@@ -68,12 +68,15 @@ fn engine_startpos_perft_deep() {
 }
 
 /// The engine and the **independent** brute-force generator must agree on every
-/// node count, depths 1–3 (cheap). This is the no-oracle cross-validation.
+/// node count, depths 1–4. This is the no-oracle cross-validation, and depth 4 is
+/// the committed independent cross-check floor (issue #500): the brute force runs
+/// perft(4) in ~1s even in debug, so it stays non-`#[ignore]`d and both engines
+/// prove 219 236 from scratch (the engine's depth-4 pin is no longer self-standing).
 #[test]
-fn engine_matches_independent_brute_force_shallow() {
+fn engine_matches_independent_brute_force() {
     let engine = Alice::from_fen(STARTPOS).expect("valid Alice FEN");
     let bf = brute::Position::startpos();
-    for depth in 1..=3 {
+    for depth in 1..=4 {
         let e = gperft::<Chess8x8, _>(&engine, depth);
         let b = brute::perft(&bf, depth);
         assert_eq!(
@@ -81,18 +84,10 @@ fn engine_matches_independent_brute_force_shallow() {
             "engine vs independent brute-force Alice perft({depth}) disagree: {e} vs {b}"
         );
     }
-    // Spot-check the literal pins too.
+    // Spot-check the literal pins too (the independent generator's own counts).
     assert_eq!(brute::perft(&bf, 1), 20);
     assert_eq!(brute::perft(&bf, 2), 400);
     assert_eq!(brute::perft(&bf, 3), 9384);
-}
-
-#[test]
-#[ignore = "deep brute-force cross-check; run with --release -- --include-ignored"]
-fn engine_matches_independent_brute_force_depth4() {
-    let engine = Alice::from_fen(STARTPOS).expect("valid Alice FEN");
-    let bf = brute::Position::startpos();
-    assert_eq!(gperft::<Chess8x8, _>(&engine, 4), 219_236);
     assert_eq!(brute::perft(&bf, 4), 219_236);
 }
 

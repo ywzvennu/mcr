@@ -17,6 +17,13 @@
 //! agreeing on every node count to depth 3 is the substitute for the missing
 //! oracle.
 //!
+//! HaChu *was* re-tried on Wa Shogi under issue #500 (it advertises `wa-shogi` and,
+//! unlike Tenjiku, does not crash): it generates **51** start-position moves against
+//! mcr's **57**, from a different start array and piece set — it ships a *different*
+//! Wa Shogi ruleset, so it is not a usable node-for-node oracle here. That probe is
+//! recorded in-repo by `compare-fairy`'s `probe_washogi` (`cargo run --release --
+//! --hachu`). The independent brute force below remains the second count source.
+//!
 //! ## How the shallow numbers are derived
 //!
 //! * **perft(1) = 57.** The two armies start five ranks apart (White on ranks 1-3,

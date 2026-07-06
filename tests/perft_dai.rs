@@ -23,16 +23,20 @@
 //!   the 71 root moves leaves Black with exactly the reply count HaChu reports
 //!   (71 each; the camps are three ranks apart, so a first move never changes the
 //!   reply count — hence 71 x 71).
-//! * **perft(3) = 357836** — validated against HaChu at the **subtree / leaf**
-//!   level rather than exhaustively (a full node-by-node depth-3 walk is ~5041
-//!   flaky one-subprocess-per-node HaChu dumps). Sampled subtrees agree with **zero
-//!   real mismatches**: e.g. the quiet `a4a3` rook subtree matches HaChu at 70/71
-//!   of its depth-2 nodes (the one gap is a HaChu subprocess crash, not a move
-//!   difference), and the line-opening `g5g6` pawn push — which frees the Dragon
-//!   King, the Free King's diagonal and the flanking Bishops behind it — matches
-//!   HaChu leaf-for-leaf (89 White replies after `1. g5g6 a11a10`). The few
-//!   unreachable nodes are HaChu 0.23 segfaulting on specific positions (its
-//!   `usermove` path is fragile on the 15x15 board), documented, not weakened.
+//! * **perft(3) = 357836** — now validated against HaChu **node-for-node** by a full
+//!   depth-3 divide walk (issue #500): for each of the 5041 depth-2 nodes the White
+//!   grandchild reply count is compared to HaChu's (`compare-fairy --hachu` with
+//!   `MCR_HACHU_DAI_DEPTH3=1`, a fresh subprocess per node). Result: **4938 / 5041
+//!   nodes match, 0 real mismatches**, 103 nodes skipped where HaChu 0.23 segfaults
+//!   (its `usermove` path is fragile on the 15x15 board — oracle flakiness, not a
+//!   move difference). The comparison is **board-move to board-move**: the Chu/Dai
+//!   Lion's **jitto pass** — which mcr emits as a `from == to` move (`h3h3`) and HaChu
+//!   as its single tracked null / lion token (`p32p32` / `@@@@`, filtered by the
+//!   dump reader) — is excluded from mcr's side too (before that exclusion the walk
+//!   flagged 417 pass-only deltas, every one a `mcr = HaChu + 1` where the sole extra
+//!   move was the Lion pass and all other moves matched, confirming the artifact).
+//!   Sampled corroboration: the `g5g6` push matches HaChu leaf-for-leaf (89 White
+//!   replies after `1. g5g6 a11a10`).
 //! * **perft(4) = 25400968** is an mcr regression pin only: a node-by-node HaChu
 //!   cross-check at depth 4 is intractable, so it is not oracle-validated.
 //!
@@ -51,10 +55,11 @@ fn startpos_round_trips() {
     );
 }
 
-/// Start-position perft. Depths 1 and 2 are **HaChu-validated** node-for-node
+/// Start-position perft. Depths 1, 2 **and 3** are **HaChu-validated** node-for-node
 /// (perft(1) = 71 is an identical move-set match; perft(2) = 5041 matches at every
-/// root). perft(3) = 357836 is validated against HaChu at the subtree/leaf level
-/// (sampled subtrees show zero real move differences; see the module docs).
+/// root; perft(3) = 357836 matches HaChu's board moves at every one of its ~5041
+/// depth-2 nodes — issue #500, see the module docs for the full depth-3 divide walk
+/// and the Lion-pass notation caveat).
 #[test]
 fn startpos_perft_regression() {
     let pos = Dai::startpos();
