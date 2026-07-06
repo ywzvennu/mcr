@@ -812,6 +812,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Perfect chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess plus the
+    // Chancellor, Archbishop, and Amazon compounds (the queen side castles with the
+    // Chancellor) — so it takes its own three-compound dialect rewrite (chancellor
+    // `e`->`c`, archbishop `a`->`m`, amazon `**a`->`g`).
+    Spec {
+        id: WideVariantId::Perfect,
+        fsf: "perfect",
+        needs_ini: false,
+        dialect: crate::perfect::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

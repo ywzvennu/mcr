@@ -4433,7 +4433,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 Some(sq) => sq,
                 None => continue,
             };
-            if self.board.piece_at(rook_from) != Some(WidePiece::new(us, WideRole::Rook)) {
+            // The castle piece is a Rook on every standard variant, but a variant
+            // may nominate a different role per side (Perfect chess castles with
+            // the Chancellor on the queen side); `castle_rook_role` defaults to
+            // Rook, so this is byte-identical everywhere else.
+            if self.board.piece_at(rook_from) != Some(WidePiece::new(us, V::castle_rook_role(side)))
+            {
                 continue;
             }
             let Some(king_dest) = Square::<G>::from_file_rank(king_dest_file, rank) else {
@@ -4903,7 +4908,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 u.touch(promo, &self.board);
             }
             if mv.kind().is_castle() {
-                u.touch(WideRole::Rook, &self.board);
+                // Record the castle piece's role mask so undo restores it. The role
+                // is Rook by default, but Perfect chess castles the queen side with
+                // the Chancellor, so read it from the same per-side hook.
+                let side = if matches!(mv.kind(), WideMoveKind::CastleKingside) {
+                    KINGSIDE
+                } else {
+                    QUEENSIDE
+                };
+                u.touch(V::castle_rook_role(side), &self.board);
             }
             if let Some(flipped) = V::flips_on_move(moving.role) {
                 u.touch(flipped, &self.board);
@@ -5034,7 +5047,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     .expect("rook start file is on the board");
                 let rook_to = Square::<G>::from_file_rank(rook_dest_file, rank)
                     .expect("rook dest file is on the board");
-                let rook = WidePiece::new(us, WideRole::Rook);
+                // The role that castles as the "rook" (Rook by default; the
+                // Chancellor on Perfect chess's queen side).
+                let rook = WidePiece::new(us, V::castle_rook_role(side));
                 // Both origins hold their known pieces (the king `moving` and the
                 // rook); clear them by mask. The destinations are set with the
                 // scanning `set_piece` since on some castle geometries a dest may
@@ -6867,8 +6882,9 @@ fn parse_castling<G: Geometry, V: WideVariant<G>>(
                 // The rank the king and rooks castle on — the back rank by default,
                 // but a variant (Shako) may place them on a different rank.
                 let rank = V::castle_rank(color);
-                let file = outermost_rook_file::<G>(board, color, side, rank)
-                    .ok_or(WideFenError::BadCastling)?;
+                let file =
+                    outermost_rook_file::<G>(board, color, side, rank, V::castle_rook_role(side))
+                        .ok_or(WideFenError::BadCastling)?;
                 rights.set(color, side, Some(file));
             }
             // Shredder-FEN: an explicit rook-file letter.
@@ -7005,8 +7021,9 @@ fn parse_castling_and_gating<G: Geometry>(
                         _ => (Color::Black, QUEENSIDE),
                     };
                     let rank = back_rank::<G>(color);
-                    let rook_file = outermost_rook_file::<G>(board, color, side, rank)
-                        .ok_or(WideFenError::BadCastling)?;
+                    let rook_file =
+                        outermost_rook_file::<G>(board, color, side, rank, WideRole::Rook)
+                            .ok_or(WideFenError::BadCastling)?;
                     castling.set(color, side, Some(rook_file));
                     // The rook and (unmoved) king squares are gating-eligible.
                     if let Some(sq) = Square::<G>::from_file_rank(rook_file, rank) {
@@ -7049,15 +7066,18 @@ fn mark_gating_file<G: Geometry>(
     Ok(())
 }
 
-/// The outermost rook file for a color/side on `rank`: the rightmost rook for the
-/// kingside, the leftmost for the queenside.
+/// The outermost castle-piece file for a color/side on `rank`: the rightmost for
+/// the kingside, the leftmost for the queenside. The castle piece is a Rook on
+/// every standard variant; `role` lets a variant scan for a different piece on a
+/// side (Perfect chess's queen-side Chancellor).
 fn outermost_rook_file<G: Geometry>(
     board: &Board<G>,
     color: Color,
     side: usize,
     rank: u8,
+    role: WideRole,
 ) -> Option<u8> {
-    let rooks = board.pieces(color, WideRole::Rook);
+    let rooks = board.pieces(color, role);
     let mut chosen: Option<u8> = None;
     for file in 0..G::WIDTH {
         if let Some(sq) = Square::<G>::from_file_rank(file, rank) {

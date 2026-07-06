@@ -28,10 +28,10 @@ use super::{
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
     Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate,
     Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern,
-    Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Placement, Pocketknight, Seirawan,
-    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
-    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
-    WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect, Placement, Pocketknight,
+    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
+    Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
+    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -812,6 +812,7 @@ wide_variants! {
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
     Pawnback, Pawnback, Pawnback, "pawnback", "pawn-back", "pawnbackchess";
     Pawnsideways, Pawnsideways, Pawnsideways, "pawnsideways", "pawn-sideways";
+    Perfect, Perfect, Perfect, "perfect", "perfectchess";
     Placement, Placement, Placement, "placement";
     Pocketknight, Pocketknight, Pocketknight, "pocketknight", "pocket-knight";
     Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
@@ -978,7 +979,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 83, "all 83 fairy variants are covered");
+        assert_eq!(count, 84, "all 84 fairy variants are covered");
     }
 
     #[test]
@@ -1419,6 +1420,7 @@ mod tests {
             AnyWideVariant::Pawnsideways,
             2
         );
+        agrees_with_typed!(WideVariantId::Perfect, Perfect, AnyWideVariant::Perfect, 2);
         agrees_with_typed!(
             WideVariantId::Placement,
             Placement,

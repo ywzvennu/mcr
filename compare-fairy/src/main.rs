@@ -72,6 +72,7 @@ mod orda;
 mod ordamirror;
 mod pawnback;
 mod pawnsideways;
+mod perfect;
 mod placement;
 mod pocketknight;
 mod seirawan;
@@ -417,6 +418,11 @@ fn main() {
     // diagonal move, two-orthogonal capture — and an L-shaped corner promotion
     // region; no double step, en passant, or castling).
     let legan_mismatches = legan::run(&mut engine, opts.full);
+    // Perfect chess is a FSF built-in (no variants.ini needed), like georgian: it
+    // rides the same generic 8x8 engine as standard chess with the Chancellor,
+    // Archbishop, and Amazon compounds added (the queen side castles with the
+    // Chancellor).
+    let perfect_mismatches = perfect::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -515,6 +521,7 @@ fn main() {
         + pawnback_mismatches
         + georgian_mismatches
         + legan_mismatches
+        + perfect_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
