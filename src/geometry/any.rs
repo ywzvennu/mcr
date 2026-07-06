@@ -27,10 +27,10 @@ use super::{
     Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
     Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins,
     Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Nocastle, Opulent, Orda, Ordamirror, Placement, Seirawan, Shako, Shatar, Shatranj,
-    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed,
-    Tenjiku, Tori, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome,
-    WideVariant, Xiangfu, Xiangqi,
+    Minixiangqi, Nocastle, Opulent, Orda, Ordamirror, Placement, Pocketknight, Seirawan, Shako,
+    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
+    Synochess, Tencubed, Tenjiku, Tori, Washogi, WideEndReason, WideFenError, WideMove,
+    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -802,6 +802,7 @@ wide_variants! {
     Orda, Orda, Orda, "orda";
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
     Placement, Placement, Placement, "placement";
+    Pocketknight, Pocketknight, Pocketknight, "pocketknight", "pocket-knight";
     Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
     Shako, Shako, Shako, "shako";
     Shatar, Shatar, Shatar, "shatar";
@@ -964,7 +965,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 70, "all 70 fairy variants are covered");
+        assert_eq!(count, 71, "all 71 fairy variants are covered");
     }
 
     #[test]
