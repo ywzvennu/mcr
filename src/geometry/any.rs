@@ -25,14 +25,14 @@ use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
     Chigorin, Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi,
-    Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
-    Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
-    Knightmate, Kyotoshogi, Legan, Losalamos, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback,
-    Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
-    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed,
-    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
-    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian, Gorogoro,
+    Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk,
+    Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Makpong, Makruk, Manchu, Mansindam,
+    Micro, Minishogi, Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda,
+    Ordamirror, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan,
+    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
+    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
+    WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -783,6 +783,7 @@ wide_variants! {
     EuroShogi, EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
     Extinction, Extinction, Extinction, "extinction";
     FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
+    Gardner, Gardner, Gardner, "gardner";
     Georgian, Georgian, Georgian, "georgian";
     Gorogoro, Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
     Gothic, Gothic, Gothic, "gothic";
@@ -985,7 +986,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 89, "all 89 fairy variants are covered");
+        assert_eq!(count, 90, "all 90 fairy variants are covered");
     }
 
     #[test]
@@ -1346,6 +1347,7 @@ mod tests {
             AnyWideVariant::FogOfWar,
             2
         );
+        agrees_with_typed!(WideVariantId::Gardner, Gardner, AnyWideVariant::Gardner, 2);
         agrees_with_typed!(
             WideVariantId::Georgian,
             Georgian,

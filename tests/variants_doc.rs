@@ -391,6 +391,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess movement, castling, en passant, and promotion but no check: a side may leave its king attacked, and capturing the enemy king wins; the per-player fog is a view layer only.",
             oracle: "Fairy-Stockfish (`UCI_Variant fogofwar`): the deterministic movegen perft-matches FSF; the fog is a view layer, not part of perft.",
         },
+        WideVariantId::Gardner => Meta {
+            display: "Gardner minichess (5x5)",
+            pieces: "Standard chess army on a 5x5 board: a back rank of Rook, Knight, Bishop, Queen, King and five pawns.",
+            rules: "Standard chess on the 5x5 board — every piece keeps its ordinary move — with no pawn double step, no castling, and no en passant; pawns promote on the far rank to Queen, Rook, Bishop, or Knight. Win by checkmate; the fifty-move rule draws.",
+            oracle: "Fairy-Stockfish (`UCI_Variant gardner`).",
+        },
         WideVariantId::Georgian => Meta {
             display: "Georgian Chess (8x8)",
             pieces: "Amazon Chess army — the standard chess army with the Queen replaced by an Amazon (Queen + Knight, mcr Angel).",

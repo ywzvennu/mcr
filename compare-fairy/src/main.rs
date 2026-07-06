@@ -44,6 +44,7 @@ mod duck;
 mod empire;
 mod extinction;
 mod fogofwar;
+mod gardner;
 mod georgian;
 mod gorogoro;
 mod grand;
@@ -418,6 +419,10 @@ fn main() {
     // rides the same generic 8x8 engine as Amazon Chess (the Amazon army) with
     // castling and en passant removed.
     let georgian_mismatches = georgian::run(&mut engine, opts.full);
+    // Gardner minichess is a FSF built-in (no variants.ini needed): standard chess
+    // on the 5x5 Minishogi board (no double step, castle, or en passant), riding
+    // the same generic engine over the existing Minishogi5x5 geometry.
+    let gardner_mismatches = gardner::run(&mut engine, opts.full);
     // Legan chess is a FSF built-in (no variants.ini needed), like berolina: it rides
     // the same generic 8x8 engine (a diagonal corner army with a directional pawn —
     // diagonal move, two-orthogonal capture — and an L-shaped corner promotion
@@ -547,6 +552,7 @@ fn main() {
         + pawnsideways_mismatches
         + pawnback_mismatches
         + georgian_mismatches
+        + gardner_mismatches
         + legan_mismatches
         + losalamos_mismatches
         + perfect_mismatches
