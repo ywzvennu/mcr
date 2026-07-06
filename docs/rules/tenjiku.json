@@ -1,0 +1,2833 @@
+{
+  "board": {
+    "width": 16,
+    "height": 16,
+    "square_count": 256,
+    "backing_bits": 256,
+    "geometry": "Tenjiku16x16",
+    "start_fen": "l*n***l***u***csg**ekgs***c***u***l*nl/***r1****c****c1***t***pq***n***k***t1****c****c1***r/****s****lb+b+r****w****i****g****h****i****w+r+bb****l****s/***i***vr***h***e****b****r****v****g****r****b***e***hr***v***i/pppppppppppppppp/4+r6+r4/16/16/16/16/4+R6+R4/PPPPPPPPPPPPPPPP/***I***VR***H***E****B****R****G****V****R****B***E***HR***V***I/****S****LB+B+R****W****I****H****E****I****W+R+BB****L****S/***R1****C****C***T***K***NQ***P***T1****C****C1***R1/L*N***L***U***CSGK**EGS***C***U***L*NL w - - 0 1"
+  },
+  "army": [
+    {
+      "role": "Pawn",
+      "name": "Pawn",
+      "fen_char": "p",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": true,
+      "movement": {
+        "steps": []
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Bishop",
+      "name": "Bishop",
+      "fen_char": "b",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "Rook",
+      "name": "Rook",
+      "fen_char": "r",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "Queen",
+      "name": "Queen",
+      "fen_char": "q",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "King",
+      "name": "King",
+      "fen_char": "k",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Silver",
+      "name": "Silver",
+      "fen_char": "s",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Gold",
+      "name": "Gold",
+      "fen_char": "g",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Lance",
+      "name": "Lance",
+      "fen_char": "l",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "Dragon",
+      "name": "Dragon",
+      "fen_char": "r",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "DragonHorse",
+      "name": "DragonHorse",
+      "fen_char": "b",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "ShogiKnight",
+      "name": "ShogiKnight",
+      "fen_char": "n",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "DrunkElephant",
+      "name": "DrunkElephant",
+      "fen_char": "e",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "CopperGeneral",
+      "name": "CopperGeneral",
+      "fen_char": "c",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "FerociousLeopard",
+      "name": "FerociousLeopard",
+      "fen_char": "l",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "BlindTiger",
+      "name": "BlindTiger",
+      "fen_char": "t",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "ReverseChariot",
+      "name": "ReverseChariot",
+      "fen_char": "r",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "SideMover",
+      "name": "SideMover",
+      "fen_char": "i",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "VerticalMover",
+      "name": "VerticalMover",
+      "fen_char": "v",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Kirin",
+      "name": "Kirin",
+      "fen_char": "k",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Phoenix",
+      "name": "Phoenix",
+      "fen_char": "p",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "ChuLion",
+      "name": "ChuLion",
+      "fen_char": "n",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "HornedFalcon",
+      "name": "HornedFalcon",
+      "fen_char": "h",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "SoaringEagle",
+      "name": "SoaringEagle",
+      "fen_char": "e",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "IronGeneral",
+      "name": "IronGeneral",
+      "fen_char": "u",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "FireDemon",
+      "name": "FireDemon",
+      "fen_char": "i",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "GreatGeneral",
+      "name": "GreatGeneral",
+      "fen_char": "g",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "ViceGeneral",
+      "name": "ViceGeneral",
+      "fen_char": "v",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "RookGeneral",
+      "name": "RookGeneral",
+      "fen_char": "r",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "BishopGeneral",
+      "name": "BishopGeneral",
+      "fen_char": "b",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "LionHawk",
+      "name": "LionHawk",
+      "fen_char": "h",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "FreeEagle",
+      "name": "FreeEagle",
+      "fen_char": "e",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "ChariotSoldier",
+      "name": "ChariotSoldier",
+      "fen_char": "c",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "WaterBuffalo",
+      "name": "WaterBuffalo",
+      "fen_char": "w",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "VerticalSoldier",
+      "name": "VerticalSoldier",
+      "fen_char": "l",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "SideSoldier",
+      "name": "SideSoldier",
+      "fen_char": "s",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    }
+  ],
+  "pawns": {
+    "double_step_ranks": [
+      1
+    ],
+    "double_step_any_rank": false,
+    "en_passant": true,
+    "moves_sideways": false,
+    "moves_backward": false,
+    "berolina": false,
+    "legan": false,
+    "stepper": true,
+    "move_resets_clock": true
+  },
+  "promotion": {
+    "roles": [
+      "Gold"
+    ],
+    "zone_ranks": [
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "forced_on_last_rank": true,
+    "mandatory_in_zone": false,
+    "lion_style": true,
+    "piece_promotion_no_hand": true
+  },
+  "castling": {
+    "enabled": false,
+    "rook_role_kingside": "Rook",
+    "rook_role_queenside": "Rook",
+    "castle_rank_white": 0,
+    "king_dest_kingside": 6,
+    "king_dest_queenside": 2
+  },
+  "draw": {
+    "move_rule_plies": null,
+    "tracks_repetition": true,
+    "repetition_fold": 4,
+    "counting_rule": null,
+    "impasse": null,
+    "has_bikjang": false,
+    "stalemate_is_loss": false,
+    "has_bare_king_draw": false,
+    "has_bare_king_loss": false,
+    "perpetual_check_loses": true,
+    "perpetual_chase_loses": false,
+    "attack_repetition_loses": false
+  },
+  "terminal": {
+    "royal": "pseudo_royal_all_survive",
+    "extinction": null,
+    "flag_win": null,
+    "stalemate_is_loss": false,
+    "wins_on_check": false,
+    "temple_win": false,
+    "bare_king_draw": false,
+    "bare_king_loss": false,
+    "explosion_win": false,
+    "lose_all_wins": false,
+    "all_pieces_lost_loses": false,
+    "check_count_to_win": null,
+    "region_win": null
+  },
+  "mechanics": {
+    "needs_full_verify": false,
+    "has_petrify": false,
+    "petrifying_roles": [],
+    "royal_cannot_capture": false,
+    "has_cannons": false,
+    "uses_board_attacks": false,
+    "has_flying_general": false,
+    "has_hand": false,
+    "has_placement": false,
+    "supports_gating": false,
+    "has_duck": false,
+    "is_alice": false,
+    "has_first_move_leaps": false,
+    "has_lion_moves": true,
+    "has_area_burn": true,
+    "has_jump_captures": true,
+    "allows_pass": false,
+    "confine_pins_to_segment": false,
+    "atomic_blast": false,
+    "mandatory_captures": false,
+    "checks_forbidden": false,
+    "asymmetric_armies": false,
+    "shuffled_setup": false
+  },
+  "oracle": "independent"
+}

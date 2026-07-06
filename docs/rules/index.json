@@ -1,0 +1,1912 @@
+[
+  {
+    "name": "standard",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chess"
+    }
+  },
+  {
+    "name": "chess960",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chess960"
+    }
+  },
+  {
+    "name": "atomic",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "atomic"
+    }
+  },
+  {
+    "name": "antichess",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "giveaway"
+    }
+  },
+  {
+    "name": "crazyhouse",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "crazyhouse"
+    }
+  },
+  {
+    "name": "kingofthehill",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "kingofthehill"
+    }
+  },
+  {
+    "name": "threecheck",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 3+3",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "3check"
+    }
+  },
+  {
+    "name": "racingkings",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "8/8/8/8/8/8/krbnNBRK/qrbnNBRQ w - - 0 1",
+    "roles": [
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "racingkings"
+    }
+  },
+  {
+    "name": "horde",
+    "family": "concrete",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/1PP2PP1/PPPPPPPP/PPPPPPPP/PPPPPPPP/PPPPPPPP w kq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "horde"
+    }
+  },
+  {
+    "name": "ai-wok",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rns**sksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSK**SSNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Silver",
+      "Ship"
+    ],
+    "oracle": {
+      "fairy_stockfish": "ai-wok"
+    }
+  },
+  {
+    "name": "alice",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": "independent"
+  },
+  {
+    "name": "almost",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "almost"
+    }
+  },
+  {
+    "name": "amazon",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Angel"
+    ],
+    "oracle": {
+      "fairy_stockfish": "amazon"
+    }
+  },
+  {
+    "name": "asean",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSMKSNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Silver"
+    ],
+    "oracle": {
+      "fairy_stockfish": "asean"
+    }
+  },
+  {
+    "name": "berolina",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "berolina"
+    }
+  },
+  {
+    "name": "bughouse",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "bughouse"
+    }
+  },
+  {
+    "name": "cambodian",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w DEde - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Silver"
+    ],
+    "oracle": {
+      "fairy_stockfish": "cambodian"
+    }
+  },
+  {
+    "name": "cannonshogi",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "lnsgkgsnl/1r=c=i1c=ab1/p1p1p1p1p/9/9/9/P1P1P1P1P/1B=AC1=I=CR1/LNSGKGSNL[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold",
+      "Cannon",
+      "Lance",
+      "RookCannon",
+      "BishopCannon",
+      "BishopHopper"
+    ],
+    "oracle": {
+      "fairy_stockfish": "cannonshogi"
+    }
+  },
+  {
+    "name": "capablanca",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "capablanca"
+    }
+  },
+  {
+    "name": "capahouse",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR[] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "capahouse"
+    }
+  },
+  {
+    "name": "caparandom",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rnabqkbenr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBENR w JAja - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "caparandom"
+    }
+  },
+  {
+    "name": "centaur",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPPPPP/RWNBQKBNWR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Kheshig"
+    ],
+    "oracle": {
+      "fairy_stockfish": "centaur"
+    }
+  },
+  {
+    "name": "chak",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "rn*s*qkw*snr/4*o4/*p1*p1*p1*p1*p/9/9/9/*P1*P1*P1*P1*P/4*O4/RN*SWK*Q*SNR w - - 0 1",
+    "roles": [
+      "Knight",
+      "Rook",
+      "King",
+      "Kheshig",
+      "Serpent",
+      "Quetzal",
+      "ChakSoldier",
+      "Temple"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chak"
+    }
+  },
+  {
+    "name": "chancellor",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chancellor"
+    }
+  },
+  {
+    "name": "chaturanga",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rn*xmk*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XMK*XNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Alfil"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chaturanga"
+    }
+  },
+  {
+    "name": "checkshogi",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance"
+    ],
+    "oracle": {
+      "fairy_stockfish": "checkshogi"
+    }
+  },
+  {
+    "name": "chennis",
+    "family": "wide",
+    "width": 7,
+    "height": 7,
+    "start_fen": "1mk*u3/1**p1z3/7/7/7/3Z1**P1/3*UKM1[] w - - 0 1",
+    "roles": [
+      "King",
+      "Met",
+      "Soldier",
+      "Commoner",
+      "ChennisPawn"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chennis"
+    }
+  },
+  {
+    "name": "chigorin",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rbbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNNEKNNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "chigorin"
+    }
+  },
+  {
+    "name": "chu",
+    "family": "wide",
+    "width": 12,
+    "height": 12,
+    "start_fen": "l***l***csg**ekgs***c***ll/***r1b1***t***p***k***t1b1***r/***i***vr+b+rq***n+r+br***v***i/pppppppppppp/3***g4***g3/12/12/3***G4***G3/PPPPPPPPPPPP/***I***VR+B+R***NQ+R+BR***V***I/***R1B1***T***K***P***T1B1***R/L***L***CSGK**EGS***C***LL w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance",
+      "Dragon",
+      "DragonHorse",
+      "DrunkElephant",
+      "CopperGeneral",
+      "FerociousLeopard",
+      "BlindTiger",
+      "GoBetween",
+      "ReverseChariot",
+      "SideMover",
+      "VerticalMover",
+      "Kirin",
+      "Phoenix",
+      "ChuLion"
+    ],
+    "oracle": "ha_chu"
+  },
+  {
+    "name": "coregal",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "coregal"
+    }
+  },
+  {
+    "name": "courier",
+    "family": "wide",
+    "width": 12,
+    "height": 8,
+    "start_fen": "rn*xb*uk1*jb*xnr/1ppppp1pppp1/6m5/p5p4p/P5P4P/6M5/1PPPPP1PPPP1/RN*XB*UK1*JB*XNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Met",
+      "Wazir",
+      "Commoner",
+      "Alfil"
+    ],
+    "oracle": {
+      "fairy_stockfish": "courier"
+    }
+  },
+  {
+    "name": "dai",
+    "family": "wide",
+    "width": 15,
+    "height": 15,
+    "start_fen": "l*n***z***u***csgkgs***c***u***z*nl/***r1m1***l1***t**e***t1***l1m1***r/1***x1*j1***f***p***n***k***f1*j1***x1/r***d***i***vb+b+rq+r+bb***v***i***dr/ppppppppppppppp/4***g5***g4/15/15/15/4***G5***G4/PPPPPPPPPPPPPPP/R***D***I***VB+B+RQ+R+BB***V***I***DR/1***X1*J1***F***K***N***P***F1*J1***X1/***R1M1***L1***T**E***T1***L1M1***R/L*N***Z***U***CSGKGS***C***U***Z*NL w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Met",
+      "Silver",
+      "Gold",
+      "Wazir",
+      "Lance",
+      "Dragon",
+      "DragonHorse",
+      "ShogiKnight",
+      "DrunkElephant",
+      "CopperGeneral",
+      "FerociousLeopard",
+      "BlindTiger",
+      "GoBetween",
+      "ReverseChariot",
+      "SideMover",
+      "VerticalMover",
+      "Kirin",
+      "Phoenix",
+      "ChuLion",
+      "ViolentOx",
+      "FlyingDragon",
+      "EvilWolf",
+      "IronGeneral",
+      "StoneGeneral"
+    ],
+    "oracle": "ha_chu"
+  },
+  {
+    "name": "dobutsu",
+    "family": "wide",
+    "width": 3,
+    "height": 4,
+    "start_fen": "*jkm/1p1/1P1/MK*J[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "King",
+      "Met",
+      "Wazir"
+    ],
+    "oracle": {
+      "fairy_stockfish": "dobutsu"
+    }
+  },
+  {
+    "name": "dragon",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Aa] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "dragon"
+    }
+  },
+  {
+    "name": "duck",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "duck"
+    }
+  },
+  {
+    "name": "embassy",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rnbqkeabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQKEABNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "embassy"
+    }
+  },
+  {
+    "name": "empire",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/PPPZZPPP/8/*T*E*C*DK*C*E*T w kq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Soldier",
+      "Eagle",
+      "Cardinal",
+      "Tower",
+      "Duke"
+    ],
+    "oracle": {
+      "fairy_stockfish": "empire"
+    }
+  },
+  {
+    "name": "euroshogi",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "1nbgkgn1/1r4b1/pppppppp/8/8/PPPPPPPP/1B4R1/1NGKGBN1[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Gold"
+    ],
+    "oracle": {
+      "fairy_stockfish": "euroshogi"
+    }
+  },
+  {
+    "name": "extinction",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "extinction"
+    }
+  },
+  {
+    "name": "fogofwar",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "fogofwar"
+    }
+  },
+  {
+    "name": "gardner",
+    "family": "wide",
+    "width": 5,
+    "height": 5,
+    "start_fen": "rnbqk/ppppp/5/PPPPP/RNBQK w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "gardner"
+    }
+  },
+  {
+    "name": "georgian",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**AKBNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Angel"
+    ],
+    "oracle": {
+      "fairy_stockfish": "georgian"
+    }
+  },
+  {
+    "name": "gorogoro",
+    "family": "wide",
+    "width": 5,
+    "height": 6,
+    "start_fen": "sgkgs/5/1ppp1/1PPP1/5/SGKGS[NLnl] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "King",
+      "Silver",
+      "Gold"
+    ],
+    "oracle": {
+      "fairy_stockfish": "gorogoroplus"
+    }
+  },
+  {
+    "name": "gothic",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "rnbqekabnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNBQEKABNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "gothic"
+    }
+  },
+  {
+    "name": "grand",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "grand"
+    }
+  },
+  {
+    "name": "grandhouse",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "r8r/1nbqkeabn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKEABN1/R8R[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "grandhouse"
+    }
+  },
+  {
+    "name": "grasshopper",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/***j***j***j***j***j***j***j***j/pppppppp/8/8/PPPPPPPP/***J***J***J***J***J***J***J***J/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Grasshopper"
+    ],
+    "oracle": {
+      "fairy_stockfish": "grasshopper"
+    }
+  },
+  {
+    "name": "hoppelpoppel",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "r*h*bqk*b*hr/pppppppp/8/8/8/8/PPPPPPPP/R*H*BQK*B*HR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Rook",
+      "Queen",
+      "King",
+      "KnightBishop",
+      "BishopKnight"
+    ],
+    "oracle": {
+      "fairy_stockfish": "hoppelpoppel"
+    }
+  },
+  {
+    "name": "janggi",
+    "family": "wide",
+    "width": 9,
+    "height": 10,
+    "start_fen": "rjxu1uxjr/4k4/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/4K4/RJXU1UXJR w - - 0 1",
+    "roles": [
+      "Rook",
+      "King",
+      "Cannon",
+      "Advisor",
+      "Horse",
+      "Soldier",
+      "JanggiElephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "janggi"
+    }
+  },
+  {
+    "name": "janus",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "ranbkqbnar/pppppppppp/10/10/10/10/PPPPPPPPPP/RANBKQBNAR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk"
+    ],
+    "oracle": {
+      "fairy_stockfish": "janus"
+    }
+  },
+  {
+    "name": "jieqi",
+    "family": "wide",
+    "width": 9,
+    "height": 10,
+    "start_fen": "=d=d=d=dk=d=d=d=d/9/1=d5=d1/=d1=d1=d1=d1=d/9/9/=D1=D1=D1=D1=D/1=D5=D1/9/=D=D=D=DK=D=D=D=D w - - 0 1",
+    "roles": [
+      "King",
+      "Dark"
+    ],
+    "oracle": "independent"
+  },
+  {
+    "name": "judkins",
+    "family": "wide",
+    "width": 6,
+    "height": 6,
+    "start_fen": "rbnsgk/5p/6/6/P5/KGSNBR[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold"
+    ],
+    "oracle": {
+      "fairy_stockfish": "judkins"
+    }
+  },
+  {
+    "name": "karouk",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w DEde - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Silver"
+    ],
+    "oracle": {
+      "fairy_stockfish": "karouk"
+    }
+  },
+  {
+    "name": "khans",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "fwy=tkywf/=s=s=s=s=s=s=s=s/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Lancer",
+      "Kheshig",
+      "Archer",
+      "Khan",
+      "KhanSoldier"
+    ],
+    "oracle": {
+      "fairy_stockfish": "khans"
+    }
+  },
+  {
+    "name": "kinglet",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "kinglet"
+    }
+  },
+  {
+    "name": "knightmate",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "r*ubqkb*ur/pppppppp/8/8/8/8/PPPPPPPP/R*UBQKB*UR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Commoner"
+    ],
+    "oracle": {
+      "fairy_stockfish": "knightmate"
+    }
+  },
+  {
+    "name": "kyotoshogi",
+    "family": "wide",
+    "width": 5,
+    "height": 5,
+    "start_fen": "p+nks+l/5/5/5/+LSK+NP[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "King",
+      "Silver",
+      "PromotedLance",
+      "PromotedKnight"
+    ],
+    "oracle": {
+      "fairy_stockfish": "kyotoshogi"
+    }
+  },
+  {
+    "name": "legan",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "knbrp3/bqpp4/npp5/rp1p3P/p3P1PR/5PPN/4PPQB/3PRBNK w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "legan"
+    }
+  },
+  {
+    "name": "losalamos",
+    "family": "wide",
+    "width": 6,
+    "height": 6,
+    "start_fen": "rnqknr/pppppp/6/6/PPPPPP/RNQKNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "losalamos"
+    }
+  },
+  {
+    "name": "makpong",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Silver"
+    ],
+    "oracle": {
+      "fairy_stockfish": "makpong"
+    }
+  },
+  {
+    "name": "makruk",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnsmksnr/8/pppppppp/8/8/PPPPPPPP/8/RNSKMSNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Silver"
+    ],
+    "oracle": {
+      "fairy_stockfish": "makruk"
+    }
+  },
+  {
+    "name": "manchu",
+    "family": "wide",
+    "width": 9,
+    "height": 10,
+    "start_fen": "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/9/9/*M1OUKUO2 w - - 0 1",
+    "roles": [
+      "Rook",
+      "King",
+      "Cannon",
+      "Advisor",
+      "Horse",
+      "XiangqiElephant",
+      "Soldier",
+      "Banner"
+    ],
+    "oracle": {
+      "fairy_stockfish": "manchu"
+    }
+  },
+  {
+    "name": "mansindam",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "rnb**akqane/9/ppppppppp/9/9/9/PPPPPPPPP/9/ENAQK**ABNR[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant",
+      "Angel"
+    ],
+    "oracle": {
+      "fairy_stockfish": "mansindam"
+    }
+  },
+  {
+    "name": "micro",
+    "family": "wide",
+    "width": 4,
+    "height": 5,
+    "start_fen": "kb+r+l/p3/4/3P/+L+RBK[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "King",
+      "PromotedLance",
+      "Dragon"
+    ],
+    "oracle": {
+      "fairy_stockfish": "micro"
+    }
+  },
+  {
+    "name": "minishogi",
+    "family": "wide",
+    "width": 5,
+    "height": 5,
+    "start_fen": "rbsgk/4p/5/P4/KGSBR[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold"
+    ],
+    "oracle": {
+      "fairy_stockfish": "minishogi"
+    }
+  },
+  {
+    "name": "minixiangqi",
+    "family": "wide",
+    "width": 7,
+    "height": 7,
+    "start_fen": "rcjkjcr/z1zzz1z/7/7/7/Z1ZZZ1Z/RCJKJCR w - - 0 1",
+    "roles": [
+      "Rook",
+      "King",
+      "Cannon",
+      "Horse",
+      "Soldier"
+    ],
+    "oracle": {
+      "fairy_stockfish": "minixiangqi"
+    }
+  },
+  {
+    "name": "modern",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "rnbqkabnr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBAKQBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk"
+    ],
+    "oracle": {
+      "fairy_stockfish": "modern"
+    }
+  },
+  {
+    "name": "newzealand",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "****kfbqkbf****k/pppppppp/8/8/8/8/PPPPPPPP/****KFBQKBF****K w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Queen",
+      "King",
+      "Lancer",
+      "Rookni"
+    ],
+    "oracle": {
+      "fairy_stockfish": "newzealand"
+    }
+  },
+  {
+    "name": "nightrider",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "r****nbqkb****nr/pppppppp/8/8/8/8/PPPPPPPP/R****NBQKB****NR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Nightrider"
+    ],
+    "oracle": {
+      "fairy_stockfish": "nightrider"
+    }
+  },
+  {
+    "name": "nocastle",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "nocastle"
+    }
+  },
+  {
+    "name": "opulent",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "r**w6**wr/e**yb**zqk**zb**ya/pppppppppp/10/10/10/10/PPPPPPPPPP/E**YB**ZQK**ZB**YA/R**W6**WR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant",
+      "Wizard",
+      "OpulentLion",
+      "OpulentKnight"
+    ],
+    "oracle": {
+      "fairy_stockfish": "opulent"
+    }
+  },
+  {
+    "name": "orda",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "fwyskywf/8/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Silver",
+      "Lancer",
+      "Kheshig",
+      "Archer"
+    ],
+    "oracle": {
+      "fairy_stockfish": "orda"
+    }
+  },
+  {
+    "name": "ordamirror",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "fwy*fkywf/8/pppppppp/8/8/PPPPPPPP/8/FWY*FKYWF w - - 0 1",
+    "roles": [
+      "Pawn",
+      "King",
+      "Lancer",
+      "Kheshig",
+      "Archer",
+      "Falcon"
+    ],
+    "oracle": {
+      "fairy_stockfish": "ordamirror"
+    }
+  },
+  {
+    "name": "pawnback",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "pawnback"
+    }
+  },
+  {
+    "name": "pawnsideways",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "pawnsideways"
+    }
+  },
+  {
+    "name": "perfect",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "eaq**akbnr/pppppppp/8/8/8/8/PPPPPPPP/EAQ**AKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant",
+      "Angel"
+    ],
+    "oracle": {
+      "fairy_stockfish": "perfect"
+    }
+  },
+  {
+    "name": "petrified",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "petrified"
+    }
+  },
+  {
+    "name": "placement",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "8/pppppppp/8/8/8/8/PPPPPPPP/8[NNBBRRQKnnbbrrqk] w - - 0 1",
+    "roles": [
+      "Pawn"
+    ],
+    "oracle": {
+      "fairy_stockfish": "placement"
+    }
+  },
+  {
+    "name": "pocketknight",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Nn] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "pocketknight"
+    }
+  },
+  {
+    "name": "seirawan",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[HEhe] w KQkqBCDFGbcdfg - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "seirawan"
+    }
+  },
+  {
+    "name": "shako",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "c8c/vrnbqkbnrv/pppppppppp/10/10/10/10/PPPPPPPPPP/VRNBQKBNRV/C8C w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Cannon",
+      "FersAlfil"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shako"
+    }
+  },
+  {
+    "name": "shatar",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbdkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBDKBNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "General"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shatar"
+    }
+  },
+  {
+    "name": "shatranj",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rn*xkm*xnr/pppppppp/8/8/8/8/PPPPPPPP/RN*XKM*XNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "King",
+      "Met",
+      "Alfil"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shatranj"
+    }
+  },
+  {
+    "name": "shinobi",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/L*N1*UK1*NL[MMALD*N] w kq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Lance",
+      "Commoner",
+      "ShogiKnight"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shinobi"
+    }
+  },
+  {
+    "name": "shogi",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shogi"
+    }
+  },
+  {
+    "name": "shogun",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shogun"
+    }
+  },
+  {
+    "name": "shoshogi",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "lnsgkgsnl/1r2**e2b1/ppppppppp/9/9/9/PPPPPPPPP/1B2**E2R1/LNSGKGSNL w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance",
+      "DrunkElephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shoshogi"
+    }
+  },
+  {
+    "name": "shouse",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[AEae] w KQkqBCDFGbcdfg - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "shouse"
+    }
+  },
+  {
+    "name": "sittuyin",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "8/8/4pppp/pppp4/4PPPP/PPPP4/8/8[NNRRKMSSnnrrkmss] w - - 0 1",
+    "roles": [
+      "Pawn"
+    ],
+    "oracle": {
+      "fairy_stockfish": "sittuyin"
+    }
+  },
+  {
+    "name": "spartan",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "tdkiikat/hhhhhhhh/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Lieutenant",
+      "General",
+      "Captain",
+      "Hoplite"
+    ],
+    "oracle": {
+      "fairy_stockfish": "spartan"
+    }
+  },
+  {
+    "name": "synochess",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnv*ukvnr/8/1c4c1/1zz2zz1/8/8/PPPPPPPP/RNBQKBNR[zz] w KQ - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Cannon",
+      "FersAlfil",
+      "Soldier",
+      "Commoner"
+    ],
+    "oracle": {
+      "fairy_stockfish": "synochess"
+    }
+  },
+  {
+    "name": "tencubed",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "2**x**wae**w**x2/1rnbqkbnr1/pppppppppp/10/10/10/10/PPPPPPPPPP/1RNBQKBNR1/2**X**WAE**W**X2 w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Hawk",
+      "Elephant",
+      "Wizard",
+      "TencubedChampion"
+    ],
+    "oracle": {
+      "fairy_stockfish": "tencubed"
+    }
+  },
+  {
+    "name": "tenjiku",
+    "family": "wide",
+    "width": 16,
+    "height": 16,
+    "start_fen": "l*n***l***u***csg**ekgs***c***u***l*nl/***r1****c****c1***t***pq***n***k***t1****c****c1***r/****s****lb+b+r****w****i****g****h****i****w+r+bb****l****s/***i***vr***h***e****b****r****v****g****r****b***e***hr***v***i/pppppppppppppppp/4+r6+r4/16/16/16/16/4+R6+R4/PPPPPPPPPPPPPPPP/***I***VR***H***E****B****R****G****V****R****B***E***HR***V***I/****S****LB+B+R****W****I****H****E****I****W+R+BB****L****S/***R1****C****C***T***K***NQ***P***T1****C****C1***R1/L*N***L***U***CSGK**EGS***C***U***L*NL w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance",
+      "Dragon",
+      "DragonHorse",
+      "ShogiKnight",
+      "DrunkElephant",
+      "CopperGeneral",
+      "FerociousLeopard",
+      "BlindTiger",
+      "ReverseChariot",
+      "SideMover",
+      "VerticalMover",
+      "Kirin",
+      "Phoenix",
+      "ChuLion",
+      "HornedFalcon",
+      "SoaringEagle",
+      "IronGeneral",
+      "FireDemon",
+      "GreatGeneral",
+      "ViceGeneral",
+      "RookGeneral",
+      "BishopGeneral",
+      "LionHawk",
+      "FreeEagle",
+      "ChariotSoldier",
+      "WaterBuffalo",
+      "VerticalSoldier",
+      "SideSoldier"
+    ],
+    "oracle": "independent"
+  },
+  {
+    "name": "threekings",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "knbqkbnk/pppppppp/8/8/8/8/PPPPPPPP/KNBQKBNK w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "threekings"
+    }
+  },
+  {
+    "name": "tori",
+    "family": "wide",
+    "width": 7,
+    "height": 7,
+    "start_fen": "*r*z*kk*k*z*v/3*a3/*y*y*y*y*y*y*y/2*y1*Y2/*Y*Y*Y*Y*Y*Y*Y/3*A3/*V*Z*KK*K*Z*R[] w - - 0 1",
+    "roles": [
+      "King",
+      "Swallow",
+      "ToriFalcon",
+      "Crane",
+      "LeftQuail",
+      "RightQuail",
+      "Pheasant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "torishogi"
+    }
+  },
+  {
+    "name": "torpedo",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "torpedo"
+    }
+  },
+  {
+    "name": "washogi",
+    "family": "wide",
+    "width": 11,
+    "height": 11,
+    "start_fen": "**f**j**h**l**nk**o**k**g**m**d/1**v3**q3**t1/**b**b**b**r**b**b**b**u**b**b**b/11/11/11/11/11/**B**B**B**U**B**B**B**R**B**B**B/1**T3**Q3**V1/**D**M**G**K**OK**N**L**H**J**F[] w - - 0 1",
+    "roles": [
+      "King",
+      "SparrowPawn",
+      "Oxcart",
+      "LiberatedHorse",
+      "StruttingCrow",
+      "SwoopingOwl",
+      "ClimbingMonkey",
+      "FlyingGoose",
+      "FlyingCock",
+      "BlindDog",
+      "ViolentStag",
+      "ViolentWolf",
+      "SwallowsWings",
+      "RunningRabbit",
+      "FlyingFalcon",
+      "TreacherousFox",
+      "CloudEagle"
+    ],
+    "oracle": "independent"
+  },
+  {
+    "name": "xiangfu",
+    "family": "wide",
+    "width": 9,
+    "height": 9,
+    "start_fen": "2rb=m4/2c=cj4/2=k1=k4/9/9/9/4=K1=K2/4J=CC2/4=MBR2[] w - - 0 1",
+    "roles": [
+      "Bishop",
+      "Rook",
+      "Cannon",
+      "Horse",
+      "BishopCannon",
+      "Champion",
+      "Mahout"
+    ],
+    "oracle": {
+      "fairy_stockfish": "xiangfu"
+    }
+  },
+  {
+    "name": "xiangqi",
+    "family": "wide",
+    "width": 9,
+    "height": 10,
+    "start_fen": "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR w - - 0 1",
+    "roles": [
+      "Rook",
+      "King",
+      "Cannon",
+      "Advisor",
+      "Horse",
+      "XiangqiElephant",
+      "Soldier"
+    ],
+    "oracle": {
+      "fairy_stockfish": "xiangqi"
+    }
+  }
+]

@@ -1,0 +1,536 @@
+{
+  "board": {
+    "width": 8,
+    "height": 8,
+    "square_count": 64,
+    "backing_bits": 64,
+    "geometry": "Chess8x8",
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 3+3"
+  },
+  "army": [
+    {
+      "role": "Pawn",
+      "name": "Pawn",
+      "fen_char": "p",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": true,
+      "movement": {
+        "steps": []
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Knight",
+      "name": "Knight",
+      "fen_char": "n",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -2,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -2,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 2,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 2,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    },
+    {
+      "role": "Bishop",
+      "name": "Bishop",
+      "fen_char": "b",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "Rook",
+      "name": "Rook",
+      "fen_char": "r",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "Queen",
+      "name": "Queen",
+      "fen_char": "q",
+      "is_slider": true,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": true
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": true
+          }
+        ]
+      }
+    },
+    {
+      "role": "King",
+      "name": "King",
+      "fen_char": "k",
+      "is_slider": false,
+      "hopper": false,
+      "board_dependent": false,
+      "move_neq_capture": false,
+      "movement": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      },
+      "capture": {
+        "steps": [
+          {
+            "file": -1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": -1,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 0,
+            "rank": 1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": -1,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 0,
+            "rides": false
+          },
+          {
+            "file": 1,
+            "rank": 1,
+            "rides": false
+          }
+        ]
+      }
+    }
+  ],
+  "pawns": {
+    "double_step_ranks": [
+      1
+    ],
+    "double_step_any_rank": false,
+    "en_passant": true,
+    "moves_sideways": false,
+    "moves_backward": false,
+    "berolina": false,
+    "legan": false,
+    "stepper": false,
+    "move_resets_clock": true
+  },
+  "promotion": {
+    "roles": [
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen"
+    ],
+    "zone_ranks": [
+      7
+    ],
+    "forced_on_last_rank": true,
+    "mandatory_in_zone": false,
+    "lion_style": false,
+    "piece_promotion_no_hand": false
+  },
+  "castling": {
+    "enabled": true,
+    "rook_role_kingside": "Rook",
+    "rook_role_queenside": "Rook",
+    "castle_rank_white": 0,
+    "king_dest_kingside": 6,
+    "king_dest_queenside": 2
+  },
+  "draw": {
+    "move_rule_plies": 100,
+    "tracks_repetition": true,
+    "repetition_fold": 5,
+    "counting_rule": null,
+    "impasse": null,
+    "has_bikjang": false,
+    "stalemate_is_loss": false,
+    "has_bare_king_draw": false,
+    "has_bare_king_loss": false,
+    "perpetual_check_loses": false,
+    "perpetual_chase_loses": false,
+    "attack_repetition_loses": false
+  },
+  "terminal": {
+    "royal": "checkmate",
+    "extinction": null,
+    "flag_win": null,
+    "stalemate_is_loss": false,
+    "wins_on_check": true,
+    "temple_win": false,
+    "bare_king_draw": false,
+    "bare_king_loss": false,
+    "explosion_win": false,
+    "lose_all_wins": false,
+    "all_pieces_lost_loses": false,
+    "check_count_to_win": 3,
+    "region_win": null
+  },
+  "mechanics": {
+    "needs_full_verify": false,
+    "has_petrify": false,
+    "petrifying_roles": [],
+    "royal_cannot_capture": false,
+    "has_cannons": false,
+    "uses_board_attacks": false,
+    "has_flying_general": false,
+    "has_hand": false,
+    "has_placement": false,
+    "supports_gating": false,
+    "has_duck": false,
+    "is_alice": false,
+    "has_first_move_leaps": false,
+    "has_lion_moves": false,
+    "has_area_burn": false,
+    "has_jump_captures": false,
+    "allows_pass": false,
+    "confine_pins_to_segment": false,
+    "atomic_blast": false,
+    "mandatory_captures": false,
+    "checks_forbidden": false,
+    "asymmetric_armies": false,
+    "shuffled_setup": false
+  },
+  "oracle": {
+    "fairy_stockfish": "3check"
+  }
+}

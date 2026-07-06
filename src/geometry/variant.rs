@@ -71,6 +71,11 @@ pub enum RoyalSlider {
 /// [`WideVariant::counting_rule`]; the default is `None` (no counting), so every
 /// non-counting variant is byte-identical and the count is never tracked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "snake_case")
+)]
 pub enum WideCountingRule {
     /// Thai Makruk: board-honour (64 full moves) while the counted side still has
     /// material, then pieces-honour (8 / 16 / 22 / 32 / 44 moves, scaled by the
