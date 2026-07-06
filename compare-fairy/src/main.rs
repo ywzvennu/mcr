@@ -16,6 +16,7 @@
 //! cargo run --release                # locate FSF (env / PATH / prebuilt), compare
 //! cargo run --release -- --build     # also clone + build FSF if not found
 //! cargo run --release -- --full      # one ply deeper
+//! cargo run --release -- --quick     # bounded per-PR tier: CASES corpus, depth<=4
 //! cargo run --release --features magic   # mcr magic-bitboard sliders
 //! ```
 //!
@@ -97,6 +98,11 @@ struct Opts {
     full: bool,
     /// Run the differential fuzzer (issue #239) instead of the pinned corpus.
     difffuzz: bool,
+    /// Bounded per-PR tier (issue #502): run only the `AnyVariant` CASES corpus,
+    /// each capped at depth 4, and exit before the heavy per-module variant runs.
+    /// A depth-4 perft slice over the representative core families, fast enough to
+    /// sit on the per-PR CI path alongside a bounded difffuzz.
+    quick: bool,
     /// Run the Xiangqi perpetual-chase cross-check (issue #475) instead of the
     /// pinned corpus. Reuses `--seed` / `--games` / `--plies`.
     xiangqi_chase: bool,
@@ -240,12 +246,25 @@ fn main() {
     }
 
     // ---- run the corpus through both engines ------------------------------
+    // The effective per-case depth: `--quick` caps every case at depth 4 (the
+    // bounded per-PR tier, issue #502), `--full` deepens by one ply, otherwise the
+    // case's own default depth.
+    let case_depth = |case: &Case| -> u32 {
+        if opts.quick {
+            case.depth.min(4)
+        } else if opts.full {
+            case.depth + 1
+        } else {
+            case.depth
+        }
+    };
+
     let mut rows: Vec<Row> = Vec::with_capacity(CASES.len());
     let mut mismatches = 0usize;
     let mut skipped = 0usize;
 
     for case in CASES {
-        match run_case(&mut engine, case, opts.full) {
+        match run_case(&mut engine, case, case_depth(case)) {
             Ok(row) => {
                 if !row.matched {
                     mismatches += 1;
@@ -263,6 +282,20 @@ fn main() {
     print_table(&rows);
     println!();
     print_summary(&rows, mismatches, skipped);
+
+    // ---- bounded per-PR tier (issue #502): stop after the CASES corpus -------
+    // `--quick` is the depth-4 perft slice over the representative core families;
+    // it deliberately skips the heavy per-module variant runs below (Shogi,
+    // Xiangqi, the 10x10 boards, …) which are what make the full differential a
+    // multi-minute job. Those stay on the weekly `fairy-differential` sweep. The
+    // per-PR job pairs this slice with a bounded difffuzz for all-variant coverage.
+    if opts.quick {
+        engine.quit();
+        if mismatches > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
 
     // Makruk, Capablanca, and Seirawan ride the generic engine (not the
     // `AnyVariant` corpus above), so each has its own comparison loop. Fold their
@@ -445,6 +478,7 @@ fn parse_args() -> Opts {
         build: false,
         full: false,
         difffuzz: false,
+        quick: false,
         xiangqi_chase: false,
         fuzz: difffuzz::Config::default(),
         hachu: false,
@@ -455,6 +489,7 @@ fn parse_args() -> Opts {
         match arg.as_str() {
             "--build" => o.build = true,
             "--full" => o.full = true,
+            "--quick" => o.quick = true,
             "--hachu" => o.hachu = true,
             "--build-hachu" => {
                 o.hachu = true;
@@ -469,11 +504,15 @@ fn parse_args() -> Opts {
                 o.fuzz.variant = Some(parse_value(&mut args, "--variant", |s| Some(s.to_string())))
             }
             "--help" | "-h" => {
-                println!("usage: compare-fairy [--build] [--full]");
+                println!("usage: compare-fairy [--build] [--full] [--quick]");
                 println!("       compare-fairy --difffuzz [--seed N] [--games K] [--plies P] [--variant X]");
                 println!("       compare-fairy --hachu [--build-hachu]");
                 println!("  --build       : clone + build Fairy-Stockfish if no binary is found");
                 println!("  --full        : one ply deeper per position");
+                println!(
+                    "  --quick       : bounded per-PR tier (issue #502): the AnyVariant CASES corpus \
+only, each capped at depth 4"
+                );
                 println!(
                     "  --hachu       : run the HaChu large-shogi differential-oracle mode (issue #379)"
                 );
@@ -519,10 +558,8 @@ fn parse_seed(s: &str) -> Option<u64> {
     }
 }
 
-/// Run one corpus case through both engines and measure it.
-fn run_case(engine: &mut uci::Engine, case: &Case, full: bool) -> Result<Row, String> {
-    let depth = if full { case.depth + 1 } else { case.depth };
-
+/// Run one corpus case through both engines at `depth` and measure it.
+fn run_case(engine: &mut uci::Engine, case: &Case, depth: u32) -> Result<Row, String> {
     // mcr side.
     let mcr_pos =
         AnyVariant::from_fen(case.id, case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
