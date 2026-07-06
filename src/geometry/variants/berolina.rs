@@ -100,6 +100,7 @@ impl WideVariant<Chess8x8> for BerolinaRules {
             fullmove_number: 1,
             consecutive_passes: 0,
             board_b: Bitboard::EMPTY,
+            petrified: Bitboard::EMPTY,
         };
         (board, state)
     }

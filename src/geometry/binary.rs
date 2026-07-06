@@ -88,6 +88,7 @@ const F_PROMOTED: u16 = 1 << 6;
 const F_BOARD_B: u16 = 1 << 7;
 const F_PASSES: u16 = 1 << 8;
 const F_CLOCKS: u16 = 1 << 9;
+const F_PETRIFIED: u16 = 1 << 10;
 
 /// The widest board the geometry layer supports is the 16x16 Tenjiku Shogi board
 /// (256 squares, U256-backed), so an occupancy bitset never exceeds this many
@@ -401,6 +402,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if !state.board_b.is_empty() {
             flags |= F_BOARD_B;
         }
+        if !state.petrified.is_empty() {
+            flags |= F_PETRIFIED;
+        }
         if state.consecutive_passes != 0 {
             flags |= F_PASSES;
         }
@@ -478,6 +482,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         if flags & F_BOARD_B != 0 {
             encode_bitset(state.board_b, out);
+        }
+        if flags & F_PETRIFIED != 0 {
+            encode_bitset(state.petrified, out);
         }
         if flags & F_PASSES != 0 {
             out.push(state.consecutive_passes);
@@ -566,6 +573,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             Bitboard::EMPTY
         };
 
+        let petrified = if flags & F_PETRIFIED != 0 {
+            decode_bitset::<G>(&mut cur)?
+        } else {
+            Bitboard::EMPTY
+        };
+
         let consecutive_passes = if flags & F_PASSES != 0 { cur.u8()? } else { 0 };
 
         let (halfmove_clock, fullmove_number) = if flags & F_CLOCKS != 0 {
@@ -599,6 +612,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             fullmove_number,
             consecutive_passes,
             board_b,
+            petrified,
         };
         let mut pos = Self::from_parts(board, state);
         pos.set_promoted(promoted);

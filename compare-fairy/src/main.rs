@@ -76,6 +76,7 @@ mod ordamirror;
 mod pawnback;
 mod pawnsideways;
 mod perfect;
+mod petrified;
 mod placement;
 mod pocketknight;
 mod seirawan;
@@ -426,6 +427,10 @@ fn main() {
     // Archbishop, and Amazon compounds added (the queen side castles with the
     // Chancellor).
     let perfect_mismatches = perfect::run(&mut engine, opts.full);
+    // Petrified chess is a FSF built-in (no variants.ini needed): the pawnsideways
+    // base plus turn-to-stone captures and a pseudo-royal Commoner, on the generic
+    // 8x8 engine.
+    let petrified_mismatches = petrified::run(&mut engine, opts.full);
     // Grasshopper chess is a FSF built-in (no variants.ini needed), like legan: it
     // rides the same generic 8x8 engine as standard chess with a rank of queen-line
     // grasshoppers added (no pawn double step / en passant), and takes the
@@ -539,6 +544,7 @@ fn main() {
         + georgian_mismatches
         + legan_mismatches
         + perfect_mismatches
+        + petrified_mismatches
         + grasshopper_mismatches
         + newzealand_mismatches
         + nightrider_mismatches

@@ -29,10 +29,10 @@ use super::{
     Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
     Knightmate, Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda, Ordamirror, Pawnback,
-    Pawnsideways, Perfect, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi,
-    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku,
-    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
-    WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
+    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed,
+    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
+    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -817,6 +817,7 @@ wide_variants! {
     Pawnback, Pawnback, Pawnback, "pawnback", "pawn-back", "pawnbackchess";
     Pawnsideways, Pawnsideways, Pawnsideways, "pawnsideways", "pawn-sideways";
     Perfect, Perfect, Perfect, "perfect", "perfectchess";
+    Petrified, Petrified, Petrified, "petrified";
     Placement, Placement, Placement, "placement";
     Pocketknight, Pocketknight, Pocketknight, "pocketknight", "pocket-knight";
     Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
@@ -983,7 +984,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 87, "all 87 fairy variants are covered");
+        assert_eq!(count, 88, "all 88 fairy variants are covered");
     }
 
     #[test]
@@ -1033,7 +1034,7 @@ mod tests {
     /// arm) — never to paper over an accidental bloat.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        const CEILING: usize = 2816;
+        const CEILING: usize = 2832;
         let actual = core::mem::size_of::<AnyWideVariant>();
         assert!(
             actual <= CEILING,
@@ -1074,7 +1075,7 @@ mod tests {
     #[test]
     fn per_backing_position_size_ceiling() {
         // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
-        const CEILINGS: &[(u32, usize)] = &[(64, 1560), (128, 2800), (256, 5264)];
+        const CEILINGS: &[(u32, usize)] = &[(64, 1568), (128, 2816), (256, 5296)];
         for &(bits, ceiling) in CEILINGS {
             let mut max = 0usize;
             let mut worst = "";
@@ -1449,6 +1450,12 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Perfect, Perfect, AnyWideVariant::Perfect, 2);
+        agrees_with_typed!(
+            WideVariantId::Petrified,
+            Petrified,
+            AnyWideVariant::Petrified,
+            2
+        );
         agrees_with_typed!(
             WideVariantId::Placement,
             Placement,

@@ -418,6 +418,18 @@ pub struct GenericState<G: Geometry> {
     /// [`WideVariant::is_alice`], never fire and produced moves, state, and FEN
     /// stay byte-identical to a build without the Alice mechanic.
     pub board_b: Bitboard<G>,
+    /// **Petrified chess** wall squares: the set of squares holding a piece that
+    /// has been "turned to stone" by making a capture. A petrified square is an
+    /// inert, colorless obstacle — it blocks sliding pieces and cannot be moved
+    /// onto or captured, and it neither attacks, defends, nor gives check. The
+    /// underlying piece is removed from the [`Board`] when it petrifies, so this
+    /// mask is the sole record of the wall.
+    ///
+    /// [`Bitboard::EMPTY`] for every non-petrified variant, so the wall occupancy,
+    /// target-masking, and capture-petrification code paths — all guarded behind
+    /// [`WideVariant::has_petrify`] — never fire and produced moves, state, and FEN
+    /// stay byte-identical to a build without the petrify mechanic.
+    pub petrified: Bitboard<G>,
 }
 
 impl<G: Geometry> core::fmt::Debug for GenericState<G> {
@@ -434,6 +446,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("fullmove_number", &self.fullmove_number)
             .field("consecutive_passes", &self.consecutive_passes)
             .field("board_b", &self.board_b.count())
+            .field("petrified", &self.petrified.count())
             .finish()
     }
 }
@@ -456,6 +469,7 @@ impl<G: Geometry> PartialEq for GenericState<G> {
             && self.fullmove_number == other.fullmove_number
             && self.consecutive_passes == other.consecutive_passes
             && self.board_b == other.board_b
+            && self.petrified == other.petrified
     }
 }
 
@@ -478,6 +492,9 @@ impl<G: Geometry> core::hash::Hash for GenericState<G> {
         self.fullmove_number.hash(state);
         self.consecutive_passes.hash(state);
         for sq in self.board_b {
+            sq.index().hash(state);
+        }
+        for sq in self.petrified {
             sq.index().hash(state);
         }
     }
@@ -846,6 +863,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     // -- Attack queries ----------------------------------------------------
 
+    /// The occupancy used by move generation and king-safety: the pieces on the
+    /// board plus any petrified wall squares, which block sliding pieces even
+    /// though they belong to no side. Equal to `board.occupied()` for every
+    /// non-petrified variant (the mask is empty and the gate is a compile-time
+    /// `false`), so their generation stays byte-identical.
+    #[inline]
+    fn occupied_with_walls(&self) -> Bitboard<G> {
+        if V::has_petrify() {
+            self.board.occupied() | self.state.petrified
+        } else {
+            self.board.occupied()
+        }
+    }
+
     /// Returns the set of `attacker` pieces that attack `sq` under `occupied`.
     ///
     /// Pawns attack diagonally; sliders are blocked by the occupancy. The king
@@ -861,6 +892,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let b = &self.board;
         let mut result = Bitboard::EMPTY;
         for &role in &WideRole::ALL[..V::ROLE_SPAN] {
+            // Petrified chess: the pseudo-royal Commoner cannot capture (it would
+            // petrify itself and forfeit its royalty), so it never attacks, defends,
+            // or gives check. Skip it as an attacker. Compile-time `false` for every
+            // other variant, so their attacker scan is byte-identical.
+            if V::royal_cannot_capture() && role == WideRole::King {
+                continue;
+            }
             let pieces = b.pieces(attacker, role);
             if pieces.is_empty() {
                 continue;
@@ -1057,7 +1095,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return false;
         }
         let them = us.opposite();
-        let occ = self.board.occupied();
+        let occ = self.occupied_with_walls();
         let royals = V::royal_squares(&self.board, us);
         if royals.is_empty() {
             return false;
@@ -1084,6 +1122,12 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let b = &self.board;
         let mut attacked = Bitboard::EMPTY;
         for &role in &WideRole::ALL[..V::ROLE_SPAN] {
+            // Petrified chess: the Commoner cannot capture, so it contributes no
+            // king-danger squares (a castling piece may pass a square the enemy
+            // Commoner "guards"). Compile-time `false` elsewhere — byte-identical.
+            if V::royal_cannot_capture() && role == WideRole::King {
+                continue;
+            }
             for from in b.pieces(by, role) {
                 attacked |= V::role_attacks(role, by, from, occupied);
             }
@@ -1897,7 +1941,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // identical. (When already in duple check, no move is pre-accepted: every
         // move must be verified, since legality then requires the move to *create*
         // a surviving king.)
-        let occ = self.board.occupied();
+        let occ = self.occupied_with_walls();
         // The fast-accept is disabled while the side is "in check": for Spartan's
         // duple-check rule that means **every** royal is attacked (a move off the
         // lines cannot create a surviving king); for Chak's all-must-survive rule it
@@ -2752,7 +2796,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     ) -> bool {
         debug_assert_eq!(king_masks.square(), king);
         let board = &self.board;
-        let occupied = board.occupied();
+        let occupied = self.occupied_with_walls();
         for (idx, &role) in attackers.roles().iter().enumerate() {
             let mut pieces = board.pieces(by, role);
             if pieces.is_empty() {
@@ -2995,7 +3039,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if kings.is_empty() {
             return false;
         }
-        let occ = self.board.occupied();
+        let occ = self.occupied_with_walls();
         let them = who.opposite();
         // A royal is safe when no ordinary attacker bears on it *and* — for Tenjiku —
         // no enemy General jump-*checks* it through a screen (#491). The jump term is
@@ -3021,7 +3065,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// emitted with a full board mask and no pins.
     fn gen_multi_royal_pseudo<S: WideSink>(&self, pseudo: &mut S, us: Color) {
         let board = &self.board;
-        let occupied = board.occupied();
+        let occupied = self.occupied_with_walls();
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(us.opposite());
         let full = Bitboard::FULL;
@@ -3121,6 +3165,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     targets
                 } else {
                     targets & !capture_immune_enemies
+                };
+                // Petrified chess: no piece may land on a wall square (an inert
+                // obstacle that blocks the slide but cannot be captured), and the
+                // pseudo-royal Commoner may not capture at all — a capture would
+                // petrify it and forfeit its royalty. Both gates are compile-time
+                // `false` for every other variant, so their targets are byte-identical.
+                let targets = if V::has_petrify() {
+                    let mut t = targets & !self.state.petrified;
+                    if V::royal_cannot_capture() && role == WideRole::King {
+                        t &= !their_pieces;
+                    }
+                    t
+                } else {
+                    targets
                 };
                 if promotable {
                     // The full Shogi-aware promotion expansion: a move that starts
@@ -5163,6 +5221,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             }
         }
 
+        // Petrified chess (default-off): a capturing Queen/Rook/Bishop/Knight is
+        // "turned to stone" on the square it captured on. The piece is removed from
+        // the board and the square becomes an inert, colorless wall recorded in
+        // `state.petrified` — it blocks sliders and can never move, capture, be
+        // captured, or give check again. A capturing Pawn is not petrified, and the
+        // pseudo-royal Commoner can never capture, so neither ever reaches here.
+        // Gated behind `has_petrify()` (compile-time `false` elsewhere), so every
+        // other variant's apply is byte-identical. `moving`'s role mask and both
+        // color masks are already snapshotted by `apply_with_undo`, and `petrified`
+        // rides the whole-state snapshot, so `undo` restores the wall for free.
+        if V::has_petrify() && mv.is_capture() && V::role_petrifies(moving.role) {
+            self.board.remove_known(to, moving);
+            self.state.petrified.set(to);
+        }
+
         // Kyoto Shogi per-move flip (default-off): a moved piece toggles to its
         // alternate form on the square it just reached. Applied after the move is
         // on the board, so it never affects the legality of the move itself — only
@@ -5865,6 +5938,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         for sq in self.promoted {
             hash ^= zobrist::promoted_key(sq.index());
         }
+        for sq in s.petrified {
+            hash ^= zobrist::petrified_key(sq.index());
+        }
 
         hash
     }
@@ -5988,6 +6064,20 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             placement
         };
+        // Petrified chess renders each inert wall square as a `*` in the placement.
+        // Strip them out (recording their squares) before the board parser, which
+        // knows only real pieces. Non-petrified variants never see a `*`, so they
+        // keep the borrowed placement and allocate nothing here.
+        let mut petrified = Bitboard::<G>::EMPTY;
+        let petrified_stripped;
+        let placement = if V::has_petrify() {
+            let (s, mask) = split_petrified::<G>(placement)?;
+            petrified = mask;
+            petrified_stripped = s;
+            petrified_stripped.as_str()
+        } else {
+            placement
+        };
         let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
         // Sittuyin carries the setup-phase pocket in the same `[..]` holdings
@@ -6095,6 +6185,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             fullmove_number,
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
+            petrified,
         };
         let mut pos = Self::from_parts(board, state);
         pos.promoted = promoted;
@@ -6113,6 +6204,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             placement_with_promoted::<G>(&self.board, self.promoted)
         } else if V::has_duck() {
             placement_with_duck::<G>(&self.board, self.state.duck)
+        } else if V::has_petrify() {
+            placement_with_walls::<G>(&self.board, self.state.petrified)
         } else {
             self.board.to_fen_placement()
         };
@@ -6495,6 +6588,13 @@ impl EnemyAttackers {
         let mut roles = [WideRole::King; WideRole::COUNT];
         let mut len = 0;
         for &role in &WideRole::ALL[..V::ROLE_SPAN] {
+            // Petrified chess: the Commoner never attacks (it cannot capture), so it
+            // is not an attacker of any royal square — two Commoners may stand
+            // adjacent. Compile-time `false` for every other variant, so their
+            // fielded-attacker set is byte-identical.
+            if V::royal_cannot_capture() && role == WideRole::King {
+                continue;
+            }
             if !board.pieces(by, role).is_empty() {
                 roles[len] = role;
                 len += 1;
@@ -7364,6 +7464,91 @@ fn placement_with_duck<G: Geometry>(board: &Board<G>, duck: Option<Square<G>>) -
             let square = Square::<G>::new(rank * width + file);
             let is_duck = duck == Some(square);
             match (board.piece_at(square), is_duck) {
+                (Some(piece), _) => {
+                    flush_empty(&mut fen, &mut empty);
+                    fen.push(piece.char());
+                }
+                (None, true) => {
+                    flush_empty(&mut fen, &mut empty);
+                    fen.push('*');
+                }
+                (None, false) => empty += 1,
+            }
+        }
+        flush_empty(&mut fen, &mut empty);
+        if rank > 0 {
+            fen.push('/');
+        }
+    }
+    fen
+}
+
+/// Strips the petrified-chess wall cells (each a `*`) out of a placement field,
+/// returning the placement with those cells blanked and the set of wall squares.
+/// The inverse of [`placement_with_walls`]; the multi-wall analogue of
+/// [`split_duck`] (which allows only one `*`).
+fn split_petrified<G: Geometry>(placement: &str) -> Result<(String, Bitboard<G>), WideFenError> {
+    let height = G::HEIGHT;
+    let mut out = String::with_capacity(placement.len());
+    let mut walls = Bitboard::<G>::EMPTY;
+
+    for (rank_from_top, rank_str) in placement.split('/').enumerate() {
+        if rank_from_top > 0 {
+            out.push('/');
+        }
+        if rank_from_top as u8 >= height {
+            out.push_str(rank_str);
+            continue;
+        }
+        let rank = height - 1 - rank_from_top as u8;
+        let mut file: u32 = 0;
+        let mut empty: u32 = 0;
+        let bytes = rank_str.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            let b = bytes[i];
+            if b == b'*' {
+                let sq = Square::<G>::from_file_rank(file as u8, rank)
+                    .ok_or(WideFenError::BadEnPassant)?;
+                walls.set(sq);
+                empty += 1; // the wall cell is empty for the board parser
+                file += 1;
+                i += 1;
+            } else if b.is_ascii_digit() {
+                let mut skip: u32 = 0;
+                while i < bytes.len() && bytes[i].is_ascii_digit() {
+                    skip = skip
+                        .saturating_mul(10)
+                        .saturating_add((bytes[i] - b'0') as u32);
+                    i += 1;
+                }
+                empty = empty.saturating_add(skip);
+                file = file.saturating_add(skip);
+            } else {
+                flush_empty(&mut out, &mut empty);
+                out.push(b as char);
+                file = file.saturating_add(1);
+                i += 1;
+            }
+        }
+        flush_empty(&mut out, &mut empty);
+    }
+    Ok((out, walls))
+}
+
+/// Renders a placement field with each petrified wall shown as a `*` on its
+/// square. The inverse of [`split_petrified`]; iterates per cell like
+/// [`Board::to_fen_placement`] but emits `*` on every wall square.
+fn placement_with_walls<G: Geometry>(board: &Board<G>, walls: Bitboard<G>) -> String {
+    let width = G::WIDTH;
+    let height = G::HEIGHT;
+    let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
+    for rank_from_top in 0..height {
+        let rank = height - 1 - rank_from_top;
+        let mut empty: u32 = 0;
+        for file in 0..width {
+            let square = Square::<G>::new(rank * width + file);
+            match (board.piece_at(square), walls.contains(square)) {
                 (Some(piece), _) => {
                     flush_empty(&mut fen, &mut empty);
                     fen.push(piece.char());
