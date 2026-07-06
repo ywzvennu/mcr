@@ -94,7 +94,7 @@ pub use variants::{
     ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun, ShogunRules, Shouse,
     ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess, SynochessRules,
     Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules, Tori, ToriRules,
-    Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

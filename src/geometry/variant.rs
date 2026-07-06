@@ -511,6 +511,23 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         }
     }
 
+    /// Returns `true` if a pawn of `color` standing on `rank` (0-based) may make
+    /// its **two-square advance** — provided both squares ahead are empty (the
+    /// generic pawn generator still checks the occupancy).
+    ///
+    /// The default is the standard rule: the double step is available **only** from
+    /// the single starting [`double_push_rank`](WideVariant::double_push_rank), so
+    /// this predicate reproduces the old `rank == double_push_rank(color)` guard
+    /// exactly and every existing variant is byte-identical. Torpedo chess overrides
+    /// it to `true` for every rank, letting a pawn double-step from anywhere on the
+    /// board. The en-passant target of such a step is always the intermediate square
+    /// (the origin square shifted one rank forward), so the standard en-passant
+    /// machinery — which derives the target and the captured-pawn square from the
+    /// move's origin — stays correct for double-steps made from any rank.
+    fn pawn_may_double_push_from(rank: u8, color: Color) -> bool {
+        rank == Self::double_push_rank(color)
+    }
+
     /// Returns `true` if this variant offers standard castling. The default is
     /// `true`. A variant without castling overrides this to `false`.
     fn has_castling() -> bool {

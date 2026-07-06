@@ -643,6 +643,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "7x7 Shogi with a hand and drops (up to two Swallows per file); mandatory two-rank promotion for the Swallow and Falcon only. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant torishogi`).",
         },
+        WideVariantId::Torpedo => Meta {
+            display: "Torpedo chess (8x8)",
+            pieces: "Standard chess army.",
+            rules: "Standard 8x8 chess in which a pawn may make its two-square advance from any rank (not only its starting rank), whenever both squares ahead are empty. Single pushes, diagonal captures, en passant (off a double-step from any rank), promotion to Queen/Rook/Bishop/Knight, and castling are all standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant torpedo`).",
+        },
         WideVariantId::Washogi => Meta {
             display: "Wa Shogi (animal shogi, 11x11)",
             pieces: "An animal-and-bird army of thirty-one kinds: the royal Crane King plus sixteen non-royal base pieces (Sparrow Pawn, Oxcart, Liberated Horse, Strutting Crow, Swooping Owl, Climbing Monkey, Flying Goose, Flying Cock, Blind Dog, Violent Stag, Violent Wolf, Swallow's Wings, Running Rabbit, Flying Falcon, and the never-promoting Treacherous Fox and Cloud Eagle) and fourteen distinct promoted forms (Golden Bird, Plodding Ox, Heavenly Horse, Flying Falcon, Cloud Eagle, Violent Stag, Swallow's Wings, Raiding Falcon, Violent Wolf, Gliding Swallow, Treacherous Fox, Tenacious Falcon, Roaming Boar, Bear's Eyes).",

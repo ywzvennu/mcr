@@ -726,6 +726,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Torpedo chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as Extinction / Three kings / Kinglet above: a mid-list
+    // insert would re-roll every later variant's fuzz seed. A FSF built-in spelled
+    // identically to mcr (standard-chess letters — a pawn simply double-steps from
+    // any rank, a *rule* difference, not a letter one), so it takes the `identity`
+    // dialect.
+    Spec {
+        id: WideVariantId::Torpedo,
+        fsf: "torpedo",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
