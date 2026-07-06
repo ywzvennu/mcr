@@ -80,6 +80,7 @@ mod sittuyin;
 mod spartan;
 mod synochess;
 mod tencubed;
+mod threekings;
 mod tori;
 mod uci;
 mod variants;
@@ -374,6 +375,8 @@ fn main() {
     let modern_mismatches = modern::run(&mut engine, opts.full);
     // Extinction chess is a FSF built-in (no variants.ini needed), like coregal.
     let extinction_mismatches = extinction::run(&mut engine, opts.full);
+    // Three kings chess is a FSF built-in (no variants.ini needed), like extinction.
+    let threekings_mismatches = threekings::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -463,6 +466,7 @@ fn main() {
         + coregal_mismatches
         + modern_mismatches
         + extinction_mismatches
+        + threekings_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

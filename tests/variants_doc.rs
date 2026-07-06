@@ -625,6 +625,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "No hand or drops; five-rank promotion zone with Tenjiku-specific promotions (Soaring Eagle→Rook General, Lion→Lion Hawk, Free King→Free Eagle, …); two royals (King and the promoted Prince). **Honest partial:** ordinary movement of every piece is modelled and validated; the Fire Demon's multi-square **area burn** and the four Generals' **jump-capture** are documented-unmodelled (they capture as ordinary blockable sliders); the Lion / Lion Hawk keep the full igui / double-capture / pass move set.",
             oracle: "HaChu 0.23 **crashes deterministically** on `variant tenjiku` (its 16x16 board leaves no EDGE-sentinel border), so no live oracle is available. mcr's start position is instead reconciled **move-for-move against HaChu's own source tables** (`tenjikuPieces` / `tenArray` / `GenNonCapts`): start-position perft(1)=72 node-for-node; perft(2)=5662 and perft(3)=424195 are mcr regression pins (faithful to the rules at these depths — no special power is reachable — but not HaChu-cross-checked).",
         },
+        WideVariantId::Threekings => Meta {
+            display: "Three kings chess (8x8)",
+            pieces: "Standard chess army minus the rooks, with three non-royal Commoner kings per side (on files a, e, and h).",
+            rules: "Standard chess movement, en passant, and standard Q/R/B/N promotion but no check or checkmate — each king is an ordinary capturable Commoner and each side fields three of them. A side loses the instant its king count drops to two, so losing any one of its three kings decides the game. No castling (the start array has no rooks). Rides the generic extinction terminal (the king type, threshold 2).",
+            oracle: "Fairy-Stockfish (`UCI_Variant threekings`).",
+        },
         WideVariantId::Tori => Meta {
             display: "Tori Shogi (bird shogi, 7x7)",
             pieces: "A seven-bird army: Swallow (to Goose), Falcon (to Eagle), Crane, Left and Right Quail, Pheasant, and King.",
