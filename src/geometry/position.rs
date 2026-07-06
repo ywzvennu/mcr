@@ -366,6 +366,18 @@ pub struct GenericState<G: Geometry> {
     pub castling: GenericCastling,
     /// The en-passant target square (the square a pawn skipped), if any.
     pub ep_square: Option<Square<G>>,
+    /// The square holding the **en-passant-capturable pawn** — the piece an
+    /// en-passant capture removes. For a standard pawn this is fully derivable from
+    /// [`ep_square`](Self::ep_square) (the pawn one straight step beyond the skipped
+    /// square), so it stays `None` and the capture location is derived at apply
+    /// time, keeping every ordinary-pawn variant byte-identical. A **Berolina**
+    /// variant ([`WideVariant::pawn_is_berolina`]) sets it, because its diagonal
+    /// double step leaves the captured pawn on a square *diagonally* offset from the
+    /// skipped `ep_square` — the offset direction (which of the two diagonals the
+    /// double step took) is not recoverable from `ep_square` alone, so the exact
+    /// victim square is recorded here at the double-step. `None` for every non-
+    /// Berolina variant.
+    pub ep_captured: Option<Square<G>>,
     /// The Seirawan gating state (reserves in hand + gating-eligible squares).
     /// [`GenericGating::NONE`] for every non-gating variant.
     pub gating: GenericGating<G>,
@@ -414,6 +426,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
             .field("turn", &self.turn)
             .field("castling", &self.castling)
             .field("ep_square", &self.ep_square.map(|s| s.index()))
+            .field("ep_captured", &self.ep_captured.map(|s| s.index()))
             .field("gating", &self.gating)
             .field("duck", &self.duck.map(|s| s.index()))
             .field("placement", &self.placement)
@@ -435,6 +448,7 @@ impl<G: Geometry> PartialEq for GenericState<G> {
         self.turn == other.turn
             && self.castling == other.castling
             && self.ep_square == other.ep_square
+            && self.ep_captured == other.ep_captured
             && self.gating == other.gating
             && self.duck == other.duck
             && self.placement == other.placement
@@ -456,6 +470,7 @@ impl<G: Geometry> core::hash::Hash for GenericState<G> {
         self.turn.hash(state);
         self.castling.hash(state);
         self.ep_square.hash(state);
+        self.ep_captured.hash(state);
         self.gating.hash(state);
         self.duck.hash(state);
         self.placement.hash(state);
@@ -4026,6 +4041,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             return;
         }
         let forward: i8 = if us.is_white() { 1 } else { -1 };
+        let start_rank = V::double_push_rank(us);
+        // Berolina pawns invert push and capture: the quiet advance is diagonal and
+        // the capture is straight. Default-off, so every ordinary-pawn variant takes
+        // the straight-push branch below and is byte-identical.
+        let berolina = V::pawn_is_berolina();
         // The legal promotion targets, materialised **lazily**. The default reads
         // only the static promotion config (every existing variant); Grand chess
         // overrides it to a board-dependent set recomputed from the live board.
@@ -4040,8 +4060,48 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         for from in pawns {
             let pin_line = pins.line_of(from);
 
-            // Single (and double) push.
-            if let Some(one) = from.offset(0, forward) {
+            // Quiet advance. A Berolina pawn advances **diagonally** (two squares
+            // along the diagonal from its start rank — a *lame* jump that needs the
+            // skipped square empty); an ordinary pawn advances straight ahead.
+            if berolina {
+                // Each forward-diagonal single step (empty landing square). The two
+                // targets come from the shared Berolina-push hook.
+                for one in V::berolina_push_targets(us, from) {
+                    if !occupied.contains(one) && check_mask.contains(one) && pin_line.contains(one)
+                    {
+                        if V::in_promotion_zone(us, one.rank()) {
+                            let roles =
+                                promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
+                            for &role in roles.iter() {
+                                out.push(WideMove::new(
+                                    from,
+                                    one,
+                                    WideMoveKind::Promotion {
+                                        role,
+                                        capture: false,
+                                    },
+                                ));
+                            }
+                        } else {
+                            out.push(WideMove::new(from, one, WideMoveKind::Quiet));
+                        }
+                    }
+                    // The two-square diagonal advance from the start rank: a lame
+                    // jump along the *same* diagonal, blocked if the intervening
+                    // (single-step) square `one` is occupied.
+                    if from.rank() == start_rank && !occupied.contains(one) {
+                        let df = ((one.file() as i8) - (from.file() as i8)).signum();
+                        if let Some(two) = from.offset(2 * df, 2 * forward) {
+                            if !occupied.contains(two)
+                                && check_mask.contains(two)
+                                && pin_line.contains(two)
+                            {
+                                out.push(WideMove::new(from, two, WideMoveKind::DoublePawnPush));
+                            }
+                        }
+                    }
+                }
+            } else if let Some(one) = from.offset(0, forward) {
                 if !occupied.contains(one) {
                     if check_mask.contains(one) && pin_line.contains(one) {
                         if V::in_promotion_zone(us, one.rank()) {
@@ -4116,7 +4176,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
             }
 
-            // Diagonal captures (and capturing promotions).
+            // Captures (and capturing promotions). The capture squares come from
+            // [`role_attacks`](WideVariant::role_attacks): the two forward diagonals
+            // for an ordinary pawn, the single square straight ahead for a Berolina
+            // pawn (whose override returns exactly that), so this loop is unchanged
+            // for both.
             let caps = V::role_attacks(WideRole::Pawn, us, from, occupied) & their_pieces;
             for to in caps {
                 if !check_mask.contains(to) || !pin_line.contains(to) {
@@ -4185,9 +4249,21 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 let takers = V::role_attacks(WideRole::Pawn, us.opposite(), ep, occupied) & pawns;
                 for from in takers {
                     let pin_line = pins.line_of(from);
-                    let captured = match Square::<G>::from_file_rank(ep.file(), from.rank()) {
-                        Some(sq) => sq,
-                        None => continue,
+                    // The captured pawn. For an ordinary pawn it sits on the ep file
+                    // at the taker's rank (one straight step beyond the skipped
+                    // square). A **Berolina** pawn's diagonal double step leaves it
+                    // diagonally offset — not on the ep file — so the exact victim,
+                    // recorded at the double step, is read from `ep_captured`.
+                    let captured = if berolina {
+                        match self.state.ep_captured {
+                            Some(sq) => sq,
+                            None => continue,
+                        }
+                    } else {
+                        match Square::<G>::from_file_rank(ep.file(), from.rank()) {
+                            Some(sq) => sq,
+                            None => continue,
+                        }
                     };
                     let resolves_check = check_mask.contains(ep) || check_mask.contains(captured);
                     let ep_pin_ok = self.ep_is_legal(us, from, ep, captured, king_sq);
@@ -4768,7 +4844,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // only on the Alice path (default-off), so every other variant is inert.
         let alice_from_plane = V::is_alice() && self.state.board_b.contains(from);
 
+        // The Berolina en-passant victim recorded by the pawn that set this ep
+        // target — read before the target is cleared, so the en-passant arm below
+        // removes exactly the diagonally-offset pawn the skipped `ep_square` cannot
+        // locate on its own. `None` for every ordinary-pawn variant (which derives
+        // the victim from `ep_square`), so their apply is byte-identical.
+        let prev_ep_captured = self.state.ep_captured;
         self.state.ep_square = None;
+        self.state.ep_captured = None;
 
         // The castling rook's origin, captured for the gating update below (a
         // castle vacates both the king's and the rook's squares).
@@ -4804,22 +4887,39 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             WideMoveKind::DoublePawnPush => {
                 self.board.remove_known(from, moving);
                 self.board.set_empty(to, moving);
-                // The ep target is the square the pawn skipped.
-                let mid = if us.is_white() {
-                    from.offset(0, 1)
+                // The ep target is the square the pawn skipped. A **Berolina** pawn
+                // advances diagonally, so the skipped square is the midpoint of the
+                // diagonal (one file toward the destination), and the captured-en-
+                // passant victim is the pawn itself on its landing square `to` — a
+                // square diagonally offset from the skipped target, recorded so the
+                // en-passant arm can find it. An ordinary pawn skips the square
+                // straight ahead and leaves `ep_captured` clear (byte-identical).
+                let forward: i8 = if us.is_white() { 1 } else { -1 };
+                if V::pawn_is_berolina() {
+                    let df = (to.file() as i8) - (from.file() as i8);
+                    let df = df.signum();
+                    self.state.ep_square = from.offset(df, forward);
+                    self.state.ep_captured = Some(to);
                 } else {
-                    from.offset(0, -1)
-                };
-                self.state.ep_square = mid;
+                    self.state.ep_square = from.offset(0, forward);
+                }
             }
             WideMoveKind::EnPassant => {
                 reset_clock = true;
-                // The ep landing square is empty (the enemy pawn skipped it); the
-                // captured pawn sits on `to`'s file at `from`'s rank and is a known
-                // enemy pawn, so it too can be cleared without a scan.
+                // The ep landing square is empty (the enemy pawn skipped it). For an
+                // ordinary pawn the captured pawn sits on `to`'s file at `from`'s
+                // rank; for a **Berolina** pawn the victim is the diagonally-offset
+                // pawn recorded in `ep_captured` at the double step (the skipped
+                // square cannot locate it). Both are known enemy pawns, cleared
+                // without a scan.
                 self.board.remove_known(from, moving);
                 self.board.set_empty(to, moving);
-                if let Some(captured) = Square::<G>::from_file_rank(to.file(), from.rank()) {
+                let captured = if V::pawn_is_berolina() {
+                    prev_ep_captured
+                } else {
+                    Square::<G>::from_file_rank(to.file(), from.rank())
+                };
+                if let Some(captured) = captured {
                     self.board
                         .remove_known(captured, WidePiece::new(them, WideRole::Pawn));
                 }
@@ -5816,7 +5916,39 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
 
         let ep_field = fields.next().ok_or(WideFenError::MissingField)?;
-        let ep_square = parse_ep::<G>(ep_field)?;
+        // The en-passant field is normally the single skipped square. A **Berolina**
+        // position may carry the Fairy-Stockfish **two-square** form
+        // `<skipped><captured>` (e.g. `d3e4`), naming the diagonally-offset victim the
+        // skipped square alone cannot locate. Parse both squares; the first is the ep
+        // target, the second (if present) the recorded victim.
+        let (ep_square, ep_captured_field) = parse_ep_field::<G>(ep_field)?;
+        // When only the skipped square is given for a Berolina position, recover the
+        // victim from the board — the lone enemy pawn on an enemy-forward diagonal of
+        // the skipped square. Ambiguous or absent ⇒ `None` (no en-passant offered
+        // from this parse). `None` for every non-Berolina variant.
+        let ep_captured = match (V::pawn_is_berolina(), ep_square) {
+            (_, _) if ep_captured_field.is_some() => ep_captured_field,
+            (true, Some(mid)) => {
+                let them = turn.opposite();
+                let ef: i8 = if them.is_white() { 1 } else { -1 };
+                let mut found: Option<Square<G>> = None;
+                let mut count = 0u8;
+                for df in [-1i8, 1] {
+                    if let Some(sq) = mid.offset(df, ef) {
+                        if board.pieces(them, WideRole::Pawn).contains(sq) {
+                            found = Some(sq);
+                            count += 1;
+                        }
+                    }
+                }
+                if count == 1 {
+                    found
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
 
         let halfmove_clock = match fields.next() {
             Some(s) => parse_clock(s)?,
@@ -5835,6 +5967,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             turn,
             castling,
             ep_square,
+            ep_captured,
             gating,
             duck,
             placement: placement_pocket,
@@ -5885,7 +6018,18 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
         out.push(' ');
         match self.state.ep_square {
-            Some(sq) => write_square::<G>(&mut out, sq),
+            Some(sq) => {
+                write_square::<G>(&mut out, sq);
+                // A Berolina en-passant records its diagonally-offset victim as a
+                // second square appended to the skipped target (`<skipped><captured>`,
+                // e.g. `d3e4`) — the Fairy-Stockfish two-square form, needed because
+                // the victim is not on the skipped square's file. Only emitted when a
+                // captured square is recorded (Berolina); every ordinary-pawn variant
+                // writes the single skipped square and is byte-identical.
+                if let Some(captured) = self.state.ep_captured {
+                    write_square::<G>(&mut out, captured);
+                }
+            }
             None => out.push('-'),
         }
         out.push(' ');
@@ -7210,12 +7354,36 @@ fn flush_empty(out: &mut String, empty: &mut u32) {
     }
 }
 
-/// Parses the en-passant field (`-` or a `file`+`rank` coordinate) into a
-/// square, mapping the file letter and 1-based rank number to an index.
-fn parse_ep<G: Geometry>(field: &str) -> Result<Option<Square<G>>, WideFenError> {
+/// The parsed FEN en-passant field: the skipped target square and, for the
+/// Berolina two-square form, the recorded captured-victim square.
+type EpFieldSquares<G> = (Option<Square<G>>, Option<Square<G>>);
+
+/// Parses the FEN en-passant field into `(skipped_target, captured_victim)`.
+///
+/// The ordinary form is a single square (the skipped target), returned as
+/// `(Some(sq), None)`. A **Berolina** position may use the Fairy-Stockfish
+/// **two-square** form `<skipped><captured>` (e.g. `d3e4`), returned as
+/// `(Some(skipped), Some(captured))`; the second square names the diagonally-offset
+/// en-passant victim the single skipped square cannot locate. `-` is `(None, None)`.
+fn parse_ep_field<G: Geometry>(field: &str) -> Result<EpFieldSquares<G>, WideFenError> {
     if field == "-" {
-        return Ok(None);
+        return Ok((None, None));
     }
+    let (first, rest) = parse_one_square::<G>(field)?;
+    if rest.is_empty() {
+        return Ok((Some(first), None));
+    }
+    let (second, tail) = parse_one_square::<G>(rest)?;
+    if !tail.is_empty() {
+        return Err(WideFenError::BadEnPassant);
+    }
+    Ok((Some(first), Some(second)))
+}
+
+/// Parses one `file`-letter + 1-based-rank-number square from the front of `field`,
+/// returning the square and the unparsed remainder (a second square, for the
+/// Berolina two-square en-passant form, or the empty string).
+fn parse_one_square<G: Geometry>(field: &str) -> Result<(Square<G>, &str), WideFenError> {
     let bytes = field.as_bytes();
     if bytes.is_empty() {
         return Err(WideFenError::BadEnPassant);
@@ -7225,8 +7393,10 @@ fn parse_ep<G: Geometry>(field: &str) -> Result<Option<Square<G>>, WideFenError>
         return Err(WideFenError::BadEnPassant);
     }
     let file = file_ch - b'a';
-    // The remaining bytes are the 1-based rank number (one or more digits).
-    let rank_str = &field[1..];
+    // The 1-based rank number is the run of digits immediately following the file
+    // letter; it stops at the next file letter (the start of a second square).
+    let digits_end = 1 + bytes[1..].iter().take_while(|b| b.is_ascii_digit()).count();
+    let rank_str = &field[1..digits_end];
     if rank_str.is_empty() {
         return Err(WideFenError::BadEnPassant);
     }
@@ -7235,9 +7405,8 @@ fn parse_ep<G: Geometry>(field: &str) -> Result<Option<Square<G>>, WideFenError>
         return Err(WideFenError::BadEnPassant);
     }
     let rank = (rank_no - 1) as u8;
-    Square::<G>::from_file_rank(file, rank)
-        .map(Some)
-        .ok_or(WideFenError::BadEnPassant)
+    let sq = Square::<G>::from_file_rank(file, rank).ok_or(WideFenError::BadEnPassant)?;
+    Ok((sq, &field[digits_end..]))
 }
 
 /// Writes a square as a `file`-letter + 1-based-rank coordinate.

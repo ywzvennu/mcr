@@ -120,6 +120,7 @@ impl WideVariant<Grand10x10> for GrandRules {
             // Grand has no castling.
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

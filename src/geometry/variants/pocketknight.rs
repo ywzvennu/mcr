@@ -102,6 +102,7 @@ impl WideVariant<Chess8x8> for PocketknightRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             // One Knight per side in the pocket.

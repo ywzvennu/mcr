@@ -183,6 +183,7 @@ impl WideVariant<Gorogoro5x6> for GorogoroRules {
             turn: Color::White,
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: Self::initial_hand(),

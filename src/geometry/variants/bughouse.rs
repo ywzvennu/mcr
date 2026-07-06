@@ -109,6 +109,7 @@ impl WideVariant<Chess8x8> for BughouseRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             // The hand starts empty; it is fed externally (the partner board) and

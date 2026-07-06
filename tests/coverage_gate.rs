@@ -180,6 +180,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Almost), "perft_almost.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Amazon), "perft_amazon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Asean), "perft_asean.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("asean_pieces_honour_count_matches_fsf")),
+    row(Game::Wide(WideVariantId::Berolina), "perft_berolina.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Bughouse), "perft_bughouse.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Cambodian), "perft_cambodian.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("cambodian_pieces_honour_count_matches_fsf")),
     row(Game::Wide(WideVariantId::CannonShogi), "perft_cannonshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("cannonshogi_perpetual_check_loses_for_the_checker")),

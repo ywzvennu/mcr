@@ -40,6 +40,7 @@ fn build(
         turn,
         castling,
         ep_square,
+        ep_captured: None,
         gating: GenericGating::NONE,
         duck: None,
         placement: GenericPlacement::NONE,

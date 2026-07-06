@@ -104,6 +104,7 @@ impl WideVariant<Cap10x8> for CentaurRules {
             // (kingside) rooks on this 10-wide board.
             castling: GenericCastling::standard::<Cap10x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

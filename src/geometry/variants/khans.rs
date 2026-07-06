@@ -143,6 +143,7 @@ impl WideVariant<Chess8x8> for KhansRules {
             turn: Color::White,
             castling,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

@@ -134,6 +134,7 @@ impl WideVariant<Chess8x8> for ShogunRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

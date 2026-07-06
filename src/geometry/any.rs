@@ -22,16 +22,16 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
-    perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
-    Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Coregal,
-    Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, Extinction, FogOfWar,
-    GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
-    Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Makpong, Makruk,
-    Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror,
-    Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
-    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo,
-    Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant,
-    Xiangfu, Xiangqi,
+    perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
+    Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin,
+    Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, Extinction,
+    FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
+    HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi,
+    Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent,
+    Orda, Ordamirror, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi,
+    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku,
+    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
+    WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -756,6 +756,7 @@ wide_variants! {
     Almost, Almost, Almost, "almost", "almostchess";
     Amazon, Amazon, Amazon, "amazon", "amazonchess";
     Asean, Asean, Asean, "asean";
+    Berolina, Berolina, Berolina, "berolina";
     Bughouse, Bughouse, Bughouse, "bughouse", "bug";
     Cambodian, Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
     CannonShogi, CannonShogi, CannonShogi, "cannonshogi", "cannon-shogi";
@@ -972,7 +973,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 77, "all 77 fairy variants are covered");
+        assert_eq!(count, 78, "all 78 fairy variants are covered");
     }
 
     #[test]
@@ -1241,6 +1242,12 @@ mod tests {
         agrees_with_typed!(WideVariantId::Almost, Almost, AnyWideVariant::Almost, 2);
         agrees_with_typed!(WideVariantId::Amazon, Amazon, AnyWideVariant::Amazon, 2);
         agrees_with_typed!(WideVariantId::Asean, Asean, AnyWideVariant::Asean, 2);
+        agrees_with_typed!(
+            WideVariantId::Berolina,
+            Berolina,
+            AnyWideVariant::Berolina,
+            2
+        );
         agrees_with_typed!(
             WideVariantId::Bughouse,
             Bughouse,

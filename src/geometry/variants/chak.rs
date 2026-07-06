@@ -218,6 +218,7 @@ impl WideVariant<Shogi9x9> for ChakRules {
             turn: Color::White,
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

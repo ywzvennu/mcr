@@ -141,6 +141,7 @@ impl WideVariant<Chess8x8> for PlacementRules {
             // conferred by the deployment (see `placement_castling_king_file`).
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: Self::initial_placement(),

@@ -125,6 +125,7 @@ impl WideVariant<Chess8x8> for SeirawanRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: Self::initial_gating(),
             duck: None,
             placement: GenericPlacement::NONE,

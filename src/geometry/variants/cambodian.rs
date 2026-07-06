@@ -115,6 +115,7 @@ impl WideVariant<Chess8x8> for CambodianRules {
             // Met. This is the `DEde` field of the start FEN.
             castling: starting_leap_rights(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

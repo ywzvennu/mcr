@@ -109,6 +109,7 @@ impl WideVariant<Chess9x9> for ModernRules {
             // this 9-wide board.
             castling: GenericCastling::standard::<Chess9x9>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,
