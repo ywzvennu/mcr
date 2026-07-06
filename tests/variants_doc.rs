@@ -86,6 +86,11 @@ the committed copy, so it can never fall behind the code.\n\n",
 where that differs from Fairy-Stockfish's spelling the `compare-fairy/` harness \
 reconciles the two (see each variant's module docs).\n\n",
     );
+    out.push_str(
+        "For a per-variant deep dive — full army movement geometry, pawn / promotion / \
+castling rules, and every draw / terminal / special-mechanic condition, all rendered \
+from the engine-derived `VariantRules` model — see the [per-variant pages](variants/README.md).\n\n",
+    );
 
     // -- Concrete 8x8 engine ------------------------------------------------
     out.push_str("## Concrete 8x8 engine\n\n");

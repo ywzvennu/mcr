@@ -7,6 +7,8 @@ Every variant mcr registers, generated straight from the code so it stays in syn
 
 Board size is `files`x`ranks`. Start FENs are in mcr's own piece dialect; where that differs from Fairy-Stockfish's spelling the `compare-fairy/` harness reconciles the two (see each variant's module docs).
 
+For a per-variant deep dive — full army movement geometry, pawn / promotion / castling rules, and every draw / terminal / special-mechanic condition, all rendered from the engine-derived `VariantRules` model — see the [per-variant pages](variants/README.md).
+
 ## Concrete 8x8 engine
 
 The frozen, hand-tuned 8x8 engine reached through `mcr::AnyVariant` / `mcr::VariantId` — **9** variants.
@@ -25,7 +27,7 @@ The frozen, hand-tuned 8x8 engine reached through `mcr::AnyVariant` / `mcr::Vari
 
 ## Fairy / geometry-layer variants
 
-The generic geometry engine reached through `mcr::geometry::AnyWideVariant` / `WideVariantId` — **89** variants, spanning 3x4 Dobutsu to 12x8 Courier and 10x10 Opulent / Ten-Cubed.
+The generic geometry engine reached through `mcr::geometry::AnyWideVariant` / `WideVariantId` — **90** variants, spanning 3x4 Dobutsu to 12x8 Courier and 10x10 Opulent / Ten-Cubed.
 
 | Variant | Canonical | Board | Start FEN | Notable pieces | Special rules | Validation oracle |
 |---|---|---|---|---|---|---|
