@@ -25,7 +25,7 @@ use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin,
     Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, Extinction,
-    FogOfWar, GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse,
+    FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand, Grandhouse,
     HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi,
     Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent,
     Orda, Ordamirror, Pawnback, Pawnsideways, Placement, Pocketknight, Seirawan, Shako, Shatar,
@@ -781,6 +781,7 @@ wide_variants! {
     EuroShogi, EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
     Extinction, Extinction, Extinction, "extinction";
     FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
+    Georgian, Georgian, Georgian, "georgian";
     Gorogoro, Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
     Gothic, Gothic, Gothic, "gothic";
     Grand, Grand, Grand, "grand";
@@ -975,7 +976,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 80, "all 80 fairy variants are covered");
+        assert_eq!(count, 81, "all 81 fairy variants are covered");
     }
 
     #[test]
@@ -1322,6 +1323,12 @@ mod tests {
             WideVariantId::FogOfWar,
             FogOfWar,
             AnyWideVariant::FogOfWar,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Georgian,
+            Georgian,
+            AnyWideVariant::Georgian,
             2
         );
         agrees_with_typed!(

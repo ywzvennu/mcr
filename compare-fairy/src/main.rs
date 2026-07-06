@@ -43,6 +43,7 @@ mod duck;
 mod empire;
 mod extinction;
 mod fogofwar;
+mod georgian;
 mod gorogoro;
 mod grand;
 mod grandhouse;
@@ -402,6 +403,10 @@ fn main() {
     // rides the same generic engine (standard chess with a pawn that may also step
     // one square straight backward, capped out of its own first rank).
     let pawnback_mismatches = pawnback::run(&mut engine, opts.full);
+    // Georgian chess is a FSF built-in (no variants.ini needed), like pawnback: it
+    // rides the same generic 8x8 engine as Amazon Chess (the Amazon army) with
+    // castling and en passant removed.
+    let georgian_mismatches = georgian::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -497,6 +502,7 @@ fn main() {
         + berolina_mismatches
         + pawnsideways_mismatches
         + pawnback_mismatches
+        + georgian_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
