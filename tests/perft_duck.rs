@@ -135,6 +135,25 @@ fn king_capture_is_legal_and_terminal() {
     );
 }
 
+/// A **dense** placement position — only four empty squares (g5/h5/g4/h4) — whose
+/// small duck-placement fan keeps the two-part cross-product tractable to depth 3
+/// **without** `#[ignore]`, so the per-PR floor exercises the placement mechanic at
+/// depth 3 (issue #501). The corpus's FSF-confirmed depth-3 counts are inherently
+/// heavy (tens of millions of nodes) and stay release-gated below (#499); this
+/// light case is an mcr self-consistent regression pin — the installed FSF build
+/// enumerates only the base piece move (`go perft` depth 1 = 20, not 640), so it
+/// cannot re-confirm duck-placement node counts in-tree (the placement counts were
+/// FSF-confirmed against upstream `280626`; see `compare-fairy/src/duck.rs`).
+const DENSE: &str =
+    "rnbqkbnr/pppppppp/pppppppp/pppppp2/PPPPPP2/PPPPPPPP/PPPPPPPP/RNBQKBNR w - - 0 1";
+
+#[test]
+fn perft_dense_placement_to_depth_3() {
+    assert_eq!(perft_at(DENSE, 1), 58);
+    assert_eq!(perft_at(DENSE, 2), 3177);
+    assert_eq!(perft_at(DENSE, 3), 206_355);
+}
+
 // --- FSF-confirmed perft counts ------------------------------------------
 
 #[test]
