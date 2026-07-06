@@ -317,6 +317,36 @@ pub struct TerminalRules {
     pub bare_king_draw: bool,
     /// Whether baring a side's king loses (mirrors the draw-rules field).
     pub bare_king_loss: bool,
+    /// The atomic king-explosion win: a capture whose blast destroys the enemy
+    /// king wins outright (atomic chess). A concrete-8x8 mechanic; `false` for
+    /// every wide variant.
+    pub explosion_win: bool,
+    /// The antichess "losing wins" terminal: a side reduced to no pieces — or left
+    /// with no legal move (stalemate) — **wins** (antichess / giveaway). A
+    /// concrete-8x8 mechanic; `false` for every wide variant.
+    pub lose_all_wins: bool,
+    /// The horde elimination loss: a side reduced to no material **loses** (the
+    /// Horde pawn army). The mirror of `lose_all_wins`. A concrete-8x8 mechanic;
+    /// `false` for every wide variant.
+    pub all_pieces_lost_loses: bool,
+    /// The number of checks a side must deliver to win when the game is decided by
+    /// a check count (Three-check: `Some(3)`). A concrete-8x8 mechanic; `None` for
+    /// every wide variant.
+    pub check_count_to_win: Option<u8>,
+    /// The region-goal win: a king reaching any square in the set wins
+    /// (King-of-the-Hill's four central squares) — the square-set generalization of
+    /// `flag_win`. A concrete-8x8 mechanic; `None` for every wide variant.
+    pub region_win: Option<RegionWin>,
+}
+
+/// A region-goal win condition: a king that reaches any of these squares wins the
+/// game outright (King-of-the-Hill's central "hill"). The square-set
+/// generalization of [`FlagWin`]'s single goal rank.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegionWin {
+    /// The goal squares, each a 0-based `(file, rank)` pair in White's orientation.
+    /// A king of either side that stands on one of them wins.
+    pub squares: Vec<(u8, u8)>,
 }
 
 /// How a variant treats royalty and the decisive check terminal.
@@ -405,6 +435,24 @@ pub struct SpecialMechanics {
     /// Pinned leapers are confined to the king–pinner segment
     /// ([`WideVariant::confine_pins_to_segment`]).
     pub confine_pins_to_segment: bool,
+    /// Atomic chess: a capture detonates, removing the capturing piece and every
+    /// adjacent non-pawn (a 3x3 blast). A concrete-8x8 mechanic; `false` for every
+    /// wide variant.
+    pub atomic_blast: bool,
+    /// Antichess: captures are mandatory — when any capture is available the side
+    /// to move must play one. A concrete-8x8 mechanic; `false` for every wide
+    /// variant.
+    pub mandatory_captures: bool,
+    /// Racing Kings: no move may give check (nor leave a king in check) — checks
+    /// are wholly illegal. A concrete-8x8 mechanic; `false` for every wide variant.
+    pub checks_forbidden: bool,
+    /// Horde: the two sides begin with different armies (White is a kingless pawn
+    /// horde). A concrete-8x8 mechanic; `false` for every wide variant.
+    pub asymmetric_armies: bool,
+    /// Chess960: the back rank is one of 960 shuffled arrangements (the start FEN
+    /// is one representative). A concrete-8x8 mechanic; `false` for every wide
+    /// variant.
+    pub shuffled_setup: bool,
 }
 
 /// The external oracle a variant's move generation is validated against — a
@@ -705,6 +753,13 @@ fn derive_terminal<G: Geometry, V: WideVariant<G>>() -> TerminalRules {
         temple_win: V::has_temple_win(),
         bare_king_draw: V::has_bare_king_draw(),
         bare_king_loss: V::has_bare_king_loss(),
+        // Concrete-8x8-only terminals (atomic / antichess / horde / three-check /
+        // king-of-the-hill): the wide layer never fields them.
+        explosion_win: false,
+        lose_all_wins: false,
+        all_pieces_lost_loses: false,
+        check_count_to_win: None,
+        region_win: None,
     }
 }
 
@@ -738,5 +793,12 @@ fn derive_mechanics<G: Geometry, V: WideVariant<G>>() -> SpecialMechanics {
         has_jump_captures: V::has_jump_captures(),
         allows_pass: V::allows_pass(),
         confine_pins_to_segment: V::confine_pins_to_segment(),
+        // Concrete-8x8-only mechanics (atomic blast / mandatory captures /
+        // no-check racing / horde asymmetry / 960 shuffle): never on the wide layer.
+        atomic_blast: false,
+        mandatory_captures: false,
+        checks_forbidden: false,
+        asymmetric_armies: false,
+        shuffled_setup: false,
     }
 }

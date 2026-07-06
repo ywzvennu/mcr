@@ -39,6 +39,7 @@ mod crazyhouse;
 mod horde;
 mod koth;
 mod racing;
+mod rules;
 mod three_check;
 
 use alloc::borrow::ToOwned;
