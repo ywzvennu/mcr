@@ -55,7 +55,7 @@ use crate::Color;
 pub struct KaroukRules;
 
 impl WideVariant<Chess8x8> for KaroukRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 8;

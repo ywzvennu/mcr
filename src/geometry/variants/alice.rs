@@ -80,7 +80,7 @@ use crate::geometry::{Board, Chess8x8, GenericPosition, StandardChess, WideVaria
 pub struct AliceRules;
 
 impl WideVariant<Chess8x8> for AliceRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 6;

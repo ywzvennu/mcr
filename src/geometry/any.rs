@@ -863,7 +863,7 @@ mod tests {
     }
 
     /// Every variant's [`WideVariant::ROLE_SPAN`](super::WideVariant::ROLE_SPAN)
-    /// is a valid prefix length of [`WideRole::ALL`](super::role::WideRole::ALL):
+    /// is a valid prefix length of `WideRole::ALL`(super::role::WideRole::ALL):
     /// at least one role wide and never past the global
     /// [`WideRole::COUNT`](crate::geometry::WideRole::COUNT). A span `> COUNT` would
     /// panic when the bounded movegen loops slice `WideRole::ALL[..ROLE_SPAN]`.

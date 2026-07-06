@@ -72,7 +72,7 @@ const CAPABLANCA_START_PLACEMENT: &str = "rnabqkbenr/pppppppppp/10/10/10/10/PPPP
 const KINGSIDE: usize = 0;
 
 impl WideVariant<Cap10x8> for CapablancaRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 12;

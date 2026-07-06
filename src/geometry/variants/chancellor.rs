@@ -70,7 +70,7 @@ pub struct ChancellorRules;
 const CHANCELLOR_START_PLACEMENT: &str = "rnbqkenbr/ppppppppp/9/9/9/9/9/PPPPPPPPP/RNBQKENBR";
 
 impl WideVariant<Chess9x9> for ChancellorRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 12;

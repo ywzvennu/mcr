@@ -101,7 +101,7 @@ impl ManchuRules {
 }
 
 impl WideVariant<Xiangqi9x10> for ManchuRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 43;
