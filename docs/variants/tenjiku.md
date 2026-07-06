@@ -33,33 +33,33 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Silver | `s` | leaper / stepper | no |
 | Gold | `g` | leaper / stepper | no |
 | Lance | `l` | slider | no |
-| Dragon | `r` | slider | no |
-| DragonHorse | `b` | slider | no |
-| ShogiKnight | `n` | leaper / stepper | no |
-| DrunkElephant | `e` | leaper / stepper | no |
-| CopperGeneral | `c` | leaper / stepper | no |
-| FerociousLeopard | `l` | leaper / stepper | no |
-| BlindTiger | `t` | leaper / stepper | no |
-| ReverseChariot | `r` | slider | no |
-| SideMover | `i` | slider | no |
-| VerticalMover | `v` | slider | no |
-| Kirin | `k` | leaper / stepper | no |
-| Phoenix | `p` | leaper / stepper | no |
-| ChuLion | `n` | leaper / stepper | no |
-| HornedFalcon | `h` | slider | no |
-| SoaringEagle | `e` | slider | no |
-| IronGeneral | `u` | leaper / stepper | no |
-| FireDemon | `i` | slider | no |
-| GreatGeneral | `g` | slider | no |
-| ViceGeneral | `v` | slider | no |
-| RookGeneral | `r` | slider | no |
-| BishopGeneral | `b` | slider | no |
-| LionHawk | `h` | slider | no |
-| FreeEagle | `e` | slider | no |
-| ChariotSoldier | `c` | slider | no |
-| WaterBuffalo | `w` | slider | no |
-| VerticalSoldier | `l` | slider | no |
-| SideSoldier | `s` | slider | no |
+| Dragon | `+r` | slider | no |
+| DragonHorse | `+b` | slider | no |
+| ShogiKnight | `*n` | leaper / stepper | no |
+| DrunkElephant | `**e` | leaper / stepper | no |
+| CopperGeneral | `***c` | leaper / stepper | no |
+| FerociousLeopard | `***l` | leaper / stepper | no |
+| BlindTiger | `***t` | leaper / stepper | no |
+| ReverseChariot | `***r` | slider | no |
+| SideMover | `***i` | slider | no |
+| VerticalMover | `***v` | slider | no |
+| Kirin | `***k` | leaper / stepper | no |
+| Phoenix | `***p` | leaper / stepper | no |
+| ChuLion | `***n` | leaper / stepper | no |
+| HornedFalcon | `***h` | slider | no |
+| SoaringEagle | `***e` | slider | no |
+| IronGeneral | `***u` | leaper / stepper | no |
+| FireDemon | `****i` | slider | no |
+| GreatGeneral | `****g` | slider | no |
+| ViceGeneral | `****v` | slider | no |
+| RookGeneral | `****r` | slider | no |
+| BishopGeneral | `****b` | slider | no |
+| LionHawk | `****h` | slider | no |
+| FreeEagle | `****e` | slider | no |
+| ChariotSoldier | `****c` | slider | no |
+| WaterBuffalo | `****w` | slider | no |
+| VerticalSoldier | `****l` | slider | no |
+| SideSoldier | `****s` | slider | no |
 
 ### Pawn (`p`)
 
@@ -110,172 +110,172 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - rides (repeats until blocked): forward (+0,+1)
 
-### Dragon (`r`)
+### Dragon (`+r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### DragonHorse (`b`)
+### DragonHorse (`+b`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### ShogiKnight (`n`)
+### ShogiKnight (`*n`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+2), forward-right (+1,+2)
 
-### DrunkElephant (`e`)
+### DrunkElephant (`**e`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### CopperGeneral (`c`)
+### CopperGeneral (`***c`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+1), backward (+0,-1), forward (+0,+1), forward-right (+1,+1)
 
-### FerociousLeopard (`l`)
+### FerociousLeopard (`***l`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### BlindTiger (`t`)
+### BlindTiger (`***t`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### ReverseChariot (`r`)
+### ReverseChariot (`***r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): backward (+0,-1), forward (+0,+1)
 
-### SideMover (`i`)
+### SideMover (`***i`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), right (+1,+0)
   - single step / leap: backward (+0,-1), forward (+0,+1)
 
-### VerticalMover (`v`)
+### VerticalMover (`***v`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): backward (+0,-1), forward (+0,+1)
   - single step / leap: left (-1,+0), right (+1,+0)
 
-### Kirin (`k`)
+### Kirin (`***k`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Phoenix (`p`)
+### Phoenix (`***p`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### ChuLion (`n`)
+### ChuLion (`***n`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), forward-left (-1,+2), back-right (+1,-2), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### HornedFalcon (`h`)
+### HornedFalcon (`***h`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### SoaringEagle (`e`)
+### SoaringEagle (`***e`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### IronGeneral (`u`)
+### IronGeneral (`***u`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: forward-left (-1,+1), forward (+0,+1), forward-right (+1,+1)
 
-### FireDemon (`i`)
+### FireDemon (`****i`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### GreatGeneral (`g`)
+### GreatGeneral (`****g`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### ViceGeneral (`v`)
+### ViceGeneral (`****v`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### RookGeneral (`r`)
+### RookGeneral (`****r`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### BishopGeneral (`b`)
+### BishopGeneral (`****b`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### LionHawk (`h`)
+### LionHawk (`****h`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), forward-left (-1,+2), back-right (+1,-2), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### FreeEagle (`e`)
+### FreeEagle (`****e`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### ChariotSoldier (`c`)
+### ChariotSoldier (`****c`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### WaterBuffalo (`w`)
+### WaterBuffalo (`****w`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### VerticalSoldier (`l`)
+### VerticalSoldier (`****l`)
 
 - Type: slider
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), forward (+0,+1), right (+1,+0)
   - single step / leap: backward (+0,-1)
 
-### SideSoldier (`s`)
+### SideSoldier (`****s`)
 
 - Type: slider
 - Moves & captures:

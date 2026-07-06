@@ -1932,6 +1932,38 @@ impl WideRole {
         )
     }
 
+    /// The FEN-token prefix the board FEN I/O writes **before** this role's base
+    /// [`char`](WideRole::char) to spell its unambiguous board token.
+    ///
+    /// This is the single authoritative source of the prefix (the board FEN writer
+    /// [`Board::to_fen_placement`](crate::geometry::Board::to_fen_placement) reuses
+    /// it): the empty string for a plain single-letter role, `"+"` for a Shogi
+    /// [`is_promoted`](WideRole::is_promoted) role, and the overflow prefixes
+    /// [`OVERFLOW_PREFIX`] (`"*"`), doubled `"**"` ([`is_overflow2`](WideRole::is_overflow2)),
+    /// tripled `"***"` ([`is_overflow4`](WideRole::is_overflow4)), quadrupled
+    /// `"****"` ([`is_overflow5`](WideRole::is_overflow5)), or [`OVERFLOW_PREFIX_3`]
+    /// (`"="`, [`is_overflow3`](WideRole::is_overflow3)) for the overflow tiers. The
+    /// full board token is this prefix followed by [`char`](WideRole::char).
+    #[must_use]
+    #[inline]
+    pub const fn board_token_prefix(self) -> &'static str {
+        if self.is_promoted() {
+            "+"
+        } else if self.is_overflow5() {
+            "****"
+        } else if self.is_overflow4() {
+            "***"
+        } else if self.is_overflow2() {
+            "**"
+        } else if self.is_overflow() {
+            "*"
+        } else if self.is_overflow3() {
+            "="
+        } else {
+            ""
+        }
+    }
+
     /// For a Shogi promoted role, the **base** role it reverts to when captured
     /// (and from which it was promoted); for any other role, the role itself.
     #[must_use]
@@ -2658,6 +2690,40 @@ mod tests {
             assert_eq!(wide[i].index(), i);
             assert_eq!(wide[i].char(), concrete[i].char());
             assert_eq!(wide[i].upper_char(), concrete[i].upper_char());
+        }
+    }
+
+    #[test]
+    fn board_token_is_fully_prefixed_and_unambiguous() {
+        use alloc::format;
+        // The board token is the tier prefix followed by the recycled base letter,
+        // so overflow roles that share a base letter with a single-letter role are
+        // unambiguous. A plain role has no prefix.
+        let token = |r: WideRole| format!("{}{}", r.board_token_prefix(), r.char());
+        assert_eq!(token(WideRole::Knight), "n");
+        assert_eq!(token(WideRole::Nightrider), "****n");
+        assert_eq!(token(WideRole::Rookni), "****k");
+        assert_eq!(token(WideRole::Grasshopper), "***j");
+        // A Shogi promoted role carries the `+` prefix.
+        assert_eq!(token(WideRole::Tokin), "+p");
+        // Every role's prefix must agree with its tier predicate.
+        for role in WideRole::ALL {
+            let expect = if role.is_promoted() {
+                "+"
+            } else if role.is_overflow5() {
+                "****"
+            } else if role.is_overflow4() {
+                "***"
+            } else if role.is_overflow2() {
+                "**"
+            } else if role.is_overflow() {
+                "*"
+            } else if role.is_overflow3() {
+                "="
+            } else {
+                ""
+            };
+            assert_eq!(role.board_token_prefix(), expect, "{role:?}");
         }
     }
 

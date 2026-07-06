@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Lancer | `f` | slider | yes |
 | Kheshig | `w` | leaper / stepper | no |
 | Archer | `y` | slider | yes |
-| Falcon | `f` | leaper / stepper | yes |
+| Falcon | `*f` | leaper / stepper | yes |
 
 ### Pawn (`p`)
 
@@ -69,7 +69,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Captures / gives check:
   - rides (repeats until blocked): back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Falcon (`f`)
+### Falcon (`*f`)
 
 - Type: leaper / stepper
 - **Move ≠ capture** — the two geometries differ.

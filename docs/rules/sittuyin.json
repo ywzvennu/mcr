@@ -12,6 +12,7 @@
       "role": "Pawn",
       "name": "Pawn",
       "fen_char": "p",
+      "board_token": "p",
       "is_slider": false,
       "hopper": false,
       "board_dependent": false,

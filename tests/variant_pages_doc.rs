@@ -162,7 +162,7 @@ fn render_army_table(out: &mut String, army: &[PieceRules]) {
         out.push_str(&format!(
             "| {} | `{}` | {} | {} |\n",
             p.name,
-            p.fen_char,
+            p.board_token,
             kind,
             if p.move_neq_capture { "yes" } else { "no" },
         ));
@@ -194,7 +194,7 @@ step is `direction (Δfile,Δrank)`; \"rides\" marks a repeating slider / rider.
     render_army_table(out, army);
 
     for p in army {
-        out.push_str(&format!("### {} (`{}`)\n\n", p.name, p.fen_char));
+        out.push_str(&format!("### {} (`{}`)\n\n", p.name, p.board_token));
         out.push_str(&format!("- Type: {}\n", piece_kind(p)));
 
         let pawnish = p.name == "Pawn" || p.name == "Hoplite";

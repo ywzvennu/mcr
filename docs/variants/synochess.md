@@ -34,7 +34,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Cannon | `c` | whole-board attacker | no |
 | FersAlfil | `v` | leaper / stepper | no |
 | Soldier | `z` | leaper / stepper | no |
-| Commoner | `u` | leaper / stepper | no |
+| Commoner | `*u` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -90,7 +90,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: left (-1,+0), forward (+0,+1), right (+1,+0)
 
-### Commoner (`u`)
+### Commoner (`*u`)
 
 - Type: leaper / stepper
 - Moves & captures:

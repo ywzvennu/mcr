@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | King | `k` | leaper / stepper | no |
 | Met | `m` | leaper / stepper | no |
-| Alfil | `x` | leaper / stepper | no |
+| Alfil | `*x` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -63,7 +63,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Alfil (`x`)
+### Alfil (`*x`)
 
 - Type: leaper / stepper
 - Moves & captures:

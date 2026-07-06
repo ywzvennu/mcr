@@ -31,9 +31,9 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | King | `k` | leaper / stepper | no |
 | Met | `m` | leaper / stepper | no |
-| Wazir | `j` | leaper / stepper | no |
-| Commoner | `u` | leaper / stepper | no |
-| Alfil | `x` | leaper / stepper | no |
+| Wazir | `*j` | leaper / stepper | no |
+| Commoner | `*u` | leaper / stepper | no |
+| Alfil | `*x` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -72,19 +72,19 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Wazir (`j`)
+### Wazir (`*j`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### Commoner (`u`)
+### Commoner (`*u`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Alfil (`x`)
+### Alfil (`*x`)
 
 - Type: leaper / stepper
 - Moves & captures:

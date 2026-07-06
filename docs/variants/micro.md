@@ -28,8 +28,8 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Pawn | `p` | leaper / stepper | yes |
 | Bishop | `b` | slider | no |
 | King | `k` | leaper / stepper | no |
-| PromotedLance | `l` | leaper / stepper | no |
-| Dragon | `r` | leaper / stepper | no |
+| PromotedLance | `+l` | leaper / stepper | no |
+| Dragon | `+r` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -50,13 +50,13 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### PromotedLance (`l`)
+### PromotedLance (`+l`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), forward (+0,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Dragon (`r`)
+### Dragon (`+r`)
 
 - Type: leaper / stepper
 - Moves & captures:

@@ -562,45 +562,14 @@ impl<G: Geometry> Board<G> {
                             push_empty_run(&mut fen, empty);
                             empty = 0;
                         }
-                        // A Shogi promoted piece renders as its base letter with a
-                        // `+` prefix (`+P`, `+R`, ...); every other piece is a
-                        // single letter. `char()` already returns the base letter
-                        // for a promoted role, so only the prefix is added.
-                        if piece.role.is_promoted() {
-                            fen.push('+');
-                        } else if piece.role.is_overflow5() {
-                            // A fifth-tier overflow role (the Tenjiku Shogi army)
-                            // renders as the **quadrupled** `****` prefix plus its
-                            // recycled base letter.
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                        } else if piece.role.is_overflow4() {
-                            // A fourth-tier overflow role (the Chu Shogi army)
-                            // renders as the **tripled** `***` prefix plus its
-                            // recycled base letter.
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                        } else if piece.role.is_overflow2() {
-                            // A second-bank overflow role (the Sho Shogi royals)
-                            // renders as the **doubled** `**` prefix plus its
-                            // recycled base letter.
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                        } else if piece.role.is_overflow() {
-                            // An overflow role renders as the `*` prefix plus its
-                            // recycled base letter; `char()` returns that base
-                            // letter and `piece.char()` applies the colour case.
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX);
-                        } else if piece.role.is_overflow3() {
-                            // A third-tier overflow role (the Cannon Shogi cannon
-                            // army) renders as the `=` prefix plus its recycled base
-                            // letter, exactly as a `*` overflow role but in the
-                            // third tier.
-                            fen.push(crate::geometry::role::OVERFLOW_PREFIX_3);
-                        }
+                        // A piece renders as an optional prefix (Shogi `+`
+                        // promotion, or a `*` / `**` / `***` / `****` / `=` overflow
+                        // tier) followed by its base letter. `char()` already returns
+                        // the base letter for a promoted / overflow role, and
+                        // `board_token_prefix` is the single authoritative source of
+                        // the prefix (shared with the `VariantRules` board token);
+                        // `piece.char()` then applies the colour case.
+                        fen.push_str(piece.role.board_token_prefix());
                         fen.push(piece.char());
                     }
                     None => empty += 1,

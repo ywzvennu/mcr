@@ -28,8 +28,8 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | King | `k` | leaper / stepper | no |
 | Met | `m` | leaper / stepper | no |
 | Soldier | `z` | leaper / stepper | no |
-| Commoner | `u` | leaper / stepper | no |
-| ChennisPawn | `p` | whole-board attacker | no |
+| Commoner | `*u` | leaper / stepper | no |
+| ChennisPawn | `**p` | whole-board attacker | no |
 
 ### King (`k`)
 
@@ -49,13 +49,13 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: left (-1,+0), forward (+0,+1), right (+1,+0)
 
-### Commoner (`u`)
+### Commoner (`*u`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### ChennisPawn (`p`)
+### ChennisPawn (`**p`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.

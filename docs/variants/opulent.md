@@ -32,9 +32,9 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | King | `k` | leaper / stepper | no |
 | Hawk | `a` | slider | no |
 | Elephant | `e` | slider | no |
-| Wizard | `w` | leaper / stepper | no |
-| OpulentLion | `y` | leaper / stepper | no |
-| OpulentKnight | `z` | leaper / stepper | no |
+| Wizard | `**w` | leaper / stepper | no |
+| OpulentLion | `**y` | leaper / stepper | no |
+| OpulentKnight | `**z` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -81,20 +81,20 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-2,-1), forward-left (-2,+1), back-left (-1,-2), forward-left (-1,+2), back-right (+1,-2), forward-right (+1,+2), back-right (+2,-1), forward-right (+2,+1)
 
-### Wizard (`w`)
+### Wizard (`**w`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - single step / leap: back-left (-3,-1), forward-left (-3,+1), back-left (-1,-3), back-left (-1,-1), forward-left (-1,+1), forward-left (-1,+3), back-right (+1,-3), back-right (+1,-1), forward-right (+1,+1), forward-right (+1,+3), back-right (+3,-1), forward-right (+3,+1)
 
-### OpulentLion (`y`)
+### OpulentLion (`**y`)
 
 - Type: leaper / stepper
 - Moves & captures:
   - rides (repeats until blocked): left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### OpulentKnight (`z`)
+### OpulentKnight (`**z`)
 
 - Type: leaper / stepper
 - Moves & captures:

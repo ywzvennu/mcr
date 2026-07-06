@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Rook | `r` | slider | no |
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
-| Nightrider | `n` | leaper / stepper | no |
+| Nightrider | `****n` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -63,7 +63,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Nightrider (`n`)
+### Nightrider (`****n`)
 
 - Type: leaper / stepper
 - Moves & captures:

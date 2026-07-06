@@ -134,6 +134,7 @@ fn derive_piece(role: Role) -> PieceRules {
         role: wide,
         name: format!("{wide:?}"),
         fen_char: wide.char(),
+        board_token: format!("{}{}", wide.board_token_prefix(), wide.char()),
         is_slider,
         hopper: false,
         board_dependent: false,

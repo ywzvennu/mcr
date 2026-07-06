@@ -28,7 +28,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Pawn | `p` | leaper / stepper | yes |
 | King | `k` | leaper / stepper | no |
 | Met | `m` | leaper / stepper | no |
-| Wazir | `j` | leaper / stepper | no |
+| Wazir | `*j` | leaper / stepper | no |
 
 ### Pawn (`p`)
 
@@ -49,7 +49,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), forward-left (-1,+1), back-right (+1,-1), forward-right (+1,+1)
 
-### Wazir (`j`)
+### Wazir (`*j`)
 
 - Type: leaper / stepper
 - Moves & captures:

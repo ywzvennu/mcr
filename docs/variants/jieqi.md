@@ -26,7 +26,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Piece | FEN | Type | Move ≠ capture |
 |---|---|---|---|
 | King | `k` | leaper / stepper | no |
-| Dark | `d` | leaper / stepper | no |
+| Dark | `=d` | leaper / stepper | no |
 
 ### King (`k`)
 
@@ -34,7 +34,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: left (-1,+0), backward (+0,-1), forward (+0,+1), right (+1,+0)
 
-### Dark (`d`)
+### Dark (`=d`)
 
 - Type: leaper / stepper
 - Moves & captures:

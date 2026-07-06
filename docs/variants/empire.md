@@ -32,10 +32,10 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Queen | `q` | slider | no |
 | King | `k` | leaper / stepper | no |
 | Soldier | `z` | leaper / stepper | no |
-| Eagle | `e` | whole-board attacker | no |
-| Cardinal | `c` | whole-board attacker | no |
-| Tower | `t` | whole-board attacker | no |
-| Duke | `d` | whole-board attacker | no |
+| Eagle | `*e` | whole-board attacker | no |
+| Cardinal | `*c` | whole-board attacker | no |
+| Tower | `*t` | whole-board attacker | no |
+| Duke | `*d` | whole-board attacker | no |
 
 ### Pawn (`p`)
 
@@ -80,22 +80,22 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: left (-1,+0), forward (+0,+1), right (+1,+0)
 
-### Eagle (`e`)
+### Eagle (`*e`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
 
-### Cardinal (`c`)
+### Cardinal (`*c`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
 
-### Tower (`t`)
+### Tower (`*t`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
 
-### Duke (`d`)
+### Duke (`*d`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.

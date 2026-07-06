@@ -30,7 +30,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Bishop | `b` | slider | no |
 | Rook | `r` | slider | no |
 | King | `k` | leaper / stepper | no |
-| Angel | `a` | slider | no |
+| Angel | `**a` | slider | no |
 
 ### Pawn (`p`)
 
@@ -63,7 +63,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: back-left (-1,-1), left (-1,+0), forward-left (-1,+1), backward (+0,-1), forward (+0,+1), back-right (+1,-1), right (+1,+0), forward-right (+1,+1)
 
-### Angel (`a`)
+### Angel (`**a`)
 
 - Type: slider
 - Moves & captures:

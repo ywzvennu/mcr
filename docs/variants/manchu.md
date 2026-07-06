@@ -32,7 +32,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 | Horse | `j` | leaper / stepper | no |
 | XiangqiElephant | `o` | leaper / stepper | no |
 | Soldier | `z` | leaper / stepper | no |
-| Banner | `m` | whole-board attacker | no |
+| Banner | `*m` | whole-board attacker | no |
 
 ### Rook (`r`)
 
@@ -78,7 +78,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 - Moves & captures:
   - single step / leap: left (-1,+0), forward (+0,+1), right (+1,+0)
 
-### Banner (`m`)
+### Banner (`*m`)
 
 - Type: whole-board attacker
 - Attack set is computed from the whole board; not sampled on an empty board.
