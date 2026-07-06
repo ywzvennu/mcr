@@ -4199,6 +4199,28 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                 }
             }
 
+            // Pawn back: a single quiet step straight **backward** — one square
+            // toward our own side along the same file. Independent of the forward
+            // push and gated behind [`pawn_moves_backward`](WideVariant::pawn_moves_backward)
+            // (default-off), so every other variant skips it and is byte-identical.
+            // The step is quiet-only (never a capture or promotion), needs an empty
+            // landing square within the pawn's mobility cap
+            // ([`pawn_may_occupy_rank`](WideVariant::pawn_may_occupy_rank) — a pawn
+            // on its home rank cannot retreat off the near edge), and obeys the same
+            // check mask and pin line as the forward push. It creates no en-passant
+            // target (only the forward double step does).
+            if V::pawn_moves_backward() {
+                if let Some(back) = from.offset(0, -forward) {
+                    if V::pawn_may_occupy_rank(us, back.rank())
+                        && !occupied.contains(back)
+                        && check_mask.contains(back)
+                        && pin_line.contains(back)
+                    {
+                        out.push(WideMove::new(from, back, WideMoveKind::Quiet));
+                    }
+                }
+            }
+
             // Captures (and capturing promotions). The capture squares come from
             // [`role_attacks`](WideVariant::role_attacks): the two forward diagonals
             // for an ordinary pawn, the single square straight ahead for a Berolina
@@ -4787,7 +4809,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             .piece_at(from)
             .expect("move originates from an occupied square");
         let is_pawn_move = moving.role == WideRole::Pawn;
-        let mut reset_clock = is_pawn_move;
+        // An ordinary pawn move (a quiet push / backward step / double step) zeroes
+        // the halfmove clock in standard chess, where a pawn move is irreversible.
+        // Pawn back chess overrides `pawn_move_resets_move_clock` to `false` — its
+        // pawns can retreat, so pushes are no longer irreversible and only captures
+        // (and promotions, handled in the `Promotion` arm) reset the clock, matching
+        // Fairy-Stockfish's empty `nMoveRuleTypes`. Every other variant keeps the
+        // hook's `true` default, so `is_pawn_move && true == is_pawn_move` and the
+        // clock behaviour is byte-identical.
+        let mut reset_clock = is_pawn_move && V::pawn_move_resets_move_clock();
 
         // Record, before any board edit, the role masks this move will touch, so
         // `undo` can restore the board by direct assignment with no per-square scan.

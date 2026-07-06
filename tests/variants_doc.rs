@@ -541,6 +541,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Symmetric horde mirror; no castling, single-step pawns; a pawn promotes to Lancer, Kheshig, Archer, or Falcon; flag-win (campmate) when a king reaches the far rank. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant ordamirror`).",
         },
+        WideVariantId::Pawnback => Meta {
+            display: "Pawn back chess",
+            pieces: "Standard chess army with a pawn that may also step backward (`p`/`P`).",
+            rules: "Standard chess, but the pawn may also make a single quiet step straight backward (same file); it still captures diagonally forward, double-steps forward from the second rank, and promotes on the last rank. A pawn may never retreat onto its own first rank (White ranks 2-8, Black ranks 1-7), so a home-rank pawn cannot step back. En passant is standard (only off the forward double step). Because pawns can move backward, a pawn move does NOT reset the fifty-move clock (only captures and promotions do), so pawn shuffling can reach the fifty-move draw. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant pawnback`).",
+        },
         WideVariantId::Pawnsideways => Meta {
             display: "Pawn-sideways chess (8x8)",
             pieces: "Standard chess army with a pawn that may also step sideways (`p`/`P`).",

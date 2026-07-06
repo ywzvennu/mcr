@@ -528,6 +528,54 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         rank == Self::double_push_rank(color)
     }
 
+    /// Returns `true` if this variant's pawns may also make a single **quiet**
+    /// step straight **backward** — one square toward their own side along the
+    /// same file, onto an empty square.
+    ///
+    /// The default is `false`: the ordinary pawn only advances, so this hook is
+    /// inert and every existing variant is byte-identical. **Pawn back chess**
+    /// ([`Pawnback`](super::variants::Pawnback)) overrides it to `true`, letting a
+    /// pawn retreat one rank. The backward step is quiet-only (never a capture or
+    /// promotion) and creates no en-passant target; it is subject to the pawn's
+    /// mobility cap ([`pawn_may_occupy_rank`](WideVariant::pawn_may_occupy_rank)),
+    /// so a pawn on its home rank cannot retreat off the board's near edge.
+    fn pawn_moves_backward() -> bool {
+        false
+    }
+
+    /// Returns `true` if a pawn of `color` may occupy the 0-based `rank` — a
+    /// per-variant mobility cap on where a pawn is allowed to stand.
+    ///
+    /// The default is `true` for every rank: an ordinary pawn's mobility is bounded
+    /// only by promotion, so this hook is inert and every existing variant is
+    /// byte-identical. **Pawn back chess** ([`Pawnback`](super::variants::Pawnback))
+    /// overrides it to forbid a pawn from retreating onto its **own first rank**
+    /// (White may not step to rank 1, Black not to rank 8 — Fairy-Stockfish's
+    /// `mobilityRegion` of ranks 2..8 / 1..7). Only the backward step
+    /// ([`pawn_moves_backward`](WideVariant::pawn_moves_backward)) can reach that
+    /// edge — forward pushes and captures always move away from it — so the cap is
+    /// consulted only there.
+    fn pawn_may_occupy_rank(_color: Color, _rank: u8) -> bool {
+        true
+    }
+
+    /// Returns `true` if an ordinary (non-capturing, non-promoting) **pawn move**
+    /// resets the halfmove clock, the way the fifty-move rule treats a pawn push as
+    /// irreversible.
+    ///
+    /// The default is `true`, matching standard chess and Fairy-Stockfish's usual
+    /// `nMoveRuleTypes` (which includes the pawn): a pawn push zeroes the clock, so
+    /// this hook is inert and every existing variant is byte-identical. **Pawn back
+    /// chess** ([`Pawnback`](super::variants::Pawnback)) overrides it to `false`,
+    /// because a pawn that can also step *backward* is no longer irreversible;
+    /// Fairy-Stockfish sets pawn back's `nMoveRuleTypes` to the empty set, so only
+    /// captures (and promotions) reset the clock, and pawn shuffling can reach the
+    /// fifty-move draw. Captures and promotions still reset the clock regardless of
+    /// this hook.
+    fn pawn_move_resets_move_clock() -> bool {
+        true
+    }
+
     /// Returns `true` if this variant offers standard castling. The default is
     /// `true`. A variant without castling overrides this to `false`.
     fn has_castling() -> bool {

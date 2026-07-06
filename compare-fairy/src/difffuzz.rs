@@ -764,6 +764,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Pawn back chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in spelled identically to mcr
+    // (standard-chess letters — the pawn that may also step backward stays `p`/`P`,
+    // a *rule* difference, not a letter one), so it takes the `identity` dialect.
+    Spec {
+        id: WideVariantId::Pawnback,
+        fsf: "pawnback",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

@@ -67,6 +67,7 @@ mod nocastle;
 mod opulent;
 mod orda;
 mod ordamirror;
+mod pawnback;
 mod pawnsideways;
 mod placement;
 mod pocketknight;
@@ -397,6 +398,10 @@ fn main() {
     // it rides the same generic 8x8 engine (standard chess with the pawn allowed an
     // extra sideways quiet step).
     let pawnsideways_mismatches = pawnsideways::run(&mut engine, opts.full);
+    // Pawn back chess is a FSF built-in (no variants.ini needed), like berolina: it
+    // rides the same generic engine (standard chess with a pawn that may also step
+    // one square straight backward, capped out of its own first rank).
+    let pawnback_mismatches = pawnback::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -491,6 +496,7 @@ fn main() {
         + torpedo_mismatches
         + berolina_mismatches
         + pawnsideways_mismatches
+        + pawnback_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
