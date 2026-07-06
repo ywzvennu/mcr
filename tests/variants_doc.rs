@@ -367,6 +367,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Shogi on the 8x8 board with a hand and drops; promotion in the far three ranks is compulsory. The sideways-stepping Knight is never immobile, so it may be dropped anywhere; the Pawn keeps the last-rank and nifu drop restrictions. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant euroshogi`).",
         },
+        WideVariantId::Extinction => Meta {
+            display: "Extinction chess (8x8)",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Standard chess movement, castling, en passant, and promotion but no check or checkmate — the king is an ordinary capturable Commoner. A side loses the instant any one of its piece types is wiped out (Pawn, Knight, Bishop, Rook, Queen, or king reaches zero), so capturing the last enemy queen — or promoting your own last pawn — decides the game. Rides the generic extinction terminal (all army types, threshold 0).",
+            oracle: "Fairy-Stockfish (`UCI_Variant extinction`).",
+        },
         WideVariantId::FogOfWar => Meta {
             display: "Fog of War (Dark Chess, 8x8)",
             pieces: "Standard chess army with a non-royal king.",

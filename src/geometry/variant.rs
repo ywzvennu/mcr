@@ -155,6 +155,42 @@ pub struct ImpasseRule {
     pub big_roles: &'static [WideRole],
 }
 
+/// A **generic extinction terminal rule**: a side **loses the moment the count of
+/// any watched piece type drops to (or below) a threshold** — Fairy-Stockfish's
+/// `extinctionValue = -VALUE_MATE` with its `extinctionPieceTypes` /
+/// `extinctionPieceCount` pair, expressed once here so several variants can share
+/// the same terminal:
+///
+/// * **Extinction chess** (`UCI_Variant extinction`, `variant.cpp:449`) — watches
+///   **every** army role (Pawn, Knight, Bishop, Rook, Queen, and the non-royal
+///   king) with `threshold = 0`: a side loses if *any* of its piece types is
+///   wiped out (including promoting its **last** pawn, which empties the Pawn
+///   type). The king is a non-royal Commoner — there is no check or checkmate, so
+///   this is the *only* decisive terminal.
+/// * **Kinglet** (a planned reuse) watches only `[Pawn]` with `threshold = 0` — a
+///   side loses when its last pawn is captured (or promoted away).
+/// * **Codrus** watches only the Commoner (`[King]`) with `threshold = 0` — a
+///   plain king-capture loss with a non-royal king.
+/// * **Three-kings** watches the Commoner with `threshold = 1` — a side loses once
+///   it is reduced to **one** king (count drops through 2 to `<= 1`).
+///
+/// The rule is consulted only when [`WideVariant::extinction_rule`] returns `Some`
+/// (default `None`), so every other variant is byte-identical: the terminal is a
+/// pure property of the current position (a single count per watched role), so it
+/// truncates perft at exactly the nodes Fairy-Stockfish does and needs no move
+/// history.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExtinctionRule {
+    /// The piece types whose disappearance ends the game. A side loses when it
+    /// holds `threshold` **or fewer** of *any* of these roles. Extinction chess
+    /// lists the whole standard army; a single-role slice models Kinglet / Codrus.
+    pub watched: &'static [WideRole],
+    /// The count at or below which a watched role counts as **extinct** for its
+    /// side. Extinction / Kinglet / Codrus use `0` (the type is gone); Three-kings
+    /// uses `1` (reduced to a lone king). Mirrors FSF's `extinctionPieceCount`.
+    pub threshold: usize,
+}
+
 /// The promotion configuration a variant exposes: which squares promote and to
 /// which roles. The default is standard chess — the last rank, promoting to
 /// knight, bishop, rook, or queen.
@@ -1000,6 +1036,33 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// [`has_bare_king_draw`]: WideVariant::has_bare_king_draw
     fn has_bare_king_loss() -> bool {
         false
+    }
+
+    /// Returns this variant's **extinction terminal rule**, or `None` if it has no
+    /// such rule. The default is `None`, so while it stays `None` the engine never
+    /// evaluates the rule and every other variant is byte-identical (no move-gen
+    /// truncation, no terminal check).
+    ///
+    /// When `Some`, a position in which some side holds
+    /// `threshold` or fewer of any
+    /// `watched` role is **terminal**: the move
+    /// generator short-circuits to *zero moves* (the node is a perft leaf, exactly
+    /// as Fairy-Stockfish truncates it — FSF's `extinctionValue` reports the game
+    /// over before generating a move), funnelled through the single
+    /// [`extinction_loser`](super::position::GenericPosition::extinction_loser)
+    /// chokepoint both the standard generator and the bulk-count leaf path share,
+    /// and the loss is reported as a [`WideEndReason::VariantWin`] credited to the
+    /// side whose army is intact.
+    ///
+    /// This is the shared terminal Extinction chess, Kinglet, Codrus, and
+    /// Three-kings ride — see [`ExtinctionRule`] for how the `watched` / `threshold`
+    /// pair specialises it. Extinction chess (the only variant that overrides this
+    /// today) demotes its king to a **non-royal Commoner**, so it also returns an
+    /// empty [`royal_squares`](WideVariant::royal_squares) and sets
+    /// [`non_royal_king`](WideVariant::non_royal_king) — there is no check, and this
+    /// extinction rule is the game's only decisive terminal.
+    fn extinction_rule() -> Option<ExtinctionRule> {
+        None
     }
 
     /// Returns `true` if **stalemate is a loss** for the stalemated side rather
@@ -1963,7 +2026,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
 /// of special terminal rules each variant carries, and require every variant that
 /// carries one to register an adjudication test (see `tests/coverage_gate.rs`).
 ///
-/// Each field is `true` when the variant overrides that hook. The twelve hooks
+/// Each field is `true` when the variant overrides that hook. The thirteen hooks
 /// mirror the [`WideVariant`] draw-rule surface: the counting endgame
 /// ([`counting_rule`](WideVariant::counting_rule)), the impasse / jishogi rule
 /// ([`impasse_rule`](WideVariant::impasse_rule)), the perpetual-check
@@ -1977,8 +2040,9 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
 /// two bare-king terminals
 /// ([`has_bare_king_draw`](WideVariant::has_bare_king_draw) /
 /// [`has_bare_king_loss`](WideVariant::has_bare_king_loss)), the move-count rule
-/// ([`move_rule_plies`](WideVariant::move_rule_plies)), and win-on-check
-/// ([`wins_on_check`](WideVariant::wins_on_check)).
+/// ([`move_rule_plies`](WideVariant::move_rule_plies)), win-on-check
+/// ([`wins_on_check`](WideVariant::wins_on_check)), and the extinction terminal
+/// ([`extinction_rule`](WideVariant::extinction_rule)).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DrawHooks {
     /// [`WideVariant::counting_rule`] returns `Some`.
@@ -2006,6 +2070,8 @@ pub struct DrawHooks {
     pub move_rule_plies: bool,
     /// [`WideVariant::wins_on_check`] is `true`.
     pub wins_on_check: bool,
+    /// [`WideVariant::extinction_rule`] returns `Some`.
+    pub extinction_rule: bool,
 }
 
 impl DrawHooks {
@@ -2026,6 +2092,7 @@ impl DrawHooks {
             || self.has_bare_king_loss
             || self.move_rule_plies
             || self.wins_on_check
+            || self.extinction_rule
     }
 
     /// The canonical names of the overridden hooks, in declaration order — a
@@ -2046,6 +2113,7 @@ impl DrawHooks {
             (self.has_bare_king_loss, "has_bare_king_loss"),
             (self.move_rule_plies, "move_rule_plies"),
             (self.wins_on_check, "wins_on_check"),
+            (self.extinction_rule, "extinction_rule"),
         ] {
             if on {
                 out.push(name);
