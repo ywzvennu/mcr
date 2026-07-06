@@ -1374,10 +1374,32 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let our_pieces = board.by_color(us);
         let their_pieces = board.by_color(them);
 
-        let king_sq = match board.king_of(us) {
-            Some(sq) => sq,
-            None => return,
-        };
+        // Locate our king. A kingless side is a terminal leaf with **no
+        // continuation** — return — for every variant *except* one where the king is
+        // a truly ordinary, non-terminal piece: a non-royal king whose loss is not a
+        // watched extinction condition. That is Kinglet, whose extinction rule
+        // watches only the Pawn type, so a side that has had its (non-royal) king
+        // captured plays on with its remaining pieces. Every other case keeps the
+        // "kingless = no moves" behaviour it relies on: a **royal** side (standard
+        // chess), and the non-royal king-capture variants — Fog of War / Dobutsu
+        // (where losing the king is the loss condition, expressed exactly by having
+        // no king move) and Extinction (whose King type *is* watched, so a kingless
+        // side is already caught by the extinction terminal above and never reaches
+        // here). The king-relative helpers below — pins, en passant, castling — are
+        // all inert for a non-royal side (empty pins; `ep_is_legal` / `gen_castles`
+        // short-circuit on the empty royal set), so the synthetic king square is
+        // never actually consulted, and every king-piece emission is gated on
+        // `has_king`.
+        let maybe_king = board.king_of(us);
+        if maybe_king.is_none() {
+            let king_loss_survivable = V::non_royal_king()
+                && V::extinction_rule().is_some_and(|r| !r.watched.contains(&WideRole::King));
+            if !king_loss_survivable {
+                return;
+            }
+        }
+        let has_king = maybe_king.is_some();
+        let king_sq = maybe_king.unwrap_or(Square::new(0));
 
         // A **non-royal** king (Dobutsu's Lion): there is no check, so the king
         // never has a check mask, pins, or king-danger filter — it may step into an
@@ -1406,22 +1428,25 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         };
 
         // King moves are always generated (the only legal moves under double
-        // check).
-        let mut king_targets =
-            V::role_attacks(WideRole::King, us, king_sq, occupied) & !our_pieces & !king_danger;
-        // Makpong: while in check, the king may move ONLY to capture the lone
-        // checker — it may not flee to a safe square. Under double check there is
-        // no single checker the king could capture, so it has no legal move; the
-        // target set is emptied. Default-off, so every other variant is
-        // byte-identical (the king-target set is left exactly as generated above).
-        if V::king_may_only_capture_checker() && num_checkers > 0 {
-            king_targets &= if num_checkers == 1 {
-                checkers
-            } else {
-                Bitboard::EMPTY
-            };
+        // check) — unless the side has no king at all (a kingless non-royal Kinglet
+        // side plays on with its other pieces; there is simply no king to move).
+        if has_king {
+            let mut king_targets =
+                V::role_attacks(WideRole::King, us, king_sq, occupied) & !our_pieces & !king_danger;
+            // Makpong: while in check, the king may move ONLY to capture the lone
+            // checker — it may not flee to a safe square. Under double check there is
+            // no single checker the king could capture, so it has no legal move; the
+            // target set is emptied. Default-off, so every other variant is
+            // byte-identical (the king-target set is left exactly as generated above).
+            if V::king_may_only_capture_checker() && num_checkers > 0 {
+                king_targets &= if num_checkers == 1 {
+                    checkers
+                } else {
+                    Bitboard::EMPTY
+                };
+            }
+            out.emit_targets(king_sq, king_targets, their_pieces);
         }
-        out.emit_targets(king_sq, king_targets, their_pieces);
 
         // Extra kings (Extinction chess, a pawn promoted to a second Commoner
         // king): a non-royal side may hold more than one King-role piece, so
@@ -1582,8 +1607,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             self.gen_pawn_moves(out, us, occupied, their_pieces, check_mask, &pins, king_sq);
         }
 
-        // Castling, only when not in check.
-        if V::has_castling() && num_checkers == 0 {
+        // Castling, only when not in check (and only with a king to castle: a
+        // kingless non-royal side cannot castle).
+        if V::has_castling() && num_checkers == 0 && has_king {
             self.gen_castles(out, us, occupied, king_danger, king_sq);
         }
 

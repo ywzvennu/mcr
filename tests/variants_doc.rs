@@ -445,6 +445,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Asymmetric; only White castles; Khan soldiers force-promote to a Khan on the first rank; flag-win when a king reaches the far rank; stalemate-is-loss. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant khans`).",
         },
+        WideVariantId::Kinglet => Meta {
+            display: "Kinglet chess (8x8)",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Standard chess movement, castling, and en passant but no check or checkmate — the king is an ordinary capturable Commoner. Pawns promote only to a (non-royal) Commoner/King, never to Queen, Rook, Bishop, or Knight. A side loses the instant it has no pawns left, so capturing the enemy's last pawn — or promoting your own last pawn — decides the game. Rides the generic extinction terminal (watching only the Pawn type, threshold 0).",
+            oracle: "Fairy-Stockfish (`UCI_Variant kinglet`).",
+        },
         WideVariantId::Knightmate => Meta {
             display: "Knightmate (8x8)",
             pieces: "A royal Knight on the king's square, with the two knights replaced by non-royal Commoners (Manns).",

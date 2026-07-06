@@ -26,8 +26,8 @@ use super::{
     Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Coregal,
     Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, Extinction, FogOfWar,
     GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
-    Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu,
-    Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror,
+    Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Makpong, Makruk,
+    Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror,
     Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
     Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Washogi,
     WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu,
@@ -791,6 +791,7 @@ wide_variants! {
     Judkins, Judkins, Judkins, "judkins", "judkinsshogi", "judkins-shogi";
     Karouk, Karouk, Karouk, "karouk", "kar-ouk", "kaouk";
     Khans, Khans, Khans, "khans";
+    Kinglet, Kinglet, Kinglet, "kinglet";
     Knightmate, Knightmate, Knightmate, "knightmate";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
     Makpong, Makpong, Makpong, "makpong";
@@ -970,7 +971,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 75, "all 75 fairy variants are covered");
+        assert_eq!(count, 76, "all 76 fairy variants are covered");
     }
 
     #[test]
