@@ -313,6 +313,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "No hand or drops; mandatory promotion on entering the far four ranks (HaChu's promote-on-entry); two royals (King and the promoted Prince). The Lion and lion-power promoted pieces (Horned Falcon, Soaring Eagle) have their full move set: igui, double capture, two-step area move, and jitto pass. Lion-trading restrictions are not enforced (HaChu does not enforce them either).",
             oracle: "HaChu (H. G. Muller) external move-list tree-walk: start-position perft(1)=36 (byte-identical move set) and perft(2)=1296 match node-for-node; perft(3) mcr=48319 vs HaChu=48317, agreeing at every node but one where HaChu 0.23 misses two legal anti-diagonal Lion captures (a HaChu bug; mcr is correct).",
         },
+        WideVariantId::Coregal => Meta {
+            display: "Coregal chess (8x8)",
+            pieces: "Standard chess army.",
+            rules: "Standard 8x8 chess in which the queen is royal as well as the king — a side loses if either its king or its queen is checkmated (or captured), so the queen may not move onto, or be left on, an attacked square. Castling, double step, en passant, and promotion to Queen/Rook/Bishop/Knight are standard; every queen (including a promoted one) is royal. Win by checkmate of either royal.",
+            oracle: "Fairy-Stockfish (`UCI_Variant coregal`).",
+        },
         WideVariantId::Courier => Meta {
             display: "Courier chess (12x8)",
             pieces: "Rook, Knight, Bishop, King plus the medieval Courier (Alfil, two-square diagonal leap), Man (non-royal king-mover), Wazir, and Ferz.",

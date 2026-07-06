@@ -329,6 +329,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::capablanca::fen_to_fsf,
     },
     Spec {
+        // Coregal chess: standard chess with a royal queen. mcr and FSF spell it
+        // with the identical standard-chess letters, so the dialect is identity.
+        id: WideVariantId::Coregal,
+        fsf: "coregal",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         id: WideVariantId::Dobutsu,
         fsf: "dobutsu",
         needs_ini: false,
