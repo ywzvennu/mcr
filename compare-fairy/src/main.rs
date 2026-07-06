@@ -32,6 +32,7 @@ mod capablanca;
 mod capahouse;
 mod chak;
 mod chennis;
+mod coregal;
 mod corpus;
 mod courier;
 mod difffuzz;
@@ -365,6 +366,8 @@ fn main() {
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
     // No-castle chess is a FSF built-in (no variants.ini needed), like knightmate.
     let nocastle_mismatches = nocastle::run(&mut engine, opts.full);
+    // Coregal chess is a FSF built-in (no variants.ini needed), like nocastle.
+    let coregal_mismatches = coregal::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -451,6 +454,7 @@ fn main() {
         + shogun_mismatches
         + knightmate_mismatches
         + nocastle_mismatches
+        + coregal_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

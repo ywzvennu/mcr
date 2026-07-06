@@ -23,13 +23,13 @@ use core::str::FromStr;
 
 use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
-    Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Courier,
-    Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus, GenericPosition,
-    Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins,
-    Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Nocastle, Opulent, Orda, Ordamirror, Placement, Pocketknight, Seirawan, Shako,
-    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
-    Synochess, Tencubed, Tenjiku, Tori, Washogi, WideEndReason, WideFenError, WideMove,
+    Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Coregal,
+    Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus,
+    GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus,
+    Jieqi, Judkins, Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam,
+    Micro, Minishogi, Minixiangqi, Nocastle, Opulent, Orda, Ordamirror, Placement, Pocketknight,
+    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
+    Square, Synochess, Tencubed, Tenjiku, Tori, Washogi, WideEndReason, WideFenError, WideMove,
     WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
@@ -768,6 +768,7 @@ wide_variants! {
     Chennis, Chennis, Chennis, "chennis";
     Chigorin, Chigorin, Chigorin, "chigorin";
     Chu, Chu, Box<Chu>, "chu", "chushogi", "chu-shogi";
+    Coregal, Coregal, Coregal, "coregal";
     Courier, Courier, Courier, "courier";
     Dai, Dai, Box<Dai>, "dai", "daishogi", "dai-shogi";
     Dobutsu, Dobutsu, Dobutsu, "dobutsu";
@@ -965,7 +966,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 71, "all 71 fairy variants are covered");
+        assert_eq!(count, 72, "all 72 fairy variants are covered");
     }
 
     #[test]

@@ -6252,7 +6252,17 @@ fn multi_royal_move_off_lines<G: Geometry>(
     // reasoning, and an igui's from == to defeats it too, so no Fire Demon move is
     // ever fast-accepted; each is routed to the full verify. (Gated behind
     // `has_area_burn`, so inert for every other variant.)
+    //
+    // A **promotion** may create a *new* royal piece (Coregal's royal queen, a
+    // Spartan Hoplite promoting back to a King) on the promotion square — a square
+    // that is off the *current* royals' lines and so passes the geometry test, yet
+    // whose own safety has not been verified. A promoted royal landing en prise is
+    // an illegal move the off-lines reasoning would wrongly accept, so every
+    // promotion is routed to the full make/unmake verify instead. (For a variant
+    // whose promotion role is never royal this only forgoes the fast path on a rare
+    // move; the produced set stays byte-identical.)
     if kings.contains(from)
+        || mv.promotion().is_some()
         || matches!(
             mv.kind(),
             WideMoveKind::EnPassant

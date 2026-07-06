@@ -193,6 +193,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Chennis), "perft_chennis.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Chigorin), "perft_chigorin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Chu), "perft_chu.rs", PerftOracle::HaChu, 2, Difffuzz::Excluded("HaChu-only large shogi; FSF has no chu variant"), DrawTest::Named("chu_attack_repetition_loses_for_the_attacker")),
+    row(Game::Wide(WideVariantId::Coregal), "perft_coregal.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Courier), "perft_courier.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Dai), "perft_dai.rs", PerftOracle::HaChu, 3, Difffuzz::Excluded("HaChu-only large shogi; FSF has no dai variant"), DrawTest::Named("dai_attack_repetition_loses_for_the_attacker")),
     row(Game::Wide(WideVariantId::Dobutsu), "perft_dobutsu.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
