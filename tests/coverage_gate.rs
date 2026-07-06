@@ -211,6 +211,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Gothic), "perft_gothic.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Grand), "perft_grand.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Grandhouse), "perft_grandhouse.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
+    row(Game::Wide(WideVariantId::Grasshopper), "perft_grasshopper.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::HoppelPoppel), "perft_hoppelpoppel.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Janggi), "perft_janggi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("janggi_bikjang_facing_generals_draw")),
     row(Game::Wide(WideVariantId::Janus), "perft_janus.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
