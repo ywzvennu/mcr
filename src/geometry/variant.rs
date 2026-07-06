@@ -365,6 +365,21 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         rank == Self::promotion_rank(color)
     }
 
+    /// Returns `true` if a pawn of `color` arriving on `sq` is **in the promotion
+    /// zone** — the **square-aware** form of
+    /// [`in_promotion_zone`](WideVariant::in_promotion_zone), consulted by the pawn
+    /// generator for every pawn *destination*.
+    ///
+    /// The default forwards to the rank test, so a variant whose promotion zone is
+    /// one or more whole ranks (standard chess, Makruk, Grand, …) needs no override
+    /// and its pawn generation is byte-identical. Only a variant whose zone is not a
+    /// set of ranks overrides this: [`Legan`](super::variants::Legan) promotes on an
+    /// **L-shaped corner** (the far edge's near half plus the near edge's far half),
+    /// a set of squares no single rank describes.
+    fn in_promotion_zone_sq(color: Color, sq: Square<G>) -> bool {
+        Self::in_promotion_zone(color, sq.rank())
+    }
+
     /// Returns `true` if a pawn of `color` arriving on `rank` (already known to be
     /// [`in_promotion_zone`](WideVariant::in_promotion_zone)) **must** promote —
     /// a non-promoting move to that square is then illegal.
@@ -810,6 +825,45 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// [`WideRole::Hoplite`]: super::role::WideRole::Hoplite
     fn pawn_is_berolina() -> bool {
         false
+    }
+
+    /// Returns `true` if this variant's [`WideRole::Pawn`] is a **Legan pawn** — the
+    /// directional pawn of Legan chess, whose army attacks along a corner diagonal.
+    /// It *moves* (non-capturing) one square **diagonally toward the far corner** —
+    /// forward-and-left for White (up-left), forward-and-right for Black
+    /// (down-right) — with **no double step and no en passant**; and it *captures*
+    /// one square along **either orthogonal** making up that diagonal — straight
+    /// forward or straight sideways-left for White (north or west), straight forward
+    /// or straight sideways-right for Black (south or east).
+    ///
+    /// The default is `false`, so every other variant keeps the ordinary
+    /// straight-push / diagonal-capture pawn and its move generation is
+    /// byte-identical. Only [`Legan`](super::variants::Legan) sets it `true`.
+    ///
+    /// A Legan variant pairs this with a [`role_attacks`](WideVariant::role_attacks)
+    /// override returning the pawn's **two orthogonal capture squares** (its capture —
+    /// and so its check / king-danger threat), a
+    /// [`legan_push_target`](WideVariant::legan_push_target) giving the single
+    /// diagonal *move*, and an
+    /// [`in_promotion_zone_sq`](WideVariant::in_promotion_zone_sq) override for the
+    /// L-shaped corner promotion region.
+    ///
+    /// [`WideRole::Pawn`]: super::role::WideRole::Pawn
+    fn pawn_is_legan() -> bool {
+        false
+    }
+
+    /// Returns the single **diagonal quiet-advance** square of a Legan pawn of
+    /// `color` standing on `from`: one square toward the far corner (up-left for
+    /// White, down-right for Black), or `None` when that square is off the board.
+    ///
+    /// The default is `None`, so this hook is inert for every non-Legan variant and
+    /// their pawn generation is byte-identical. Only
+    /// [`Legan`](super::variants::Legan) overrides it, and only under
+    /// [`pawn_is_legan`](WideVariant::pawn_is_legan). Unlike a Berolina pawn there is
+    /// no second diagonal and no double step.
+    fn legan_push_target(_color: Color, _from: Square<G>) -> Option<Square<G>> {
+        None
     }
 
     /// Returns `true` if this variant's [`WideRole::Pawn`] is a **sideways pawn** —

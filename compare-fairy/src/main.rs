@@ -56,6 +56,7 @@ mod khans;
 mod kinglet;
 mod knightmate;
 mod kyotoshogi;
+mod legan;
 mod locate;
 mod locate_hachu;
 mod makpong;
@@ -411,6 +412,11 @@ fn main() {
     // rides the same generic 8x8 engine as Amazon Chess (the Amazon army) with
     // castling and en passant removed.
     let georgian_mismatches = georgian::run(&mut engine, opts.full);
+    // Legan chess is a FSF built-in (no variants.ini needed), like berolina: it rides
+    // the same generic 8x8 engine (a diagonal corner army with a directional pawn —
+    // diagonal move, two-orthogonal capture — and an L-shaped corner promotion
+    // region; no double step, en passant, or castling).
+    let legan_mismatches = legan::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -508,6 +514,7 @@ fn main() {
         + pawnsideways_mismatches
         + pawnback_mismatches
         + georgian_mismatches
+        + legan_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

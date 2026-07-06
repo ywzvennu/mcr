@@ -799,6 +799,19 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::chaturanga::to_fsf_dialect,
     },
+    // Legan chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in spelled identically to mcr
+    // (standard-chess letters — the directional pawn stays `p`/`P`, and the diagonal
+    // move / two-orthogonal capture / L-shaped corner promotion are *rule*
+    // differences, not letter ones), so it takes the `identity` dialect. Legan has no
+    // double step and no en passant, so the FEN ep field is always `-`.
+    Spec {
+        id: WideVariantId::Legan,
+        fsf: "legan",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
