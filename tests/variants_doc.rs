@@ -295,6 +295,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess on a 9x9 board with castling on the standard files, double step, and en passant; pawns promote to Queen, Rook, Bishop, Knight, or Chancellor. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant chancellor`).",
         },
+        WideVariantId::Chaturanga => Meta {
+            display: "Chaturanga (ancient Indian chess, 8x8)",
+            pieces: "Shatranj army on the standard chess array: Rukh (rook), Faras (knight), Pil (Alfil, two-square diagonal leap), Farzin (ferz), Shah (king), and single-step pawns.",
+            rules: "Shatranj without the bare-king rule: no double push, en passant, or castling; a pawn promotes only to a Ferz; stalemate is a loss, but baring the enemy king is not a win. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant chaturanga`).",
+        },
         WideVariantId::CheckShogi => Meta {
             display: "Checkshogi (Check Shogi, 9x9)",
             pieces: "The standard 9x9 Shogi army: King, Rook (Dragon), Bishop (Horse), Gold and Silver Generals, Knight, Lance, Pawn, and their promoted forms.",

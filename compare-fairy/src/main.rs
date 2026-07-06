@@ -32,6 +32,7 @@ mod cannonshogi;
 mod capablanca;
 mod capahouse;
 mod chak;
+mod chaturanga;
 mod chennis;
 mod coregal;
 mod corpus;
@@ -363,6 +364,9 @@ fn main() {
     // Shatranj is a FSF built-in (no variants.ini needed), like makruk; its mcr
     // dialect (`*x`/`m`) is rewritten to FSF's `b`/`q` inside shatranj::run.
     let shatranj_mismatches = shatranj::run(&mut engine, opts.full);
+    // Chaturanga is a FSF built-in (Shatranj without the baring rule, standard
+    // array); it shares Shatranj's `*x`/`m` → `b`/`q` dialect rewrite.
+    let chaturanga_mismatches = chaturanga::run(&mut engine, opts.full);
     // Courier is a FSF built-in (needs a `largeboards=yes` build for the 12-wide
     // board); its mcr dialect (`*x`/`*u`/`*j`/`m`) is rewritten to FSF's
     // `e`/`m`/`w`/`f` inside courier::run.
@@ -488,6 +492,7 @@ fn main() {
         + shako_mismatches
         + shatar_mismatches
         + shatranj_mismatches
+        + chaturanga_mismatches
         + courier_mismatches
         + shinobi_mismatches
         + shogun_mismatches

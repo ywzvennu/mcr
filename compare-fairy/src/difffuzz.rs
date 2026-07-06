@@ -788,6 +788,17 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: amazon_to_fsf,
     },
+    // Chaturanga is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in (Shatranj without the baring
+    // rule, on the standard array); it shares Shatranj's `*x → b` / `m → q`
+    // dialect rewrite since the two variants field the same pieces.
+    Spec {
+        id: WideVariantId::Chaturanga,
+        fsf: "chaturanga",
+        needs_ini: false,
+        dialect: crate::chaturanga::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
