@@ -460,6 +460,14 @@ const SPECS: &[Spec] = &[
         dialect: crate::minixiangqi::fen_to_fsf,
     },
     Spec {
+        // No-castle chess: standard chess with castling disabled. mcr and FSF spell
+        // it with the identical standard-chess letters, so the dialect is identity.
+        id: WideVariantId::Nocastle,
+        fsf: "nocastle",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         // Opulent (10x10, Grand geometry): mcr spells the Wizard `**w`, Lion `**y`,
         // augmented Knight `**z`, and Chancellor `e`; FSF spells them `w`/`l`/`n`/`c`.
         id: WideVariantId::Opulent,

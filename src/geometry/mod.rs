@@ -87,12 +87,12 @@ pub use variants::{
     Judkins, JudkinsRules, Karouk, KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules,
     Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules,
     Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi,
-    MinixiangqiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
-    Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules,
-    Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules,
-    Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules,
-    Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Tori, ToriRules,
-    Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    MinixiangqiRules, Nocastle, NocastleRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror,
+    OrdamirrorRules, Placement, PlacementRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
+    ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
+    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
+    SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Tori,
+    ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
