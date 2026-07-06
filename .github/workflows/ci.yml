@@ -329,6 +329,102 @@ jobs:
           pip install "./bindings/python[test]"
           pytest bindings/python/tests
 
+  # BOUNDED per-PR differential tier (issue #502). The heavy `fairy-differential`
+  # job below (deep 12x90 difffuzz sweep + `--include-ignored` perft) is
+  # schedule/manual only, so a PR that regresses movegen against Fairy-Stockfish
+  # gets no FSF cross-check before merge. This job closes that gap with a strictly
+  # BOUNDED FSF check that still catches a depth-4 or shallow-difffuzz regression,
+  # kept cheap enough for the per-PR path:
+  #
+  #   * a bounded, deterministic difffuzz — 1 fixed seed x 2 games x 24 plies over
+  #     every fuzzable variant (~3k nodes, ~2 s locally); and
+  #   * a depth-4 perft slice (`--quick`) — the AnyVariant CASES corpus (the nine
+  #     core rule families) capped at depth 4, node-for-node vs FSF (~1 s locally).
+  #
+  # NOT flaky: both steps are fully deterministic — the difffuzz seed is fixed
+  # (never the weekly job's `run_number`-rotating seed) and perft is exact — so a
+  # red run is a real divergence, never noise. The heavy 12x90 sweep and the deep
+  # `--include-ignored` perft stay UNCHANGED on the weekly `fairy-differential`
+  # job; nothing here touches them.
+  #
+  # TIME BUDGET: the two bounded checks together run in a few seconds; the cost is
+  # the FSF build (~2 min, GPL-3.0+, ARCH=x86-64 largeboards=yes). To keep that off
+  # the critical path on the common case, the built FSF binary + its variants.ini
+  # are CACHED keyed on a PINNED FSF commit (`FSF_REF`), so only the first PR run
+  # after a cache miss pays the build; subsequent runs restore in seconds. Pinning
+  # the commit (vs the weekly job's floating `--depth 1` master clone) also makes
+  # the cache key stable and the oracle reproducible. Total per-PR budget: ~2-3 min
+  # on a cold cache, well under a minute of FSF work on a warm cache.
+  #
+  # GPL FENCE unchanged: FSF is built and driven purely AS A SUBPROCESS over a
+  # process boundary (the clean-room `mcr` library never links or vendors it), and
+  # the binary is never committed — only ephemerally cached in the Actions cache.
+  fairy-differential-pr:
+    name: fairy-differential-pr (bounded FSF tier)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      # Pinned Fairy-Stockfish commit used as the per-PR oracle. Bump deliberately
+      # (in lockstep with any weekly-job oracle bump); the cache key keys on it, so
+      # a new commit simply forces one rebuild then caches again.
+      FSF_REF: fb78cb561aa01708338e35b3dc3b65a42149a3c4
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: compare-fairy
+
+      # Restore the prebuilt FSF binary + variants.ini for the pinned commit. On a
+      # hit the (~2 min) build below is skipped entirely.
+      - name: Cache Fairy-Stockfish binary
+        id: fsf-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            fsf/src/stockfish
+            fsf/src/variants.ini
+          key: fsf-${{ runner.os }}-x86-64-largeboards-${{ env.FSF_REF }}
+
+      # Build the FSF oracle only on a cache miss. `largeboards=yes` enables the
+      # 10x10 / 12-wide variants the difffuzz and CASES corpus also cover. The clone
+      # goes to a throwaway `fsf/` dir that is never committed (GPL fence).
+      - name: Build Fairy-Stockfish oracle (GPL, subprocess only; cache miss)
+        if: steps.fsf-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/fairy-stockfish/Fairy-Stockfish.git fsf
+          git -C fsf checkout "$FSF_REF"
+          make -C fsf/src -j build ARCH=x86-64 largeboards=yes
+
+      - name: Export FSF environment
+        run: |
+          echo "MCR_FSF_BIN=$GITHUB_WORKSPACE/fsf/src/stockfish" >> "$GITHUB_ENV"
+          echo "MCR_FSF_VARIANTS_INI=$GITHUB_WORKSPACE/fsf/src/variants.ini" >> "$GITHUB_ENV"
+
+      # Bounded difffuzz: a SINGLE fixed seed (deterministic — never the weekly
+      # job's rotating seed), 2 games x 24 plies over every fuzzable variant. A
+      # shallow movegen regression on a reachable position surfaces here as a
+      # perft(1)/perft(2)+divide divergence; `main` exits non-zero on any, failing
+      # the job. The held-back variants stay held back (same `HELD_BACK` source of
+      # truth the weekly sweep uses).
+      - name: Bounded differential fuzzer vs FSF (fixed seed)
+        run: |
+          cargo run --release --manifest-path compare-fairy/Cargo.toml -- \
+            --difffuzz --seed 0x502 --games 2 --plies 24
+
+      # Depth-4 perft slice: the AnyVariant CASES corpus (standard, chess960, KOTH,
+      # three-check, racing-kings, atomic, antichess, horde, crazyhouse) capped at
+      # depth 4, node-for-node vs FSF. `--quick` exits before the heavy per-module
+      # variant runs (those stay on the weekly job), so this is bounded. A depth-4
+      # perft regression flips a corpus row to MISMATCH and exits non-zero.
+      - name: Depth-4 perft slice vs FSF (bounded corpus)
+        run: |
+          cargo run --release --manifest-path compare-fairy/Cargo.toml -- --quick
+
   # Heavy differential + deep-perft job, GATED to the weekly schedule and manual
   # `workflow_dispatch` only (never per-PR), because it builds Fairy-Stockfish
   # from source (~2 min, GPL-3.0+) and runs the slow deep `--ignored` perft
