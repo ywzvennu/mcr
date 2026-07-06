@@ -571,6 +571,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess in which a pawn, in addition to its ordinary moves, may make a single quiet step sideways (one square left or right along its own rank) onto an empty square. The forward push, initial forward double step, diagonal capture, en passant (off the forward double step only), and promotion to Queen/Rook/Bishop/Knight are all standard; a sideways step never captures, never promotes, gives no check, and creates no en-passant target. Castling and the fifty-move rule are standard. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant pawnsideways`).",
         },
+        WideVariantId::Perfect => Meta {
+            display: "Perfect chess (8x8)",
+            pieces: "Standard chess army plus a Chancellor (Rook + Knight, mcr Elephant `e`/`E`), an Archbishop (Bishop + Knight, mcr Hawk `a`/`A`), and an Amazon (Queen + Knight, mcr Angel `**a`/`**A`) on the back rank.",
+            rules: "Standard 8x8 chess with double step and en passant. The king castles on the standard files, but the queen-side castle is performed with the a-file Chancellor (the king-side castle uses the ordinary h-file Rook). A pawn promotes on the last rank to Amazon, Chancellor, Archbishop, Queen, Rook, Bishop, or Knight. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant perfect`).",
+        },
         WideVariantId::Placement => Meta {
             display: "Placement (Pre-Chess, 8x8)",
             pieces: "Standard chess army; the eight non-pawn pieces start off the board, in hand.",

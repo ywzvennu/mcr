@@ -654,6 +654,22 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         }
     }
 
+    /// Returns the piece **role** that castles as the "rook" on a castling side
+    /// (`0` = kingside, `1` = queenside) — the role the castle piece has on its
+    /// home square, the one that ends up beside the king.
+    ///
+    /// The default is [`WideRole::Rook`] on both sides, so standard chess and every
+    /// existing castling variant is byte-identical: the generator, the make-move,
+    /// the undo bookkeeping, and the `KQkq` FEN rook-file scan all look for a Rook.
+    ///
+    /// Perfect chess overrides the **queenside** to [`WideRole::Elephant`] (its
+    /// a-file castling piece is the Chancellor, matching Fairy-Stockfish's
+    /// `castlingRookPieces |= CHANCELLOR`); the king still lands on c/g and the
+    /// castle piece beside it on d/f, exactly the standard destinations.
+    fn castle_rook_role(_side: usize) -> WideRole {
+        WideRole::Rook
+    }
+
     /// Returns `true` if the castling FEN field is written in **Shredder** form —
     /// explicit rook-**file** letters, uppercase for White and lowercase for Black
     /// (e.g. `JAja`) — rather than the standard `KQkq`.
