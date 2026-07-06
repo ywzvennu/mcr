@@ -881,6 +881,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Gardner minichess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess on the 5x5
+    // Minishogi board (no double step, castle, or en passant) — spelled identically
+    // in mcr and FSF (standard-chess letters on a 5x5 grid), so the FEN passes
+    // through unchanged.
+    Spec {
+        id: WideVariantId::Gardner,
+        fsf: "gardner",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random
