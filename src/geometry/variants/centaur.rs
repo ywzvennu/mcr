@@ -69,7 +69,7 @@ const CENTAUR_START_PLACEMENT: &str = "rwnbqkbnwr/pppppppppp/10/10/10/10/PPPPPPP
 const KINGSIDE: usize = 0;
 
 impl WideVariant<Cap10x8> for CentaurRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 32;

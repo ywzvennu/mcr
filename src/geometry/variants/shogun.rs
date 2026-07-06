@@ -120,7 +120,7 @@ const DROP_DEPTH: u8 = 5;
 const PROMOTION_LIMIT: u8 = 1;
 
 impl WideVariant<Chess8x8> for ShogunRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 34;

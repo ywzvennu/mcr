@@ -187,7 +187,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// The generic movegen hot path iterates roles to find each side's pieces; a
     /// small variant that iterates the full 146 probes ~140 always-empty roles per
     /// call. Bounding those loops to `ROLE_SPAN` — the tightest prefix of
-    /// [`WideRole::ALL`] that still contains every role this variant can reach —
+    /// `WideRole::ALL` that still contains every role this variant can reach —
     /// skips the empty tail and is a measured 2–3× movegen win on small variants
     /// (see `docs/perf-role-array-spike.md`, issue #506/#514). The `by_role` array
     /// and the hand pocket stay the full [`WideRole::COUNT`] wide; this is a pure
@@ -209,7 +209,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// and the default below (the full [`WideRole::COUNT`]) is always safe.
     ///
     /// [`WideRole`]: super::role::WideRole
-    /// [`WideRole::ALL`]: super::role::WideRole::ALL
+    /// `WideRole::ALL`: super::role::WideRole::ALL
     /// [`WideRole::COUNT`]: super::role::WideRole::COUNT
     const ROLE_SPAN: usize = WideRole::COUNT;
 

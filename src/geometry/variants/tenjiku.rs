@@ -225,7 +225,7 @@ const EIGHT_DIRS: [(i8, i8); 8] = [
 ];
 
 impl WideVariant<Tenjiku16x16> for TenjikuRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 146;

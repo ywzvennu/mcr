@@ -53,7 +53,7 @@ const AMAZON_START_PLACEMENT: &str = "rnb**akbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB**
 pub struct AmazonRules;
 
 impl WideVariant<Chess8x8> for AmazonRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 68;

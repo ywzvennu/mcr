@@ -1288,7 +1288,7 @@ pub enum WideRole {
 }
 
 impl WideRole {
-    /// The number of distinct roles, i.e. the length of [`WideRole::ALL`] and
+    /// The number of distinct roles, i.e. the length of `WideRole::ALL` and
     /// the size of a [`Board<G>`](super::Board)'s per-role mask array.
     ///
     /// This grows as fairy variants land and add roles.

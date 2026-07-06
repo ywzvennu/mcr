@@ -619,7 +619,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 
     /// The highest [`WideRole`] index this position **currently** fields — the
     /// largest index with a non-empty board bitboard or a non-zero hand tally,
-    /// across both colors — scanning the full [`WideRole::ALL`] set (not the
+    /// across both colors — scanning the full `WideRole::ALL` set (not the
     /// bounded span). Used only by the `role_span_covers_all_fieldable_roles`
     /// meta-test to walk a variant and prove no reachable position ever fields a
     /// role at or beyond [`ROLE_SPAN`](Self::ROLE_SPAN).
@@ -5865,7 +5865,7 @@ impl WideSink for WideCountSink {
 }
 
 /// A fixed-capacity, stack-backed list of [`WideMove`]s with heap spill on
-/// overflow — the generic analogue of the concrete [`MoveList`](crate::position),
+/// overflow — the generic analogue of the concrete `MoveList`,
 /// so the reusable-buffer perft recursion allocates no per-node `Vec`.
 ///
 /// This is the reusable buffer accepted by
@@ -6083,7 +6083,7 @@ impl EnemyAttackers {
     /// Records every role color `by` has at least one piece of on `board`.
     ///
     /// Only the variant's own [`ROLE_SPAN`](WideVariant::ROLE_SPAN) prefix of
-    /// [`WideRole::ALL`] is scanned; every role past it is always empty for `V`,
+    /// `WideRole::ALL` is scanned; every role past it is always empty for `V`,
     /// so the shorter scan is byte-identical to iterating the full role set.
     fn new<G: Geometry, V: WideVariant<G>>(board: &Board<G>, by: Color) -> EnemyAttackers {
         let mut roles = [WideRole::King; WideRole::COUNT];
@@ -6753,7 +6753,7 @@ fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenE
 }
 
 /// Writes the placement-phase `[..]` holdings bracket: white's undeployed pieces
-/// (uppercase) then black's (lowercase), each role in [`WideRole::ALL`] index
+/// (uppercase) then black's (lowercase), each role in `WideRole::ALL` index
 /// order, repeated by its count. An empty pocket (both sides fully deployed)
 /// emits `[]`, matching FSF's rendering once the setup phase is over.
 fn write_placement_holdings(placement: GenericPlacement, out: &mut String) {

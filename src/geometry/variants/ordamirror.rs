@@ -94,7 +94,7 @@ pub struct OrdamirrorRules;
 const ORDAMIRROR_START_PLACEMENT: &str = "fwy*fkywf/8/pppppppp/8/8/PPPPPPPP/8/FWY*FKYWF";
 
 impl WideVariant<Chess8x8> for OrdamirrorRules {
-    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
     /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
     const ROLE_SPAN: usize = 36;
