@@ -190,6 +190,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Centaur), "perft_centaur.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Chak), "perft_chak.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Chancellor), "perft_chancellor.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
+    row(Game::Wide(WideVariantId::Chaturanga), "perft_chaturanga.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::CheckShogi), "perft_checkshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("check_win_is_terminal")),
     row(Game::Wide(WideVariantId::Chennis), "perft_chennis.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Chigorin), "perft_chigorin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
