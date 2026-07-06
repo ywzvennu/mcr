@@ -481,6 +481,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "5x5 Shogi where every piece flips to its alternate form after each move; captures go to hand in base form and drop in either form; no drop restrictions. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant kyotoshogi`).",
         },
+        WideVariantId::Legan => Meta {
+            display: "Legan chess",
+            pieces: "Standard chess army arrayed on a corner diagonal, with a directional Legan pawn (`p`/`P`).",
+            rules: "Each side attacks toward the opposite corner. Pieces move as in standard chess; the pawn moves one square diagonally toward the far corner (up-left for White, down-right for Black) and captures one square along either orthogonal of that diagonal (north or west for White, south or east for Black). No double step, no en passant, no castling. Pawns promote (Q/R/B/N) on an L-shaped corner region — {a8,b8,c8,d8,a7,a6,a5} for White, {e1,f1,g1,h1,h2,h3,h4} for Black — so promotion can occur off the last rank. The fifty-move rule and threefold repetition are standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant legan`).",
+        },
         WideVariantId::Makpong => Meta {
             display: "Makpong (Defensive Chess)",
             pieces: "Makruk army: Rook, Knight, Khon (silver), Met (ferz), King, single-step promote-to-Met pawns.",

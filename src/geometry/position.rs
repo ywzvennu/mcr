@@ -4046,6 +4046,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // the capture is straight. Default-off, so every ordinary-pawn variant takes
         // the straight-push branch below and is byte-identical.
         let berolina = V::pawn_is_berolina();
+        // Legan pawns move one square **diagonally** toward the far corner (a single
+        // step, no double step, no en passant) and capture along the two orthogonals
+        // that make up that diagonal (their `role_attacks` override). Default-off, so
+        // every ordinary-pawn variant skips this branch and is byte-identical.
+        let legan = V::pawn_is_legan();
         // The legal promotion targets, materialised **lazily**. The default reads
         // only the static promotion config (every existing variant); Grand chess
         // overrides it to a board-dependent set recomputed from the live board.
@@ -4063,13 +4068,38 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // Quiet advance. A Berolina pawn advances **diagonally** (two squares
             // along the diagonal from its start rank — a *lame* jump that needs the
             // skipped square empty); an ordinary pawn advances straight ahead.
-            if berolina {
+            if legan {
+                // The single diagonal quiet advance toward the far corner — no
+                // double step, no en passant. Promotion is decided by the square-
+                // aware zone (Legan's L-shaped corner), never a bare rank.
+                if let Some(one) = V::legan_push_target(us, from) {
+                    if !occupied.contains(one) && check_mask.contains(one) && pin_line.contains(one)
+                    {
+                        if V::in_promotion_zone_sq(us, one) {
+                            let roles =
+                                promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
+                            for &role in roles.iter() {
+                                out.push(WideMove::new(
+                                    from,
+                                    one,
+                                    WideMoveKind::Promotion {
+                                        role,
+                                        capture: false,
+                                    },
+                                ));
+                            }
+                        } else {
+                            out.push(WideMove::new(from, one, WideMoveKind::Quiet));
+                        }
+                    }
+                }
+            } else if berolina {
                 // Each forward-diagonal single step (empty landing square). The two
                 // targets come from the shared Berolina-push hook.
                 for one in V::berolina_push_targets(us, from) {
                     if !occupied.contains(one) && check_mask.contains(one) && pin_line.contains(one)
                     {
-                        if V::in_promotion_zone(us, one.rank()) {
+                        if V::in_promotion_zone_sq(us, one) {
                             let roles =
                                 promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
                             for &role in roles.iter() {
@@ -4104,7 +4134,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             } else if let Some(one) = from.offset(0, forward) {
                 if !occupied.contains(one) {
                     if check_mask.contains(one) && pin_line.contains(one) {
-                        if V::in_promotion_zone(us, one.rank()) {
+                        if V::in_promotion_zone_sq(us, one) {
                             let roles =
                                 promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
                             for &role in roles.iter() {
@@ -4132,7 +4162,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                                 && check_mask.contains(two)
                                 && pin_line.contains(two)
                             {
-                                if V::in_promotion_zone(us, two.rank()) {
+                                if V::in_promotion_zone_sq(us, two) {
                                     // A double-step that lands on the promotion zone
                                     // (only reachable when the double-step is allowed
                                     // from a non-standard rank — torpedo) promotes,
@@ -4224,14 +4254,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // Captures (and capturing promotions). The capture squares come from
             // [`role_attacks`](WideVariant::role_attacks): the two forward diagonals
             // for an ordinary pawn, the single square straight ahead for a Berolina
-            // pawn (whose override returns exactly that), so this loop is unchanged
-            // for both.
+            // pawn, the two forward orthogonals for a Legan pawn (each override
+            // returns exactly its capture set), so this loop is unchanged for all.
             let caps = V::role_attacks(WideRole::Pawn, us, from, occupied) & their_pieces;
             for to in caps {
                 if !check_mask.contains(to) || !pin_line.contains(to) {
                     continue;
                 }
-                if V::in_promotion_zone(us, to.rank()) {
+                if V::in_promotion_zone_sq(us, to) {
                     let roles = promo_roles.get_or_insert_with(|| V::promotion_targets(us, board));
                     for &role in roles.iter() {
                         out.push(WideMove::new(

@@ -27,7 +27,7 @@ use super::{
     Chigorin, Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi,
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
     Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate,
-    Kyotoshogi, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern,
+    Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern,
     Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Placement, Pocketknight, Seirawan,
     Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
     Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
@@ -797,6 +797,7 @@ wide_variants! {
     Kinglet, Kinglet, Kinglet, "kinglet";
     Knightmate, Knightmate, Knightmate, "knightmate";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
+    Legan, Legan, Legan, "legan";
     Makpong, Makpong, Makpong, "makpong";
     Makruk, Makruk, Makruk, "makruk";
     Manchu, Manchu, Manchu, "manchu", "manchuchess";
@@ -977,7 +978,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 82, "all 82 fairy variants are covered");
+        assert_eq!(count, 83, "all 83 fairy variants are covered");
     }
 
     #[test]
@@ -1376,6 +1377,7 @@ mod tests {
             AnyWideVariant::Kyotoshogi,
             2
         );
+        agrees_with_typed!(WideVariantId::Legan, Legan, AnyWideVariant::Legan, 2);
         agrees_with_typed!(WideVariantId::Makpong, Makpong, AnyWideVariant::Makpong, 2);
         agrees_with_typed!(WideVariantId::Makruk, Makruk, AnyWideVariant::Makruk, 2);
         agrees_with_typed!(WideVariantId::Manchu, Manchu, AnyWideVariant::Manchu, 2);
