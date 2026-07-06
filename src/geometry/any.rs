@@ -178,6 +178,18 @@ macro_rules! wide_variants {
                 }
             }
 
+            /// This variant's [`WideVariant::ROLE_SPAN`](super::WideVariant::ROLE_SPAN)
+            /// — the number of leading [`WideRole`](super::role::WideRole)s its
+            /// movegen loops iterate. A static per-variant fact used by the
+            /// `role_span_covers_all_fieldable_roles` meta-test.
+            #[cfg(test)]
+            #[must_use]
+            pub(crate) const fn role_span(self) -> usize {
+                match self {
+                    $( WideVariantId::$variant => <$pos>::ROLE_SPAN, )+
+                }
+            }
+
             /// Which of this variant's history-independent **draw / adjudication
             /// hooks** are overridden away from their [`WideVariant`](super::WideVariant)
             /// defaults, computed by calling the concrete rules' hook methods (see
@@ -324,6 +336,18 @@ macro_rules! wide_variants {
             pub fn legal_moves(&self) -> Vec<WideMove> {
                 match self {
                     $( AnyWideVariant::$variant(p) => p.legal_moves(), )+
+                }
+            }
+
+            /// The highest [`WideRole`](super::role::WideRole) index this position
+            /// currently fields (board or hand). Forwards to
+            /// [`GenericPosition::max_fielded_role_index`](super::GenericPosition::max_fielded_role_index);
+            /// used only by the `role_span_covers_all_fieldable_roles` meta-test.
+            #[cfg(test)]
+            #[must_use]
+            pub(crate) fn max_fielded_role_index(&self) -> usize {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.max_fielded_role_index(), )+
                 }
             }
 
@@ -836,6 +860,74 @@ mod tests {
             "legal_moves_into diverged from legal_moves for {}",
             pos.variant_id()
         );
+    }
+
+    /// Every variant's [`WideVariant::ROLE_SPAN`](super::WideVariant::ROLE_SPAN)
+    /// is a valid prefix length of [`WideRole::ALL`](super::role::WideRole::ALL):
+    /// at least one role wide and never past the global
+    /// [`WideRole::COUNT`](crate::geometry::WideRole::COUNT). A span `> COUNT` would
+    /// panic when the bounded movegen loops slice `WideRole::ALL[..ROLE_SPAN]`.
+    #[test]
+    fn role_span_within_count() {
+        for &id in WideVariantId::ALL {
+            let span = id.role_span();
+            assert!(
+                (1..=crate::geometry::WideRole::COUNT).contains(&span),
+                "{id}: ROLE_SPAN {span} must be in 1..={}",
+                crate::geometry::WideRole::COUNT
+            );
+        }
+    }
+
+    /// Safety meta-test for issue #514: the movegen role loops are bounded to each
+    /// variant's [`ROLE_SPAN`](super::WideVariant::ROLE_SPAN), so a span set below a
+    /// role the variant can actually field would silently drop that role's pieces.
+    ///
+    /// This walks every shipped variant from its start position over a bounded
+    /// legal-move tree (full width, depth- and node-capped) and asserts that **no**
+    /// reachable position ever fields a role at index `>= ROLE_SPAN` — the strongest
+    /// form: the OR of the board occupancy and both hands is checked at every node
+    /// via [`max_fielded_role_index`](AnyWideVariant::max_fielded_role_index), so it
+    /// catches roles introduced by promotions, drops, gating, and reveals — not just
+    /// the start army. A too-small span fails here (and would also diverge the
+    /// per-variant perft suites); this test makes the requirement explicit.
+    #[test]
+    fn role_span_covers_all_fieldable_roles() {
+        fn walk(
+            pos: &AnyWideVariant,
+            span: usize,
+            id: WideVariantId,
+            depth: u32,
+            budget: &mut u64,
+        ) {
+            let max = pos.max_fielded_role_index();
+            assert!(
+                max < span,
+                "{id}: reached role index {max} (>= ROLE_SPAN {span}); \
+                 the bounded movegen loops would drop this role's pieces — \
+                 raise this variant's ROLE_SPAN to at least {}",
+                max + 1
+            );
+            if depth == 0 || *budget == 0 {
+                return;
+            }
+            for mv in pos.legal_moves() {
+                if *budget == 0 {
+                    break;
+                }
+                *budget -= 1;
+                let child = pos.play(&mv);
+                walk(&child, span, id, depth - 1, budget);
+            }
+        }
+        for &id in WideVariantId::ALL {
+            let pos = AnyWideVariant::startpos(id);
+            // A full-width tree to depth 6, capped at 100k explored moves per
+            // variant so the walk reaches promotions/drops/reveals on many lines
+            // without an unbounded blow-up on the wide giant-shogi variants.
+            let mut budget: u64 = 100_000;
+            walk(&pos, id.role_span(), id, 6, &mut budget);
+        }
     }
 
     #[test]

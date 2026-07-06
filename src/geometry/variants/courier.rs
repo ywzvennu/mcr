@@ -107,6 +107,11 @@ const ALFIL_OFFSETS: [(i8, i8); 4] = [(2, 2), (2, -2), (-2, 2), (-2, -2)];
 const WAZIR_OFFSETS: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
 impl WideVariant<Courier12x8> for CourierRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 58;
+
     /// The western **fifty-move rule**: a position whose halfmove clock has
     /// reached 100 plies (50 full moves with no capture or pawn move) is a
     /// [`WideEndReason::MoveRule`](crate::geometry::WideEndReason::MoveRule) draw,

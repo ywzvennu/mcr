@@ -142,6 +142,11 @@ impl MicroRules {
 }
 
 impl WideVariant<Micro4x5> for MicroRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 29;
+
     fn starting_position() -> (Board<Micro4x5>, GenericState<Micro4x5>) {
         let board = Board::<Micro4x5>::from_fen_placement(MICRO_PLACEMENT)
             .expect("the Micro Shogi starting placement is valid on a 4x5 board");

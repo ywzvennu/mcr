@@ -206,6 +206,11 @@ impl ChakRules {
 }
 
 impl WideVariant<Shogi9x9> for ChakRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 49;
+
     fn starting_position() -> (Board<Shogi9x9>, GenericState<Shogi9x9>) {
         let board = Board::<Shogi9x9>::from_fen_placement(CHAK_PLACEMENT)
             .expect("the Chak starting placement is valid on a 9x9 board");

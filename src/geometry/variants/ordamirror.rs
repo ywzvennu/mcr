@@ -94,6 +94,11 @@ pub struct OrdamirrorRules;
 const ORDAMIRROR_START_PLACEMENT: &str = "fwy*fkywf/8/pppppppp/8/8/PPPPPPPP/8/FWY*FKYWF";
 
 impl WideVariant<Chess8x8> for OrdamirrorRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 36;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(ORDAMIRROR_START_PLACEMENT)
             .expect("the Ordamirror starting placement is valid on an 8x8 board");

@@ -269,6 +269,11 @@ impl JanggiRules {
 }
 
 impl WideVariant<Xiangqi9x10> for JanggiRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 30;
+
     fn starting_position() -> (Board<Xiangqi9x10>, GenericState<Xiangqi9x10>) {
         let board = Board::<Xiangqi9x10>::from_fen_placement(JANGGI_START_PLACEMENT)
             .expect("the Janggi starting placement is valid on a 9x10 board");

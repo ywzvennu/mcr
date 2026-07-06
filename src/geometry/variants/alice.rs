@@ -80,6 +80,11 @@ use crate::geometry::{Board, Chess8x8, GenericPosition, StandardChess, WideVaria
 pub struct AliceRules;
 
 impl WideVariant<Chess8x8> for AliceRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 6;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         // The standard chess start: all pieces on board A (the empty `board_b`
         // mask), board B empty. Reuse the reference array verbatim.

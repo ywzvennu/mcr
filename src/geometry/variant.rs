@@ -178,6 +178,41 @@ pub struct PromotionConfig {
 /// dispatch-free code — there is no per-hook vtable, exactly as the concrete
 /// [`Variant`](crate::variant::Variant) layer guarantees.
 pub trait WideVariant<G: Geometry>: Copy + 'static {
+    /// The number of leading [`WideRole`]s this variant can **ever** field —
+    /// `(the highest role index it can place on the board or hold in hand) + 1`.
+    ///
+    /// [`WideRole::COUNT`] is the global union of every variant's roles (146),
+    /// but any one variant fields only a small, low-indexed cluster of them (the
+    /// standard six live at `0..=5` and each variant's own pieces sit just above).
+    /// The generic movegen hot path iterates roles to find each side's pieces; a
+    /// small variant that iterates the full 146 probes ~140 always-empty roles per
+    /// call. Bounding those loops to `ROLE_SPAN` — the tightest prefix of
+    /// [`WideRole::ALL`] that still contains every role this variant can reach —
+    /// skips the empty tail and is a measured 2–3× movegen win on small variants
+    /// (see `docs/perf-role-array-spike.md`, issue #506/#514). The `by_role` array
+    /// and the hand pocket stay the full [`WideRole::COUNT`] wide; this is a pure
+    /// throughput bound on iteration, not a storage change.
+    ///
+    /// # Correctness
+    ///
+    /// This span **must** cover every role the variant can ever place on the
+    /// board or hold in hand, reached through **any** code path — its starting
+    /// army, pawn/piece promotions, drops, gating/placement deployment, Jieqi
+    /// reveals, Alice-plane pieces, board-aware roles, and anything the *shared*
+    /// generator produces (e.g. the default `[Knight, Bishop, Rook, Queen]`
+    /// promotion set). A span set below a reachable role silently drops that
+    /// role's bitboard off the end of the bounded loops — pieces vanish with no
+    /// type error. When in doubt, set it larger: a too-large span is merely slower
+    /// (correct), a too-small span is a correctness bug. The
+    /// `role_span_covers_all_fieldable_roles` meta-test walks every variant from
+    /// its start position and fails if any reachable role index is `>= ROLE_SPAN`,
+    /// and the default below (the full [`WideRole::COUNT`]) is always safe.
+    ///
+    /// [`WideRole`]: super::role::WideRole
+    /// [`WideRole::ALL`]: super::role::WideRole::ALL
+    /// [`WideRole::COUNT`]: super::role::WideRole::COUNT
+    const ROLE_SPAN: usize = WideRole::COUNT;
+
     /// Returns the starting board and state for a fresh game of this variant.
     ///
     /// The board carries the piece placement; the state carries the side to

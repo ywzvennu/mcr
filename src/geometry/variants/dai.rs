@@ -167,6 +167,11 @@ const ORTHO: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 const DIAG: [(i8, i8); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
 impl WideVariant<Dai15x15> for DaiRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 132;
+
     fn starting_position() -> (Board<Dai15x15>, GenericState<Dai15x15>) {
         let board = Board::<Dai15x15>::from_fen_placement(DAI_PLACEMENT)
             .expect("the Dai Shogi starting placement is valid on a 15x15 board");

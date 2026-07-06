@@ -50,6 +50,11 @@ const ALMOST_START_PLACEMENT: &str = "rnbekbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBN
 pub struct AlmostRules;
 
 impl WideVariant<Chess8x8> for AlmostRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 12;
+
     /// The western **fifty-move rule**: a position whose halfmove clock has
     /// reached 100 plies (50 full moves with no capture or pawn move) is a
     /// [`WideEndReason::MoveRule`](crate::geometry::WideEndReason::MoveRule) draw,

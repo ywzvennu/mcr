@@ -127,6 +127,11 @@ impl PlacementRules {
 }
 
 impl WideVariant<Chess8x8> for PlacementRules {
+    /// The tightest prefix of [`WideRole::ALL`] that still contains every role
+    /// this variant can field (start army, promotions, drops, gating, reveals);
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    const ROLE_SPAN: usize = 6;
+
     fn starting_position() -> (Board<Chess8x8>, GenericState<Chess8x8>) {
         let board = Board::<Chess8x8>::from_fen_placement(PLACEMENT_PAWNS)
             .expect("the Placement pawn layout is valid on an 8x8 board");
