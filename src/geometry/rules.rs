@@ -62,6 +62,7 @@ use crate::Color;
 /// docs); none is hand-restated prose. Build one with
 /// [`WideVariantId::rules`](super::WideVariantId::rules).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariantRules {
     /// Board geometry and the starting position.
     pub board: BoardRules,
@@ -90,6 +91,7 @@ pub struct VariantRules {
 
 /// Board geometry and the starting array.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BoardRules {
     /// The number of files (board width), `G::WIDTH`.
     pub width: u8,
@@ -108,6 +110,7 @@ pub struct BoardRules {
 
 /// One role's derived gameplay mechanics: how it moves and how it captures.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PieceRules {
     /// The role.
     pub role: WideRole,
@@ -140,6 +143,7 @@ pub struct PieceRules {
 
 /// A derived movement geometry: a set of primitive step directions.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Movement {
     /// The primitive directions reached on an empty board (White's orientation),
     /// each with a `rides` flag (a repeating slider / rider vs a single-step
@@ -150,6 +154,7 @@ pub struct Movement {
 
 /// One primitive move direction: a `(file, rank)` delta with a `rides` flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Step {
     /// The file delta (positive = toward the h-file), the primitive (gcd-reduced)
     /// component.
@@ -164,6 +169,7 @@ pub struct Step {
 
 /// The pawn's movement rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PawnRules {
     /// The White ranks (0-based) a pawn may make its initial two-square advance
     /// from, [`WideVariant::pawn_may_double_push_from`].
@@ -194,6 +200,7 @@ pub struct PawnRules {
 
 /// The promotion rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PromotionRules {
     /// The roles a promoting pawn may become, [`WideVariant::promotion_config`].
     pub roles: Vec<WideRole>,
@@ -217,6 +224,7 @@ pub struct PromotionRules {
 
 /// The castling rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CastlingRules {
     /// Whether the variant offers castling, [`WideVariant::has_castling`].
     pub enabled: bool,
@@ -238,6 +246,7 @@ pub struct CastlingRules {
 
 /// The draw / repetition / counting adjudication rules, with their values.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DrawRules {
     /// The move-count ("fifty-move") draw ply threshold, if any
     /// ([`WideVariant::move_rule_plies`]).
@@ -280,6 +289,7 @@ pub struct DrawRules {
 /// The impasse / jishogi (entering-king) declaration parameters, an owned copy of
 /// [`ImpasseRule`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ImpasseInfo {
     /// The minimum own pieces required inside the promotion zone.
     pub min_pieces_in_zone: u32,
@@ -297,6 +307,7 @@ pub struct ImpasseInfo {
 
 /// The win / terminal conditions.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TerminalRules {
     /// How the king's royalty is treated (checkmate / non-royal / pseudo-royal).
     pub royal: RoyalRule,
@@ -343,6 +354,7 @@ pub struct TerminalRules {
 /// game outright (King-of-the-Hill's central "hill"). The square-set
 /// generalization of [`FlagWin`]'s single goal rank.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RegionWin {
     /// The goal squares, each a 0-based `(file, rank)` pair in White's orientation.
     /// A king of either side that stands on one of them wins.
@@ -351,6 +363,11 @@ pub struct RegionWin {
 
 /// How a variant treats royalty and the decisive check terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(rename_all = "snake_case")
+)]
 pub enum RoyalRule {
     /// A single royal king; a side loses by checkmate.
     Checkmate,
@@ -369,6 +386,7 @@ pub enum RoyalRule {
 /// The extinction terminal parameters, an owned copy of
 /// [`ExtinctionRule`](super::variant::ExtinctionRule).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExtinctionInfo {
     /// The roles whose disappearance ends the game.
     pub watched: Vec<WideRole>,
@@ -378,6 +396,7 @@ pub struct ExtinctionInfo {
 
 /// The flag / campmate win parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FlagWin {
     /// The 0-based rank White wins by reaching, [`WideVariant::flag_rank`].
     pub rank_white: u8,
@@ -388,6 +407,7 @@ pub struct FlagWin {
 
 /// Special board mechanics that fall outside the movement / terminal categories.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SpecialMechanics {
     /// Every move is verified by make/unmake king-safety re-test (a riding-leaper
     /// check geometry), [`WideVariant::needs_full_verify`].
@@ -458,6 +478,11 @@ pub struct SpecialMechanics {
 /// The external oracle a variant's move generation is validated against — a
 /// structured pointer, not prose. Mirrors the `tests/coverage_gate.rs` manifest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(rename_all = "snake_case")
+)]
 pub enum ValidationOracle {
     /// Cross-checked node-for-node against Fairy-Stockfish `UCI_Variant <name>`.
     /// The name is FSF's spelling, which may differ from mcr's canonical name.
