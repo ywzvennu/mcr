@@ -468,6 +468,15 @@ const SPECS: &[Spec] = &[
         dialect: crate::minixiangqi::fen_to_fsf,
     },
     Spec {
+        // Modern chess (9x9): standard chess widened to a 9x9 board with an added
+        // Archbishop. mcr spells the archbishop `a`/`A` (its Hawk compound), FSF
+        // spells it `m`/`M`; the FSF `modern` built-in needs no variants.ini.
+        id: WideVariantId::Modern,
+        fsf: "modern",
+        needs_ini: false,
+        dialect: crate::modern::fen_to_fsf,
+    },
+    Spec {
         // No-castle chess: standard chess with castling disabled. mcr and FSF spell
         // it with the identical standard-chess letters, so the dialect is identity.
         id: WideVariantId::Nocastle,
