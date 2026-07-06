@@ -421,6 +421,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Grand chess with captures banking to hand for later drops (promoted pieces demote to Pawn; a pawn not on its back rank or promotion zone); no castling; three-rank promotion zone. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant grandhouse`).",
         },
+        WideVariantId::Grasshopper => Meta {
+            display: "Grasshopper chess (8x8)",
+            pieces: "Standard army plus a full rank of Grasshoppers (Betza gQ): a queen-line hopper that lands on the single square immediately beyond the first piece it meets along any queen direction.",
+            rules: "Standard 8x8 chess with castling; pawns start on the third rank and push one square only (no double step, no en passant); a pawn promotes to Queen, Rook, Bishop, Knight, or Grasshopper. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant grasshopper`).",
+        },
         WideVariantId::HoppelPoppel => Meta {
             display: "Hoppel-Poppel (8x8)",
             pieces: "Standard army where the Knight captures like a bishop (moves as a knight) and the Bishop captures like a knight (moves as a bishop).",

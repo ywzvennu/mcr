@@ -1285,6 +1285,18 @@ pub enum WideRole {
     /// backward diagonal (three targets). Promotes to a Multi-General. FEN token
     /// `****D` / `****d`.
     Dog = 145,
+    /// Grasshopper (Grasshopper chess, Betza `gQ`) — a queen-line **hopper**: it
+    /// slides out to the first piece (of either colour, the "hurdle") along any of
+    /// the eight queen directions and lands on the single square immediately
+    /// **beyond** it. Its
+    /// [`role_attacks`](super::WideVariant::role_attacks) set is occupancy-aware
+    /// (the [`attacks::grasshopper_attacks`](super::attacks::grasshopper_attacks)
+    /// primitive) and geometrically asymmetric, so king-safety recomputes it on the
+    /// live board via the [`has_cannons`](super::WideVariant::has_cannons)
+    /// verify path. A fourth-tier overflow role: its FEN token is the tripled
+    /// prefix `***` plus the recycled base letter `j` (mcr's own `g` names the Gold
+    /// and every overflow `g` slot is taken); FSF spells it `g`.
+    Grasshopper = 146,
 }
 
 impl WideRole {
@@ -1304,14 +1316,14 @@ impl WideRole {
     /// `0xff` mask to `0` (Pawn) and silently corrupt every packed move — so
     /// `COUNT` must never exceed `256`.
     ///
-    /// At `COUNT == 146` there are **110** free slots left, ample headroom past the
-    /// jumbo shogi armies (issue #402 Tenjiku added the fourteen roles `132..=145`),
-    /// which #448 widened the field to unblock. Before #448 the field was 7 bits (a
-    /// 128-role ceiling, one slot from full); see issue #441 for the budget audit
-    /// and the widening design. Do **not** grow this past `256` without another
-    /// field widening (a fresh wire-format version bump touching `super::binary` and
-    /// [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 146;
+    /// At `COUNT == 147` there are **109** free slots left, ample headroom past the
+    /// jumbo shogi armies (issue #402 Tenjiku added the fourteen roles `132..=145`)
+    /// and the Grasshopper (`146`), which #448 widened the field to unblock. Before
+    /// #448 the field was 7 bits (a 128-role ceiling, one slot from full); see issue
+    /// #441 for the budget audit and the widening design. Do **not** grow this past
+    /// `256` without another field widening (a fresh wire-format version bump
+    /// touching `super::binary` and [`WideMove`](super::WideMove)).
+    pub const COUNT: usize = 147;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1461,6 +1473,7 @@ impl WideRole {
         WideRole::SideSoldier,
         WideRole::MultiGeneral,
         WideRole::Dog,
+        WideRole::Grasshopper,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1824,6 +1837,13 @@ impl WideRole {
             WideRole::SideSoldier => 's',
             WideRole::MultiGeneral => 'm',
             WideRole::Dog => 'd',
+            // Grasshopper chess — a fourth-tier overflow role past the exhausted
+            // single-letter alphabet and every `g` slot. Its FEN token is the
+            // tripled `***` prefix plus the recycled base letter `j` (the Horse's
+            // bare letter, distinct by the prefix), so `char()` returns the bare
+            // base letter and the board FEN I/O adds the `***`. The `compare-fairy`
+            // harness maps `***j` to FSF's `g` when driving Grasshopper chess.
+            WideRole::Grasshopper => 'j',
         }
     }
 
@@ -2214,6 +2234,7 @@ impl WideRole {
                 | WideRole::EvilWolf
                 | WideRole::IronGeneral
                 | WideRole::StoneGeneral
+                | WideRole::Grasshopper
         )
     }
 
@@ -2249,6 +2270,10 @@ impl WideRole {
             'f' => Some(WideRole::EvilWolf),
             'u' => Some(WideRole::IronGeneral),
             'z' => Some(WideRole::StoneGeneral),
+            // Grasshopper chess: recycles the free tier-4 base letter `j` (the
+            // Horse's bare letter, distinct by the `***` prefix); the harness maps
+            // `***j` to FSF's `g`.
+            'j' => Some(WideRole::Grasshopper),
             _ => None,
         }
     }
@@ -2519,6 +2544,7 @@ impl fmt::Display for WideRole {
             WideRole::SideSoldier => "side-soldier",
             WideRole::MultiGeneral => "multi-general",
             WideRole::Dog => "dog",
+            WideRole::Grasshopper => "grasshopper",
         })
     }
 }

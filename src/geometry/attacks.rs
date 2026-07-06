@@ -857,6 +857,100 @@ pub fn diag_cannon_quiet_jumps<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>
 }
 
 // ---------------------------------------------------------------------------
+// Grasshopper primitive (queen-line hopper).
+// ---------------------------------------------------------------------------
+
+/// One ascending-ray grasshopper landing square: the square **immediately
+/// beyond** the first occupant (the "hurdle") on the ascending half-ray `ray`.
+/// `None` if the ray has no hurdle, or the hurdle sits on the ray's last square
+/// (nothing lies beyond it).
+///
+/// Unlike the cannon ([`cannon_target_up`]) — which slides *past* the screen to
+/// the next occupied square — the grasshopper stops on the single geometric cell
+/// right after the hurdle: the nearest (lowest) *ray* square strictly above it,
+/// occupied or empty.
+#[inline]
+fn grasshopper_target_up<G: Geometry>(
+    occupied: Bitboard<G>,
+    ray: Bitboard<G>,
+) -> Option<Square<G>> {
+    let hurdle = nearest_up(occupied & ray)?;
+    // The ray's own squares strictly beyond the hurdle; the nearest (lowest) is
+    // the cell immediately past it along the ray.
+    let beyond = Bitboard::<G>(ray.0 & !screen_and_below::<G>(hurdle));
+    nearest_up(beyond)
+}
+
+/// The descending-ray analogue of [`grasshopper_target_up`]: the square
+/// immediately beyond (below) the first occupant on the descending half-ray.
+#[inline]
+fn grasshopper_target_down<G: Geometry>(
+    occupied: Bitboard<G>,
+    ray: Bitboard<G>,
+) -> Option<Square<G>> {
+    let hurdle = nearest_down(occupied & ray)?;
+    let beyond = Bitboard::<G>(ray.0 & screen_below::<G>(hurdle));
+    nearest_down(beyond)
+}
+
+/// Returns the squares a **Grasshopper** (Betza `gQ`) on `sq` may move to or
+/// threaten under `occupied`: along each of the eight queen rays, the single
+/// square **immediately beyond the first piece** (the "hurdle") it meets.
+///
+/// The grasshopper is a hopper: on each ray it skips the empty run out to the
+/// first occupied square (of either colour), then its only reachable cell is the
+/// one square directly past that hurdle. That landing square is returned whether
+/// it is empty (a quiet hop), holds an enemy (a capture), **or** holds a friendly
+/// piece — the caller masks out friendly occupants exactly as it does for the
+/// slider and cannon primitives. A ray with no hurdle, or whose hurdle sits on
+/// the board edge (nothing beyond), contributes nothing. Unlike a leaper this set
+/// is *occupancy-aware* (the hurdle is read from `occupied`) and geometrically
+/// asymmetric, so it is both the grasshopper's move set and — since it lands on
+/// the square past the hurdle — the set of squares from which it gives check.
+///
+/// ```
+/// use mcr::geometry::{attacks::grasshopper_attacks, Chess8x8, Bitboard, Square};
+/// // A hurdle on a4: a grasshopper on a1 hops to a5, the square just beyond it,
+/// // and — with no other hurdle on any ray — nowhere else.
+/// let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24)); // a4
+/// let att = grasshopper_attacks::<Chess8x8>(Square::new(0), occ);
+/// assert!(att.contains(Square::new(32))); // a5
+/// assert_eq!(att.count(), 1);
+/// ```
+#[must_use]
+#[inline]
+pub fn grasshopper_attacks<G: Geometry>(sq: Square<G>, occupied: Bitboard<G>) -> Bitboard<G> {
+    let o = ortho_rays::<G>(sq);
+    let d = diag_rays::<G>(sq);
+    let mut bb = Bitboard::EMPTY;
+    if let Some(t) = grasshopper_target_up(occupied, o.north) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_up(occupied, o.east) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_down(occupied, o.south) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_down(occupied, o.west) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_up(occupied, d.ne) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_up(occupied, d.nw) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_down(occupied, d.sw) {
+        bb.set(t);
+    }
+    if let Some(t) = grasshopper_target_down(occupied, d.se) {
+        bb.set(t);
+    }
+    bb
+}
+
+// ---------------------------------------------------------------------------
 // Blockable-leg leapers (Xiangqi horse and elephant).
 // ---------------------------------------------------------------------------
 
@@ -2362,6 +2456,123 @@ mod tests {
         }
         check::<Chess8x8>(64);
         check::<Cap10x8>(80);
+    }
+
+    // ----- Grasshopper primitive (queen-line hopper) -------------------------
+
+    /// Independent reference for the grasshopper: along each of the eight queen
+    /// directions, walk to the first occupant (the hurdle), then the single square
+    /// immediately beyond it is a target if it is on the board — occupied or not.
+    fn scan_grasshopper<G: Geometry>(sq: Square<G>, occ: Bitboard<G>) -> Bitboard<G> {
+        let mut bb = Bitboard::EMPTY;
+        for &(df, dr) in &[
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (-1, -1),
+            (-1, 1),
+            (1, -1),
+        ] {
+            let mut cur = sq.offset(df, dr);
+            let hurdle = loop {
+                match cur {
+                    None => break None,
+                    Some(n) if occ.contains(n) => break Some(n),
+                    Some(n) => cur = n.offset(df, dr),
+                }
+            };
+            let Some(hurdle) = hurdle else { continue };
+            if let Some(land) = hurdle.offset(df, dr) {
+                bb.set(land);
+            }
+        }
+        bb
+    }
+
+    #[test]
+    fn grasshopper_matches_walk() {
+        // Sweep the grasshopper landing set against the independent eight-direction
+        // walk, on an 8x8 (u64), 10x8 (u128), and 10x10 (u128) geometry. Pins the
+        // `ortho_rays` / `diag_rays` half-ray split and the one-beyond-hurdle scan.
+        use crate::geometry::Grand10x10;
+        fn check<G>(squares: u8)
+        where
+            G: Geometry,
+            G::Bits: core::fmt::Debug,
+        {
+            let occs = occ_basket::<G>(24);
+            for index in 0..squares {
+                let sq = Square::<G>::new(index);
+                for &occ in &occs {
+                    assert_eq!(
+                        grasshopper_attacks::<G>(sq, occ),
+                        scan_grasshopper::<G>(sq, occ),
+                        "grasshopper sq {index}"
+                    );
+                }
+            }
+        }
+        check::<Chess8x8>(64);
+        check::<Cap10x8>(80);
+        check::<Grand10x10>(100);
+    }
+
+    #[test]
+    fn grasshopper_lands_immediately_beyond_a_hurdle() {
+        // a1 grasshopper, hurdle on a4 (idx 24): it hops to a5 (idx 32), the single
+        // square beyond the hurdle — never a2/a3 (short of the hurdle) nor a6+.
+        let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(24));
+        let att = grasshopper_attacks::<Chess8x8>(Square::new(0), occ);
+        assert_eq!(att, Bitboard::EMPTY.with(Square::new(32)));
+
+        // A hurdle two-plus squares out still yields exactly the one cell beyond it:
+        // hurdle on a5 (idx 32) => landing a6 (idx 40).
+        let occ = Bitboard::<Chess8x8>::EMPTY.with(Square::new(32));
+        let att = grasshopper_attacks::<Chess8x8>(Square::new(0), occ);
+        assert_eq!(att, Bitboard::EMPTY.with(Square::new(40)));
+    }
+
+    #[test]
+    fn grasshopper_needs_a_hurdle_no_empty_ray_move() {
+        // On an empty board a grasshopper has no hurdle on any ray, so it can move
+        // nowhere at all.
+        for index in 0..64u8 {
+            assert_eq!(
+                grasshopper_attacks::<Chess8x8>(Square::new(index), Bitboard::EMPTY),
+                Bitboard::EMPTY,
+                "empty-board grasshopper sq {index} must be immobile"
+            );
+        }
+    }
+
+    #[test]
+    fn grasshopper_landing_includes_occupant_beyond_the_hurdle() {
+        // The landing square is returned whether empty or occupied (the caller masks
+        // friendly / splits capture): hurdle a4 (idx 24), a piece on the landing a5
+        // (idx 32) => a5 is still in the set (a capture target there).
+        let occ = Bitboard::<Chess8x8>::EMPTY
+            .with(Square::new(24))
+            .with(Square::new(32));
+        let att = grasshopper_attacks::<Chess8x8>(Square::new(0), occ);
+        assert!(att.contains(Square::new(32)));
+    }
+
+    #[test]
+    fn grasshopper_does_not_wrap_or_leak_off_board() {
+        // On the 10x10 u128 geometry a grasshopper's landings stay on the board for
+        // every square and a basket of occupancies (no bit escapes the 100-square
+        // region, and no ray wraps across a file edge).
+        use crate::geometry::Grand10x10;
+        let off = !Grand10x10::BOARD_MASK;
+        let occs = occ_basket::<Grand10x10>(24);
+        for index in 0..100u8 {
+            let sq = Square::<Grand10x10>::new(index);
+            for &occ in &occs {
+                assert_eq!(grasshopper_attacks::<Grand10x10>(sq, occ).0 & off, 0);
+            }
+        }
     }
 
     /// Independent reference for the Xiangqi elephant: four two-square diagonal

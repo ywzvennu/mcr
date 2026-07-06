@@ -48,6 +48,7 @@ mod georgian;
 mod gorogoro;
 mod grand;
 mod grandhouse;
+mod grasshopper;
 mod hachu;
 mod hoppelpoppel;
 mod janggi;
@@ -423,6 +424,11 @@ fn main() {
     // Archbishop, and Amazon compounds added (the queen side castles with the
     // Chancellor).
     let perfect_mismatches = perfect::run(&mut engine, opts.full);
+    // Grasshopper chess is a FSF built-in (no variants.ini needed), like legan: it
+    // rides the same generic 8x8 engine as standard chess with a rank of queen-line
+    // grasshoppers added (no pawn double step / en passant), and takes the
+    // hurdle-dependent king-safety verify path.
+    let grasshopper_mismatches = grasshopper::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -522,6 +528,7 @@ fn main() {
         + georgian_mismatches
         + legan_mismatches
         + perfect_mismatches
+        + grasshopper_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

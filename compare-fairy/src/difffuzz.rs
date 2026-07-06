@@ -824,6 +824,18 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::perfect::to_fsf_dialect,
     },
+    // Grasshopper chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess plus a rank
+    // of queen-line grasshoppers and no pawn double step — spelled in mcr with the
+    // fourth-tier overflow token `***j`/`***J`, which its dialect rewrites to FSF's
+    // `g`/`G`.
+    Spec {
+        id: WideVariantId::Grasshopper,
+        fsf: "grasshopper",
+        needs_ini: false,
+        dialect: crate::grasshopper::fen_to_fsf,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

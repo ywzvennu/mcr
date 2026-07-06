@@ -26,12 +26,13 @@ use super::{
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
     Chigorin, Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi,
     Extinction, FogOfWar, GameStatus, GenericPosition, Geometry, Georgian, Gorogoro, Gothic, Grand,
-    Grandhouse, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate,
-    Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Modern,
-    Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect, Placement, Pocketknight,
-    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
-    Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
-    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet,
+    Knightmate, Kyotoshogi, Legan, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
+    Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect,
+    Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
+    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo,
+    Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant,
+    Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -787,6 +788,7 @@ wide_variants! {
     Gothic, Gothic, Gothic, "gothic";
     Grand, Grand, Grand, "grand";
     Grandhouse, Grandhouse, Grandhouse, "grandhouse";
+    Grasshopper, Grasshopper, Grasshopper, "grasshopper";
     HoppelPoppel, HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
     Janggi, Janggi, Janggi, "janggi", "korean";
     Janus, Janus, Janus, "janus", "januschess";
@@ -979,7 +981,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 84, "all 84 fairy variants are covered");
+        assert_eq!(count, 85, "all 85 fairy variants are covered");
     }
 
     #[test]
@@ -1022,12 +1024,14 @@ mod tests {
     /// size so adding a variant, widening a position's inline state, or
     /// un-boxing a large arm fails here.
     ///
-    /// Current measured value: 2768 bytes. Raise this **only** deliberately, with
-    /// a justified reason (a genuinely needed larger arm) — never to paper over an
-    /// accidental bloat.
+    /// Current measured value: 2784 bytes (was 2768 before the Grasshopper role took
+    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) from 146 to 147, adding one
+    /// `u128` slot — 16 bytes — to the widest inline board's per-role array). Raise
+    /// this **only** deliberately, with a justified reason (a genuinely needed larger
+    /// arm) — never to paper over an accidental bloat.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        const CEILING: usize = 2768;
+        const CEILING: usize = 2784;
         let actual = core::mem::size_of::<AnyWideVariant>();
         assert!(
             actual <= CEILING,
@@ -1059,12 +1063,16 @@ mod tests {
     /// per-backing ceiling — so growing any position's role array / inline state
     /// past its geometry class's current widest fails here.
     ///
-    /// Current measured maxima: u64 = 1528 (ai-wok), u128 = 2752 (cannonshogi),
-    /// U256 = 5168 (chu). Raise a ceiling only deliberately.
+    /// Current measured maxima: u64 = 1536 (ai-wok), u128 = 2768 (cannonshogi),
+    /// U256 = 5200 (chu) — each 8 / 16 / 32 bytes above the pre-Grasshopper values
+    /// (1528 / 2752 / 5168), the one extra per-role slot the Grasshopper's
+    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->147 bump adds to every
+    /// board's role array (one bitboard per backing width). Raise a ceiling only
+    /// deliberately.
     #[test]
     fn per_backing_position_size_ceiling() {
         // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
-        const CEILINGS: &[(u32, usize)] = &[(64, 1528), (128, 2752), (256, 5168)];
+        const CEILINGS: &[(u32, usize)] = &[(64, 1536), (128, 2768), (256, 5200)];
         for &(bits, ceiling) in CEILINGS {
             let mut max = 0usize;
             let mut worst = "";
@@ -1352,6 +1360,12 @@ mod tests {
             WideVariantId::Grandhouse,
             Grandhouse,
             AnyWideVariant::Grandhouse,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Grasshopper,
+            Grasshopper,
+            AnyWideVariant::Grasshopper,
             2
         );
         agrees_with_typed!(
