@@ -206,6 +206,27 @@ macro_rules! wide_variants {
                     $( WideVariantId::$variant => <$pos>::overridden_draw_hooks(), )+
                 }
             }
+
+            /// The structured, engine-derived
+            /// [`VariantRules`](super::rules::VariantRules) for this variant: its
+            /// board, army (with per-piece move / capture geometry), and pawn /
+            /// promotion / castling / draw / terminal / special-mechanic rules,
+            /// plus the validation oracle.
+            ///
+            /// Every field is derived from the variant's
+            /// [`WideVariant`](super::WideVariant) hooks — sampled from its movement
+            /// vocabulary or read from its rule predicates — so it can never
+            /// disagree with move generation. Available for every
+            /// [`WideVariantId::ALL`](WideVariantId::ALL) without panicking. See the
+            /// [`rules`](super::rules) module.
+            #[must_use]
+            pub fn rules(self) -> super::rules::VariantRules {
+                let mut rules = match self {
+                    $( WideVariantId::$variant => <$pos>::variant_rules(), )+
+                };
+                rules.oracle = self.validation_oracle();
+                rules
+            }
         }
 
         impl core::fmt::Display for WideVariantId {
@@ -861,6 +882,33 @@ impl WideVariantId {
     #[must_use]
     pub fn from_index(index: u8) -> Option<WideVariantId> {
         Self::ALL.get(index as usize).copied()
+    }
+
+    /// The external oracle this variant's move generation is validated against —
+    /// the [`rules`](super::rules) model's validation provenance, mirroring the
+    /// `tests/coverage_gate.rs` manifest.
+    ///
+    /// Most variants are cross-checked against Fairy-Stockfish under their canonical
+    /// name; the few whose FSF spelling differs, and the handful with no FSF oracle
+    /// (large shogi validated against HaChu, and the oracle-less Alice / Jieqi /
+    /// Tenjiku / Wa Shogi), are named explicitly.
+    #[must_use]
+    pub fn validation_oracle(self) -> super::rules::ValidationOracle {
+        use super::rules::ValidationOracle::{FairyStockfish, HaChu, Independent};
+        match self {
+            // No external engine oracle (independent in-repo generator / hand-derived).
+            WideVariantId::Alice
+            | WideVariantId::Jieqi
+            | WideVariantId::Tenjiku
+            | WideVariantId::Washogi => Independent,
+            // The HaChu large-shogi reference engine.
+            WideVariantId::Chu | WideVariantId::Dai => HaChu,
+            // Fairy-Stockfish under a name that differs from mcr's canonical spelling.
+            WideVariantId::Gorogoro => FairyStockfish("gorogoroplus"),
+            WideVariantId::Tori => FairyStockfish("torishogi"),
+            // Every other variant: Fairy-Stockfish under its canonical name.
+            other => FairyStockfish(other.as_str()),
+        }
     }
 }
 

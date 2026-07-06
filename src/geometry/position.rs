@@ -717,6 +717,22 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         }
     }
 
+    /// Derives the structured [`VariantRules`](super::rules::VariantRules) of this
+    /// variant `V` from its [`WideVariant`] hooks — its board, army (with per-piece
+    /// move / capture geometry), and pawn / promotion / castling / draw / terminal /
+    /// special-mechanic rules.
+    ///
+    /// A static, position-free snapshot: every field is read from the rule layer's
+    /// hooks or sampled from its movement vocabulary on an empty board, so it can
+    /// never disagree with move generation. The `oracle` field is left as
+    /// [`ValidationOracle::Independent`](super::rules::ValidationOracle::Independent);
+    /// [`WideVariantId::rules`](super::WideVariantId::rules) fills it from the
+    /// variant's identity. See the [`rules`](super::rules) module.
+    #[must_use]
+    pub(crate) fn variant_rules() -> super::rules::VariantRules {
+        super::rules::derive_rules::<G, V>()
+    }
+
     /// Returns a reference to the board.
     #[must_use]
     #[inline]
