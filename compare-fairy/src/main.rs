@@ -59,6 +59,7 @@ mod manchu;
 mod mansindam;
 mod minishogi;
 mod minixiangqi;
+mod modern;
 mod nocastle;
 mod opulent;
 mod orda;
@@ -368,6 +369,8 @@ fn main() {
     let nocastle_mismatches = nocastle::run(&mut engine, opts.full);
     // Coregal chess is a FSF built-in (no variants.ini needed), like nocastle.
     let coregal_mismatches = coregal::run(&mut engine, opts.full);
+    // Modern chess (9x9) is a large-board FSF built-in (no variants.ini needed).
+    let modern_mismatches = modern::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -455,6 +458,7 @@ fn main() {
         + knightmate_mismatches
         + nocastle_mismatches
         + coregal_mismatches
+        + modern_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches
