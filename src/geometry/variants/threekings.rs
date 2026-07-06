@@ -93,6 +93,7 @@ impl WideVariant<Chess8x8> for ThreekingsRules {
             // No castling rights: the start array has no rooks (files k/n/b/q/k/b/n/k).
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

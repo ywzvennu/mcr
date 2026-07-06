@@ -197,6 +197,7 @@ impl WideVariant<Chess8x8> for SittuyinRules {
             // Sittuyin has no castling.
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: Self::initial_placement(),

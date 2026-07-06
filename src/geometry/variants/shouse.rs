@@ -140,6 +140,7 @@ impl WideVariant<Chess8x8> for ShouseRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: Self::initial_gating(),
             duck: None,
             placement: Self::starting_hand(),

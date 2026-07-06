@@ -235,6 +235,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "FIDE-style symmetric setup, no castling; pawns promote on the last rank to Met, Rook, Silver, or Knight; a pieces-honour counting endgame. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant asean`).",
         },
+        WideVariantId::Berolina => Meta {
+            display: "Berolina chess",
+            pieces: "Standard chess army with an inverted Berolina pawn (`p`/`P`).",
+            rules: "Standard chess, but the pawn is the mirror of the ordinary pawn: it moves one square diagonally forward (two along the diagonal from its start rank, a lame jump blocked by an occupied intervening square) and captures one square straight forward. En passant applies to the diagonal double step; promotion is standard (Q/R/B/N). Castling, check, and the fifty-move rule are standard. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant berolina`).",
+        },
         WideVariantId::Bughouse => Meta {
             display: "Bughouse (single-board rules)",
             pieces: "Standard chess army plus an externally-fed drop hand (pocket).",

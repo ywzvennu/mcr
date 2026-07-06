@@ -25,6 +25,7 @@
 
 mod asean;
 mod ataxx;
+mod berolina;
 mod bughouse;
 mod cambodian;
 mod cannonshogi;
@@ -387,6 +388,10 @@ fn main() {
     // rides the same generic 8x8 engine (standard chess with the pawn double-step
     // allowed from any rank).
     let torpedo_mismatches = torpedo::run(&mut engine, opts.full);
+    // Berolina chess is a FSF built-in (no variants.ini needed), like kinglet: it
+    // rides the same generic engine (the inverted diagonal-move / straight-capture
+    // pawn, standard everything else).
+    let berolina_mismatches = berolina::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -479,6 +484,7 @@ fn main() {
         + threekings_mismatches
         + kinglet_mismatches
         + torpedo_mismatches
+        + berolina_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

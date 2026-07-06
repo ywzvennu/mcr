@@ -721,6 +721,33 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if this variant's [`WideRole::Pawn`] is a **Berolina pawn**
+    /// on the **standard single-king path** — the inversion of the ordinary chess
+    /// pawn: it *moves* one square **diagonally** forward (two from its start rank,
+    /// along the same diagonal, blocked if the intervening square is occupied — a
+    /// *lame* double step) and *captures* one square **straight** forward. En
+    /// passant applies to the diagonal double step, promotion is standard, and the
+    /// board symbol stays `p`/`P`.
+    ///
+    /// The default is `false`, so every other variant keeps the ordinary
+    /// straight-push / diagonal-capture pawn and its move generation is
+    /// byte-identical. Only [`Berolina`](super::variants::Berolina) sets it `true`.
+    /// It is distinct from [`has_berolina_pawns`](WideVariant::has_berolina_pawns),
+    /// which drives the Spartan **Hoplite** ([`WideRole::Hoplite`]) on the
+    /// *multi-royal* path with no en passant; this hook drives the ordinary
+    /// [`WideRole::Pawn`] on the single-king path *with* en passant.
+    ///
+    /// A Berolina variant pairs this with a [`role_attacks`](WideVariant::role_attacks)
+    /// override returning the pawn's **straight-forward** square (its capture — and
+    /// so its check / king-danger threat), leaving the diagonal *move* — which is
+    /// not an attack and gives no check — to the pawn generator.
+    ///
+    /// [`WideRole::Pawn`]: super::role::WideRole::Pawn
+    /// [`WideRole::Hoplite`]: super::role::WideRole::Hoplite
+    fn pawn_is_berolina() -> bool {
+        false
+    }
+
     /// Returns the squares a piece of `role` of `color` on `sq` may move to but
     /// **never capture on** — non-capturing "quiet-only" steps that the role's
     /// [`role_attacks`](WideVariant::role_attacks) set deliberately omits (so they
@@ -2297,6 +2324,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             turn: Color::White,
             castling: GenericCastling::standard::<G>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

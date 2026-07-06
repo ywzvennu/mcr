@@ -134,6 +134,7 @@ impl WideVariant<Grand10x10> for ShakoRules {
             turn: Color::White,
             castling,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

@@ -738,6 +738,19 @@ const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Berolina chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in spelled identically to mcr
+    // (standard-chess letters — the inverted pawn stays `p`/`P`), so it takes the
+    // `identity` dialect. mcr emits the Fairy-Stockfish two-square en-passant form
+    // (`<skipped><captured>`) whenever a Berolina ep is live, so the fuzzed FEN
+    // pins the exact ep victim on both engines.
+    Spec {
+        id: WideVariantId::Berolina,
+        fsf: "berolina",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

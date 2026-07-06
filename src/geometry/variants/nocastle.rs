@@ -76,6 +76,7 @@ impl WideVariant<Chess8x8> for NocastleRules {
             // No castling rights: castling is disabled entirely.
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

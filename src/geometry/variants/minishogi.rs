@@ -153,6 +153,7 @@ impl WideVariant<Minishogi5x5> for MinishogiRules {
             turn: Color::White,
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

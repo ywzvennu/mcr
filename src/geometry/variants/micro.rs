@@ -154,6 +154,7 @@ impl WideVariant<Micro4x5> for MicroRules {
             turn: Color::White,
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

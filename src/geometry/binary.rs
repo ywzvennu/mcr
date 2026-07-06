@@ -591,6 +591,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             },
             castling,
             ep_square,
+            ep_captured: None,
             gating,
             duck,
             placement,

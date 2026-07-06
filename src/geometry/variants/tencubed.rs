@@ -142,6 +142,7 @@ impl WideVariant<Grand10x10> for TencubedRules {
             // Ten-Cubed has no castling.
             castling: GenericCastling::NONE,
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

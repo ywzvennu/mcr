@@ -103,6 +103,7 @@ impl WideVariant<Chess8x8> for ExtinctionRules {
             // non-royal king is never restricted by attacked squares).
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             placement: GenericPlacement::NONE,

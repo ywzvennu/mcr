@@ -84,6 +84,7 @@ impl WideVariant<Chess8x8> for DuckRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Chess8x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             // The Duck enters on the first move; it is off the board at the start.
             duck: None,

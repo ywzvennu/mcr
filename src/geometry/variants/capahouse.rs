@@ -82,6 +82,7 @@ impl WideVariant<Cap10x8> for CapahouseRules {
             turn: Color::White,
             castling: GenericCastling::standard::<Cap10x8>(),
             ep_square: None,
+            ep_captured: None,
             gating: GenericGating::NONE,
             duck: None,
             // The crazyhouse hand starts empty; it rides in `GenericPlacement`.
