@@ -71,8 +71,8 @@ pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use square::Square;
 pub use status::GameStatus;
 pub use variant::{
-    DrawHooks, PromotionConfig, RoyalSlider, StandardChess, WideCountingRule, WideEndReason,
-    WideRegion, WideVariant,
+    DrawHooks, ExtinctionRule, PromotionConfig, RoyalSlider, StandardChess, WideCountingRule,
+    WideEndReason, WideRegion, WideVariant,
 };
 pub use variants::{
     Aiwok, AiwokRules, Alice, AliceRules, Almost, AlmostRules, Amazon, AmazonRules, Asean,
@@ -81,19 +81,19 @@ pub use variants::{
     CentaurRules, Chak, ChakRules, Chancellor, ChancellorRules, CheckShogi, CheckShogiRules,
     Chennis, ChennisRules, Chigorin, ChigorinRules, Chu, ChuRules, Coregal, CoregalRules, Courier,
     CourierRules, Dai, DaiRules, Dobutsu, DobutsuRules, Dragon, DragonRules, Duck, DuckRules,
-    Embassy, EmbassyRules, Empire, EmpireRules, EuroShogi, EuroShogiRules, FogOfWar, FogOfWarRules,
-    Gorogoro, GorogoroRules, Gothic, GothicRules, Grand, GrandRules, Grandhouse, GrandhouseRules,
-    HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus, JanusRules, Jieqi, JieqiRules,
-    Judkins, JudkinsRules, Karouk, KaroukRules, Khans, KhansRules, Knightmate, KnightmateRules,
-    Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules,
-    Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi,
-    MinixiangqiRules, Modern, ModernRules, Nocastle, NocastleRules, Opulent, OpulentRules, Orda,
-    OrdaRules, Ordamirror, OrdamirrorRules, Placement, PlacementRules, Pocketknight,
-    PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj,
-    ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun,
-    ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess,
-    SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Tori, ToriRules, Washogi,
-    WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Embassy, EmbassyRules, Empire, EmpireRules, EuroShogi, EuroShogiRules, Extinction,
+    ExtinctionRules, FogOfWar, FogOfWarRules, Gorogoro, GorogoroRules, Gothic, GothicRules, Grand,
+    GrandRules, Grandhouse, GrandhouseRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules,
+    Janus, JanusRules, Jieqi, JieqiRules, Judkins, JudkinsRules, Karouk, KaroukRules, Khans,
+    KhansRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Makpong, MakpongRules,
+    Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules, Micro, MicroRules,
+    Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Modern, ModernRules, Nocastle,
+    NocastleRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Placement,
+    PlacementRules, Pocketknight, PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules,
+    Shatar, ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules,
+    Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
+    SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Tori,
+    ToriRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

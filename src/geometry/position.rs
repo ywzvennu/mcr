@@ -681,6 +681,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             has_bare_king_loss: V::has_bare_king_loss(),
             move_rule_plies: V::move_rule_plies().is_some(),
             wins_on_check: V::wins_on_check(),
+            extinction_rule: V::extinction_rule().is_some(),
         }
     }
 
@@ -1358,6 +1359,16 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::wins_on_check() && self.is_check() {
             return;
         }
+        // Extinction terminal (Extinction chess): if some side has been stripped of
+        // its last piece of a watched type, the game is already decided and the node
+        // is terminal — no moves. Gated behind `extinction_rule()` (default-off), so
+        // every other variant skips the check and is byte-identical. The single
+        // `extinction_loser` chokepoint both the materialising generator and the
+        // bulk-count leaf path funnel through truncates perft descent exactly as
+        // Fairy-Stockfish's `extinctionValue` does.
+        if V::extinction_rule().is_some() && self.extinction_loser().is_some() {
+            return;
+        }
 
         let occupied = board.occupied();
         let our_pieces = board.by_color(us);
@@ -1411,6 +1422,24 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             };
         }
         out.emit_targets(king_sq, king_targets, their_pieces);
+
+        // Extra kings (Extinction chess, a pawn promoted to a second Commoner
+        // king): a non-royal side may hold more than one King-role piece, so
+        // generate the moves of every king beyond `king_sq` as ordinary steppers.
+        // There is no check, pin, or king-danger filter here (a non-royal king is
+        // just a piece), so each extra king's targets are its attack pattern minus
+        // friendly pieces. This loop runs only when a non-royal side actually holds
+        // a second king (`kings_of(us).count() > 1`), so every single-king variant —
+        // royal or not (Fog of War, Dobutsu) — never enters it and stays
+        // byte-identical.
+        if non_royal {
+            let mut extra_kings = board.kings_of(us);
+            extra_kings = extra_kings.without(king_sq);
+            for from in extra_kings {
+                let targets = V::role_attacks(WideRole::King, us, from, occupied) & !our_pieces;
+                out.emit_targets(from, targets, their_pieces);
+            }
+        }
 
         if num_checkers >= 2 {
             // Double check: only king moves are legal.
@@ -2327,6 +2356,14 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
             return;
         }
+        // Extinction terminal (Extinction chess): a side that has lost its last
+        // piece of a watched type has lost, so the node is a terminal perft leaf.
+        // Gated behind `extinction_rule()` (default-off), so inert for every other
+        // variant. (Mirrors the standard-path chokepoint for any extinction variant
+        // that rides the verify path.)
+        if V::extinction_rule().is_some() && self.extinction_loser().is_some() {
+            return;
+        }
         // A side whose king has been captured has no royal piece, so there is no
         // self-check to filter: every pseudo-legal move is "legal" (the side has
         // already lost, but perft still enumerates its continuations). Fairy-
@@ -2842,6 +2879,33 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             None
         }
+    }
+
+    /// Returns the side that has **lost by extinction** — it holds
+    /// `threshold` or fewer of some
+    /// `watched` piece type — or `None` if the position
+    /// is not terminal under the variant's [`WideVariant::extinction_rule`] (or the
+    /// variant has none). This is the single chokepoint the move generator, the
+    /// bulk-count leaf path, and [`end_reason`](Self::end_reason) all funnel
+    /// through, so the extinction terminal truncates perft descent exactly as
+    /// Fairy-Stockfish's `extinctionValue` does.
+    ///
+    /// Both sides are checked, the side to move first: a capture that empties a
+    /// type strikes the side **to move** (their piece was taken on the previous
+    /// ply), while a self-emptying move — promoting the last pawn away — strikes the
+    /// side **not** to move. If both are simultaneously extinct (a capture-promotion
+    /// that clears a type on each side) the side to move is reported, deterministic
+    /// and immaterial to perft (either way the node truncates to zero moves).
+    #[must_use]
+    pub fn extinction_loser(&self) -> Option<Color> {
+        let rule = V::extinction_rule()?;
+        [self.state.turn, self.state.turn.opposite()]
+            .into_iter()
+            .find(|&color| {
+                rule.watched
+                    .iter()
+                    .any(|&role| self.board.pieces(color, role).count() as usize <= rule.threshold)
+            })
     }
 
     /// Returns the flag goal rank of the side to move (`us`) when it is
@@ -5213,6 +5277,15 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::has_bare_king_loss() && self.bare_king_loss_loser().is_some() {
             return Some(WideEndReason::VariantWin);
         }
+        // Extinction (Extinction chess): a side whose last piece of a watched type
+        // has been wiped out has lost. The king is a non-royal Commoner, so there is
+        // no check/checkmate path — this is the only decisive terminal. Reported
+        // before the (never-firing) checkmate/stalemate test as a variant win;
+        // `outcome` resolves the winner as the side whose army is intact. Gated
+        // behind `extinction_rule()` (default-off), so inert for every other variant.
+        if V::extinction_rule().is_some() && self.extinction_loser().is_some() {
+            return Some(WideEndReason::VariantWin);
+        }
         // Impasse / jishogi (Shogi): at the start of its turn the side to move may
         // **declare** the entering-king point count and win outright — its king has
         // marched into the far promotion zone (and is not in check), it has enough
@@ -5299,6 +5372,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
                     // Baring (Shatranj): the bared side has lost, so its opponent
                     // wins, whichever side is to move.
                     match self.bare_king_loss_loser() {
+                        Some(loser) => loser.opposite(),
+                        None => self.state.turn,
+                    }
+                } else if V::extinction_rule().is_some() {
+                    // Extinction: the side whose watched type went extinct has lost,
+                    // so its opponent wins, whichever side is to move.
+                    match self.extinction_loser() {
                         Some(loser) => loser.opposite(),
                         None => self.state.turn,
                     }

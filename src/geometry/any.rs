@@ -24,12 +24,12 @@ use core::str::FromStr;
 use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Bughouse, Cambodian, CannonShogi, Capablanca,
     Capahouse, Caparandom, Centaur, Chak, Chancellor, CheckShogi, Chennis, Chigorin, Chu, Coregal,
-    Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, FogOfWar, GameStatus,
-    GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel, Janggi, Janus,
-    Jieqi, Judkins, Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu, Mansindam,
-    Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror, Placement,
-    Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse,
-    Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Tori, Washogi, WideEndReason,
+    Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi, Extinction, FogOfWar,
+    GameStatus, GenericPosition, Geometry, Gorogoro, Gothic, Grand, Grandhouse, HoppelPoppel,
+    Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Knightmate, Kyotoshogi, Makpong, Makruk, Manchu,
+    Mansindam, Micro, Minishogi, Minixiangqi, Modern, Nocastle, Opulent, Orda, Ordamirror,
+    Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
+    Shouse, Sittuyin, Spartan, Square, Synochess, Tencubed, Tenjiku, Tori, Washogi, WideEndReason,
     WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
@@ -777,6 +777,7 @@ wide_variants! {
     Embassy, Embassy, Embassy, "embassy";
     Empire, Empire, Empire, "empire";
     EuroShogi, EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
+    Extinction, Extinction, Extinction, "extinction";
     FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gorogoro, Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
     Gothic, Gothic, Gothic, "gothic";
@@ -967,7 +968,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 73, "all 73 fairy variants are covered");
+        assert_eq!(count, 74, "all 74 fairy variants are covered");
     }
 
     #[test]
