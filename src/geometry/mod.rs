@@ -46,6 +46,7 @@ pub mod game;
 mod notation;
 pub mod position;
 mod role;
+pub mod rules;
 mod square;
 pub mod status;
 pub mod variant;
@@ -68,6 +69,11 @@ pub use position::{
     GenericState, Undo, WideFenError, WideMoveList, WideOutcome,
 };
 pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
+pub use rules::{
+    BoardRules, CastlingRules, DrawRules, ExtinctionInfo, FlagWin, ImpasseInfo, Movement,
+    PawnRules, PieceRules, PromotionRules, RoyalRule, SpecialMechanics, Step, TerminalRules,
+    ValidationOracle, VariantRules,
+};
 pub use square::Square;
 pub use status::GameStatus;
 pub use variant::{
