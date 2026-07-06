@@ -88,17 +88,18 @@ pub use variants::{
     GrasshopperRules, HoppelPoppel, HoppelPoppelRules, Janggi, JanggiRules, Janus, JanusRules,
     Jieqi, JieqiRules, Judkins, JudkinsRules, Karouk, KaroukRules, Khans, KhansRules, Kinglet,
     KingletRules, Knightmate, KnightmateRules, Kyotoshogi, KyotoshogiRules, Legan, LeganRules,
-    Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules, Mansindam, MansindamRules,
-    Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi, MinixiangqiRules, Modern,
-    ModernRules, Newzealand, NewzealandRules, Nightrider, NightriderRules, Nocastle, NocastleRules,
-    Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules, Pawnback, PawnbackRules,
-    Pawnsideways, PawnsidewaysRules, Perfect, PerfectRules, Petrified, PetrifiedRules, Placement,
-    PlacementRules, Pocketknight, PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules,
-    Shatar, ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules,
-    Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules,
-    Threekings, ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules,
-    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Losalamos, LosalamosRules, Makpong, MakpongRules, Makruk, MakrukRules, Manchu, ManchuRules,
+    Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules, Minixiangqi,
+    MinixiangqiRules, Modern, ModernRules, Newzealand, NewzealandRules, Nightrider,
+    NightriderRules, Nocastle, NocastleRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror,
+    OrdamirrorRules, Pawnback, PawnbackRules, Pawnsideways, PawnsidewaysRules, Perfect,
+    PerfectRules, Petrified, PetrifiedRules, Placement, PlacementRules, Pocketknight,
+    PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj,
+    ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun,
+    ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan, SpartanRules, Synochess,
+    SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules,
+    Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi,
+    XiangqiRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -481,6 +482,27 @@ geometry!(
     /// a..f, ranks 1..6. It reuses Shogi's persistent capture-fed hand, drops, and
     /// promotion on the smaller board, with a two-rank promotion zone.
     Judkins6x6,
+    u64,
+    6,
+    6
+);
+
+geometry!(
+    /// The Los Alamos chess board: six files by six ranks (36 squares), backed by
+    /// `u64`.
+    ///
+    /// A small even-width (`6`) `u64` geometry hosting Los Alamos chess — the 1956
+    /// MANIAC-I 6x6 chess with **no bishops** (the diagonal slider a machine of the
+    /// era could not search) and six pawns a side. A square index reaches `35`, and
+    /// edge-masked east/west shifts must not wrap past the sixth file. Files run
+    /// a..f, ranks 1..6. It shares the 6x6 shape and `u64` backing with
+    /// [`Judkins6x6`] but is a **distinct** geometry, so the western-chess variant
+    /// never shares its file / rank / edge masks with the shogi family (mirroring
+    /// how [`Tori7x7`], [`Minixiangqi7x7`], and [`Chennis7x7`] keep separate 7x7
+    /// geometries). It fields the standard chess army minus the Bishop — Rook,
+    /// Knight, Queen, King, and Pawn — moving exactly as in standard chess, with no
+    /// castling, no pawn double-step, and no en passant.
+    Losalamos6x6,
     u64,
     6,
     6
