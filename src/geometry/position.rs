@@ -957,11 +957,15 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// `false`), so their generation stays byte-identical.
     #[inline]
     fn occupied_with_walls(&self) -> Bitboard<G> {
-        if V::has_petrify() {
+        let occupied = if V::has_petrify() {
             self.board.occupied() | self.state.petrified
         } else {
             self.board.occupied()
-        }
+        };
+        // Static, variant-baked wall squares (Gustav3's a2–a7 / j2–j7 holes). The
+        // default `board_walls()` is `Bitboard::EMPTY`, so `| EMPTY` is a no-op and
+        // every other variant is byte-identical.
+        occupied | V::board_walls()
     }
 
     /// Returns the set of `attacker` pieces that attack `sq` under `occupied`.
@@ -3283,6 +3287,11 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                 } else {
                     targets
                 };
+                // No piece may land on a static wall square (Gustav3's board holes,
+                // which block slides like an occupied square but can never be
+                // occupied or captured). `board_walls()` is `EMPTY` by default, so
+                // `& !EMPTY` keeps every other variant byte-identical.
+                let targets = targets & !V::board_walls();
                 if promotable {
                     // The full Shogi-aware promotion expansion: a move that starts
                     // or ends in the zone may promote (to `role_promoted_to`), and

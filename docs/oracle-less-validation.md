@@ -32,6 +32,7 @@ Selected by `ValidationOracle` (runtime) and the non-`Fsf` `PerftOracle` rows:
 | Wa Shogi | 11x11 | Independent | depth 1–3 vs in-repo brute force | depth 4 | independent in-repo 11x11 generator |
 | Okisaki Shogi | 10x10 | Independent | depth 1 hand-derived; depths 1–3 vs in-repo generator | depth 4 | independent in-repo 10x10 generator |
 | Yari Shogi | 9x7 | Independent | startpos depth 1–4 + a midgame depth 1–3 vs in-repo brute force | — | independent in-repo 7x9 generator |
+| Gustav 3 | 10x8 | Independent | depth 1 hand-derived; startpos + two midgames depth 1–3 vs in-repo generator | depth 4 | independent in-repo 10x8 generator |
 
 "Second source" is what stands in for the missing FSF oracle. For the HaChu-oracle
 variants it is the HaChu engine (driven as a subprocess by `compare-fairy`, never
@@ -42,7 +43,7 @@ on every node count — issue #500.
 
 ## Invariants every oracle-less variant is held to
 
-Beyond perft, all seven are swept by the crate's variant-generic property tests,
+Beyond perft, all of these are swept by the crate's variant-generic property tests,
 which iterate `WideVariantId::ALL` and therefore cover these variants with no
 per-variant opt-in:
 
@@ -179,6 +180,34 @@ catch a large class of move-generation defects independently of the perft pins.
   mirrored-Black perft agree at depths 1–3.
 - **Residual gap:** no external engine oracle; two in-repo implementations agree to
   depth 4 on the start and depth 3 on the midgame; deeper is single-source.
+
+### Gustav 3 — FSF built-in, but no large-board binary
+- Gustav 3 is a Fairy-Stockfish built-in (`gustav3`), but the FSF binary available
+  here is a **non-large-board build**: asked for `UCI_Variant gustav3` it silently
+  falls back to standard chess and `go perft` returns chess-root counts (20 at
+  depth 1), so there is no usable engine oracle.
+- The board is 10x8, but its **a- and j-files exist only on the two back ranks** —
+  the intervening a2–a7 / j2–j7 cells are permanent **walls** that block slides and
+  can never be occupied — so the corner **Amazons** (Queen + Knight) are boxed in
+  and open with a single knight-leap. mcr models the walls as a compile-time
+  `WideVariant::board_walls` mask (not FEN state, so the `*` token stays free for the
+  Amazon's `**a` spelling) and routes king safety through the make/unmake
+  multi-royal path so every generated target — the king's own steps included — is
+  masked against the walls.
+- **perft(1) = 22** is hand-derived from a full per-piece enumeration of the start
+  array (see `tests/perft_gustav3.rs`); **perft(2) = 484 = 22²** follows because the
+  armies begin four ranks apart.
+- **perft(2) = 484, perft(3) = 12804** at the start, and two hand-constructed
+  **midgames** (one offering an en-passant capture, one a pawn one step from
+  promotion, both with Amazons active off the walls) at depths 1–3, are produced
+  **identically** by the engine and an **independent from-scratch 10x8 generator**
+  (its own array model, move tables, walls, en passant, promotion and King safety),
+  so the trees are agreed node-for-node by two independent implementations. Castling
+  onto the custom h-/d-files is pinned separately by targeted engine tests (the
+  independent generator omits castling; every cross-checked position either has no
+  castling rights or cannot castle within three plies).
+- **Residual gap:** no external engine oracle; two in-repo implementations agree to
+  depth 3 on the start and both midgames; deeper is single-source.
 
 ## Summary of what is and is not claimed
 

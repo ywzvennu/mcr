@@ -237,6 +237,11 @@ fn centaur_to_fsf(fen: &str) -> String {
 ///   the project's binary is compiled without (`setoption UCI_Variant yarishogi`
 ///   falls back to chess), so it has no live FSF oracle and is rules-only; it
 ///   carries no FSF spec.
+/// * **Gustav3** — 10x8 Gustav 3 is an FSF built-in, but the available FSF binary is
+///   a non-large-board build that does not implement it (`setoption UCI_Variant
+///   gustav3` falls back to standard chess), so there is no usable oracle here. It is
+///   rules-only, cross-checked against an independent from-scratch 10x8 generator; it
+///   carries no FSF spec.
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1847,6 +1852,7 @@ mod tests {
             WideVariantId::Washogi,
             WideVariantId::OkisakiShogi,
             WideVariantId::Yari,
+            WideVariantId::Gustav3,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1854,12 +1860,12 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 8 by-design exclusions (Alice / Duck /
+        // Every shipped variant minus the 10 by-design exclusions (Alice / Duck /
         // Jieqi, the HaChu-only large-shogi Chu / Dai / Tenjiku, and the oracle-less
-        // Wa Shogi, Okisaki Shogi, and Yari Shogi, which the available Fairy-Stockfish
-        // build does not implement); the deeper-sweep follow-ups stay in SPECS but are
-        // skipped via `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 9);
+        // Wa Shogi, Okisaki Shogi, Yari Shogi, and Gustav 3, which the available
+        // Fairy-Stockfish build does not implement); the deeper-sweep follow-ups stay
+        // in SPECS but are skipped via `HELD_BACK` on the default run.
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 10);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never

@@ -26,10 +26,10 @@ use super::{
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
     Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
     EuroShogi, Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian,
-    Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi,
-    Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Losers, Makpong,
-    Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern, Newzealand,
-    Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Paradigm, Pawnback,
+    Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel, Janggi,
+    Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos,
+    Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern,
+    Newzealand, Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Paradigm, Pawnback,
     Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
     Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide,
     Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
@@ -814,6 +814,7 @@ wide_variants! {
     Grand, Grand, Grand, "grand";
     Grandhouse, Grandhouse, Grandhouse, "grandhouse";
     Grasshopper, Grasshopper, Grasshopper, "grasshopper";
+    Gustav3, Gustav3, Gustav3, "gustav3";
     HoppelPoppel, HoppelPoppel, HoppelPoppel, "hoppelpoppel", "hoppel-poppel";
     Janggi, Janggi, Janggi, "janggi", "korean";
     Janus, Janus, Janus, "janus", "januschess";
@@ -908,6 +909,7 @@ impl WideVariantId {
         match self {
             // No external engine oracle (independent in-repo generator / hand-derived).
             WideVariantId::Alice
+            | WideVariantId::Gustav3
             | WideVariantId::Jieqi
             | WideVariantId::OkisakiShogi
             | WideVariantId::Tenjiku
@@ -1097,7 +1099,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 99, "all 99 fairy variants are covered");
+        assert_eq!(count, 100, "all 100 fairy variants are covered");
     }
 
     #[test]
@@ -1557,6 +1559,7 @@ mod tests {
             AnyWideVariant::Grasshopper,
             2
         );
+        agrees_with_typed!(WideVariantId::Gustav3, Gustav3, AnyWideVariant::Gustav3, 2);
         agrees_with_typed!(
             WideVariantId::HoppelPoppel,
             HoppelPoppel,
