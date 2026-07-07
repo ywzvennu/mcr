@@ -1,4 +1,4 @@
-//! Game-end and draw detection: turning a [`Position`] (and, for the
+//! ChessGame-end and draw detection: turning a [`Position`] (and, for the
 //! history-dependent rules, a sequence of them) into a chess result.
 //!
 //! Two layers are provided:
@@ -6,11 +6,11 @@
 //! - [`Position::outcome`] computes the result that is derivable from a *single*
 //!   position — checkmate, stalemate, insufficient material, and the automatic
 //!   seventy-five-move rule. These need no history.
-//! - [`Game`] wraps a [`Position`] together with the [`Zobrist`] keys of the
+//! - [`ChessGame`] wraps a [`Position`] together with the [`Zobrist`] keys of the
 //!   positions that have occurred, so it can also detect repetition. It reports
 //!   the *claimable* draws (the fifty-move rule and threefold repetition) through
 //!   predicates, and folds the *automatic* draws (the seventy-five-move rule and
-//!   fivefold repetition) into [`Game::outcome`].
+//!   fivefold repetition) into [`ChessGame::outcome`].
 //!
 //! # Which rules end the game automatically
 //!
@@ -22,9 +22,9 @@
 //! - **Claimable** (a player *may* claim the draw, but play may continue if
 //!   nobody does): the fifty-move rule and threefold repetition.
 //!
-//! [`Position::outcome`] and [`Game::outcome`] therefore return a result only for
+//! [`Position::outcome`] and [`ChessGame::outcome`] therefore return a result only for
 //! the automatic conditions; the claimable ones are exposed as predicates
-//! ([`Game::is_fifty_move_rule`], [`Game::is_threefold_repetition`]).
+//! ([`ChessGame::is_fifty_move_rule`], [`ChessGame::is_threefold_repetition`]).
 
 use crate::{Color, Move, Position, Zobrist};
 use alloc::vec;
@@ -196,7 +196,7 @@ impl Position {
     /// - **Seventy-five-move rule** (halfmove clock ≥ 150) → [`Outcome::Draw`].
     ///
     /// Repetition draws (threefold and fivefold) need the sequence of prior
-    /// positions and are therefore *not* reported here; use [`Game::outcome`] for
+    /// positions and are therefore *not* reported here; use [`ChessGame::outcome`] for
     /// those. The claimable fifty-move rule is likewise omitted on purpose — it
     /// does not end the game on its own.
     ///
@@ -238,7 +238,7 @@ impl Position {
     }
 }
 
-/// The error returned when an illegal move is passed to [`Game::play`].
+/// The error returned when an illegal move is passed to [`ChessGame::play`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IllegalMove(pub Move);
 
@@ -270,13 +270,13 @@ pub fn is_repetition(history: &[Zobrist], key: Zobrist, threshold: usize) -> boo
 /// A game in progress: a [`Position`] plus the [`Zobrist`] keys of every position
 /// that has occurred, which is what repetition detection needs.
 ///
-/// [`Position`] is kept deliberately history-free; `Game` is the lightweight
-/// wrapper that records history. Advance the game with [`Game::play`], which
+/// [`Position`] is kept deliberately history-free; `ChessGame` is the lightweight
+/// wrapper that records history. Advance the game with [`ChessGame::play`], which
 /// validates legality and records the key of the resulting position.
 ///
 /// ```
-/// use mcr::{Game, Outcome};
-/// let mut game = Game::from_startpos();
+/// use mcr::{ChessGame, Outcome};
+/// let mut game = ChessGame::from_startpos();
 /// // Shuffle knights back and forth; the start position recurs.
 /// for uci in ["g1f3", "g8f6", "f3g1", "f6g8"] {
 ///     let mv = game.position().parse_uci(uci).unwrap();
@@ -287,26 +287,26 @@ pub fn is_repetition(history: &[Zobrist], key: Zobrist, threshold: usize) -> boo
 /// assert_eq!(game.outcome(), None);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Game {
+pub struct ChessGame {
     position: Position,
     /// The Zobrist key of every position that has occurred, oldest first, with
     /// the current position's key last. Always non-empty.
     history: Vec<Zobrist>,
 }
 
-impl Game {
+impl ChessGame {
     /// Starts a game from `position`. Its key seeds the (otherwise empty)
     /// history, so it counts as its own first occurrence.
     #[must_use]
-    pub fn new(position: Position) -> Game {
+    pub fn new(position: Position) -> ChessGame {
         let history = vec![position.zobrist()];
-        Game { position, history }
+        ChessGame { position, history }
     }
 
     /// Starts a game from the standard chess starting position.
     #[must_use]
-    pub fn from_startpos() -> Game {
-        Game::new(Position::startpos())
+    pub fn from_startpos() -> ChessGame {
+        ChessGame::new(Position::startpos())
     }
 
     /// The current position.
@@ -421,10 +421,10 @@ impl Game {
     }
 }
 
-impl From<Position> for Game {
+impl From<Position> for ChessGame {
     #[inline]
-    fn from(position: Position) -> Game {
-        Game::new(position)
+    fn from(position: Position) -> ChessGame {
+        ChessGame::new(position)
     }
 }
 
@@ -432,8 +432,8 @@ impl From<Position> for Game {
 mod tests {
     use super::*;
 
-    /// Plays a sequence of UCI moves through a [`Game`], asserting each is legal.
-    fn play_line(game: &mut Game, ucis: &[&str]) {
+    /// Plays a sequence of UCI moves through a [`ChessGame`], asserting each is legal.
+    fn play_line(game: &mut ChessGame, ucis: &[&str]) {
         for uci in ucis {
             let mv = game.position().parse_uci(uci).expect("legal uci move");
             game.play(&mv).expect("legal move");
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn fools_mate_is_decisive_for_black() {
         // 1.f3 e5 2.g4 Qh4# — fastest mate; white is mated, so black wins.
-        let mut game = Game::from_startpos();
+        let mut game = ChessGame::from_startpos();
         play_line(&mut game, &["f2f3", "e7e5", "g2g4", "d8h4"]);
         assert!(game.position().is_checkmate());
         assert_eq!(
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn ongoing_game_has_no_outcome() {
-        let game = Game::from_startpos();
+        let game = ChessGame::from_startpos();
         assert_eq!(game.outcome(), None);
         assert!(!game.is_over());
         assert!(!game.is_draw());
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn illegal_move_is_rejected_and_leaves_game_unchanged() {
-        let mut game = Game::from_startpos();
+        let mut game = ChessGame::from_startpos();
         // e2e5 is not a legal opening move.
         let bogus = Move::new(crate::Square::E2, crate::Square::E5, crate::MoveKind::Quiet);
         let before = game.clone();
@@ -548,7 +548,7 @@ mod tests {
 
     #[test]
     fn threefold_then_fivefold_repetition() {
-        let mut game = Game::from_startpos();
+        let mut game = ChessGame::from_startpos();
         // The starting position has occurred once.
         assert_eq!(game.repetition_count(), 1);
         assert!(!game.is_threefold_repetition());
@@ -587,7 +587,7 @@ mod tests {
         // Halfmove clock exactly at 100 plies: fifty-move rule claimable, but not
         // automatic (no outcome yet from the move rule).
         let fifty = Position::from_fen("4k3/8/8/8/8/8/8/Q3K3 w - - 100 80").unwrap();
-        let game = Game::new(fifty);
+        let game = ChessGame::new(fifty);
         assert!(game.is_fifty_move_rule());
         assert!(!game.is_seventy_five_move_rule());
         // The fifty-move rule is claimable, so it does not end the game by itself.
@@ -595,13 +595,13 @@ mod tests {
 
         // Just below 150 plies: still not automatic.
         let almost = Position::from_fen("4k3/8/8/8/8/8/8/Q3K3 w - - 149 100").unwrap();
-        let game = Game::new(almost);
+        let game = ChessGame::new(almost);
         assert!(!game.is_seventy_five_move_rule());
         assert_eq!(game.outcome(), None);
 
         // At 150 plies: the seventy-five-move rule ends the game automatically.
         let seventy_five = Position::from_fen("4k3/8/8/8/8/8/8/Q3K3 w - - 150 100").unwrap();
-        let game = Game::new(seventy_five.clone());
+        let game = ChessGame::new(seventy_five.clone());
         assert!(game.is_seventy_five_move_rule());
         assert_eq!(game.outcome(), Some(Outcome::Draw));
         assert_eq!(

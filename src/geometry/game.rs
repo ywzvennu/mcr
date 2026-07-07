@@ -10,7 +10,7 @@
 //! [`outcome`](GenericPosition::outcome) from the board and state alone, so perft
 //! never allocates or maintains a position history and stays **byte-identical**.
 //! The history-dependent rules therefore live here, exactly as the concrete
-//! engine splits [`Position`](crate::Position) from [`Game`](crate::Game).
+//! engine splits [`Position`](crate::Position) from [`ChessGame`](crate::ChessGame).
 //!
 //! A `GenericGame` records a [`repetition_key`](GenericPosition::repetition_key)
 //! (and whether the side to move was in check) for every position that has
