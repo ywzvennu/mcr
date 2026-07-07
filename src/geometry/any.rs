@@ -914,7 +914,10 @@ impl WideVariantId {
 
 #[cfg(test)]
 mod tests {
+    use core::mem::size_of;
+
     use super::*;
+    use crate::geometry::{GenericPlacement, WideRole};
     use proptest::prelude::*;
 
     /// Fills `list` with `pos`'s legal moves via the allocation-free
@@ -1073,24 +1076,46 @@ mod tests {
 
     /// The runtime facade [`AnyWideVariant`] is sized by its widest **inline**
     /// arm (a `u128` position; the three U256 large-shogi arms are boxed, so they
-    /// do not inflate it — see the enum's storage note). This ceiling pins that
-    /// size so adding a variant, widening a position's inline state, or
-    /// un-boxing a large arm fails here.
+    /// do not inflate it — see the enum's storage note) plus the enum
+    /// discriminant / padding.
     ///
-    /// Current measured value: 2784 bytes (was 2768 before the Grasshopper role took
-    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) from 146 to 147, adding one
-    /// `u128` slot — 16 bytes — to the widest inline board's per-role array). Raise
-    /// this **only** deliberately, with a justified reason (a genuinely needed larger
-    /// arm) — never to paper over an accidental bloat.
+    /// This guard is split the same way as
+    /// [`per_backing_position_size_ceiling`] (issue #560): the widest inline arm
+    /// is a `u128` position, whose size is dominated by two **role-indexed**
+    /// arrays — the `[Bitboard<G>; COUNT]` role masks (`COUNT * 16` bytes over
+    /// the `u128` backing) and the two `[u8; COUNT]` in-hand tallies in
+    /// [`GenericPlacement`] (`2 * COUNT` bytes). Both are DERIVED from
+    /// [`WideRole::COUNT`] here, so adding a `WideRole` flows through with no
+    /// edit. The remaining **fixed overhead** — the arm's non-role state plus the
+    /// enum discriminant — is a small role-count-independent number, asserted
+    /// against a committed band.
+    ///
+    /// The band (not a point) absorbs the tail-padding jitter the align-1 in-hand
+    /// array induces as `COUNT` changes (see
+    /// [`per_backing_position_size_ceiling`]); a genuinely added field, or
+    /// un-boxing a U256 arm, moves the fixed overhead well outside it and trips
+    /// here. Adjust the band only deliberately (see docs/perf-regression.md);
+    /// role-count growth is auto-derived and must NOT move it.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        const CEILING: usize = 2832;
-        let actual = core::mem::size_of::<AnyWideVariant>();
+        // Fixed-overhead band = u128 arm's non-role state + enum discriminant.
+        // Width is align_of::<Bitboard<u128>>() - 2 = 14 (padding jitter). Bump
+        // only for a real field change / an un-boxed arm, never for a new role.
+        const FIXED_LOW: usize = 144;
+        const FIXED_HIGH: usize = 158;
+        // The widest inline arm is `u128`-backed (16-byte bitboards); its role
+        // arrays scale with COUNT and are derived, not committed.
+        let role_arrays = WideRole::COUNT * 16 + size_of::<GenericPlacement>();
+        let actual = size_of::<AnyWideVariant>();
+        let fixed = actual - role_arrays;
         assert!(
-            actual <= CEILING,
-            "size_of::<AnyWideVariant>() = {actual} exceeds the {CEILING}-byte \
-             ceiling; a size-sensitive type grew. Bump the ceiling only if the \
-             growth is justified (see docs/perf-regression.md)."
+            (FIXED_LOW..=FIXED_HIGH).contains(&fixed),
+            "size_of::<AnyWideVariant>() = {actual}: fixed overhead {fixed} B is \
+             outside the committed [{FIXED_LOW}, {FIXED_HIGH}] band (size = role \
+             arrays {role_arrays} + fixed {fixed}). A size-sensitive field grew, or \
+             a large arm was un-boxed. Role-count growth is auto-derived and must \
+             not move this band; adjust it only deliberately (see \
+             docs/perf-regression.md)."
         );
     }
 
@@ -1108,25 +1133,59 @@ mod tests {
         );
     }
 
-    /// Per-backing position-size ceiling: for each bitboard backing (`u64` /
-    /// `u128` / `U256`), the largest concrete position over that backing must stay
-    /// within its current measured size. Buckets every shipped variant by
-    /// [`WideVariantId::position_backing_bits`] and checks the max
-    /// [`position_footprint`](WideVariantId::position_footprint) size against a
-    /// per-backing ceiling — so growing any position's role array / inline state
-    /// past its geometry class's current widest fails here.
+    /// Per-backing position-size regression gate (issues #504, #560).
     ///
-    /// Current measured maxima: u64 = 1560 (ai-wok), u128 = 2800 (cannonshogi),
-    /// U256 = 5264 (chu) — above the pre-Grasshopper values (1528 / 2752 / 5168), the
-    /// extra per-role slots the Grasshopper, Nightrider and New Zealand ROOKNI roles'
-    /// [`WideRole::COUNT`](super::role::WideRole::COUNT) 146->149 bump adds to every
-    /// board's role array (one bitboard per backing width per role, plus alignment
-    /// padding). Raise a ceiling only deliberately.
+    /// For each bitboard backing (`u64` / `u128` / `U256`) the largest concrete
+    /// position over that backing is split into two parts and only the *second*
+    /// is committed as a constant:
+    ///
+    /// 1. The **role-array contribution**, DERIVED structurally from
+    ///    [`WideRole::COUNT`]. Every position holds a `[Bitboard<G>; COUNT]` role
+    ///    mask array in its [`Board`](super::Board)
+    ///    (`COUNT * size_of::<Bitboard<G>>()` = `COUNT * bits / 8` bytes) plus the
+    ///    two `[u8; COUNT]` in-hand tallies in [`GenericPlacement`]
+    ///    (`size_of::<GenericPlacement>()` = `2 * COUNT` bytes). Both scale with
+    ///    the role count, so adding a [`WideRole`] flows through here
+    ///    automatically — this is the recurring hand-bump that #560 removes.
+    /// 2. The **fixed (non-role-array) overhead** — everything else: the two
+    ///    color masks, the promoted / `board_b` / petrified / gating bitboards,
+    ///    the turn / castling / en-passant / clock / duck scalars, and struct
+    ///    padding. This is a small number *independent of the role count*,
+    ///    asserted against the committed band below.
+    ///
+    /// Splitting the gate this way keeps BOTH regressions it must catch:
+    /// * **Expected role growth** — a new [`WideRole`] enlarges every role array —
+    ///   is absorbed by part 1 with no edit here (the whole point of #560).
+    /// * **Unexpected struct bloat** — a stray field on
+    ///   [`Board`](super::Board) / [`GenericState`](super::GenericState) / the
+    ///   position — grows part 2 and TRIPS the fixed-overhead assertion, exactly
+    ///   as the old whole-size ceiling did. A naive "derive the whole size from
+    ///   `COUNT`" would be tautological and blind to this; the fixed-overhead
+    ///   assertion is what preserves the tripwire.
+    ///
+    /// The fixed overhead is asserted as a tight **band**, not a point: the
+    /// align-1 in-hand array (`2 * COUNT` bytes) breathes against the struct's
+    /// tail padding as `COUNT` changes, so the remainder oscillates within an
+    /// `align_of::<Bitboard<G>>() - 2` byte window (6 bytes on the 8-aligned
+    /// `u64`, 14 on the 16-aligned `u128` / `U256`). The band is exactly that
+    /// window, so any `COUNT` bump stays inside it — while a real added field is
+    /// at least one machine word (>= 8 bytes) and escapes it (the `u64` backing's
+    /// 6-byte window catches any such field). Adjust a band only deliberately for
+    /// a genuine fixed-field change (see docs/perf-regression.md).
     #[test]
     fn per_backing_position_size_ceiling() {
-        // (backing bits, ceiling in bytes). Measured on main; bump only with cause.
-        const CEILINGS: &[(u32, usize)] = &[(64, 1568), (128, 2816), (256, 5296)];
-        for &(bits, ceiling) in CEILINGS {
+        // (backing bits, fixed-overhead band [low, high]). The role-array part is
+        // DERIVED from WideRole::COUNT below and is deliberately NOT committed
+        // here; only the role-count-independent fixed overhead is. Band width is
+        // align_of::<Bitboard>() - 2 (tail-padding jitter). Move a band only when
+        // a genuine non-role field on the position changes — never for a new role.
+        const FIXED: &[(u32, usize, usize)] = &[(64, 72, 78), (128, 128, 142), (256, 224, 238)];
+        let count = WideRole::COUNT;
+        let placement = size_of::<GenericPlacement>();
+        for &(bits, low, high) in FIXED {
+            // All positions over a backing are the same size (they differ only in a
+            // zero-sized rule marker); the bucket keeps the per-variant reporting
+            // and feeds the populated-bucket guard below.
             let mut max = 0usize;
             let mut worst = "";
             for &id in WideVariantId::ALL {
@@ -1139,21 +1198,30 @@ mod tests {
                     worst = id.as_str();
                 }
             }
+            // DERIVED role-array contribution: the per-role bitboard masks plus the
+            // two per-role in-hand tallies. Scales with COUNT with no committed
+            // constant, so a role addition never touches this test.
+            let bitboard = (bits / 8) as usize;
+            let role_arrays = count * bitboard + placement;
+            let fixed = max - role_arrays;
             assert!(
-                max <= ceiling,
-                "max {bits}-bit-backed position size = {max} ({worst}) exceeds the \
-                 {ceiling}-byte ceiling; a position over the {bits}-bit backing grew. \
-                 Bump the ceiling only deliberately (see docs/perf-regression.md)."
+                (low..=high).contains(&fixed),
+                "{bits}-bit-backed position ({worst}): fixed overhead {fixed} B is \
+                 outside the committed [{low}, {high}] band (size {max} = role arrays \
+                 {role_arrays} + fixed {fixed}). A non-role field on Board / \
+                 GenericState / the position changed its size. Role-count growth is \
+                 auto-derived and must NOT move this band; adjust it only \
+                 deliberately (see docs/perf-regression.md)."
             );
         }
-        // Sanity: every backing bucket is actually populated, so a ceiling can
-        // never pass vacuously (e.g. if a backing's variants all disappeared).
-        for &(bits, _) in CEILINGS {
+        // Sanity: every backing bucket is actually populated, so a band can never
+        // pass vacuously (e.g. if a backing's variants all disappeared).
+        for &(bits, _, _) in FIXED {
             assert!(
                 WideVariantId::ALL
                     .iter()
                     .any(|id| id.position_backing_bits() == bits),
-                "no shipped variant uses the {bits}-bit backing; ceiling would be vacuous"
+                "no shipped variant uses the {bits}-bit backing; the band would be vacuous"
             );
         }
     }
