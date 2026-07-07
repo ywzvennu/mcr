@@ -7340,17 +7340,25 @@ fn parse_placement_holdings<const R: usize>(
         // the board placement's overflow handling. A bare letter is an ordinary
         // role.
         let (role, white) = if ch == crate::geometry::role::OVERFLOW_PREFIX {
-            let next = chars.next().ok_or(WideFenError::BadCastling)?;
-            // A doubled prefix `**` marks a second-bank overflow role (e.g. the
-            // Mansindam Angel `**a`); a single `*` an ordinary overflow role.
-            if next == crate::geometry::role::OVERFLOW_PREFIX {
-                let base = chars.next().ok_or(WideFenError::BadCastling)?;
-                let role = WideRole::overflow2_from_base(base).ok_or(WideFenError::BadCastling)?;
-                (role, base.is_ascii_uppercase())
-            } else {
-                let role = WideRole::overflow_from_base(next).ok_or(WideFenError::BadCastling)?;
-                (role, next.is_ascii_uppercase())
+            // Count the run of `*` prefixes: `*` = a first-bank overflow role, `**`
+            // a second-bank (e.g. the Mansindam Angel), `***` a fourth-tier (Chu
+            // Shogi), `****` a fifth-tier (the Yari Shogi spear army). The base
+            // letter's case carries the colour.
+            let mut stars = 1u8;
+            let mut base = chars.next().ok_or(WideFenError::BadCastling)?;
+            while base == crate::geometry::role::OVERFLOW_PREFIX {
+                stars += 1;
+                base = chars.next().ok_or(WideFenError::BadCastling)?;
             }
+            let role = match stars {
+                1 => WideRole::overflow_from_base(base),
+                2 => WideRole::overflow2_from_base(base),
+                3 => WideRole::overflow4_from_base(base),
+                4 => WideRole::overflow5_from_base(base),
+                _ => None,
+            }
+            .ok_or(WideFenError::BadCastling)?;
+            (role, base.is_ascii_uppercase())
         } else if ch == crate::geometry::role::OVERFLOW_PREFIX_3 {
             // A held third-tier overflow role (the Cannon Shogi cannon army) is
             // `=` + a recycled base letter, mirroring the `*` overflow handling.
@@ -7394,14 +7402,25 @@ fn write_placement_holdings<const R: usize>(placement: GenericPlacement<R>, out:
             for _ in 0..n {
                 // An overflow role (e.g. Shinobi's Shogi Knight `*N`) has no bare
                 // letter: its token is the `*` prefix plus the recycled base
-                // letter, the case already encoded in `ch` above. A second-bank
-                // overflow role (the Mansindam Angel `**A`) doubles the prefix.
-                if role.is_overflow2() {
-                    out.push(crate::geometry::role::OVERFLOW_PREFIX);
-                    out.push(crate::geometry::role::OVERFLOW_PREFIX);
+                // letter, the case already encoded in `ch` above. Higher tiers
+                // repeat the prefix — `**` second-bank (the Mansindam Angel), `***`
+                // fourth-tier (Chu Shogi), `****` fifth-tier (the Yari Shogi spear
+                // army) — and the third tier uses `=` instead.
+                let stars = if role.is_overflow5() {
+                    4
+                } else if role.is_overflow4() {
+                    3
+                } else if role.is_overflow2() {
+                    2
                 } else if role.is_overflow() {
+                    1
+                } else {
+                    0
+                };
+                for _ in 0..stars {
                     out.push(crate::geometry::role::OVERFLOW_PREFIX);
-                } else if role.is_overflow3() {
+                }
+                if role.is_overflow3() {
                     // A held third-tier overflow role (the Cannon Shogi cannon
                     // army) has no bare letter: its token is the `=` prefix plus the
                     // recycled base letter, the case already encoded in `ch` above.

@@ -31,6 +31,7 @@ Selected by `ValidationOracle` (runtime) and the non-`Fsf` `PerftOracle` rows:
 | Jieqi | 9x10 | Independent (Hand-derived) | depth 1–4 live vs **FSF Xiangqi** (identity reveal) | — | FSF `xiangqi`, via the identity-reveal equivalence |
 | Wa Shogi | 11x11 | Independent | depth 1–3 vs in-repo brute force | depth 4 | independent in-repo 11x11 generator |
 | Okisaki Shogi | 10x10 | Independent | depth 1 hand-derived; depths 1–3 vs in-repo generator | depth 4 | independent in-repo 10x10 generator |
+| Yari Shogi | 9x7 | Independent | startpos depth 1–4 + a midgame depth 1–3 vs in-repo brute force | — | independent in-repo 7x9 generator |
 
 "Second source" is what stands in for the missing FSF oracle. For the HaChu-oracle
 variants it is the HaChu engine (driven as a subprocess by `compare-fairy`, never
@@ -41,7 +42,7 @@ on every node count — issue #500.
 
 ## Invariants every oracle-less variant is held to
 
-Beyond perft, all six are swept by the crate's variant-generic property tests,
+Beyond perft, all seven are swept by the crate's variant-generic property tests,
 which iterate `WideVariantId::ALL` and therefore cover these variants with no
 per-variant opt-in:
 
@@ -57,10 +58,10 @@ per-variant opt-in:
   `properties::perft_children_sum_wide`.
 - **attackers-consistency** (`attackers_to` reverse projection ≡ the forward
   attack relation, and king-safety agreement) — `tests/attackers_consistency.rs`.
-  Chu, Dai, Tenjiku, and Alice were added to this sweep under issue #558; Jieqi and
-  Wa Shogi were already covered.
+  Chu, Dai, Tenjiku, and Alice were added to this sweep under issue #558; Jieqi,
+  Wa Shogi, and Yari Shogi are covered too.
 - **colour symmetry of the start** — `tests/symmetry_oracle_less.rs` (issue #558):
-  for the five colour-symmetric starts, handing the first move to Black gives an
+  for the six colour-symmetric starts, handing the first move to Black gives an
   identical perft. Tenjiku is deliberately excluded (see below).
 
 None of these needs an external oracle; they are self-consistency checks that would
@@ -159,12 +160,32 @@ catch a large class of move-generation defects independently of the perft pins.
 - **Residual gap:** no external engine oracle; two in-repo implementations agree to
   depth 3; depth ≥ 4 is single-source.
 
+### Yari Shogi — no usable engine oracle
+- Fairy-Stockfish **defines** a `yarishogi` variant, but the project's built FSF
+  binary is compiled **without large boards**, so it cannot host the 9-rank board:
+  `setoption name UCI_Variant value yarishogi` is silently ignored and `go perft`
+  returns chess-root counts. There is no HaChu Yari Shogi either.
+- **perft(1) = 20** is hand-derived from a full per-piece enumeration of the start
+  array (see `tests/perft_yarishogi.rs`).
+- **perft(2) = 400, perft(3) = 7960, perft(4) = 158404** are produced **identically**
+  by the engine and an **independent from-scratch 7x9 generator** (its own array
+  model, move tables, hand/drops, per-piece promotion and King safety), so the
+  startpos tree is agreed node-for-node through depth 4 by two independent
+  implementations.
+- A hand-constructed **midgame** (promotions offered in the far three ranks,
+  captures into hand, drops with the nifu bar) is likewise agreed node-for-node at
+  depths 1–3 (perft 111 / 6411 / 446974).
+- The start array is colour-symmetric, so `symmetry_oracle_less.rs` checks White and
+  mirrored-Black perft agree at depths 1–3.
+- **Residual gap:** no external engine oracle; two in-repo implementations agree to
+  depth 4 on the start and depth 3 on the midgame; deeper is single-source.
+
 ## Summary of what is and is not claimed
 
 - **Claimed:** low-depth move generation for each variant is either matched
   node-for-node against a reference engine (Chu, Dai; Tenjiku's depth 1 against
   HaChu source) or agreed on node-for-node by two fully independent in-repo
-  implementations (Tenjiku 2–3, Alice 1–4, Wa 1–3), Jieqi movement is equal to
+  implementations (Tenjiku 2–3, Alice 1–4, Wa 1–3, Yari 1–4), Jieqi movement is equal to
   FSF-validated Xiangqi under the identity baseline, and every variant satisfies the
   make/unmake, hash, notation, attackers-consistency, and (where applicable)
   colour-symmetry invariants.

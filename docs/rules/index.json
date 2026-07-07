@@ -1326,6 +1326,25 @@
     }
   },
   {
+    "name": "okisakishogi",
+    "family": "wide",
+    "width": 10,
+    "height": 10,
+    "start_fen": "lnsgkqgsnl/1r6b1/pppppppppp/10/10/10/10/PPPPPPPPPP/1B6R1/LNSGQKGSNL[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Silver",
+      "Gold",
+      "Lance"
+    ],
+    "oracle": "independent"
+  },
+  {
     "name": "opulent",
     "family": "wide",
     "width": 10,
@@ -1908,5 +1927,20 @@
     "oracle": {
       "fairy_stockfish": "xiangqi"
     }
+  },
+  {
+    "name": "yarishogi",
+    "family": "wide",
+    "width": 7,
+    "height": 9,
+    "start_fen": "****o****j****jk****a****a****o/7/ppppppp/7/7/7/PPPPPPP/7/****O****A****AK****J****J****O[] w - - 0 1",
+    "roles": [
+      "Pawn",
+      "King",
+      "YariRook",
+      "YariKnight",
+      "YariBishop"
+    ],
+    "oracle": "independent"
   }
 ]

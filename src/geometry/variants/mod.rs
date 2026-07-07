@@ -99,6 +99,7 @@ pub mod torpedo;
 pub mod washogi;
 pub mod xiangfu;
 pub mod xiangqi;
+pub mod yari;
 
 pub use aiwok::{Aiwok, AiwokRules};
 pub use alice::{Alice, AliceRules};
@@ -191,3 +192,4 @@ pub use torpedo::{Torpedo, TorpedoRules};
 pub use washogi::{Washogi, WashogiRules};
 pub use xiangfu::{Xiangfu, XiangfuRules};
 pub use xiangqi::{Xiangqi, XiangqiRules};
+pub use yari::{Yari, YariRules};

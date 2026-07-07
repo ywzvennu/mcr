@@ -36,7 +36,7 @@
 
 use mcr::geometry::{
     perft as gperft, Alice, Chess8x8, Chu, Chu12x12, Dai, Dai15x15, Grand10x10, Jieqi,
-    OkisakiShogi, Washogi, Washogi11x11, Xiangqi9x10,
+    OkisakiShogi, Washogi, Washogi11x11, Xiangqi9x10, Yari, YariShogi7x9,
 };
 
 /// Returns `fen` with its side-to-move field flipped (`w` <-> `b`), leaving every
@@ -127,6 +127,13 @@ symmetric_start!(
     OkisakiShogi,
     Grand10x10,
     OkisakiShogi::startpos(),
+    &[1, 2, 3]
+);
+symmetric_start!(
+    yari_colour_symmetric,
+    Yari,
+    YariShogi7x9,
+    Yari::startpos(),
     &[1, 2, 3]
 );
 

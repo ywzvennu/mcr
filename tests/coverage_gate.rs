@@ -266,6 +266,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF wa-shogi; HaChu's wa-shogi is a different ruleset (51 vs 57 start moves) — independent brute force is the second source"), DrawTest::Named("washogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Xiangfu), "perft_xiangfu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Xiangqi), "perft_xiangqi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("xiangqi_perpetual_chase_loses_for_the_chaser")),
+    row(Game::Wide(WideVariantId::Yari), "perft_yarishogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF yarishogi in the built binary (9-rank board needs large boards, off); independent brute force is the second source"), DrawTest::Named("yari_sennichite_is_a_draw")),
     // ---- Concrete 8x8 engine variants (`VariantId::ALL`) ---------------------
     // The concrete engine has its own terminal-rule suite (not the `WideVariant`
     // draw hooks), so these rows are not draw-hook-introspected: `draw_test` is
@@ -291,10 +292,10 @@ const REQUIRED: &[Required] = &[
 const EXPECTED_TODO498: usize = 0;
 
 /// The by-design difffuzz exclusion count (Alice, Duck, Jieqi + the HaChu-only
-/// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi and Okisaki Shogi) —
-/// the `8` in the `SPECS.len() == ALL.len() - 8` invariant that
+/// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi, Okisaki Shogi, and
+/// Yari Shogi) — the `9` in the `SPECS.len() == ALL.len() - 9` invariant that
 /// `compare-fairy/src/difffuzz.rs` asserts on its own side.
-const DIFFFUZZ_EXCLUSIONS: usize = 8;
+const DIFFFUZZ_EXCLUSIONS: usize = 9;
 
 /// The variants CI holds back from the **deep rotating** difffuzz sweep (12 games ×
 /// 90 plies), each hitting a documented FSF *oracle* limitation whose false

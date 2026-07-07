@@ -105,7 +105,7 @@ pub use variants::{
     Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
     SpartanRules, Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules,
     Threekings, ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules,
-    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Xiangfu, XiangfuRules, Xiangqi, XiangqiRules, Yari, YariRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -675,6 +675,27 @@ geometry!(
     u128,
     11,
     11
+);
+
+geometry!(
+    /// The Yari Shogi board: seven files by nine ranks (63 squares), backed by
+    /// `u64`.
+    ///
+    /// A small odd non-power-of-two width (`7`) by nine ranks on a `u64` backing:
+    /// `7 * 9 = 63 <= 64`, so it fits a single `u64` (one bit short of the full
+    /// board, unlike the 8x8 [`Chess8x8`]). A square index reaches `62`, and
+    /// edge-masked east/west shifts must not wrap past the seventh file. Files run
+    /// a..g, ranks 1..9. It hosts Yari Shogi ("spear shogi"), whose forward-biased
+    /// "spear" pieces (a lance-like Rook, and Yari knight / bishop / rook / gold /
+    /// silver) reuse Shogi's persistent capture-fed hand, drops, and far-three-rank
+    /// promotion on the narrower board. The named-geometry convention here is
+    /// files-by-ranks (`7x9`), matching every other geometry in this module
+    /// (`Xiangqi9x10` = nine files by ten ranks), even though the variant is
+    /// traditionally described "9x7" (nine ranks by seven files).
+    YariShogi7x9,
+    u64,
+    7,
+    9
 );
 
 #[cfg(test)]
