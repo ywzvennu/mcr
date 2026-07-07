@@ -17,7 +17,7 @@ use mcr::{VariantId, VariantRef};
 
 // ---- Unified catalog coverage -------------------------------------------------
 
-/// `VariantRef::ALL` spans both families: the nine concrete plus the ninety-one wide.
+/// `VariantRef::ALL` spans both families: the nine concrete plus the ninety-eight wide.
 #[test]
 fn all_spans_both_families() {
     let concrete = VariantRef::ALL
@@ -31,11 +31,11 @@ fn all_spans_both_families() {
     assert_eq!(concrete, VariantId::ALL.len(), "every concrete variant");
     assert_eq!(wide, WideVariantId::ALL.len(), "every wide variant");
     assert_eq!(concrete, 9, "nine concrete variants");
-    assert_eq!(wide, 99, "ninety-nine wide variants");
+    assert_eq!(wide, 100, "one hundred wide variants");
     assert_eq!(
         VariantRef::ALL.len(),
-        108,
-        "one hundred eight variants in all"
+        109,
+        "one hundred nine variants in all"
     );
 }
 

@@ -1544,6 +1544,27 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Static board walls (fixed off-board holes, default OFF) ----------
+
+    /// Returns the set of **permanently blocked "wall" squares** baked into this
+    /// variant's board — squares that are never part of play: no piece may ever
+    /// stand on one, a slider is blocked by one exactly as by an occupied square,
+    /// and a leaper may not land on one. Unlike the petrify mechanic
+    /// ([`has_petrify`](Self::has_petrify)), which grows a wall set *during* play
+    /// and records it in [`GenericState::petrified`](super::position::GenericState::petrified)
+    /// (and in the FEN as `*`), this mask is a compile-time constant folded into
+    /// the move-generation occupancy and target masks; it never enters the state or
+    /// the FEN (the wall cells render as ordinary empty squares).
+    ///
+    /// The default is [`Bitboard::EMPTY`], so every other variant ORs in nothing
+    /// and masks against the full board — byte-identical to a build without the
+    /// feature. Only [`Gustav3`](super::variants::gustav3) overrides it: its Amazon
+    /// army sits in the corners of a 10x8 board whose a- and j-files exist only on
+    /// the two back ranks, the intervening a2–a7 / j2–j7 cells being walls.
+    fn board_walls() -> Bitboard<G> {
+        Bitboard::EMPTY
+    }
+
     // --- Alice chess two-board transfer (default OFF) ---------------------
 
     /// Returns `true` if this variant is **Alice chess**: the game is played over

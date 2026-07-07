@@ -944,6 +944,23 @@
     }
   },
   {
+    "name": "gustav3",
+    "family": "wide",
+    "width": 10,
+    "height": 8,
+    "start_fen": "**arnbqkbnr**a/1pppppppp1/10/10/10/10/1PPPPPPPP1/**ARNBQKBNR**A w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Angel"
+    ],
+    "oracle": "independent"
+  },
+  {
     "name": "hoppelpoppel",
     "family": "wide",
     "width": 8,

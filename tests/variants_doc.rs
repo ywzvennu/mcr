@@ -468,6 +468,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess with castling; pawns start on the third rank and push one square only (no double step, no en passant); a pawn promotes to Queen, Rook, Bishop, Knight, or Grasshopper. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant grasshopper`).",
         },
+        WideVariantId::Gustav3 => Meta {
+            display: "Gustav 3 (10x8 Amazon)",
+            pieces: "Standard army plus an Amazon (Queen + Knight, mcr Angel) on each corner; back rank A R N B Q K B N R A.",
+            rules: "Ten-file board whose a- and j-files exist only on the two back ranks — the intervening a2-a7 / j2-j7 cells are permanent walls that block slides and can never be occupied. Standard pawns, double step and en passant; a pawn promotes to Amazon, Queen, Rook, Bishop, or Knight; the king castles to the h- (kingside) and d- (queenside) files with rooks on the b-/i-files. Win by checkmate.",
+            oracle: "Independent in-repo 10x8 generator (the available Fairy-Stockfish binary is a non-large-board build and does not implement `gustav3`).",
+        },
         WideVariantId::HoppelPoppel => Meta {
             display: "Hoppel-Poppel (8x8)",
             pieces: "Standard army where the Knight captures like a bishop (moves as a knight) and the Bishop captures like a knight (moves as a bishop).",
