@@ -138,6 +138,8 @@ impl WideVariant<Chess8x8> for PetrifiedRules {
         Some(ExtinctionRule {
             watched: PETRIFIED_WATCHED,
             threshold: 0,
+            count_total: false,
+            extinct_wins: false,
         })
     }
 

@@ -390,6 +390,36 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess movement, castling, en passant, and promotion but no check or checkmate — the king is an ordinary capturable Commoner. A side loses the instant any one of its piece types is wiped out (Pawn, Knight, Bishop, Rook, Queen, or king reaches zero), so capturing the last enemy queen — or promoting your own last pawn — decides the game. Rides the generic extinction terminal (all army types, threshold 0).",
             oracle: "Fairy-Stockfish (`UCI_Variant extinction`).",
         },
+        WideVariantId::Giveaway => Meta {
+            display: "Giveaway chess (8x8)",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Antichess with castling: a non-royal capturable king (no check or checkmate), mandatory captures (if any capture is available every move must be a capture), and pawns may promote to a king as well as Q/R/B/N. The goal is inverted — a side reduced to no pieces at all, or left with no legal move (stalemate), WINS. Rides the generic extinction terminal (whole army, threshold 0, win direction).",
+            oracle: "Fairy-Stockfish (`UCI_Variant giveaway`).",
+        },
+        WideVariantId::Suicide => Meta {
+            display: "Suicide chess (8x8)",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Antichess (giveaway without castling), mandatory captures, king-promotion, and the same losing-wins terminal. A stalemate is decided by piece count: the stalemated side with fewer pieces wins, an equal count draws.",
+            oracle: "Fairy-Stockfish (`UCI_Variant suicide`).",
+        },
+        WideVariantId::Losers => Meta {
+            display: "Losers chess (8x8)",
+            pieces: "The standard chess army (a royal king).",
+            rules: "Standard chess with a royal king (there IS check and checkmate) and mandatory captures, but every terminal is inverted: getting checkmated, being stalemated, or being reduced to a bare king all WIN. Rides the generic extinction terminal (whole army, threshold 1, win direction).",
+            oracle: "Fairy-Stockfish (`UCI_Variant losers`).",
+        },
+        WideVariantId::Misere => Meta {
+            display: "Misère chess (8x8)",
+            pieces: "The standard chess army (a royal king).",
+            rules: "Ordinary chess in every respect — royal king, castling, en passant, standard promotion, no forced captures — except that a checkmate WINS for the mated side. Move generation is byte-identical to standard chess; stalemate is the ordinary draw.",
+            oracle: "Fairy-Stockfish (`UCI_Variant misere`).",
+        },
+        WideVariantId::Codrus => Meta {
+            display: "Codrus (8x8)",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Giveaway restricted to the king: a non-royal capturable king, mandatory captures, ordinary castling, and standard Q/R/B/N promotion (no king-promotion). You WIN by losing your king — its capture (king count reaching zero) decides the game; a stalemate also wins. Rides the generic extinction terminal (the king type, threshold 0, win direction).",
+            oracle: "Fairy-Stockfish (`UCI_Variant codrus`).",
+        },
         WideVariantId::FogOfWar => Meta {
             display: "Fog of War (Dark Chess, 8x8)",
             pieces: "Standard chess army with a non-royal king.",

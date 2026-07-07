@@ -389,11 +389,22 @@ one royal and play on."
 fn terminal_lines(t: &TerminalRules) -> Vec<String> {
     let mut lines = Vec::new();
     if let Some(e) = &t.extinction {
-        lines.push(format!(
-            "Extinction: lose when any watched role [{}] falls to {} or fewer",
-            role_list(&e.watched),
-            e.threshold,
-        ));
+        let dir = if e.extinct_wins { "win" } else { "lose" };
+        if e.count_total {
+            lines.push(format!(
+                "Extinction: {dir} when the total piece count falls to {} or fewer",
+                e.threshold,
+            ));
+        } else {
+            lines.push(format!(
+                "Extinction: {dir} when any watched role [{}] falls to {} or fewer",
+                role_list(&e.watched),
+                e.threshold,
+            ));
+        }
+    }
+    if t.checkmate_is_win {
+        lines.push("Being checkmated wins for the mated side".to_string());
     }
     if let Some(f) = &t.flag_win {
         let safe = if f.requires_safe {
@@ -463,6 +474,14 @@ fn draw_lines(d: &DrawRules) -> Vec<String> {
     }
     if d.stalemate_is_loss {
         lines.push("Stalemate is a loss for the stalemated side".to_string());
+    }
+    if d.stalemate_is_win {
+        lines.push("Stalemate is a win for the stalemated side".to_string());
+    }
+    if d.stalemate_piece_count {
+        lines.push(
+            "Stalemate is decided by piece count: the side with fewer pieces wins".to_string(),
+        );
     }
     if d.has_bare_king_draw {
         lines.push("Reducing a side to a lone king is an immediate draw".to_string());
@@ -715,5 +734,5 @@ fn every_variant_has_a_page() {
             );
         }
     }
-    assert_eq!(VariantRef::ALL.len(), 101, "expected 101 variants");
+    assert_eq!(VariantRef::ALL.len(), 106, "expected 106 variants");
 }

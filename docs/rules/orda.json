@@ -890,6 +890,8 @@
     "impasse": null,
     "has_bikjang": false,
     "stalemate_is_loss": false,
+    "stalemate_is_win": false,
+    "stalemate_piece_count": false,
     "has_bare_king_draw": false,
     "has_bare_king_loss": false,
     "perpetual_check_loses": false,
@@ -904,6 +906,7 @@
       "requires_safe": false
     },
     "stalemate_is_loss": false,
+    "checkmate_is_win": false,
     "wins_on_check": false,
     "temple_win": false,
     "bare_king_draw": false,

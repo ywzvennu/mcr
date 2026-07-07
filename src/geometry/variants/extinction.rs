@@ -145,6 +145,8 @@ impl WideVariant<Chess8x8> for ExtinctionRules {
         Some(ExtinctionRule {
             watched: EXTINCTION_WATCHED,
             threshold: 0,
+            count_total: false,
+            extinct_wins: false,
         })
     }
 

@@ -137,6 +137,8 @@ impl WideVariant<Chess8x8> for ThreekingsRules {
         Some(ExtinctionRule {
             watched: THREEKINGS_WATCHED,
             threshold: 2,
+            count_total: false,
+            extinct_wins: false,
         })
     }
 

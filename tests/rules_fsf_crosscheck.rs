@@ -159,6 +159,10 @@ impl Expect {
 /// The standard promotion set `{Q, R, B, N}` (FSF default `promotionPieceTypes`).
 const QRBN: &[WideRole] = &[Queen, Rook, Bishop, N];
 
+/// The antichess promotion set `{Q, R, B, N, King}` — the giveaway family lets a
+/// pawn also become a (non-royal) Commoner/King (FSF `COMMONER | Q | R | B | N`).
+const QRBNK: &[WideRole] = &[Queen, Rook, Bishop, N, King];
+
 /// The transcribed FSF expectation table. Every row cites its `variant.cpp`
 /// constructor; the defaults it builds on are documented at the module level.
 fn table() -> Vec<Expect> {
@@ -195,14 +199,47 @@ fn table() -> Vec<Expect> {
             .promo(QRBN)
             .dstep(&[0, 1])
             .ep(true),
-        // Giveaway/Antichess: non-royal king (COMMONER), forced captures, no castling.
-        Expect::new(
-            "giveaway",
-            "giveaway_variant / antichess_variant",
-            (8, 8),
-            false,
-        )
-        .royal(NonRoyal),
+        // Antichess (concrete engine): non-royal king (COMMONER), forced captures,
+        // no castling, king-promotion.
+        Expect::new("antichess", "antichess_variant", (8, 8), false)
+            .promo(QRBNK)
+            .royal(NonRoyal),
+        // The antichess / giveaway family on the generic engine (#583).
+        // Giveaway: giveaway_variant — non-royal king, mandatory captures, castling,
+        // king-promotion, whole-army losing-wins + stalemate-win.
+        Expect::new("giveaway", "giveaway_variant", (8, 8), true)
+            .promo(QRBNK)
+            .dstep(&[1])
+            .ep(true)
+            .royal(NonRoyal),
+        // Suicide: antichess_variant + stalematePieceCount — like giveaway but no
+        // castling.
+        Expect::new("suicide", "suicide_variant", (8, 8), false)
+            .promo(QRBNK)
+            .dstep(&[1])
+            .ep(true)
+            .royal(NonRoyal),
+        // Losers: losers_variant — a royal king (checkmate) with mandatory captures
+        // and inverted terminals.
+        Expect::new("losers", "losers_variant", (8, 8), true)
+            .promo(QRBN)
+            .dstep(&[1])
+            .ep(true)
+            .royal(Checkmate),
+        // Misère: misere_variant — ordinary chess whose only change is that being
+        // checkmated wins.
+        Expect::new("misere", "misere_variant", (8, 8), true)
+            .promo(QRBN)
+            .dstep(&[1])
+            .ep(true)
+            .royal(Checkmate),
+        // Codrus: codrus_variant — giveaway watching only the king, standard Q/R/B/N
+        // promotion (no king-promotion).
+        Expect::new("codrus", "codrus_variant", (8, 8), true)
+            .promo(QRBN)
+            .dstep(&[1])
+            .ep(true)
+            .royal(NonRoyal),
         // ---- chess-family wide variants -----------------------------------------
         Expect::new("nocastle", "nocastle_variant", (8, 8), false)
             .promo(QRBN)
