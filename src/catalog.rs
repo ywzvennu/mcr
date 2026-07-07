@@ -4,8 +4,8 @@
 //! mcr ships two parallel variant families (see the crate docs): the concrete 8x8
 //! engine ([`VariantId`]: standard chess and the eight classic 8x8 variants) and
 //! the generic-geometry fairy layer
-//! ([`WideVariantId`](crate::geometry::WideVariantId): the 100 wider or
-//! ([`WideVariantId`](crate::geometry::WideVariantId): the 100 wider or
+//! ([`WideVariantId`](crate::geometry::WideVariantId): the 101 wider or
+//! ([`WideVariantId`](crate::geometry::WideVariantId): the 101 wider or
 //! differently-shaped variants). Each exposes its own structured
 //! [`VariantRules`](crate::geometry::VariantRules) model — [`VariantId::rules`]
 //! and [`WideVariantId::rules`](crate::geometry::WideVariantId::rules) — but a

@@ -1434,6 +1434,24 @@
     "oracle": "independent"
   },
   {
+    "name": "omicron",
+    "family": "wide",
+    "width": 12,
+    "height": 10,
+    "start_fen": "**w10**w/1**xrnbqkbnr**x1/1pppppppppp1/12/12/12/12/1PPPPPPPPPP1/1**XRNBQKBNR**X1/**W10**W w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Wizard",
+      "TencubedChampion"
+    ],
+    "oracle": "independent"
+  },
+  {
     "name": "opulent",
     "family": "wide",
     "width": 10,

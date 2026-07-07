@@ -618,6 +618,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "10x10 Shogi with a hand and drops and a three-rank promotion zone; nifu and dead-piece pawn-drop rules, no uchifuzume. Pawns, Silvers, chess Knights, vertical rooks, Rooks and Bishops promote (the Queen, Gold and King do not). Sennichite (four-fold) is a draw, perpetual check loses, stalemate is a loss. Win by checkmate.",
             oracle: "Rules-validated (no FSF oracle — the available Fairy-Stockfish build lacks large boards); hand-derived start count cross-checked against an independent from-scratch 10x10 generator.",
         },
+        WideVariantId::Omicron => Meta {
+            display: "Omicron (12x10 Omega chess)",
+            pieces: "Standard army plus a Champion (Wazir + Alfil + Dabbaba leaper, mcr TencubedChampion) flanking each interior back rank and a Wizard (Camel + Ferz leaper) tucked in each board corner; interior back rank C R N B Q K B N R C.",
+            rules: "Twelve-file by ten-rank board whose a-/l-files and top/bottom ranks are permanent walls except the four corners (which hold the Wizards), leaving a 10x8 interior plus the corners as the play area — walls block slides and can never be occupied. Standard pawns, double step (rank 3/8) and en passant; a pawn promotes on the last reachable rank to a Wizard, Champion, Queen, Rook, Bishop, or Knight; the king (on the g-file, rank 2/9) castles to the i- (kingside) and e- (queenside) files with rooks on the c-/j-files. Win by checkmate.",
+            oracle: "Independent in-repo 12x10 generator (the available Fairy-Stockfish binary is a non-large-board build and does not implement `omicron`).",
+        },
         WideVariantId::Opulent => Meta {
             display: "Opulent chess (10x10)",
             pieces: "Standard sliders plus an augmented Knight (Knight + Wazir), Chancellor, Archbishop, Wizard (Camel + Ferz), and Lion (Ferz + Dabbaba + Threeleaper).",
