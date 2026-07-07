@@ -80,6 +80,15 @@
 examine_globs = [
     "src/board.rs",
     "src/position.rs",
+    # --- #559: the WIDE (fairy) layer — the generic movegen + attack tables that
+    # back all 90 fairy variants. Added to examine_globs so a full CI/nightly
+    # sweep covers them; UNLIKE board.rs/position.rs these are NOT yet swept to
+    # zero survivors, so the wide layer is measured on a bounded representative
+    # sample (see the #559 findings block near the end of this file) rather than
+    # folded into the ENFORCING zero-survivor gate. A future full sweep can
+    # promote them once triaged.
+    "src/geometry/attacks.rs",
+    "src/geometry/position.rs",
 ]
 
 # Everything not in `examine_globs` is implicitly out of scope; `exclude_globs`
@@ -249,6 +258,17 @@ exclude_re = [
 # in-module / in-crate `#[cfg(test)]` pins precisely so this holds.
 test_tool = "cargo"
 additional_cargo_test_args = ["--all-features", "--lib", "--", "--skip", "geometry"]
+
+# NOTE for #559: this global filter (`--skip geometry`) is correct for the
+# ENFORCING board.rs/position.rs scope (the concrete engine, whose coverage is
+# non-geometry `--lib` tests). It is DELIBERATELY not changed for the wide-layer
+# files now in `examine_globs` (`src/geometry/attacks.rs`, `src/geometry/position.rs`):
+# their coverage lives under `geometry::`, which this filter skips, so a wide-layer
+# sweep must pass its own test selection on the command line (e.g.
+# `cargo mutants --file src/geometry/attacks.rs -- geometry::attacks`) rather than
+# relying on this global arg. A bounded local sample of `src/geometry/attacks.rs`
+# (23 of 179 mutants, run that way) surfaced 0 survivors; the full wide-layer sweep
+# is future dedicated/nightly work (it is `--exclude`d from the enforcing CI job).
 
 # ---------------------------------------------------------------------------
 # Timeouts: keep per-mutant runs bounded.

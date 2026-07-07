@@ -642,8 +642,18 @@ jobs:
   # paths) — both swept to zero real surviving mutants (#445) — and runs the fast
   # `--lib` unit suite (minus the slow geometry proptests) per mutant. With the
   # scope pinned survivor-free, the `|| true` is dropped so a NEW survivor (a rules
-  # change its unit tests fail to catch) fails the job. Broadening further (the
-  # geometry layer, the variant rule modules) remains future work.
+  # change its unit tests fail to catch) fails the job.
+  #
+  # #559 broadened the config's `examine_globs` to also list the WIDE (fairy) layer
+  # (`src/geometry/attacks.rs` + `src/geometry/position.rs`) so a future dedicated
+  # nightly/full sweep covers it — but that layer is NOT yet swept survivor-free AND
+  # its coverage lives in the geometry proptests THIS job deliberately `--skip`s for
+  # speed, so it cannot be enforced under this job's fast `--lib -- --skip geometry`
+  # filter. The two wide files are therefore `--exclude`d from the enforcing shards
+  # below, keeping this gate's scope exactly the proven-clean board+position subset.
+  # Promoting the wide layer into an enforcing sweep (with a geometry-inclusive test
+  # filter, triaged to zero survivors) remains future work — see the #559 findings
+  # block in `.cargo/mutants.toml`.
   #
   # SHARDED: the board+position scope is ~850 mutants; a single job at the fast
   # per-mutant cost would run well over an hour, so the work is split with
@@ -693,7 +703,8 @@ jobs:
       - name: cargo-mutants (enforcing, shard ${{ matrix.shard }})
         run: |
           set +e
-          cargo mutants -j 2 --timeout 90 --build-timeout 300 --shard '${{ matrix.shard }}'
+          cargo mutants -j 2 --timeout 90 --build-timeout 300 --shard '${{ matrix.shard }}' \
+            --exclude src/geometry/attacks.rs --exclude src/geometry/position.rs
           code=$?
           set -e
           if [ -s mutants.out/missed.txt ]; then
