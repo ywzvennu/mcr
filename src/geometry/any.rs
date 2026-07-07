@@ -28,11 +28,11 @@ use super::{
     Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian, Gorogoro,
     Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk,
     Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Makpong, Makruk, Manchu, Mansindam,
-    Micro, Minishogi, Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, Opulent, Orda,
-    Ordamirror, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan,
-    Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan, Square,
-    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
-    WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    Micro, Minishogi, Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Opulent,
+    Orda, Ordamirror, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight,
+    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
+    Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
+    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
 };
 use crate::Color;
 
@@ -834,6 +834,7 @@ wide_variants! {
     Newzealand, Newzealand, Newzealand, "newzealand";
     Nightrider, Nightrider, Nightrider, "nightrider";
     Nocastle, Nocastle, Nocastle, "nocastle";
+    OkisakiShogi, OkisakiShogi, OkisakiShogi, "okisakishogi", "okisaki", "okisaki-shogi";
     Opulent, Opulent, Opulent, "opulent";
     Orda, Orda, Orda, "orda";
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
@@ -899,6 +900,7 @@ impl WideVariantId {
             // No external engine oracle (independent in-repo generator / hand-derived).
             WideVariantId::Alice
             | WideVariantId::Jieqi
+            | WideVariantId::OkisakiShogi
             | WideVariantId::Tenjiku
             | WideVariantId::Washogi => Independent,
             // The HaChu large-shogi reference engine.
@@ -1085,7 +1087,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 90, "all 90 fairy variants are covered");
+        assert_eq!(count, 91, "all 91 fairy variants are covered");
     }
 
     #[test]
@@ -1601,6 +1603,12 @@ mod tests {
             WideVariantId::Nightrider,
             Nightrider,
             AnyWideVariant::Nightrider,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::OkisakiShogi,
+            OkisakiShogi,
+            AnyWideVariant::OkisakiShogi,
             2
         );
         agrees_with_typed!(WideVariantId::Orda, Orda, AnyWideVariant::Orda, 2);

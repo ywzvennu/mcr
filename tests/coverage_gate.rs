@@ -236,6 +236,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Newzealand), "perft_newzealand.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Nightrider), "perft_nightrider.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Nocastle), "perft_nocastle.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
+    row(Game::Wide(WideVariantId::OkisakiShogi), "perft_okisakishogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("the available FSF binary is a non-large-board build lacking okisakishogi (10x10); an independent from-scratch 10x10 generator is the second source"), DrawTest::Named("okisakishogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Opulent), "perft_opulent.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Orda), "perft_orda.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Ordamirror), "perft_ordamirror.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
@@ -290,10 +291,10 @@ const REQUIRED: &[Required] = &[
 const EXPECTED_TODO498: usize = 0;
 
 /// The by-design difffuzz exclusion count (Alice, Duck, Jieqi + the HaChu-only
-/// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi) — the `7` in the
-/// `SPECS.len() == ALL.len() - 7` invariant that `compare-fairy/src/difffuzz.rs`
-/// asserts on its own side.
-const DIFFFUZZ_EXCLUSIONS: usize = 7;
+/// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi and Okisaki Shogi) —
+/// the `8` in the `SPECS.len() == ALL.len() - 8` invariant that
+/// `compare-fairy/src/difffuzz.rs` asserts on its own side.
+const DIFFFUZZ_EXCLUSIONS: usize = 8;
 
 /// The variants CI holds back from the **deep rotating** difffuzz sweep (12 games ×
 /// 90 plies), each hitting a documented FSF *oracle* limitation whose false

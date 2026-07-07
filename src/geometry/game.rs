@@ -1259,8 +1259,8 @@ mod tests {
     use super::*;
     use crate::geometry::variants::{
         Aiwok, Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, EuroShogi, Gorogoro, Janggi,
-        Judkins, Kyotoshogi, Makpong, Makruk, Micro, Minishogi, Minixiangqi, ShoShogi, Shogi,
-        Shogun, Sittuyin, Tenjiku, Tori, Washogi, Xiangqi,
+        Judkins, Kyotoshogi, Makpong, Makruk, Micro, Minishogi, Minixiangqi, OkisakiShogi,
+        ShoShogi, Shogi, Shogun, Sittuyin, Tenjiku, Tori, Washogi, Xiangqi,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -2205,6 +2205,29 @@ mod tests {
             play(&mut game, 42, 35); // black K a7->a6
             play(&mut game, 10, 3); // white K d2->d1
             play(&mut game, 35, 42); // black K a6->a7
+        }
+        assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn okisakishogi_sennichite_is_a_draw() {
+        // Okisaki Shogi is 10x10 and (inheriting the Minishogi base) scores a
+        // four-fold repetition as sennichite. Black king i10 = (8,9) = 98, White king
+        // c1 = (2,0) = 2 (files far apart, no check).
+        let pos =
+            GenericPosition::<_, _, _>::from_fen("8k1/10/10/10/10/10/10/10/10/2K7[] w - - 0 1")
+                .expect("valid okisakishogi fen");
+        let _: &OkisakiShogi = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..3 {
+            play(&mut game, 2, 12); // white K c1->c2
+            play(&mut game, 98, 88); // black K i10->i9
+            play(&mut game, 12, 2); // white K c2->c1
+            play(&mut game, 88, 98); // black K i9->i10
         }
         assert_eq!(game.repetition_count(), 4);
         assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
