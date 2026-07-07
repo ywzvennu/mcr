@@ -88,17 +88,17 @@ fn derive_seed(base: u64, variant_idx: usize, game: u32) -> u64 {
 /// The FSF-side description of a fuzzable variant: its mcr identifier, the FSF
 /// `UCI_Variant` name, whether it lives in `variants.ini` (vs a built-in), and the
 /// FEN-dialect rewrite that turns an mcr FEN into the one FSF parses.
-struct Spec {
+pub(crate) struct Spec {
     /// The mcr runtime-dispatch identifier.
-    id: WideVariantId,
+    pub(crate) id: WideVariantId,
     /// FSF's `UCI_Variant` value.
-    fsf: &'static str,
+    pub(crate) fsf: &'static str,
     /// Whether the variant is defined in `variants.ini` (not a FSF built-in).
-    needs_ini: bool,
+    pub(crate) needs_ini: bool,
     /// mcr FEN -> FSF FEN. The pinned-corpus modules already encapsulate every
     /// variant's letter/field rewrite; the fuzzer reuses those exact functions so
     /// the two engines always see the byte-identical position.
-    dialect: fn(&str) -> String,
+    pub(crate) dialect: fn(&str) -> String,
 }
 
 /// The dialect for variants mcr and FSF spell identically: pass the FEN through.
@@ -228,7 +228,7 @@ fn centaur_to_fsf(fen: &str) -> String {
 /// * **Washogi** — 11x11 Wa Shogi is absent from Fairy-Stockfish's shogi family and
 ///   HaChu's perft is unreliable, so it has no trustworthy oracle and is rules-only
 ///   (like Alice); it carries no FSF spec.
-const SPECS: &[Spec] = &[
+pub(crate) const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
         // non-standard piece is the Rook+Knight Chancellor).
@@ -1011,7 +1011,7 @@ const SPECS: &[Spec] = &[
 ///   attacks over a screen. The Shako fix above (in `GenericPosition::gen_castles`,
 ///   gated by `has_cannons`/`has_flying_general`) resolves it too — synochess is
 ///   clean over deep seeded sweeps (seed 7+, 8 games × 80 plies, 0 divergences).
-const HELD_BACK: &[WideVariantId] = &[WideVariantId::Janggi];
+pub(crate) const HELD_BACK: &[WideVariantId] = &[WideVariantId::Janggi];
 
 /// Tunables for a fuzz run (parsed from the CLI in `main.rs`).
 pub struct Config {
@@ -1062,7 +1062,7 @@ struct VariantStat {
 /// Resolve the FSF `variants.ini`: `$MCR_FSF_VARIANTS_INI`, then a sibling
 /// `variants.ini` beside the FSF binary (the upstream `…/src/stockfish` +
 /// `…/src/variants.ini` layout).
-fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
+pub(crate) fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
     if let Ok(p) = std::env::var("MCR_FSF_VARIANTS_INI") {
         let path = PathBuf::from(p);
         if path.is_file() {
@@ -1093,7 +1093,7 @@ fn resolve_variants_ini(fsf_bin: &str) -> Option<PathBuf> {
 /// non-corner gating files are `b`..`g` only, so a standalone `A`/`H`/`a`/`h`
 /// implies the king has moved while its corner rook stays gating-eligible. Limited
 /// to Seirawan / S-House, whose FEN field carries this dual meaning.
-fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
+pub(crate) fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
     if spec.id != WideVariantId::Seirawan && spec.id != WideVariantId::Shouse {
         return false;
     }
@@ -1126,7 +1126,7 @@ fn is_schess_corner_castle_artifact(spec: &Spec, fen: &str) -> bool {
 /// (as Black's `perft(1)`) and leaks into the parent White node's `perft(2)`, so
 /// firing on the state skips both. The configuration is specific enough that it
 /// masks no other Empire movegen.
-fn is_empire_no_queenside_castle_artifact(spec: &Spec, fen: &str) -> bool {
+pub(crate) fn is_empire_no_queenside_castle_artifact(spec: &Spec, fen: &str) -> bool {
     if spec.id != WideVariantId::Empire {
         return false;
     }
@@ -1248,7 +1248,7 @@ fn fsf_drops_castle(pos: &AnyWideVariant, mv: &WideMove) -> bool {
 /// per-move FSF artifacts the fuzzer reconstructs (issues #454, #460). Returns
 /// `false` (inert) for every variant/move without a known artifact, so the
 /// cross-check stays byte-identical wherever the engines already agree.
-fn fsf_omits_move(
+pub(crate) fn fsf_omits_move(
     id: WideVariantId,
     pos: &AnyWideVariant,
     mv: &WideMove,

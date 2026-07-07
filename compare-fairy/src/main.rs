@@ -69,6 +69,7 @@ mod mansindam;
 mod minishogi;
 mod minixiangqi;
 mod modern;
+mod moveset;
 mod newzealand;
 mod nightrider;
 mod nocastle;
@@ -127,6 +128,10 @@ struct Opts {
     /// Run the Xiangqi perpetual-chase cross-check (issue #475) instead of the
     /// pinned corpus. Reuses `--seed` / `--games` / `--plies`.
     xiangqi_chase: bool,
+    /// Run the move-**set** differential (issue #556) instead of the pinned corpus:
+    /// a shallow exhaustive walk from each variant's start position asserting mcr's
+    /// legal-move set equals FSF's `go perft 1` divide set. Reuses `--variant`.
+    moveset: bool,
     /// Differential-fuzzer tunables (only meaningful when `difffuzz` is set).
     fuzz: difffuzz::Config,
     /// Run the HaChu large-shogi differential-oracle mode (issue #379) instead of
@@ -258,6 +263,25 @@ fn main() {
             opts.fuzz.seed,
             opts.fuzz.games,
             opts.fuzz.plies,
+        );
+        engine.quit();
+        if divergences > 0 {
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // ---- move-set differential (issue #556) -------------------------------
+    // When `--moveset` is requested, walk each variant to a shallow depth and assert
+    // mcr's legal-move SET equals FSF's `go perft 1` divide set (closing the
+    // compensating-error blind spot of the count-only checks), then exit with its
+    // divergence count.
+    if opts.moveset {
+        let divergences = moveset::run(
+            &mut engine,
+            &located.bin,
+            opts.full,
+            opts.fuzz.variant.as_deref(),
         );
         engine.quit();
         if divergences > 0 {
@@ -599,6 +623,7 @@ fn parse_args() -> Opts {
         difffuzz: false,
         quick: false,
         xiangqi_chase: false,
+        moveset: false,
         fuzz: difffuzz::Config::default(),
         hachu: false,
         build_hachu: false,
@@ -615,6 +640,7 @@ fn parse_args() -> Opts {
                 o.build_hachu = true;
             }
             "--difffuzz" | "--fuzz" => o.difffuzz = true,
+            "--moveset" => o.moveset = true,
             "--xiangqi-chase" => o.xiangqi_chase = true,
             "--seed" => o.fuzz.seed = parse_value(&mut args, "--seed", parse_seed),
             "--games" => o.fuzz.games = parse_value(&mut args, "--games", |s| s.parse().ok()),
@@ -639,6 +665,10 @@ only, each capped at depth 4"
                     "  --build-hachu : clone + build HaChu if no binary is found (implies --hachu)"
                 );
                 println!("  env MCR_HACHU_BIN=<path> selects an existing HaChu binary");
+                println!(
+                    "  --moveset  : shallow move-SET differential vs FSF `go perft 1` divide \
+(issue #556); reuses --variant / --full"
+                );
                 println!("  --difffuzz : seeded random-game perft(1..2)+divide fuzzer vs FSF (issue #239)");
                 println!("  --seed N   : fuzzer base seed (decimal or 0x-hex; default 0x239)");
                 println!("  --games K  : random games per variant (default 3)");

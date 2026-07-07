@@ -195,10 +195,7 @@ mod tests {
     /// (this runs without FSF present).
     #[test]
     fn corpus_fens_parse_and_match_pinned_shallow_counts() {
-        let pinned = [
-            ("startpos", 4u32, 4775u64),
-            ("midgame", 4, 39955),
-        ];
+        let pinned = [("startpos", 4u32, 4775u64), ("midgame", 4, 39955)];
         for (label, depth, want) in pinned {
             let case = CASES.iter().find(|c| c.label == label).expect("label");
             let pos = Gardner::from_fen(case.fen).expect("corpus FEN parses");
