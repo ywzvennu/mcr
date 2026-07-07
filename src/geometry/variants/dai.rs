@@ -570,7 +570,10 @@ impl WideVariant<Dai15x15> for DaiRules {
         true
     }
 
-    fn royal_squares(board: &Board<Dai15x15>, color: Color) -> Bitboard<Dai15x15> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Dai15x15, R>,
+        color: Color,
+    ) -> Bitboard<Dai15x15> {
         board.kings_of(color) | board.pieces(color, WideRole::CrownPrince)
     }
 
@@ -578,7 +581,7 @@ impl WideVariant<Dai15x15> for DaiRules {
         true
     }
 
-    fn royal_constraint_active(board: &Board<Dai15x15>, color: Color) -> bool {
+    fn royal_constraint_active<const R: usize>(board: &Board<Dai15x15, R>, color: Color) -> bool {
         // A royal (King or Prince) is royal only while the side holds at most one of
         // them; with two, neither is royal and the constraint is off.
         let royals = board.kings_of(color) | board.pieces(color, WideRole::CrownPrince);
@@ -655,7 +658,8 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// [`Dai::from_fen`](GenericPosition::from_fen). See the [module docs](self) for the
 /// army, the two-royal rule, the five-rank promotion zone, and the validation
 /// status.
-pub type Dai = GenericPosition<Dai15x15, DaiRules>;
+pub type Dai =
+    GenericPosition<Dai15x15, DaiRules, { <DaiRules as WideVariant<Dai15x15>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

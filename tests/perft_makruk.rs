@@ -35,7 +35,7 @@ const MID2: &str = "r1smks1r/3n4/ppp1pppp/3p4/3P4/PPP1PPPP/4N3/R1SKMS1R w - - 0 
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Makruk::from_fen(fen).expect("valid Makruk FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Makruk perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

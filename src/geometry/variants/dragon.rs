@@ -157,7 +157,11 @@ impl WideVariant<Chess8x8> for DragonRules {
         false
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // Only the Dragon (the Hawk compound) drops, only onto an empty square of
         // the dropping side's own back rank.
         if role != WideRole::Hawk {
@@ -175,4 +179,5 @@ impl WideVariant<Chess8x8> for DragonRules {
 /// [`Dragon::from_fen`](GenericPosition::from_fen). The Dragon reuses the generic
 /// Hawk (`B+N`) movement default; only the fixed pocket, the back-rank drops, and
 /// the widened promotion set distinguish it from standard chess.
-pub type Dragon = GenericPosition<Chess8x8, DragonRules>;
+pub type Dragon =
+    GenericPosition<Chess8x8, DragonRules, { <DragonRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

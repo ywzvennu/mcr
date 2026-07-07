@@ -227,7 +227,8 @@ impl WideVariant<Chess8x8> for LeganRules {
 /// [`Legan::from_fen`](GenericPosition::from_fen). Movement is standard chess with a
 /// directional pawn (diagonal move, two-orthogonal capture) and an L-shaped corner
 /// promotion region.
-pub type Legan = GenericPosition<Chess8x8, LeganRules>;
+pub type Legan =
+    GenericPosition<Chess8x8, LeganRules, { <LeganRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

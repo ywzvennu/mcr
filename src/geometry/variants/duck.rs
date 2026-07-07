@@ -102,7 +102,10 @@ impl WideVariant<Chess8x8> for DuckRules {
         true
     }
 
-    fn royal_squares(_board: &Board<Chess8x8>, _color: Color) -> Bitboard<Chess8x8> {
+    fn royal_squares<const R: usize>(
+        _board: &Board<Chess8x8, R>,
+        _color: Color,
+    ) -> Bitboard<Chess8x8> {
         // The king is not royal in Duck chess: there is no check. An empty royal
         // set makes the generic king-safety machinery report "never in check",
         // and the duck generator skips check / pin filtering entirely.
@@ -117,4 +120,5 @@ impl WideVariant<Chess8x8> for DuckRules {
 /// may carry a `*` for the Duck — with
 /// [`Duck::from_fen`](GenericPosition::from_fen). Each move is a two-part ply (a
 /// piece move plus a duck placement); see the [module docs](self).
-pub type Duck = GenericPosition<Chess8x8, DuckRules>;
+pub type Duck =
+    GenericPosition<Chess8x8, DuckRules, { <DuckRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

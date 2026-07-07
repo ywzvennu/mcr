@@ -138,7 +138,11 @@ impl WideVariant<Chess8x8> for PawnsidewaysRules {
 /// [`Pawnsideways::startpos`](GenericPosition::startpos) or parse a plain-chess FEN
 /// with [`Pawnsideways::from_fen`](GenericPosition::from_fen). Movement is standard
 /// chess with the extra sideways pawn step.
-pub type Pawnsideways = GenericPosition<Chess8x8, PawnsidewaysRules>;
+pub type Pawnsideways = GenericPosition<
+    Chess8x8,
+    PawnsidewaysRules,
+    { <PawnsidewaysRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

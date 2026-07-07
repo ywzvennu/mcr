@@ -251,7 +251,7 @@ fn parse_gate(tok: &str) -> Option<(WideRole, bool)> {
 // SAN + UCI on GenericPosition
 // ===========================================================================
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// Resolves a UCI move string to the unique legal [`WideMove`] whose
     /// [`to_uci`](WideMove::to_uci) equals `uci`, or `None` if it names no legal
     /// move.

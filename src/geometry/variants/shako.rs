@@ -284,4 +284,5 @@ impl WideVariant<Grand10x10> for ShakoRules {
 /// cannon primitive in [`attacks`]; the Elephant is a
 /// Fers-Alfil leaper. Everything else is standard chess on a wider board, with
 /// castling on rank 2 / 9.
-pub type Shako = GenericPosition<Grand10x10, ShakoRules>;
+pub type Shako =
+    GenericPosition<Grand10x10, ShakoRules, { <ShakoRules as WideVariant<Grand10x10>>::ROLE_SPAN }>;

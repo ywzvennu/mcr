@@ -177,7 +177,11 @@ impl WideVariant<Chess8x8> for BerolinaRules {
 /// [`Berolina::startpos`](GenericPosition::startpos) or parse a plain-chess FEN with
 /// [`Berolina::from_fen`](GenericPosition::from_fen). Movement is standard chess with
 /// the inverted (diagonal-move, straight-capture) Berolina pawn.
-pub type Berolina = GenericPosition<Chess8x8, BerolinaRules>;
+pub type Berolina = GenericPosition<
+    Chess8x8,
+    BerolinaRules,
+    { <BerolinaRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

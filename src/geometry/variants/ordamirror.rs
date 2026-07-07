@@ -227,4 +227,8 @@ impl WideVariant<Chess8x8> for OrdamirrorRules {
 /// [`Ordamirror::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the `lhaf` promotion, and the flag-win
 /// rule.
-pub type Ordamirror = GenericPosition<Chess8x8, OrdamirrorRules>;
+pub type Ordamirror = GenericPosition<
+    Chess8x8,
+    OrdamirrorRules,
+    { <OrdamirrorRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

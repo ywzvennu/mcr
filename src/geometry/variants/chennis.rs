@@ -223,11 +223,11 @@ impl WideVariant<Chennis7x7> for ChennisRules {
         true
     }
 
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         role: WideRole,
         color: Color,
         sq: Square<Chennis7x7>,
-        board: &Board<Chennis7x7>,
+        board: &Board<Chennis7x7, R>,
     ) -> Option<Bitboard<Chennis7x7>> {
         match role {
             // The Pawn moves one step forward onto an *empty* square and captures
@@ -247,11 +247,11 @@ impl WideVariant<Chennis7x7> for ChennisRules {
         }
     }
 
-    fn quiet_targets_board(
+    fn quiet_targets_board<const R: usize>(
         role: WideRole,
         _color: Color,
         _sq: Square<Chennis7x7>,
-        _board: &Board<Chennis7x7>,
+        _board: &Board<Chennis7x7, R>,
     ) -> Option<Bitboard<Chennis7x7>> {
         match role {
             // The Pawn's quiet step is already folded into `role_attacks_board`, so it
@@ -428,7 +428,11 @@ impl WideVariant<Chennis7x7> for ChennisRules {
 /// [`Chennis::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the per-move flip, the hand, the dual-form drops, and the king mobility
 /// region.
-pub type Chennis = GenericPosition<Chennis7x7, ChennisRules>;
+pub type Chennis = GenericPosition<
+    Chennis7x7,
+    ChennisRules,
+    { <ChennisRules as WideVariant<Chennis7x7>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

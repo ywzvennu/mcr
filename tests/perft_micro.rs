@@ -73,7 +73,7 @@ const PROMOTED_FORMS: &str = "3k/4/1+R2/+L1+P1/K3[] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Micro::from_fen(fen).expect("valid Micro FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Micro4x5, _>(&pos, depth);
+        let got = gperft::<Micro4x5, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Micro perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

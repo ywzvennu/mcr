@@ -145,7 +145,11 @@ impl WideVariant<Cap10x8> for CapahouseRules {
         true
     }
 
-    fn drop_targets(role: WideRole, _color: Color, board: &Board<Cap10x8>) -> Bitboard<Cap10x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        _color: Color,
+        board: &Board<Cap10x8, R>,
+    ) -> Bitboard<Cap10x8> {
         // Every empty square (crazyhouse) — except that a Pawn may not be dropped
         // on the first or last rank (FSF confirms pawn drops only on ranks 2-7).
         // There is no nifu, so no file filter.
@@ -194,4 +198,8 @@ impl CapahouseRules {
 /// hand) with [`Capahouse::startpos`](GenericPosition::startpos) or parse a FEN —
 /// the placement may carry the hand as a `[..]` bracket and promoted pieces as a
 /// `~` suffix — with [`Capahouse::from_fen`](GenericPosition::from_fen).
-pub type Capahouse = GenericPosition<Cap10x8, CapahouseRules>;
+pub type Capahouse = GenericPosition<
+    Cap10x8,
+    CapahouseRules,
+    { <CapahouseRules as WideVariant<Cap10x8>>::ROLE_SPAN },
+>;

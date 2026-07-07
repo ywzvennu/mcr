@@ -59,7 +59,7 @@ const PROMO: &str = "3r7k/1P10/12/12/12/12/12/K11 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Courier::from_fen(fen).expect("valid Courier FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Courier12x8, _>(&pos, depth);
+        let got = gperft::<Courier12x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Courier perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

@@ -80,7 +80,7 @@ const MIDGAME: &str = "1nbgkgn1/1r4b1/pp1ppppp/2p5/5P2/PPPPP1PP/1B4R1/1NGKGBN1[]
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = EuroShogi::from_fen(fen).expect("valid EuroShogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "EuroShogi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

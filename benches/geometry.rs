@@ -70,10 +70,10 @@ const MINIXIANGQI_MID: &str = "r1jkjcr/z1zzz1z/2c4/2J4/7/Z1ZZZ1Z/R1CKJCR w - - 0
 // ----- Generic bench helpers --------------------------------------------------
 
 /// Benches [`legal_moves`](GenericPosition::legal_moves) on a single position.
-fn add_movegen<G: Geometry, V: WideVariant<G>>(
+fn add_movegen<G: Geometry, V: WideVariant<G>, const R: usize>(
     group: &mut BenchmarkGroup<'_, WallTime>,
     id: &str,
-    pos: &GenericPosition<G, V>,
+    pos: &GenericPosition<G, V, R>,
 ) {
     group.bench_function(id, |b| {
         b.iter(|| black_box(black_box(pos).legal_moves()));
@@ -81,10 +81,10 @@ fn add_movegen<G: Geometry, V: WideVariant<G>>(
 }
 
 /// Benches [`perft`] to a fixed depth on a single position.
-fn add_perft<G: Geometry, V: WideVariant<G>>(
+fn add_perft<G: Geometry, V: WideVariant<G>, const R: usize>(
     group: &mut BenchmarkGroup<'_, WallTime>,
     id: &str,
-    pos: &GenericPosition<G, V>,
+    pos: &GenericPosition<G, V, R>,
     depth: u32,
 ) {
     group.bench_function(id, |b| {

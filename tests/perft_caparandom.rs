@@ -33,7 +33,7 @@ fn check(fen: &str, cases: &[(u32, u64)]) {
     // The FEN round-trips (Shredder castling field preserved).
     assert_eq!(pos.to_fen(), fen, "Caparandom FEN round trip for {fen}");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Caparandom perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

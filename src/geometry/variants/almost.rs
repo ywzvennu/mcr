@@ -125,7 +125,10 @@ impl WideVariant<Chess8x8> for AlmostRules {
     /// (bishop or knight) vs king, and same-colour bishops only. The Chancellor
     /// counts as mating material (a major piece). Adjudication-only and behind the
     /// default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -137,7 +140,8 @@ impl WideVariant<Chess8x8> for AlmostRules {
 /// [`Almost::from_fen`](GenericPosition::from_fen). The Chancellor reuses the
 /// [`StandardChess`](crate::geometry::StandardChess) compound default, so only the
 /// array and the no-Queen promotion set distinguish it from standard chess.
-pub type Almost = GenericPosition<Chess8x8, AlmostRules>;
+pub type Almost =
+    GenericPosition<Chess8x8, AlmostRules, { <AlmostRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

@@ -342,7 +342,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// player has had captured. The set is read live from the board, so no extra
     /// position state is needed and every non-overriding variant enumerates
     /// byte-identically to a build without this hook.
-    fn promotion_targets(_color: Color, _board: &Board<G>) -> Vec<WideRole> {
+    fn promotion_targets<const R: usize>(_color: Color, _board: &Board<G, R>) -> Vec<WideRole> {
         Self::promotion_config().roles
     }
 
@@ -697,7 +697,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// variants (Spartan) and non-royal-king variants (Duck) override this; the
     /// generic king-safety machinery treats an empty royal set as "never in
     /// check".
-    fn royal_squares(board: &Board<G>, color: Color) -> Bitboard<G> {
+    fn royal_squares<const R: usize>(board: &Board<G, R>, color: Color) -> Bitboard<G> {
         board.kings_of(color)
     }
 
@@ -777,7 +777,7 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// it reduces to ordinary single-king check.
     ///
     /// [`royal_squares`]: WideVariant::royal_squares
-    fn royal_constraint_active(_board: &Board<G>, _color: Color) -> bool {
+    fn royal_constraint_active<const R: usize>(_board: &Board<G, R>, _color: Color) -> bool {
         true
     }
 
@@ -1013,11 +1013,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// Fed to the generator it splits into quiet/capture by enemy occupancy; fed to
     /// the king-safety test it correctly reports a cannon "check" (a royal square is
     /// occupied, so it can only fall in the capture portion).
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         _role: WideRole,
         _color: Color,
         _sq: Square<G>,
-        _board: &Board<G>,
+        _board: &Board<G, R>,
     ) -> Option<Bitboard<G>> {
         None
     }
@@ -1041,11 +1041,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// attack), so projecting the full move set from an empty square (a castling
     /// transit / destination) would invent a phantom attacker. Empire overrides this
     /// to return just the short capture pattern — the squares it genuinely threatens.
-    fn role_threats_board(
+    fn role_threats_board<const R: usize>(
         role: WideRole,
         color: Color,
         sq: Square<G>,
-        board: &Board<G>,
+        board: &Board<G, R>,
     ) -> Option<Bitboard<G>> {
         Self::role_attacks_board(role, color, sq, board)
     }
@@ -1059,11 +1059,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// [`role_attacks_board`](WideVariant::role_attacks_board) (the generator's
     /// `emit_targets` splits quiet from capture by occupancy), so it leaves this at
     /// the default and the cannon emits no separate quiet-only set.
-    fn quiet_targets_board(
+    fn quiet_targets_board<const R: usize>(
         _role: WideRole,
         _color: Color,
         _sq: Square<G>,
-        _board: &Board<G>,
+        _board: &Board<G, R>,
     ) -> Option<Bitboard<G>> {
         None
     }
@@ -1112,8 +1112,8 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// is unaffected. The engine ORs this into the attacked-square test on the
     /// king-safety verify path and in `is_check`, exactly modelling the rule that
     /// the generals may never see each other down an open file.
-    fn extra_royal_attack(
-        _board: &Board<G>,
+    fn extra_royal_attack<const R: usize>(
+        _board: &Board<G, R>,
         _sq: Square<G>,
         _by: Color,
         _occupied: Bitboard<G>,
@@ -1539,7 +1539,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// nearest ranks, minus own pawns, with Rooks confined to the back rank). A
     /// drop is unconditionally pseudo-legal there (FSF applies no check filtering
     /// during placement).
-    fn placement_targets(_role: WideRole, _color: Color, board: &Board<G>) -> Bitboard<G> {
+    fn placement_targets<const R: usize>(
+        _role: WideRole,
+        _color: Color,
+        board: &Board<G, R>,
+    ) -> Bitboard<G> {
         !board.occupied()
     }
 
@@ -1558,8 +1562,8 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// expresses a promotion the rank-based standard path cannot.
     ///
     /// [`promotion_config`]: WideVariant::promotion_config
-    fn special_promotion_targets(
-        _board: &Board<G>,
+    fn special_promotion_targets<const R: usize>(
+        _board: &Board<G, R>,
         _from: Square<G>,
         _color: Color,
     ) -> Option<Bitboard<G>> {
@@ -1758,7 +1762,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// (**uchifuzume**) is *not* expressed here — it depends on the resulting
     /// position, so the generic drop generator applies it via
     /// [`drop_gives_legal_mate_ok`](WideVariant::pawn_drop_mate_forbidden).
-    fn drop_targets(_role: WideRole, _color: Color, board: &Board<G>) -> Bitboard<G> {
+    fn drop_targets<const R: usize>(
+        _role: WideRole,
+        _color: Color,
+        board: &Board<G, R>,
+    ) -> Bitboard<G> {
         !board.occupied()
     }
 
@@ -1954,7 +1962,11 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// corresponding Centaur, Archbishop, Chancellor, or Queen on the board
     /// (`promotionLimit = g:1 a:1 m:1 q:1`); the Commoner (promoted Pawn) is
     /// uncapped.
-    fn role_promotion_blocked_by_limit(_role: WideRole, _color: Color, _board: &Board<G>) -> bool {
+    fn role_promotion_blocked_by_limit<const R: usize>(
+        _role: WideRole,
+        _color: Color,
+        _board: &Board<G, R>,
+    ) -> bool {
         false
     }
 
@@ -2020,7 +2032,10 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// Hook for variant-specific terminal conditions (king-capture wins, race
     /// goals). The default reports `None` — standard chess ends only by the
     /// generic checkmate / stalemate / material rules the position computes.
-    fn extra_terminal(_board: &Board<G>, _state: &GenericState<G>) -> Option<WideEndReason> {
+    fn extra_terminal<const R: usize>(
+        _board: &Board<G, R>,
+        _state: &GenericState<G, R>,
+    ) -> Option<WideEndReason> {
         None
     }
 
@@ -2175,13 +2190,21 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// variants do not have one). Reported from the single position via
     /// [`WideEndReason::InsufficientMaterial`]; a variant that wants the rule
     /// overrides this with its own material test.
-    fn is_insufficient_material(_board: &Board<G>, _state: &GenericState<G>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        _board: &Board<G, R>,
+        _state: &GenericState<G, R>,
+    ) -> bool {
         false
     }
 
     /// Reserved no-op hook for drop generation (Shogi / crazyhouse). Standard
     /// chess emits no drops, so the default does nothing.
-    fn emit_drops(_board: &Board<G>, _state: &GenericState<G>, _out: &mut Vec<super::WideMove>) {}
+    fn emit_drops<const R: usize>(
+        _board: &Board<G, R>,
+        _state: &GenericState<G, R>,
+        _out: &mut Vec<super::WideMove>,
+    ) {
+    }
 
     // --- Seirawan gating (default OFF) ------------------------------------
 
@@ -2503,7 +2526,9 @@ pub enum WideEndReason {
 /// Consulted only by [`GenericPosition::end_reason`](super::GenericPosition)
 /// through the opt-in [`WideVariant::is_insufficient_material`] hook, never by the
 /// move generator — so a variant that enables it stays byte-identical under perft.
-pub(crate) fn standard_insufficient_material<G: Geometry>(board: &Board<G>) -> bool {
+pub(crate) fn standard_insufficient_material<G: Geometry, const R: usize>(
+    board: &Board<G, R>,
+) -> bool {
     let knights = board.by_role(WideRole::Knight);
     let bishops = board.by_role(WideRole::Bishop);
     let kings = board.by_role(WideRole::King);

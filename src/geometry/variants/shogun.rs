@@ -226,10 +226,10 @@ impl WideVariant<Chess8x8> for ShogunRules {
         }
     }
 
-    fn role_promotion_blocked_by_limit(
+    fn role_promotion_blocked_by_limit<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Chess8x8>,
+        board: &Board<Chess8x8, R>,
     ) -> bool {
         // FSF `promotionLimit = g:1 a:1 m:1 q:1`: a piece may not promote while its
         // promoted form is already at the cap on the board. The Commoner (promoted
@@ -269,7 +269,11 @@ impl WideVariant<Chess8x8> for ShogunRules {
         }
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // The dropping side's drop region (ranks 1-5 for White, 4-8 for Black) —
         // the same for every piece type. There is no nifu and no last-rank pawn
         // ban: the region simply never reaches the rank where a pawn would be
@@ -333,4 +337,5 @@ impl ShogunRules {
 /// [`Shogun::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the promotion zone, the per-piece promotions and their cap, and the
 /// crazyhouse hand and drops.
-pub type Shogun = GenericPosition<Chess8x8, ShogunRules>;
+pub type Shogun =
+    GenericPosition<Chess8x8, ShogunRules, { <ShogunRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

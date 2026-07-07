@@ -109,7 +109,10 @@ impl WideVariant<Grand10x10> for GrandhouseRules {
         GrandRules::promotion_config()
     }
 
-    fn promotion_targets(color: Color, board: &Board<Grand10x10>) -> alloc::vec::Vec<WideRole> {
+    fn promotion_targets<const R: usize>(
+        color: Color,
+        board: &Board<Grand10x10, R>,
+    ) -> alloc::vec::Vec<WideRole> {
         // Grand's promote-only-to-a-captured-type limit, read live from the board.
         GrandRules::promotion_targets(color, board)
     }
@@ -155,10 +158,10 @@ impl WideVariant<Grand10x10> for GrandhouseRules {
         true
     }
 
-    fn drop_targets(
+    fn drop_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Grand10x10>,
+        board: &Board<Grand10x10, R>,
     ) -> Bitboard<Grand10x10> {
         // Every empty square (crazyhouse) — except that a Pawn may not be dropped
         // on its own back rank nor in the promotion zone (FSF confirms white pawn
@@ -204,4 +207,8 @@ impl GrandhouseRules {
 /// with [`Grandhouse::startpos`](GenericPosition::startpos) or parse a FEN — the
 /// placement may carry the hand as a `[..]` bracket and promoted pieces as a `~`
 /// suffix — with [`Grandhouse::from_fen`](GenericPosition::from_fen).
-pub type Grandhouse = GenericPosition<Grand10x10, GrandhouseRules>;
+pub type Grandhouse = GenericPosition<
+    Grand10x10,
+    GrandhouseRules,
+    { <GrandhouseRules as WideVariant<Grand10x10>>::ROLE_SPAN },
+>;

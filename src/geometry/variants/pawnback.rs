@@ -171,7 +171,11 @@ impl WideVariant<Chess8x8> for PawnbackRules {
 /// [`Pawnback::startpos`](GenericPosition::startpos) or parse a plain-chess FEN with
 /// [`Pawnback::from_fen`](GenericPosition::from_fen). Movement is standard chess with
 /// a pawn that may also step one square straight backward.
-pub type Pawnback = GenericPosition<Chess8x8, PawnbackRules>;
+pub type Pawnback = GenericPosition<
+    Chess8x8,
+    PawnbackRules,
+    { <PawnbackRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

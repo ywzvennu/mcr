@@ -66,7 +66,7 @@ const HANDS_MIDBOARD: &str = "4k4/9/9/9/9/9/1R7/9/6K2[Gp] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = CheckShogi::from_fen(fen).expect("valid Checkshogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Shogi9x9, _>(&pos, depth);
+        let got = gperft::<Shogi9x9, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Checkshogi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
@@ -136,7 +136,7 @@ fn check_win_is_terminal() {
     assert!(pos.is_check(), "Black to move is in check");
     assert!(pos.legal_moves().is_empty(), "a checked side has no reply");
     assert_eq!(
-        gperft::<Shogi9x9, _>(&pos, 1),
+        gperft::<Shogi9x9, _, _>(&pos, 1),
         0,
         "the node is a perft leaf"
     );

@@ -218,9 +218,9 @@ impl WideVariant<Grand10x10> for TencubedRules {
     /// bishops only. Every fairy piece counts as mating material (any non-minor,
     /// non-king occupant makes the position sufficient). Adjudication-only and behind
     /// the default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(
-        board: &Board<Grand10x10>,
-        _state: &GenericState<Grand10x10>,
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Grand10x10, R>,
+        _state: &GenericState<Grand10x10, R>,
     ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
@@ -233,7 +233,11 @@ impl WideVariant<Grand10x10> for TencubedRules {
 /// with [`Tencubed::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the army (Wizard + Champion leapers), the no-castling / pawn
 /// rules, and the restricted last-rank promotion set.
-pub type Tencubed = GenericPosition<Grand10x10, TencubedRules>;
+pub type Tencubed = GenericPosition<
+    Grand10x10,
+    TencubedRules,
+    { <TencubedRules as WideVariant<Grand10x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -287,9 +291,9 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Tencubed::startpos();
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 1), 40);
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 2), 1600);
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 3), 68230);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 1), 40);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 2), 1600);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 3), 68230);
     }
 
     /// The Wizard leaps to the eight Camel and four Ferz squares (twelve targets),

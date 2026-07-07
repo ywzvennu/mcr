@@ -303,10 +303,10 @@ impl WideVariant<Chess8x8> for SittuyinRules {
         GenericPlacement::new(counts, counts)
     }
 
-    fn placement_targets(
+    fn placement_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Chess8x8>,
+        board: &Board<Chess8x8, R>,
     ) -> Bitboard<Chess8x8> {
         // Empty squares in the player's own territory; Rooks confined to the back
         // rank. (The own pawns sitting in the territory are excluded by the
@@ -318,8 +318,8 @@ impl WideVariant<Chess8x8> for SittuyinRules {
         mask
     }
 
-    fn special_promotion_targets(
-        board: &Board<Chess8x8>,
+    fn special_promotion_targets<const R: usize>(
+        board: &Board<Chess8x8, R>,
         from: Square<Chess8x8>,
         color: Color,
     ) -> Option<Bitboard<Chess8x8>> {
@@ -370,4 +370,8 @@ impl WideVariant<Chess8x8> for SittuyinRules {
 /// placement may carry the setup-phase pocket as a `[..]` holdings bracket — with
 /// [`Sittuyin::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the placement phase and special promotion.
-pub type Sittuyin = GenericPosition<Chess8x8, SittuyinRules>;
+pub type Sittuyin = GenericPosition<
+    Chess8x8,
+    SittuyinRules,
+    { <SittuyinRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

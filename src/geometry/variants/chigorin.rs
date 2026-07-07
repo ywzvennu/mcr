@@ -128,7 +128,10 @@ impl WideVariant<Chess8x8> for ChigorinRules {
         }
     }
 
-    fn promotion_targets(color: Color, _board: &Board<Chess8x8>) -> alloc::vec::Vec<WideRole> {
+    fn promotion_targets<const R: usize>(
+        color: Color,
+        _board: &Board<Chess8x8, R>,
+    ) -> alloc::vec::Vec<WideRole> {
         // White (the knight army) promotes to Chancellor / Rook / Knight; Black
         // (the bishop army) to Queen / Rook / Bishop. This is a fixed per-colour
         // set (unlike Grand's board-dependent limit), matching FSF's per-colour
@@ -147,7 +150,10 @@ impl WideVariant<Chess8x8> for ChigorinRules {
     /// always-mating Chancellor ([`WideRole::Elephant`]) and a Queen, so the
     /// ordinary insufficient-material draw applies. Adjudication-only and behind
     /// the default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -158,7 +164,11 @@ impl WideVariant<Chess8x8> for ChigorinRules {
 /// [`Chigorin::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Chigorin::from_fen`](GenericPosition::from_fen). Only the asymmetric array and
 /// the colour-restricted promotion targets distinguish it from standard chess.
-pub type Chigorin = GenericPosition<Chess8x8, ChigorinRules>;
+pub type Chigorin = GenericPosition<
+    Chess8x8,
+    ChigorinRules,
+    { <ChigorinRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

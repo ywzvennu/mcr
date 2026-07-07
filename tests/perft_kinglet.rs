@@ -73,7 +73,7 @@ const WHITE_NO_PAWNS: &str = "rnbqkbnr/pppppppp/8/8/8/8/8/RNBQKBNR w KQkq - 0 1"
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Kinglet::from_fen(fen).expect("valid Kinglet FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Kinglet perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

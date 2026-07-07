@@ -45,7 +45,7 @@ const EP_ACTIVE: &str = "4k3/8/8/8/3pP3/8/8/4K3 b - d3 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Berolina::from_fen(fen).expect("valid Berolina FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Berolina perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
@@ -133,7 +133,7 @@ fn en_passant_ambiguous_via_move() {
         "ep target is the skipped f6"
     );
     for &(depth, expected) in &[(1u32, 8u64), (2, 68), (3, 547)] {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Berolina ambiguous-ep perft({depth}): expected {expected} (FSF-confirmed), got {got}"

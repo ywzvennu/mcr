@@ -103,7 +103,10 @@ impl WideVariant<Chess8x8> for FogOfWarRules {
         true
     }
 
-    fn royal_squares(_board: &Board<Chess8x8>, _color: Color) -> Bitboard<Chess8x8> {
+    fn royal_squares<const R: usize>(
+        _board: &Board<Chess8x8, R>,
+        _color: Color,
+    ) -> Bitboard<Chess8x8> {
         // The king is **not royal**: there is no check, pin, or self-check filter.
         // An empty royal set makes the generic king-safety machinery report
         // "never in check"; a side loses by having its king captured (after which
@@ -120,7 +123,11 @@ impl WideVariant<Chess8x8> for FogOfWarRules {
 /// with [`FogOfWar::from_fen`](GenericPosition::from_fen). The move generator is
 /// deterministic and perft-validated against Fairy-Stockfish; the per-player
 /// fog is the separate [`visible_squares`](FogOfWar::visible_squares) view.
-pub type FogOfWar = GenericPosition<Chess8x8, FogOfWarRules>;
+pub type FogOfWar = GenericPosition<
+    Chess8x8,
+    FogOfWarRules,
+    { <FogOfWarRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 impl FogOfWar {
     /// Returns the squares `color` can **see** through the fog: every square its

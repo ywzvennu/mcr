@@ -53,7 +53,7 @@ const PAWN_CAPS: &str = "4k3/8/8/2ppp3/3PPP2/8/8/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Petrified::from_fen(fen).expect("valid petrified FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "petrified perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

@@ -233,7 +233,10 @@ impl WideVariant<Shogi9x9> for ShoShogiRules {
         true
     }
 
-    fn royal_squares(board: &Board<Shogi9x9>, color: Color) -> Bitboard<Shogi9x9> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Shogi9x9, R>,
+        color: Color,
+    ) -> Bitboard<Shogi9x9> {
         board.kings_of(color) | board.pieces(color, WideRole::CrownPrince)
     }
 
@@ -244,7 +247,7 @@ impl WideVariant<Shogi9x9> for ShoShogiRules {
         true
     }
 
-    fn royal_constraint_active(board: &Board<Shogi9x9>, color: Color) -> bool {
+    fn royal_constraint_active<const R: usize>(board: &Board<Shogi9x9, R>, color: Color) -> bool {
         // FSF `extinctionPieceCount = 0`: a royal (King or Crown Prince) is royal
         // only while the side holds **at most one** of them. With two, neither is
         // royal and the constraint is off.
@@ -292,7 +295,11 @@ impl WideVariant<Shogi9x9> for ShoShogiRules {
 /// with [`ShoShogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the Drunk Elephant → Crown Prince
 /// promotion, and the count-thresholded two-royal rule.
-pub type ShoShogi = GenericPosition<Shogi9x9, ShoShogiRules>;
+pub type ShoShogi = GenericPosition<
+    Shogi9x9,
+    ShoShogiRules,
+    { <ShoShogiRules as WideVariant<Shogi9x9>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

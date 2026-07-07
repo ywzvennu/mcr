@@ -34,7 +34,7 @@ const DROP_LAB: &str = "4k4/9/9/9/9/9/9/9/4K4[RBC=A=C=Irbc=a=c=i] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = CannonShogi::from_fen(fen).expect("valid Cannon Shogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Shogi9x9, _>(&pos, depth);
+        let got = gperft::<Shogi9x9, _, _>(&pos, depth);
         assert_eq!(got, expected, "perft({depth}) mismatch for {fen}");
     }
 }

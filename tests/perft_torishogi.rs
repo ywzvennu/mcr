@@ -37,7 +37,7 @@ const QUAILS: &str = "3k3/7/2*v*r3/7/3*V*R2/7/3K3[*Y*y*A*a] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Tori::from_fen(fen).expect("valid Tori Shogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Tori7x7, _>(&pos, depth);
+        let got = gperft::<Tori7x7, _, _>(&pos, depth);
         assert_eq!(got, expected, "Tori perft({depth}) mismatch for {fen}");
     }
 }

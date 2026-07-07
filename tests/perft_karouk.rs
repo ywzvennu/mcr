@@ -49,7 +49,7 @@ const CHECK_WIN: &str = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Karouk::from_fen(fen).expect("valid Ka Ouk FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Karouk perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

@@ -55,7 +55,7 @@ fn splitmix64(state: &mut u64) -> u64 {
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Jieqi::from_fen(fen).expect("Jieqi FEN parses");
     for &(depth, expected) in cases {
-        let got = gperft::<Xiangqi9x10, _>(&pos, depth);
+        let got = gperft::<Xiangqi9x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Jieqi perft({depth}) for {fen}: expected {expected} (FSF xiangqi-confirmed), got {got}"
@@ -71,8 +71,8 @@ fn assert_matches_xiangqi(jieqi_fen: &str, xiangqi_fen: &str, depths: &[u32]) {
     let jq = Jieqi::from_fen(jieqi_fen).expect("Jieqi FEN parses");
     let xq = Xiangqi::from_fen(xiangqi_fen).expect("Xiangqi FEN parses");
     for &depth in depths {
-        let a = gperft::<Xiangqi9x10, _>(&jq, depth);
-        let b = gperft::<Xiangqi9x10, _>(&xq, depth);
+        let a = gperft::<Xiangqi9x10, _, _>(&jq, depth);
+        let b = gperft::<Xiangqi9x10, _, _>(&xq, depth);
         assert_eq!(
             a, b,
             "Jieqi {jieqi_fen} vs Xiangqi {xiangqi_fen} perft({depth}): {a} != {b}"
@@ -152,8 +152,8 @@ fn lockstep_with_xiangqi_through_reveals() {
         );
         // Perft from this mixed-reveal node matches Xiangqi.
         assert_eq!(
-            gperft::<Xiangqi9x10, _>(&jq, 2),
-            gperft::<Xiangqi9x10, _>(&xq, 2),
+            gperft::<Xiangqi9x10, _, _>(&jq, 2),
+            gperft::<Xiangqi9x10, _, _>(&xq, 2),
             "ply {ply}: perft from reached node diverges",
         );
         if jm.is_empty() {

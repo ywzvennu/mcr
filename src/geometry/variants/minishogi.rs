@@ -263,10 +263,10 @@ impl WideVariant<Minishogi5x5> for MinishogiRules {
         }
     }
 
-    fn drop_targets(
+    fn drop_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Minishogi5x5>,
+        board: &Board<Minishogi5x5, R>,
     ) -> Bitboard<Minishogi5x5> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Pawn may not land on the last rank (it would
@@ -341,7 +341,11 @@ impl MinishogiRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`Minishogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the hand, drops, and single-rank promotion zone.
-pub type Minishogi = GenericPosition<Minishogi5x5, MinishogiRules>;
+pub type Minishogi = GenericPosition<
+    Minishogi5x5,
+    MinishogiRules,
+    { <MinishogiRules as WideVariant<Minishogi5x5>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

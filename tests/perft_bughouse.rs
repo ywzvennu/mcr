@@ -114,7 +114,7 @@ fn check(p: &Perft, max_depth: u32) {
             continue;
         }
         assert_eq!(
-            gperft::<Chess8x8, _>(&pos, depth),
+            gperft::<Chess8x8, _, _>(&pos, depth),
             nodes,
             "Bughouse perft depth {depth} for FEN {}",
             p.fen,

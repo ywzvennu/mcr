@@ -177,7 +177,10 @@ impl WideVariant<Cap10x8> for CentaurRules {
     /// The Centaur counts as mating material (matching Fairy-Stockfish, which
     /// classes it as a major piece). Adjudication-only and behind the default-off
     /// hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Cap10x8>, _state: &GenericState<Cap10x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Cap10x8, R>,
+        _state: &GenericState<Cap10x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -189,7 +192,8 @@ impl WideVariant<Cap10x8> for CentaurRules {
 /// [`Centaur::from_fen`](GenericPosition::from_fen). The Centaur reuses the Orda
 /// [`WideRole::Kheshig`] King + Knight leaper, so only the array, the Centaur
 /// movement, the promotion set, and the castle files distinguish it.
-pub type Centaur = GenericPosition<Cap10x8, CentaurRules>;
+pub type Centaur =
+    GenericPosition<Cap10x8, CentaurRules, { <CentaurRules as WideVariant<Cap10x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod insufficient_material_tests {

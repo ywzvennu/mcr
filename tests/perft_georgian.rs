@@ -65,7 +65,7 @@ const CASTLE_AND_EP: &str = "r3k2r/pppppppp/8/8/3pP3/8/PPPP1PPP/R3K2R b KQkq e3 
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Georgian::from_fen(fen).expect("valid Georgian FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Georgian perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

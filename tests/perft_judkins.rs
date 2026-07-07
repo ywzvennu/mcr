@@ -78,7 +78,7 @@ const MIDGAME: &str = "2k3/6/R4r/6/6/2K3[Pp] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Judkins::from_fen(fen).expect("valid Judkins FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Judkins6x6, _>(&pos, depth);
+        let got = gperft::<Judkins6x6, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Judkins perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

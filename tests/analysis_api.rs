@@ -68,8 +68,8 @@ fn squares_of<G: Geometry>(bb: Bitboard<G>) -> Vec<u8> {
 }
 
 /// Asserts the internal consistency of the analysis primitives on one position.
-fn assert_primitives<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_primitives<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {
@@ -140,8 +140,8 @@ fn assert_primitives<G: Geometry, V: WideVariant<G>>(
 /// Ties the primitives to forward move generation: every legal *capture* for the
 /// side to move lands on a square that side attacks, and the capturing piece is
 /// among that square's attackers.
-fn assert_move_gen<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_move_gen<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {
@@ -171,8 +171,8 @@ fn assert_move_gen<G: Geometry, V: WideVariant<G>>(
 
 /// Cross-checks the check / pin / per-piece-move query helpers against the
 /// validated primitives and forward move generation.
-fn assert_queries<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_queries<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {
@@ -298,8 +298,8 @@ fn assert_queries<G: Geometry, V: WideVariant<G>>(
 }
 
 /// Asserts every property on one position.
-fn assert_all<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_all<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {

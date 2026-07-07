@@ -52,7 +52,7 @@ const PROMO: &str = "4k5/8P1/10/10/10/10/10/10/10/RNBQK1EAN1 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Grand::from_fen(fen).expect("valid Grand FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Grand10x10, _>(&pos, depth);
+        let got = gperft::<Grand10x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Grand perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

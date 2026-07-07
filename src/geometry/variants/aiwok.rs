@@ -140,4 +140,5 @@ impl WideVariant<Chess8x8> for AiwokRules {
 /// [`Aiwok::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Aiwok::from_fen`](GenericPosition::from_fen). It is Makruk with the Met
 /// replaced by a Rook + Knight + Ferz Ai-Wok; see the [module docs](self).
-pub type Aiwok = GenericPosition<Chess8x8, AiwokRules>;
+pub type Aiwok =
+    GenericPosition<Chess8x8, AiwokRules, { <AiwokRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

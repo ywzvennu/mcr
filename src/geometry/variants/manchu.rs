@@ -164,11 +164,11 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
         true
     }
 
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         role: WideRole,
         _color: Color,
         sq: Square<Xiangqi9x10>,
-        board: &Board<Xiangqi9x10>,
+        board: &Board<Xiangqi9x10, R>,
     ) -> Option<Bitboard<Xiangqi9x10>> {
         // Only the Banner uses the whole board; every other role falls back to the
         // occupancy-only Xiangqi `role_attacks`. The returned set folds the rook
@@ -245,8 +245,8 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
         true
     }
 
-    fn extra_royal_attack(
-        board: &Board<Xiangqi9x10>,
+    fn extra_royal_attack<const R: usize>(
+        board: &Board<Xiangqi9x10, R>,
         sq: Square<Xiangqi9x10>,
         by: Color,
         occupied: Bitboard<Xiangqi9x10>,
@@ -272,7 +272,11 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
 /// with [`Manchu::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the Banner movement (Rook + Cannon + Horse) and the reused
 /// Xiangqi palace / river / flying-general rules.
-pub type Manchu = GenericPosition<Xiangqi9x10, ManchuRules>;
+pub type Manchu = GenericPosition<
+    Xiangqi9x10,
+    ManchuRules,
+    { <ManchuRules as WideVariant<Xiangqi9x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

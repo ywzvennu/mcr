@@ -208,7 +208,11 @@ impl WideVariant<Chess8x8> for ShouseRules {
         true
     }
 
-    fn drop_targets(role: WideRole, _color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        _color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // Every empty square (crazyhouse) — except a Pawn may not be dropped on the
         // first or last rank (FSF confirms pawn drops only on ranks 2-7). There is
         // no nifu, and drops giving check or mate are legal.
@@ -243,4 +247,5 @@ impl WideVariant<Chess8x8> for ShouseRules {
 /// `[AEae]` crazyhouse hand, the `KQBCDFGkqbcdfg` gating rights, and crazyhouse
 /// `~` promotion marks — with [`Shouse::from_fen`](GenericPosition::from_fen). See
 /// the [module docs](self) for the unified gate/drop hand and the promotion rule.
-pub type Shouse = GenericPosition<Chess8x8, ShouseRules>;
+pub type Shouse =
+    GenericPosition<Chess8x8, ShouseRules, { <ShouseRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

@@ -127,7 +127,10 @@ impl WideVariant<Chess8x8> for CoregalRules {
     /// subject to check and checkmate. A promoted pawn on a queen adds another
     /// royal that must equally be kept safe (FSF `extinctionPieceCount = 64`, so no
     /// matter how many queens a side has, all of them are royal).
-    fn royal_squares(board: &Board<Chess8x8>, color: Color) -> Bitboard<Chess8x8> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        color: Color,
+    ) -> Bitboard<Chess8x8> {
         board.kings_of(color) | board.pieces(color, WideRole::Queen)
     }
 
@@ -149,7 +152,8 @@ impl WideVariant<Chess8x8> for CoregalRules {
 /// [`StandardChess`] default except that the queen is royal alongside the king:
 /// a side loses if *either* is checkmated. See the [module docs](self) for the
 /// royal-queen rule and how it rides the multi-royal machinery.
-pub type Coregal = GenericPosition<Chess8x8, CoregalRules>;
+pub type Coregal =
+    GenericPosition<Chess8x8, CoregalRules, { <CoregalRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

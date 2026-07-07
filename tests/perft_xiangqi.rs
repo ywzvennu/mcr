@@ -108,7 +108,7 @@ const SOLDIER_GUARD_SIDE: &str = "9/3k5/4Z4/9/9/9/9/9/9/4K4 b - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Xiangqi::from_fen(fen).expect("valid Xiangqi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Xiangqi9x10, _>(&pos, depth);
+        let got = gperft::<Xiangqi9x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Xiangqi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

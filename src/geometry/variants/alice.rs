@@ -103,7 +103,10 @@ impl WideVariant<Chess8x8> for AliceRules {
     /// conservative) draw test here; Fairy-Stockfish has no Alice variant, so it is
     /// matched to standard chess rather than an FSF oracle. Adjudication-only and
     /// behind the default-off hook, so perft is byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -116,7 +119,8 @@ impl WideVariant<Chess8x8> for AliceRules {
 /// (which yields all pieces on board A). A position's per-piece board membership
 /// is then maintained internally as each move transfers its mover to the other
 /// board.
-pub type Alice = GenericPosition<Chess8x8, AliceRules>;
+pub type Alice =
+    GenericPosition<Chess8x8, AliceRules, { <AliceRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod insufficient_material_tests {

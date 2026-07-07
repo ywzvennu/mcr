@@ -51,7 +51,7 @@ fn engine_startpos_perft_pins() {
     let pos = Alice::from_fen(STARTPOS).expect("valid Alice FEN");
     // Cheap layers only (1–4); depth 5 is pinned in the ignored deep test.
     for &(depth, expected) in &ENGINE_PINS[..4] {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "engine Alice perft({depth}) mismatch (rules-validated, no FSF oracle)"
@@ -63,7 +63,7 @@ fn engine_startpos_perft_pins() {
 #[ignore = "deep perft; run with --release --test perft_alice -- --include-ignored"]
 fn engine_startpos_perft_deep() {
     let pos = Alice::from_fen(STARTPOS).expect("valid Alice FEN");
-    let got = gperft::<Chess8x8, _>(&pos, 5);
+    let got = gperft::<Chess8x8, _, _>(&pos, 5);
     assert_eq!(got, 5_910_465, "engine Alice perft(5) mismatch");
 }
 
@@ -77,7 +77,7 @@ fn engine_matches_independent_brute_force() {
     let engine = Alice::from_fen(STARTPOS).expect("valid Alice FEN");
     let bf = brute::Position::startpos();
     for depth in 1..=4 {
-        let e = gperft::<Chess8x8, _>(&engine, depth);
+        let e = gperft::<Chess8x8, _, _>(&engine, depth);
         let b = brute::perft(&bf, depth);
         assert_eq!(
             e, b,

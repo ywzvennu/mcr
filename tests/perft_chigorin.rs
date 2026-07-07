@@ -34,7 +34,7 @@ const PROMO: &str = "4k3/1P6/8/8/8/8/1p6/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Chigorin::from_fen(fen).expect("valid Chigorin FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Chigorin perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

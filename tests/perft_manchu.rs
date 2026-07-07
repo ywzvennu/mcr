@@ -72,7 +72,7 @@ const ROOK_CHECK: &str = "4k4/9/9/9/9/9/9/9/9/4*M4 b - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Manchu::from_fen(fen).expect("valid Manchu FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Xiangqi9x10, _>(&pos, depth);
+        let got = gperft::<Xiangqi9x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Manchu perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

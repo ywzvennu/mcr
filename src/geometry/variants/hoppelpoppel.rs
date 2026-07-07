@@ -232,7 +232,11 @@ impl WideVariant<Chess8x8> for HoppelPoppelRules {
 /// [`HoppelPoppel::startpos`](GenericPosition::startpos) or parse a FEN (mcr
 /// dialect) with [`HoppelPoppel::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the move≠capture pieces and the `q r b n` promotion.
-pub type HoppelPoppel = GenericPosition<Chess8x8, HoppelPoppelRules>;
+pub type HoppelPoppel = GenericPosition<
+    Chess8x8,
+    HoppelPoppelRules,
+    { <HoppelPoppelRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

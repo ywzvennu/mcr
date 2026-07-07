@@ -131,9 +131,9 @@ const PLIES_DEEP: usize = 48;
 /// positions equal here are indistinguishable in board, side, castling, en
 /// passant, gating, Duck, placement pocket, clocks, pass counter, Alice plane, and
 /// promotion state.
-fn positions_equal<G: Geometry, V: WideVariant<G>>(
-    a: &GenericPosition<G, V>,
-    b: &GenericPosition<G, V>,
+fn positions_equal<G: Geometry, V: WideVariant<G>, const R: usize>(
+    a: &GenericPosition<G, V, R>,
+    b: &GenericPosition<G, V, R>,
 ) -> bool {
     a.board() == b.board() && a.state() == b.state() && a.zobrist() == b.zobrist()
 }
@@ -141,8 +141,8 @@ fn positions_equal<G: Geometry, V: WideVariant<G>>(
 /// Invariant 4: the legal-move list has no duplicate move, and every legal move
 /// round-trips through SAN to exactly itself (so every move is well-formed and
 /// uniquely addressable).
-fn assert_move_list_integrity<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_move_list_integrity<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {
@@ -166,8 +166,8 @@ fn assert_move_list_integrity<G: Geometry, V: WideVariant<G>>(
 /// FEN dialect — the re-parse reproduces the hash, and two independent re-parses
 /// of the same FEN hash equally (hash is a pure, path-independent function of the
 /// FEN-observable position).
-fn assert_fen_round_trip<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_fen_round_trip<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen_lossless: bool,
 ) {
@@ -198,8 +198,8 @@ fn assert_fen_round_trip<G: Geometry, V: WideVariant<G>>(
 /// Invariant 1: at `pos`, every legal move round-trips through make/unmake
 /// byte-for-byte and the made position equals the `play` successor (hash
 /// included).
-fn assert_make_unmake_node<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_make_unmake_node<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
 ) {
     let fen = pos.to_fen();
@@ -223,8 +223,8 @@ fn assert_make_unmake_node<G: Geometry, V: WideVariant<G>>(
 
 /// Drives seeded random self-play from `start`, asserting every invariant at each
 /// visited node. Generic over the variant so one body serves all 54.
-fn drive<G: Geometry, V: WideVariant<G>>(
-    start: GenericPosition<G, V>,
+fn drive<G: Geometry, V: WideVariant<G>, const R: usize>(
+    start: GenericPosition<G, V, R>,
     variant: &str,
     fen_lossless: bool,
     seeds: &[u64],

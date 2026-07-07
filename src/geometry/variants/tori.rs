@@ -450,7 +450,11 @@ impl WideVariant<Tori7x7> for ToriRules {
         WideRole::Swallow
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Tori7x7>) -> Bitboard<Tori7x7> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Tori7x7, R>,
+    ) -> Bitboard<Tori7x7> {
         let mut mask = !board.occupied();
         if role == WideRole::Swallow {
             // Dead-piece rule: a dropped Swallow may not land on the last rank (it
@@ -514,4 +518,5 @@ impl WideVariant<Tori7x7> for ToriRules {
 /// the bird army, the hand, drops, and the promotion zone.
 ///
 /// [`Shogi`]: super::Shogi
-pub type Tori = GenericPosition<Tori7x7, ToriRules>;
+pub type Tori =
+    GenericPosition<Tori7x7, ToriRules, { <ToriRules as WideVariant<Tori7x7>>::ROLE_SPAN }>;

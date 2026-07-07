@@ -59,7 +59,7 @@ const ARCHBISHOP: &str = "4k4/9/9/9/4A4/9/9/9/4K4 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Modern::from_fen(fen).expect("valid Modern FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess9x9, _>(&pos, depth);
+        let got = gperft::<Chess9x9, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Modern perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

@@ -184,7 +184,11 @@ impl WideVariant<Chess8x8> for ShatranjRules {
 /// with [`Shatranj::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the pieces, the no-castling / single-step-pawn rules, and the
 /// baring / stalemate-loss terminal rules.
-pub type Shatranj = GenericPosition<Chess8x8, ShatranjRules>;
+pub type Shatranj = GenericPosition<
+    Chess8x8,
+    ShatranjRules,
+    { <ShatranjRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -207,9 +211,9 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Shatranj::startpos();
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 16);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 256);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 4176);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 16);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 256);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 3), 4176);
     }
 
     /// The Alfil jumps exactly two squares diagonally, over an intervening piece,

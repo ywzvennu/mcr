@@ -60,7 +60,7 @@ const PROMO: &str = "k9/4P5/10/10/10/10/10/10/10/K9 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Opulent::from_fen(fen).expect("valid Opulent FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Grand10x10, _>(&pos, depth);
+        let got = gperft::<Grand10x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Opulent perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

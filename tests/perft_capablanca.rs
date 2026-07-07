@@ -55,7 +55,7 @@ const PROMO: &str = "5k4/4P5/10/10/10/10/10/5K4 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Capablanca::from_fen(fen).expect("valid Capablanca FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Capablanca perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

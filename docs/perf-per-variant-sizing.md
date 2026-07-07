@@ -230,3 +230,89 @@ cost for a payoff that (1) mostly captures for nothing. **Implement (1); defer
   `src/geometry/board.rs` with `role_at` bounded to `WideRole::ALL[..8]`; (pocket)
   `GenericPlacement` fields `[u8; 8]`. Node counts were asserted equal to
   4 865 609 in every configuration (movegen byte-identical).
+
+---
+
+## Shipped: exact per-variant role-array sizing (issue #580)
+
+The array/pocket shrink deferred above **shipped** in #580, as **exact
+per-variant sizing** (not the bucketing sketched in §3(a)): each variant's
+position stores exactly `V::ROLE_SPAN` role bitboards and `2 * V::ROLE_SPAN`
+in-hand tallies — "as many as necessary and no more."
+
+### Mechanism — stable Rust, no nightly
+
+The role-array-bearing types gained a plain `const R: usize` const-generic
+parameter with a **default of `{ WideRole::COUNT }`**:
+
+- `Board<G, const R = COUNT>` — `by_role: [Bitboard<G>; R]`.
+- `GenericPlacement<const R = COUNT>` — `white/black: [u8; R]`.
+- `GenericState<G, const R = COUNT>`, `Undo<G, const R = COUNT>`,
+  `GenericPosition<G, V, const R = COUNT>`, `GenericGame<G, V, const R = COUNT>`.
+
+Each registered variant alias pins `R` to its span in **type-argument** position —
+`GenericPosition<Geom, Rules, { <Rules as WideVariant<Geom>>::ROLE_SPAN }>` — which
+is a fully-concrete const expression (no generic parameters), so it needs **no**
+`generic_const_exprs` and compiles on the crate's pinned **stable** toolchain. The
+default keeps the authoring surface (the 90 `starting_position` / `initial_placement`
+overrides, which return `Board<Geom>` / `GenericState<Geom>`) untouched at the full
+width; `GenericPosition::startpos` narrows that full-width start once via
+`Board::resized` / `GenericState::resized` (a cold, one-time copy). Only the ~14
+**hot** `WideVariant` methods that receive the stored `R`-wide board/state (e.g.
+`royal_squares`, `promotion_targets`, `drop_targets`, `is_insufficient_material`)
+became method-generic `<const R>` over `&Board<G, R>`; this also makes cross-variant
+`starting_position` delegation (Karouk→Cambodian, Alice→StandardChess, …) width-
+agnostic for free.
+
+`by_role[role.index()]` indexing stays **branch-free** on the movegen hot path: the
+existing movegen role loops are already bounded to `WideRole::ALL[..V::ROLE_SPAN]`,
+and every fielded / promoted / dropped / gated role has index `< ROLE_SPAN == R` by
+the `role_span_covers_all_fieldable_roles` meta-test. The three remaining full-width
+scans that touch a board/pocket (`Board::role_at`, `GenericPosition::attack_map`,
+the FEN/wire hand codecs) are bounded to `R`, and the four untrusted input
+boundaries (FEN board placement, FEN holdings, binary board decode, binary hand
+decode) reject any role with index `>= R` rather than index past the array.
+
+### Safety under exact sizing
+
+The meta-test's guarantee is preserved and strengthened: because the array is now
+exactly `ROLE_SPAN` wide and every array write is a bounds-checked `by_role[idx]`,
+a too-small `ROLE_SPAN` can no longer silently drop a piece — it is caught either by
+the graceful `max < ROLE_SPAN` assertion (on the full-width `StandardChess` mirror)
+or as a hard index-out-of-bounds panic when `apply` tries to place the out-of-span
+role during the walk. Movegen output, perft counts, FEN, Zobrist keys, and
+make/unmake are **byte-identical**: `properties` (make/unmake byte+key identity,
+Zobrist, FEN/UCI round-trip over all variants), `conformance_concrete_generic`,
+`variant_rules`, `concrete_variant_rules`, `coverage_gate`, and the perft suites
+(shogi, xiangqi, chu, tenjiku, gardner, seirawan, dobutsu, …) all pass with
+unchanged counts.
+
+### Measured shrink (`size_of` of the concrete position, bytes)
+
+| variant | backing | span | before (COUNT-wide) | after (exact) | shrink |
+|---|---|--:|--:|--:|--:|
+| gardner  | u64  | 6   | 1566 | 136  | −91% |
+| makruk   | u64  | 8   | 1562 | 152  | −90% |
+| seirawan | u64  | 12  | 1562 | 192  | −88% |
+| dobutsu  | u64  | 24  | 1562 | 312  | −80% |
+| capablanca | u128 | 12 | 2818 | 352 | −88% |
+| xiangqi  | u128 | 23  | 2812 | 544  | −81% |
+| shogi    | u128 | 29  | 2816 | 656  | −77% |
+| opulent  | u128 | 110 | 2814 | 2112 | −25% |
+| chu      | U256 | 127 | 5292 | 4544 | −14% |
+| tenjiku  | U256 | 146 | 5302 | 5200 | −2%  |
+
+The common u64/u128 positions shrink **77–91%**. As #506 predicted, the giant-shogi
+variants that own the top role indices barely move (Tenjiku's span is essentially
+the full `COUNT`, so it cannot shrink) — but they were never the ones held in bulk.
+The runtime `AnyWideVariant` facade, sized by its widest inline (u128) arm (Opulent),
+shrinks ~2814 → 2112 B (−25%). Perft node counts are unchanged and the perft
+throughput delta is within run-to-run noise (the dominant per-node cost was already
+the make/unmake role-mask work, not the array width; the array shrink is a cache-
+footprint win, most visible when many positions are held resident).
+
+The size-ceiling gates (`per_backing_position_size_ceiling`,
+`any_wide_variant_size_ceiling`, #560) were rewritten to derive each position's
+role-array contribution from its own `ROLE_SPAN` (a per-variant assertion) rather
+than the global `COUNT`; the committed *fixed-overhead* bands are unchanged (fixed
+overhead is genuinely role-count-independent), preserving the struct-bloat tripwire.

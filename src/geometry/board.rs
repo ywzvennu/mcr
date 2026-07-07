@@ -102,28 +102,40 @@ impl fmt::Display for WidePiece {
 /// .unwrap();
 /// assert_eq!(board.occupied().count(), 32);
 /// ```
+///
+/// The `R` const-generic parameter is the number of stored role bitboards — the
+/// variant's [`ROLE_SPAN`](crate::geometry::WideVariant::ROLE_SPAN), i.e. exactly
+/// as many role masks as the variant can ever field. It defaults to the global
+/// [`WideRole::COUNT`] so a bare `Board<G>` keeps the full role width (the
+/// authoring surface — variant start positions and the direct `Board<G>` public
+/// API — is unchanged), while a monomorphised generic position pins `R` to its
+/// variant's exact span (issue #580). Indexing stays `by_role[role.index()]`,
+/// branch-free: every role a variant can field has index `< R` by the
+/// `role_span_covers_all_fieldable_roles` meta-test, so no bound is ever crossed.
 #[derive(Clone)]
-pub struct Board<G: Geometry> {
+pub struct Board<G: Geometry, const R: usize = { WideRole::COUNT }> {
     /// Occupancy mask per color, indexed by [`color_index`].
     by_color: [Bitboard<G>; COLOR_COUNT],
-    /// Occupancy mask per role, indexed by [`WideRole::index`].
-    by_role: [Bitboard<G>; WideRole::COUNT],
+    /// Occupancy mask per role, indexed by [`WideRole::index`]. Holds `R` masks —
+    /// the variant's role span — so indices `>= R` are never fielded (guaranteed by
+    /// the `role_span_covers_all_fieldable_roles` meta-test).
+    by_role: [Bitboard<G>; R],
 }
 
 // Manual trait impls so the geometry marker `G` (a zero-sized type) need not
 // implement these; the bounds are on `Bitboard<G>` instead.
-impl<G: Geometry> Copy for Board<G> {}
+impl<G: Geometry, const R: usize> Copy for Board<G, R> {}
 
-impl<G: Geometry> PartialEq for Board<G> {
+impl<G: Geometry, const R: usize> PartialEq for Board<G, R> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.by_color == other.by_color && self.by_role == other.by_role
     }
 }
 
-impl<G: Geometry> Eq for Board<G> {}
+impl<G: Geometry, const R: usize> Eq for Board<G, R> {}
 
-impl<G: Geometry> fmt::Debug for Board<G>
+impl<G: Geometry, const R: usize> fmt::Debug for Board<G, R>
 where
     G::Bits: fmt::Debug,
 {
@@ -135,24 +147,43 @@ where
     }
 }
 
-impl<G: Geometry> Default for Board<G> {
+impl<G: Geometry, const R: usize> Default for Board<G, R> {
     /// An empty board (no standard starting placement is defined generically —
     /// the start array is variant-specific).
     #[inline]
-    fn default() -> Board<G> {
+    fn default() -> Board<G, R> {
         Board::empty()
     }
 }
 
-impl<G: Geometry> Board<G> {
+impl<G: Geometry, const R: usize> Board<G, R> {
     /// Creates a board with no pieces on it.
     #[must_use]
     #[inline]
-    pub const fn empty() -> Board<G> {
+    pub const fn empty() -> Board<G, R> {
         Board {
             by_color: [Bitboard::EMPTY; COLOR_COUNT],
-            by_role: [Bitboard::EMPTY; WideRole::COUNT],
+            by_role: [Bitboard::EMPTY; R],
         }
+    }
+
+    /// Converts to a board with a different stored role span `S`, copying the
+    /// color masks and the role masks that fit. Used once at position construction
+    /// to narrow the full-width authoring board (`V::starting_position`) to the
+    /// position's exact span `S = V::ROLE_SPAN`. Every role a start position fields
+    /// has index `< S` by the `role_span_covers_all_fieldable_roles` meta-test, so
+    /// no occupied role mask is ever dropped.
+    #[must_use]
+    pub(crate) fn resized<const S: usize>(self) -> Board<G, S> {
+        let mut out = Board::<G, S>::empty();
+        out.by_color = self.by_color;
+        let n = if R < S { R } else { S };
+        let mut i = 0;
+        while i < n {
+            out.by_role[i] = self.by_role[i];
+            i += 1;
+        }
+        out
     }
 
     /// Returns the set of all occupied squares.
@@ -211,8 +242,12 @@ impl<G: Geometry> Board<G> {
     #[must_use]
     #[inline]
     pub fn role_at(self, square: Square<G>) -> Option<WideRole> {
+        // Only the first `R` roles are stored (the variant's span); a role with
+        // index `>= R` is never fielded, so bounding the scan to `R` both keeps
+        // `by_role` in range and iterates no dead roles.
         WideRole::ALL
             .into_iter()
+            .take(R)
             .find(|&role| self.by_role(role).contains(square))
     }
 
@@ -338,10 +373,10 @@ impl<G: Geometry> Board<G> {
     /// `HEIGHT` ranks, a rank does not describe exactly `WIDTH` files, a piece
     /// is placed past the last file, or a character is neither a role letter nor
     /// a non-zero digit.
-    pub fn from_fen_placement(placement: &str) -> Result<Board<G>, ParseBoardError> {
+    pub fn from_fen_placement(placement: &str) -> Result<Board<G, R>, ParseBoardError> {
         let width = G::WIDTH as usize;
         let height = G::HEIGHT;
-        let mut board = Board::empty();
+        let mut board = Board::<G, R>::empty();
         let mut ranks = placement.split('/');
 
         // Ranks are listed from the top down.
@@ -392,6 +427,12 @@ impl<G: Geometry> Board<G> {
                     }
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
+                    }
+                    // A role outside this board's stored span `R` cannot be a valid
+                    // piece for the variant; reject it rather than index past the
+                    // `R`-wide role array (issue #580).
+                    if promoted.index() >= R {
+                        return Err(ParseBoardError::InvalidChar(next as char));
                     }
                     let square = Square::new(rank * G::WIDTH + file as u8);
                     board.set_piece(square, WidePiece::new(base.color, promoted));
@@ -475,6 +516,9 @@ impl<G: Geometry> Board<G> {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
                     }
+                    if role.index() >= R {
+                        return Err(ParseBoardError::InvalidChar(base as char));
+                    }
                     let square = Square::new(rank * G::WIDTH + file as u8);
                     board.set_piece(square, WidePiece::new(color, role));
                     file += 1;
@@ -502,6 +546,9 @@ impl<G: Geometry> Board<G> {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
                     }
+                    if role.index() >= R {
+                        return Err(ParseBoardError::InvalidChar(next as char));
+                    }
                     let square = Square::new(rank * G::WIDTH + file as u8);
                     board.set_piece(square, WidePiece::new(color, role));
                     file += 1;
@@ -509,6 +556,9 @@ impl<G: Geometry> Board<G> {
                 } else if let Some(piece) = WidePiece::from_char(b as char) {
                     if file >= width {
                         return Err(ParseBoardError::RankTooLong(rank + 1));
+                    }
+                    if piece.role.index() >= R {
+                        return Err(ParseBoardError::InvalidChar(b as char));
                     }
                     let square = Square::new(rank * G::WIDTH + file as u8);
                     board.set_piece(square, piece);
@@ -607,7 +657,7 @@ fn push_empty_run(out: &mut String, n: u32) {
     }
 }
 
-impl<G: Geometry> fmt::Display for Board<G> {
+impl<G: Geometry, const R: usize> fmt::Display for Board<G, R> {
     /// Renders the board as `HEIGHT` rows of `WIDTH` cells, the top rank first,
     /// using a piece's FEN letter for occupied squares and `.` for empty ones.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

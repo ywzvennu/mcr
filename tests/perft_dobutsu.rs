@@ -76,7 +76,7 @@ const TRY_ADVANCE: &str = "1k1/3/1K1/3[M*JP] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Dobutsu::from_fen(fen).expect("valid Dobutsu FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Dobutsu3x4, _>(&pos, depth);
+        let got = gperft::<Dobutsu3x4, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Dobutsu perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

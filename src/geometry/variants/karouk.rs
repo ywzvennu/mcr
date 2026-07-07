@@ -134,4 +134,5 @@ impl WideVariant<Chess8x8> for KaroukRules {
 /// `DEde` leap-rights field — with [`Karouk::from_fen`](GenericPosition::from_fen).
 /// It is Cambodian chess except that **giving check wins**; see the
 /// [module docs](self).
-pub type Karouk = GenericPosition<Chess8x8, KaroukRules>;
+pub type Karouk =
+    GenericPosition<Chess8x8, KaroukRules, { <KaroukRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

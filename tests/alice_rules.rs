@@ -28,7 +28,7 @@ fn build(
     ep_square: Option<Sq>,
     pieces: &[(Sq, Color, WideRole, bool)],
 ) -> Alice {
-    let mut board = Board::<Chess8x8>::default();
+    let mut board = Board::<Chess8x8, _>::default();
     let mut board_b = Bitboard::<Chess8x8>::EMPTY;
     for &(s, color, role, plane_b) in pieces {
         board.set_piece(s, WidePiece::new(color, role));

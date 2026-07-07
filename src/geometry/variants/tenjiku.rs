@@ -729,7 +729,10 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
         true
     }
 
-    fn royal_squares(board: &Board<Tenjiku16x16>, color: Color) -> Bitboard<Tenjiku16x16> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Tenjiku16x16, R>,
+        color: Color,
+    ) -> Bitboard<Tenjiku16x16> {
         board.kings_of(color) | board.pieces(color, WideRole::CrownPrince)
     }
 
@@ -737,7 +740,10 @@ impl WideVariant<Tenjiku16x16> for TenjikuRules {
         true
     }
 
-    fn royal_constraint_active(board: &Board<Tenjiku16x16>, color: Color) -> bool {
+    fn royal_constraint_active<const R: usize>(
+        board: &Board<Tenjiku16x16, R>,
+        color: Color,
+    ) -> bool {
         let royals = board.kings_of(color) | board.pieces(color, WideRole::CrownPrince);
         royals.count() <= 1
     }
@@ -815,7 +821,11 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// with [`Tenjiku::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the army, the two-royal rule, the five-rank promotion zone, and
 /// which powers are modelled vs. approximated.
-pub type Tenjiku = GenericPosition<Tenjiku16x16, TenjikuRules>;
+pub type Tenjiku = GenericPosition<
+    Tenjiku16x16,
+    TenjikuRules,
+    { <TenjikuRules as WideVariant<Tenjiku16x16>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

@@ -258,7 +258,7 @@ fn crazyhouse_state_round_trips() {
 /// asserts the deserialized position re-serializes to the same FEN. (A
 /// `GenericPosition` has no `PartialEq`; its FEN is its canonical lossless form.)
 #[track_caller]
-fn position_round_trips<G, V>(pos: GenericPosition<G, V>)
+fn position_round_trips<G, V, const R: usize>(pos: GenericPosition<G, V, R>)
 where
     G: Geometry,
     V: WideVariant<G>,
@@ -266,7 +266,7 @@ where
     let fen = pos.to_fen();
     let json = serde_json::to_string(&pos).expect("serialize");
     assert_eq!(json, format!("{fen:?}"), "serialized form must be the FEN");
-    let back: GenericPosition<G, V> = serde_json::from_str(&json).expect("deserialize");
+    let back: GenericPosition<G, V, R> = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back.to_fen(), fen, "round trip changed the position");
 }
 
@@ -377,7 +377,7 @@ fn wide_moves_round_trip_every_kind() {
 
 #[test]
 fn generic_placement_round_trips() {
-    round_trip(GenericPlacement::NONE);
+    round_trip(GenericPlacement::<{ WideRole::COUNT }>::NONE);
 
     let mut white = [0u8; WideRole::COUNT];
     let mut black = [0u8; WideRole::COUNT];

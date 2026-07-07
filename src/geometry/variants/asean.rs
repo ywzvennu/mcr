@@ -193,4 +193,5 @@ impl WideVariant<Chess8x8> for AseanRules {
 ///
 /// Construct the starting position with [`Asean::startpos`](GenericPosition::startpos)
 /// or parse a FEN with [`Asean::from_fen`](GenericPosition::from_fen).
-pub type Asean = GenericPosition<Chess8x8, AseanRules>;
+pub type Asean =
+    GenericPosition<Chess8x8, AseanRules, { <AseanRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

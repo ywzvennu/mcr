@@ -147,7 +147,11 @@ impl WideVariant<Chess8x8> for BughouseRules {
         false
     }
 
-    fn drop_targets(role: WideRole, _color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        _color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // Every empty square (crazyhouse) — except a Pawn may not be dropped on the
         // first or last rank (FSF confirms pawn drops only on ranks 2-7). There is
         // no nifu, and a drop giving check or mate is legal.
@@ -187,4 +191,8 @@ impl WideVariant<Chess8x8> for BughouseRules {
 /// [`remove_from_hand`](GenericPosition::remove_from_hand). The 2-board
 /// orchestration that wires those calls together is a **server** concern, not part
 /// of this library — see the [module docs](self).
-pub type Bughouse = GenericPosition<Chess8x8, BughouseRules>;
+pub type Bughouse = GenericPosition<
+    Chess8x8,
+    BughouseRules,
+    { <BughouseRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

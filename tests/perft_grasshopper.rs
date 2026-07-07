@@ -58,7 +58,7 @@ const CAPTURE: &str = "4k3/8/3r4/3P4/3***J4/8/8/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Grasshopper::from_fen(fen).expect("valid Grasshopper FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Grasshopper perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

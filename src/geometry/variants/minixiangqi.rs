@@ -267,8 +267,8 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
         true
     }
 
-    fn extra_royal_attack(
-        board: &Board<Minixiangqi7x7>,
+    fn extra_royal_attack<const R: usize>(
+        board: &Board<Minixiangqi7x7, R>,
         sq: Square<Minixiangqi7x7>,
         by: Color,
         occupied: Bitboard<Minixiangqi7x7>,
@@ -317,4 +317,8 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
 /// dialect) with [`Minixiangqi::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the piece movements, the palace confinement, and the
 /// flying-general rule.
-pub type Minixiangqi = GenericPosition<Minixiangqi7x7, MinixiangqiRules>;
+pub type Minixiangqi = GenericPosition<
+    Minixiangqi7x7,
+    MinixiangqiRules,
+    { <MinixiangqiRules as WideVariant<Minixiangqi7x7>>::ROLE_SPAN },
+>;

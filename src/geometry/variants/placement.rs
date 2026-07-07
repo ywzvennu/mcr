@@ -172,10 +172,10 @@ impl WideVariant<Chess8x8> for PlacementRules {
         GenericPlacement::new(counts, counts)
     }
 
-    fn placement_targets(
+    fn placement_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Chess8x8>,
+        board: &Board<Chess8x8, R>,
     ) -> Bitboard<Chess8x8> {
         // The empty first-rank squares, split by the two square colors (parities).
         let empty = Self::back_rank_mask(color) & !board.occupied();
@@ -223,4 +223,8 @@ impl WideVariant<Chess8x8> for PlacementRules {
 /// placement may carry the deployment-phase pocket as a `[..]` holdings bracket —
 /// with [`Placement::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the deployment phase and deployment-conferred castling.
-pub type Placement = GenericPosition<Chess8x8, PlacementRules>;
+pub type Placement = GenericPosition<
+    Chess8x8,
+    PlacementRules,
+    { <PlacementRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

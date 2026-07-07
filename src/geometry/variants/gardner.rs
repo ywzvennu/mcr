@@ -132,7 +132,11 @@ impl WideVariant<Minishogi5x5> for GardnerRules {
 /// [`Gardner::from_fen`](GenericPosition::from_fen). Every rule is the standard
 /// [`StandardChess`] default except castling, the pawn double step, and en
 /// passant, which are disabled.
-pub type Gardner = GenericPosition<Minishogi5x5, GardnerRules>;
+pub type Gardner = GenericPosition<
+    Minishogi5x5,
+    GardnerRules,
+    { <GardnerRules as WideVariant<Minishogi5x5>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

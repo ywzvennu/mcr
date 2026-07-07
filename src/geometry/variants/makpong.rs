@@ -112,4 +112,5 @@ impl WideVariant<Chess8x8> for MakpongRules {
 /// FEN with [`Makpong::from_fen`](crate::geometry::GenericPosition::from_fen).
 /// The position behaves exactly like [`Makruk`](super::Makruk) except that the
 /// king may not move out of check.
-pub type Makpong = GenericPosition<Chess8x8, MakpongRules>;
+pub type Makpong =
+    GenericPosition<Chess8x8, MakpongRules, { <MakpongRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

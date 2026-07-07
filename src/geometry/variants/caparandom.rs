@@ -105,7 +105,10 @@ impl WideVariant<Cap10x8> for CaparandomRules {
         true
     }
 
-    fn is_insufficient_material(board: &Board<Cap10x8>, state: &GenericState<Cap10x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Cap10x8, R>,
+        state: &GenericState<Cap10x8, R>,
+    ) -> bool {
         CapablancaRules::is_insufficient_material(board, state)
     }
 }
@@ -117,7 +120,11 @@ impl WideVariant<Cap10x8> for CaparandomRules {
 /// [`Caparandom::startpos`](GenericPosition::startpos) or parse any legal shuffle
 /// (with Shredder or `KQkq` castling rights) via
 /// [`Caparandom::from_fen`](GenericPosition::from_fen).
-pub type Caparandom = GenericPosition<Cap10x8, CaparandomRules>;
+pub type Caparandom = GenericPosition<
+    Cap10x8,
+    CaparandomRules,
+    { <CaparandomRules as WideVariant<Cap10x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -136,15 +143,18 @@ mod tests {
         let re = Caparandom::from_fen(&pos.to_fen()).expect("startpos fen parses");
         assert_eq!(re.to_fen(), pos.to_fen());
         // Same shallow perft as Capablanca (shared startpos array).
-        assert_eq!(gperft::<Cap10x8, _>(&pos, 2), 784);
+        assert_eq!(gperft::<Cap10x8, _, _>(&pos, 2), 784);
     }
 
     /// A shuffled start with rooks off the a/j files round-trips its Shredder
     /// castling field through parse -> write.
     #[test]
     fn shuffled_start_round_trips_file_letter_rights() {
-        // King e, queenside rook b, kingside rook i -> rights `IBib`.
-        let fen = "crnbkqbnra/pppppppppp/10/10/10/10/PPPPPPPPPP/CRNBKQBNRA w IBib - 0 1";
+        // King e, queenside rook b, kingside rook i -> rights `IBib`. Uses the
+        // Capablanca army: Chancellor `e` and Archbishop `a` (both within the
+        // variant's ROLE_SPAN — earlier this line used `c`, which is Cannon, a role
+        // Caparandom never fields and which now lies past the exact role span, #580).
+        let fen = "ernbkqbnra/pppppppppp/10/10/10/10/PPPPPPPPPP/ERNBKQBNRA w IBib - 0 1";
         let pos = Caparandom::from_fen(fen).expect("shuffled fen parses");
         assert_eq!(pos.to_fen(), fen);
     }

@@ -272,30 +272,54 @@ const fn gate_bit(gate: super::GateRole) -> u8 {
 /// never fire, so produced moves, state, and FEN stay byte-identical to a build
 /// without the placement mechanic. It carries no [`Geometry`] data (the pocket is
 /// a piece-count tally, board-size-independent), so it is a plain `Copy` value.
+///
+/// Carries `R` counts per color — the variant's
+/// [`ROLE_SPAN`](crate::geometry::WideVariant::ROLE_SPAN), defaulting to the global
+/// [`WideRole::COUNT`] so a bare `GenericPlacement` keeps the full width (the
+/// authoring surface — variant `initial_placement` and drop pockets — is
+/// unchanged), while a monomorphised position pins `R` to its variant's exact span
+/// (issue #580). Indexing stays `white[role.index()]`, branch-free: an in-hand role
+/// has index `< R` by the `role_span_covers_all_fieldable_roles` meta-test.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct GenericPlacement {
+pub struct GenericPlacement<const R: usize = { WideRole::COUNT }> {
     /// White's undeployed piece counts, indexed by [`WideRole::index`].
-    white: [u8; WideRole::COUNT],
+    white: [u8; R],
     /// Black's undeployed piece counts, indexed by [`WideRole::index`].
-    black: [u8; WideRole::COUNT],
+    black: [u8; R],
 }
 
-impl GenericPlacement {
+impl<const R: usize> GenericPlacement<R> {
     /// The empty pocket: no pieces in hand for either side. The value every
     /// non-placement variant carries, and the state of a placement variant once
     /// both sides are fully deployed.
-    pub const NONE: GenericPlacement = GenericPlacement {
-        white: [0; WideRole::COUNT],
-        black: [0; WideRole::COUNT],
+    pub const NONE: GenericPlacement<R> = GenericPlacement {
+        white: [0; R],
+        black: [0; R],
     };
 
     /// Builds a pocket from explicit per-color, per-role counts.
     #[must_use]
-    pub const fn new(
-        white: [u8; WideRole::COUNT],
-        black: [u8; WideRole::COUNT],
-    ) -> GenericPlacement {
+    pub const fn new(white: [u8; R], black: [u8; R]) -> GenericPlacement<R> {
         GenericPlacement { white, black }
+    }
+
+    /// Narrows (or widens) a pocket to a different stored span `S`, copying the
+    /// per-role counts that fit. Used once at position construction to convert the
+    /// full-width authoring pocket (`V::initial_placement`) to the position's exact
+    /// span. Every in-hand role has index `< R` (the target span) by the
+    /// `role_span_covers_all_fieldable_roles` meta-test, so no non-zero count is
+    /// ever dropped.
+    #[must_use]
+    pub(crate) fn resized<const S: usize>(self) -> GenericPlacement<S> {
+        let mut out = GenericPlacement::<S>::NONE;
+        let n = if R < S { R } else { S };
+        let mut i = 0;
+        while i < n {
+            out.white[i] = self.white[i];
+            out.black[i] = self.black[i];
+            i += 1;
+        }
+        out
     }
 
     /// Returns the number of `role` pieces `color` has still to deploy.
@@ -341,13 +365,13 @@ impl GenericPlacement {
     }
 }
 
-impl Default for GenericPlacement {
+impl<const R: usize> Default for GenericPlacement<R> {
     fn default() -> Self {
         GenericPlacement::NONE
     }
 }
 
-impl core::fmt::Debug for GenericPlacement {
+impl<const R: usize> core::fmt::Debug for GenericPlacement<R> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GenericPlacement")
             .field("white", &self.white)
@@ -358,8 +382,14 @@ impl core::fmt::Debug for GenericPlacement {
 
 /// The non-board state of a generic position: side to move, castling rights,
 /// en-passant target square, and the two move clocks.
+///
+/// The `R` const-generic is the stored role span of the embedded
+/// [`placement`](Self::placement) pocket — the variant's
+/// [`ROLE_SPAN`](crate::geometry::WideVariant::ROLE_SPAN), defaulting to
+/// [`WideRole::COUNT`] so a bare `GenericState<G>` keeps the full width (issue
+/// #580).
 #[derive(Clone, Copy)]
-pub struct GenericState<G: Geometry> {
+pub struct GenericState<G: Geometry, const R: usize = { WideRole::COUNT }> {
     /// The side to move.
     pub turn: Color,
     /// The castling rights.
@@ -392,7 +422,7 @@ pub struct GenericState<G: Geometry> {
     /// the placement code paths, all guarded behind
     /// [`WideVariant::has_placement`], never fire and produced moves, state, and
     /// FEN stay byte-identical to a build without the placement mechanic.
-    pub placement: GenericPlacement,
+    pub placement: GenericPlacement<R>,
     /// The halfmove clock (plies since the last capture or pawn move).
     pub halfmove_clock: u16,
     /// The fullmove number (incremented after a black move).
@@ -432,7 +462,31 @@ pub struct GenericState<G: Geometry> {
     pub petrified: Bitboard<G>,
 }
 
-impl<G: Geometry> core::fmt::Debug for GenericState<G> {
+impl<G: Geometry, const R: usize> GenericState<G, R> {
+    /// Converts to a state with a different pocket span `S`, resizing the embedded
+    /// [`placement`](Self::placement) pocket and copying every other field. Used
+    /// once at position construction to narrow the full-width authoring state
+    /// (`V::starting_position`) to the position's exact span `S = V::ROLE_SPAN`.
+    #[must_use]
+    pub(crate) fn resized<const S: usize>(self) -> GenericState<G, S> {
+        GenericState {
+            turn: self.turn,
+            castling: self.castling,
+            ep_square: self.ep_square,
+            ep_captured: self.ep_captured,
+            gating: self.gating,
+            duck: self.duck,
+            placement: self.placement.resized(),
+            halfmove_clock: self.halfmove_clock,
+            fullmove_number: self.fullmove_number,
+            consecutive_passes: self.consecutive_passes,
+            board_b: self.board_b,
+            petrified: self.petrified,
+        }
+    }
+}
+
+impl<G: Geometry, const R: usize> core::fmt::Debug for GenericState<G, R> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GenericState")
             .field("turn", &self.turn)
@@ -456,7 +510,7 @@ impl<G: Geometry> core::fmt::Debug for GenericState<G> {
 // all carry manual impls bounded on `G::Bits`, not on `G` — so writing the impl by
 // hand keeps every generic user of `GenericState` free of the spurious `G:
 // PartialEq` bound the derive would add.
-impl<G: Geometry> PartialEq for GenericState<G> {
+impl<G: Geometry, const R: usize> PartialEq for GenericState<G, R> {
     fn eq(&self, other: &Self) -> bool {
         self.turn == other.turn
             && self.castling == other.castling
@@ -473,13 +527,13 @@ impl<G: Geometry> PartialEq for GenericState<G> {
     }
 }
 
-impl<G: Geometry> Eq for GenericState<G> {}
+impl<G: Geometry, const R: usize> Eq for GenericState<G, R> {}
 
 // Manual `Hash` (mirroring `GenericGating`): the `board_b` plane mask is hashed
 // by its square indices so the impl is unconditional in `G::Bits`, keeping every
 // generic user of `GenericState` (and the `Board`-free state hashing) free of a
 // `G::Bits: Hash` bound. Every other field hashes directly.
-impl<G: Geometry> core::hash::Hash for GenericState<G> {
+impl<G: Geometry, const R: usize> core::hash::Hash for GenericState<G, R> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.turn.hash(state);
         self.castling.hash(state);
@@ -505,10 +559,16 @@ impl<G: Geometry> core::hash::Hash for GenericState<G> {
 ///
 /// `V` is a zero-sized [`WideVariant`] marker, so this monomorphises with no
 /// runtime dispatch. See the [module docs](self) for the design.
+///
+/// The `R` const-generic is the position's stored role span — the variant's
+/// [`ROLE_SPAN`](WideVariant::ROLE_SPAN) — sizing the [`Board`] role array and the
+/// [`GenericState`] pocket to exactly as many roles as `V` can field (issue #580).
+/// It defaults to the global [`WideRole::COUNT`] so a bare `GenericPosition<G, V>`
+/// keeps the full width; every registered variant alias pins it to `V::ROLE_SPAN`.
 #[derive(Clone)]
-pub struct GenericPosition<G: Geometry, V: WideVariant<G>> {
-    board: Board<G>,
-    state: GenericState<G>,
+pub struct GenericPosition<G: Geometry, V: WideVariant<G>, const R: usize = { WideRole::COUNT }> {
+    board: Board<G, R>,
+    state: GenericState<G, R>,
     /// The crazyhouse **promoted mask**: the squares whose occupant reached the
     /// board by promotion, so that capturing one banks a Pawn (the "promoted
     /// pieces demote" rule). It is always [`Bitboard::EMPTY`] — and never read —
@@ -521,7 +581,7 @@ pub struct GenericPosition<G: Geometry, V: WideVariant<G>> {
     _variant: PhantomData<V>,
 }
 
-impl<G: Geometry, V: WideVariant<G>> core::fmt::Debug for GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> core::fmt::Debug for GenericPosition<G, V, R> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("GenericPosition");
         ds.field("placement", &self.board.to_fen_placement())
@@ -584,9 +644,9 @@ const MAX_UNDO_ROLES: usize = 12;
 /// [`undo`](GenericPosition::undo) for the contract. It is designed to be
 /// extensible: incremental attacker / Zobrist state (issues #310, #311) can hook
 /// additional restore data alongside these fields.
-pub struct Undo<G: Geometry> {
+pub struct Undo<G: Geometry, const R: usize = { WideRole::COUNT }> {
     /// The non-board state exactly as it stood before the move.
-    state: GenericState<G>,
+    state: GenericState<G, R>,
     /// The crazyhouse promoted mask before the move (empty and unused for every
     /// non-demoting variant).
     promoted: Bitboard<G>,
@@ -600,20 +660,20 @@ pub struct Undo<G: Geometry> {
     role_count: usize,
 }
 
-impl<G: Geometry> Undo<G> {
+impl<G: Geometry, const R: usize> Undo<G, R> {
     /// Records `role`'s current mask (read from `board`) as one the move touched,
     /// so [`undo`](GenericPosition::undo) can restore it. Called by `apply` at the
     /// point it has the pre-move board in hand, reusing its own piece lookups so no
     /// extra [`role_at`](super::Board) scan is needed. Duplicate roles are harmless
     /// (the restore assigns the same prior mask); `MAX_UNDO_ROLES` bounds the count.
     #[inline]
-    fn touch(&mut self, role: WideRole, board: &Board<G>) {
+    fn touch(&mut self, role: WideRole, board: &Board<G, R>) {
         self.roles[self.role_count] = (role.index(), board.by_role(role));
         self.role_count += 1;
     }
 }
 
-impl<G: Geometry> core::fmt::Debug for Undo<G> {
+impl<G: Geometry, const R: usize> core::fmt::Debug for Undo<G, R> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         // Render without a `G::Bits: Debug` bound (mirroring `GenericState`): the
         // masks by their set-bit counts, the touched roles by index.
@@ -633,7 +693,7 @@ impl<G: Geometry> core::fmt::Debug for Undo<G> {
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// The bit width of this position's bitboard backing integer — `64`, `128`,
     /// or `256`, the geometry's [`Bits::BITS`](BitboardBacking::BITS). A static
     /// per-variant fact (fixed by the geometry type), it lets the type-erased
@@ -658,7 +718,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[cfg(test)]
     pub(crate) fn max_fielded_role_index(&self) -> usize {
         let mut max = 0;
-        for role in WideRole::ALL {
+        // Only the first `R` roles are stored, so the scan is bounded to `R`. On a
+        // full-width (`R == COUNT`) mirror this walks every role and the meta-test's
+        // `max < ROLE_SPAN` assertion is the graceful guard; on an exact-sized
+        // (`R == ROLE_SPAN`) position no role `>= R` can even be placed (`set_piece`
+        // would panic on the out-of-range `by_role` index), so a too-small span is
+        // caught as a hard panic during the walk instead.
+        for role in WideRole::ALL.into_iter().take(R) {
             let present = !self.board.by_role(role).is_empty()
                 || self.state.placement.count(Color::White, role) > 0
                 || self.state.placement.count(Color::Black, role) > 0;
@@ -672,7 +738,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Builds a position from a board and state directly.
     #[must_use]
     #[inline]
-    pub fn from_parts(board: Board<G>, state: GenericState<G>) -> Self {
+    pub fn from_parts(board: Board<G, R>, state: GenericState<G, R>) -> Self {
         GenericPosition {
             board,
             state,
@@ -684,8 +750,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// The starting position of the variant `V`.
     #[must_use]
     pub fn startpos() -> Self {
+        // `starting_position` is authored at the full role width; narrow it once
+        // here to this position's exact span `R` (issue #580).
         let (board, state) = V::starting_position();
-        Self::from_parts(board, state)
+        Self::from_parts(board.resized(), state.resized())
     }
 
     /// Which of `V`'s history-independent **draw / adjudication hooks** are
@@ -736,7 +804,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// Returns a reference to the board.
     #[must_use]
     #[inline]
-    pub fn board(&self) -> &Board<G> {
+    pub fn board(&self) -> &Board<G, R> {
         &self.board
     }
 
@@ -807,7 +875,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// the compact binary wire codec ([`to_bytes`](Self::to_bytes)) round-trips.
     #[must_use]
     #[inline]
-    pub fn state(&self) -> &GenericState<G> {
+    pub fn state(&self) -> &GenericState<G, R> {
         &self.state
     }
 
@@ -1941,7 +2009,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // test then projects only these from each royal square rather than
         // looping every `WideRole`. A scratch position drives make/unmake in
         // place.
-        let attackers = EnemyAttackers::new::<G, V>(&self.board, them);
+        let attackers = EnemyAttackers::new::<G, V, R>(&self.board, them);
 
         // Fast-accept filter (issue #183). When the side is **not currently in
         // duple check** — at least one of its kings is unattacked now — a move
@@ -2437,7 +2505,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if V::allows_pass()
             && self.state.consecutive_passes >= 1
             && (self.state.consecutive_passes >= 2
-                || (V::restricts_facing_general() && generals_face::<G>(&self.board)))
+                || (V::restricts_facing_general() && generals_face::<G, R>(&self.board)))
         {
             return;
         }
@@ -2490,7 +2558,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // The enemy roles in play, computed once for the whole node: the verify
         // test then projects only these from the king square rather than looping
         // every `WideRole`. A scratch position drives make/unmake in place.
-        let attackers = EnemyAttackers::new::<G, V>(&self.board, us.opposite());
+        let attackers = EnemyAttackers::new::<G, V, R>(&self.board, us.opposite());
 
         // Fast-accept filter (issue #193). When our king is **not currently in
         // check**, a move that touches no line through the king — its origin and
@@ -2543,7 +2611,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // holds, the geometry fast-accept must be disabled — a move off the king
         // lines does not resolve a facing check, so it cannot be accepted without
         // the full per-move facing verify. Default-off elsewhere.
-        let facing_check = V::restricts_facing_general() && generals_face::<G>(&self.board);
+        let facing_check = V::restricts_facing_general() && generals_face::<G, R>(&self.board);
         // A variant that opts into full verification (`needs_full_verify` — a
         // riding leaper whose knight-ray threats the geometry fast-accept cannot
         // reason about) disables the fast-accept entirely: every move falls through
@@ -2705,7 +2773,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // variant has no facing rule (`restricts_facing_general() == false`).
         debug_assert_eq!(
             faced_before,
-            V::restricts_facing_general() && generals_face::<G>(&self.board),
+            V::restricts_facing_general() && generals_face::<G, R>(&self.board),
             "faced_before must equal the pre-move facing state of the scratch board"
         );
         // Fairy-Stockfish's special-cased en-passant legality re-checks only real
@@ -2766,7 +2834,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         if legal && V::restricts_facing_general() {
             let from = mv.from::<G>();
             let to = mv.to::<G>();
-            if from != to && generals_face::<G>(&self.board) && faced_before {
+            if from != to && generals_face::<G, R>(&self.board) && faced_before {
                 // Faced before and still faces after a non-pass move: an existing
                 // bikjang check the move failed to resolve (or the general slid
                 // along the contested line staying faced). Moving *into* a facing
@@ -4715,7 +4783,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// [`play_unchecked`](Self::play_unchecked); this does not re-validate it. The
     /// returned [`Undo`] is valid only for undoing *this* move from the position
     /// this produced — make/unmake pairs must nest (last made, first unmade).
-    pub fn apply_with_undo(&mut self, mv: &WideMove) -> Undo<G> {
+    pub fn apply_with_undo(&mut self, mv: &WideMove) -> Undo<G, R> {
         // Snapshot the scalar state, promoted mask, and both color masks before any
         // edit; `apply` then fills in the touched role masks (reusing its own piece
         // lookups, so no extra `role_at` scan) and performs the move.
@@ -4742,7 +4810,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// [`apply_with_undo`](Self::apply_with_undo) call on the position this is the
     /// successor of, and make/unmake pairs must nest (last made, first unmade).
     /// Misuse leaves the position in an unspecified state; there is no validation.
-    pub fn undo(&mut self, undo: Undo<G>) {
+    pub fn undo(&mut self, undo: Undo<G, R>) {
         // Restore the non-board state and promoted mask wholesale.
         self.state = undo.state;
         self.promoted = undo.promoted;
@@ -4877,7 +4945,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// and this records the role masks the move touches as it goes — reusing the
     /// `moving`/captured piece lookups the move already performs, so the make/unmake
     /// path costs no extra `role_at` scan over plain `apply` on the common path.
-    fn apply_inner(&mut self, mv: &WideMove, mut undo: Option<&mut Undo<G>>) {
+    fn apply_inner(&mut self, mv: &WideMove, mut undo: Option<&mut Undo<G, R>>) {
         let us = self.state.turn;
         let them = us.opposite();
         let from = mv.from::<G>();
@@ -5972,7 +6040,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     /// [`zobrist_board_part`](Self::zobrist_board_part) without rescanning the whole
     /// board. The state half is handled separately by
     /// [`zobrist_state_part`](Self::zobrist_state_part).
-    pub(crate) fn zobrist_board_delta(&self, undo: &Undo<G>) -> u64 {
+    pub(crate) fn zobrist_board_delta(&self, undo: &Undo<G, R>) -> u64 {
         let mut delta = 0u64;
         // A role may be recorded more than once (the Undo tolerates duplicates); a
         // role's whole contribution must be folded exactly once, so skip repeats —
@@ -6094,7 +6162,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         } else {
             placement
         };
-        let board = Board::<G>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
+        let board =
+            Board::<G, R>::from_fen_placement(placement).map_err(WideFenError::Placement)?;
 
         // Sittuyin carries the setup-phase pocket in the same `[..]` holdings
         // bracket the gating variants use (the crazyhouse convention): uppercase
@@ -6102,9 +6171,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         // placement variant never reads the bracket here, so its pocket stays
         // `NONE`.
         let placement_pocket = if V::has_placement() || V::has_hand() {
-            parse_placement_holdings(holdings)?
+            parse_placement_holdings::<R>(holdings)?
         } else {
-            GenericPlacement::NONE
+            GenericPlacement::<R>::NONE
         };
 
         let turn = match fields.next().ok_or(WideFenError::MissingField)? {
@@ -6124,7 +6193,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             // parser sees empty holdings and only reads the eligible-square rights
             // from the castling field.
             let gating_holdings = if V::gates_from_hand() { "" } else { holdings };
-            parse_castling_and_gating::<G>(castling_field, gating_holdings, &board)?
+            parse_castling_and_gating::<G, R>(castling_field, gating_holdings, &board)?
         } else if V::has_first_move_leaps() {
             // A first-move-leap variant (Cambodian) folds its two per-side leap
             // rights into the castling field as home-file letters (`DEde`),
@@ -6136,7 +6205,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
             )
         } else {
             (
-                parse_castling::<G, V>(castling_field, &board)?,
+                parse_castling::<G, V, R>(castling_field, &board)?,
                 GenericGating::NONE,
             )
         };
@@ -6217,11 +6286,11 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     #[must_use]
     pub fn to_fen(&self) -> String {
         let mut out = if V::demotes_promoted_captures() {
-            placement_with_promoted::<G>(&self.board, self.promoted)
+            placement_with_promoted::<G, R>(&self.board, self.promoted)
         } else if V::has_duck() {
-            placement_with_duck::<G>(&self.board, self.state.duck)
+            placement_with_duck::<G, R>(&self.board, self.state.duck)
         } else if V::has_petrify() {
-            placement_with_walls::<G>(&self.board, self.state.petrified)
+            placement_with_walls::<G, R>(&self.board, self.state.petrified)
         } else {
             self.board.to_fen_placement()
         };
@@ -6600,7 +6669,10 @@ impl EnemyAttackers {
     /// Only the variant's own [`ROLE_SPAN`](WideVariant::ROLE_SPAN) prefix of
     /// `WideRole::ALL` is scanned; every role past it is always empty for `V`,
     /// so the shorter scan is byte-identical to iterating the full role set.
-    fn new<G: Geometry, V: WideVariant<G>>(board: &Board<G>, by: Color) -> EnemyAttackers {
+    fn new<G: Geometry, V: WideVariant<G>, const R: usize>(
+        board: &Board<G, R>,
+        by: Color,
+    ) -> EnemyAttackers {
         let mut roles = [WideRole::King; WideRole::COUNT];
         let mut len = 0;
         for &role in &WideRole::ALL[..V::ROLE_SPAN] {
@@ -6713,7 +6785,7 @@ fn set_plane<G: Geometry>(bb: &mut Bitboard<G>, sq: Square<G>, plane_b: bool) {
 /// strictly between them. The generic test behind the Janggi bikjang rule
 /// (default-off elsewhere).
 #[inline]
-fn generals_face<G: Geometry>(board: &Board<G>) -> bool {
+fn generals_face<G: Geometry, const R: usize>(board: &Board<G, R>) -> bool {
     let (Some(w), Some(b)) = (board.king_of(Color::White), board.king_of(Color::Black)) else {
         return false;
     };
@@ -6818,7 +6890,7 @@ fn back_rank<G: Geometry>(color: Color) -> u8 {
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// Generates every legal move into a stack-backed [`WideMoveList`], dispatching
     /// to the standard or the special generator by the same
     /// [`uses_standard_path`](Self::uses_standard_path) split the public entry
@@ -6850,7 +6922,10 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
 /// list). The node counts are byte-identical to the correctness-first reference;
 /// only the cost changes.
 #[must_use]
-pub fn perft<G: Geometry, V: WideVariant<G>>(position: &GenericPosition<G, V>, depth: u32) -> u64 {
+pub fn perft<G: Geometry, V: WideVariant<G>, const R: usize>(
+    position: &GenericPosition<G, V, R>,
+    depth: u32,
+) -> u64 {
     if depth == 0 {
         return 1;
     }
@@ -6872,8 +6947,8 @@ pub fn perft<G: Geometry, V: WideVariant<G>>(position: &GenericPosition<G, V>, d
 /// each child is reached with [`apply_with_undo`](GenericPosition::apply_with_undo)
 /// and the move undone before the next sibling, so `position` is byte-identical on
 /// entry and exit.
-fn perft_inner<G: Geometry, V: WideVariant<G>>(
-    position: &mut GenericPosition<G, V>,
+fn perft_inner<G: Geometry, V: WideVariant<G>, const R: usize>(
+    position: &mut GenericPosition<G, V, R>,
     depth: u32,
     buf: &mut WideMoveList,
 ) -> u64 {
@@ -6910,8 +6985,8 @@ fn perft_inner<G: Geometry, V: WideVariant<G>>(
 /// Like [`perft`], but returns the per-root-move leaf counts — the breakdown for
 /// debugging a mismatching total against a reference.
 #[must_use]
-pub fn perft_divide<G: Geometry, V: WideVariant<G>>(
-    position: &GenericPosition<G, V>,
+pub fn perft_divide<G: Geometry, V: WideVariant<G>, const R: usize>(
+    position: &GenericPosition<G, V, R>,
     depth: u32,
 ) -> Vec<(WideMove, u64)> {
     let mut out = Vec::new();
@@ -6992,9 +7067,9 @@ impl std::error::Error for WideFenError {}
 ///   markers `K`/`Q` fall outside the `a..j` file range. The arm only fires on
 ///   input the `KQkq` parser previously rejected, so it adds support without
 ///   changing any non-randomised result.
-fn parse_castling<G: Geometry, V: WideVariant<G>>(
+fn parse_castling<G: Geometry, V: WideVariant<G>, const R: usize>(
     field: &str,
-    board: &Board<G>,
+    board: &Board<G, R>,
 ) -> Result<GenericCastling, WideFenError> {
     let mut rights = GenericCastling::NONE;
     if field == "-" {
@@ -7012,9 +7087,14 @@ fn parse_castling<G: Geometry, V: WideVariant<G>>(
                 // The rank the king and rooks castle on — the back rank by default,
                 // but a variant (Shako) may place them on a different rank.
                 let rank = V::castle_rank(color);
-                let file =
-                    outermost_rook_file::<G>(board, color, side, rank, V::castle_rook_role(side))
-                        .ok_or(WideFenError::BadCastling)?;
+                let file = outermost_rook_file::<G, R>(
+                    board,
+                    color,
+                    side,
+                    rank,
+                    V::castle_rook_role(side),
+                )
+                .ok_or(WideFenError::BadCastling)?;
                 rights.set(color, side, Some(file));
             }
             // Shredder-FEN: an explicit rook-file letter.
@@ -7132,10 +7212,10 @@ fn split_holdings(placement_field: &str) -> (&str, &str) {
 /// `KQBCDFGkqbcdfg`. A castling letter additionally makes its rook square (and,
 /// since the king is then unmoved, the king square) gating-eligible — these
 /// redundancies are not spelled out explicitly, matching the FSF dialect.
-fn parse_castling_and_gating<G: Geometry>(
+fn parse_castling_and_gating<G: Geometry, const R: usize>(
     field: &str,
     holdings: &str,
-    board: &Board<G>,
+    board: &Board<G, R>,
 ) -> Result<(GenericCastling, GenericGating<G>), WideFenError> {
     let mut castling = GenericCastling::NONE;
     let mut eligible = Bitboard::<G>::EMPTY;
@@ -7152,7 +7232,7 @@ fn parse_castling_and_gating<G: Geometry>(
                     };
                     let rank = back_rank::<G>(color);
                     let rook_file =
-                        outermost_rook_file::<G>(board, color, side, rank, WideRole::Rook)
+                        outermost_rook_file::<G, R>(board, color, side, rank, WideRole::Rook)
                             .ok_or(WideFenError::BadCastling)?;
                     castling.set(color, side, Some(rook_file));
                     // The rook and (unmoved) king squares are gating-eligible.
@@ -7200,8 +7280,8 @@ fn mark_gating_file<G: Geometry>(
 /// the kingside, the leftmost for the queenside. The castle piece is a Rook on
 /// every standard variant; `role` lets a variant scan for a different piece on a
 /// side (Perfect chess's queen-side Chancellor).
-fn outermost_rook_file<G: Geometry>(
-    board: &Board<G>,
+fn outermost_rook_file<G: Geometry, const R: usize>(
+    board: &Board<G, R>,
     color: Color,
     side: usize,
     rank: u8,
@@ -7249,8 +7329,10 @@ fn parse_holdings(holdings: &str) -> Result<([bool; 2], [bool; 2]), WideFenError
 /// pocket. Uppercase letters tally white's undeployed pieces, lowercase black's,
 /// each letter the role's FEN character (mcr dialect — the Met is `m`, the Silver
 /// `s`). Any letter that is not a known role is rejected.
-fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenError> {
-    let mut pocket = GenericPlacement::NONE;
+fn parse_placement_holdings<const R: usize>(
+    holdings: &str,
+) -> Result<GenericPlacement<R>, WideFenError> {
+    let mut pocket = GenericPlacement::<R>::NONE;
     let mut chars = holdings.chars();
     while let Some(ch) = chars.next() {
         // An overflow role's token is `*` + a recycled base letter whose case
@@ -7279,6 +7361,11 @@ fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenE
             let role = WideRole::from_char(ch).ok_or(WideFenError::BadCastling)?;
             (role, ch.is_ascii_uppercase())
         };
+        // A held role outside this variant's stored span cannot be valid input;
+        // reject it rather than index past the `R`-wide pocket (issue #580).
+        if role.index() >= R {
+            return Err(WideFenError::BadCastling);
+        }
         let counts = if white {
             &mut pocket.white
         } else {
@@ -7293,10 +7380,11 @@ fn parse_placement_holdings(holdings: &str) -> Result<GenericPlacement, WideFenE
 /// (uppercase) then black's (lowercase), each role in `WideRole::ALL` index
 /// order, repeated by its count. An empty pocket (both sides fully deployed)
 /// emits `[]`, matching FSF's rendering once the setup phase is over.
-fn write_placement_holdings(placement: GenericPlacement, out: &mut String) {
+fn write_placement_holdings<const R: usize>(placement: GenericPlacement<R>, out: &mut String) {
     out.push('[');
     for (color, upper) in [(Color::White, true), (Color::Black, false)] {
-        for role in WideRole::ALL {
+        // Only the first `R` roles are stored; roles past the span are never held.
+        for role in WideRole::ALL.into_iter().take(R) {
             let n = placement.count(color, role);
             let ch = if upper {
                 role.upper_char()
@@ -7469,7 +7557,10 @@ fn split_duck<G: Geometry>(placement: &str) -> Result<(String, Option<Square<G>>
 /// Renders a placement field with the neutral Duck shown as a `*` on its square.
 /// The inverse of [`split_duck`]; iterates per cell like
 /// [`Board::to_fen_placement`] but emits `*` on the duck square.
-fn placement_with_duck<G: Geometry>(board: &Board<G>, duck: Option<Square<G>>) -> String {
+fn placement_with_duck<G: Geometry, const R: usize>(
+    board: &Board<G, R>,
+    duck: Option<Square<G>>,
+) -> String {
     let width = G::WIDTH;
     let height = G::HEIGHT;
     let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
@@ -7555,7 +7646,10 @@ fn split_petrified<G: Geometry>(placement: &str) -> Result<(String, Bitboard<G>)
 /// Renders a placement field with each petrified wall shown as a `*` on its
 /// square. The inverse of [`split_petrified`]; iterates per cell like
 /// [`Board::to_fen_placement`] but emits `*` on every wall square.
-fn placement_with_walls<G: Geometry>(board: &Board<G>, walls: Bitboard<G>) -> String {
+fn placement_with_walls<G: Geometry, const R: usize>(
+    board: &Board<G, R>,
+    walls: Bitboard<G>,
+) -> String {
     let width = G::WIDTH;
     let height = G::HEIGHT;
     let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
@@ -7644,7 +7738,10 @@ fn split_promoted<G: Geometry>(placement: &str) -> Result<(String, Bitboard<G>),
 /// Renders a placement field with each promoted piece carrying a trailing `~`
 /// (`Q~`). The inverse of [`split_promoted`]; iterates per cell like
 /// [`Board::to_fen_placement`] but appends `~` after a piece on a promoted square.
-fn placement_with_promoted<G: Geometry>(board: &Board<G>, promoted: Bitboard<G>) -> String {
+fn placement_with_promoted<G: Geometry, const R: usize>(
+    board: &Board<G, R>,
+    promoted: Bitboard<G>,
+) -> String {
     let width = G::WIDTH;
     let height = G::HEIGHT;
     let mut fen = String::with_capacity(width as usize * height as usize + height as usize);
@@ -7944,8 +8041,8 @@ mod tests {
     /// from-scratch [`zobrist`](GenericPosition::zobrist) recompute exactly, and that
     /// `undo` then restores the parent key. This exercises the same machinery
     /// [`GenericGame`](super::super::game::GenericGame) uses to maintain the key.
-    fn walk_incremental_zobrist<G: Geometry, V: WideVariant<G>>(
-        pos: &mut GenericPosition<G, V>,
+    fn walk_incremental_zobrist<G: Geometry, V: WideVariant<G>, const R: usize>(
+        pos: &mut GenericPosition<G, V, R>,
         depth: u32,
     ) {
         let before = pos.zobrist();
@@ -8015,8 +8112,8 @@ mod tests {
     /// the move set `legal_moves` returns — same moves, same order. The list is
     /// passed in (not created here) so the caller can prove one buffer is reused
     /// across positions without corruption.
-    fn assert_into_agrees<G: Geometry, V: WideVariant<G>>(
-        pos: &GenericPosition<G, V>,
+    fn assert_into_agrees<G: Geometry, V: WideVariant<G>, const R: usize>(
+        pos: &GenericPosition<G, V, R>,
         list: &mut WideMoveList,
     ) {
         let via_vec = pos.legal_moves();
@@ -8034,8 +8131,8 @@ mod tests {
     /// Walks the legal-move tree to `depth`, asserting at every node that
     /// `legal_moves_into` (into one reused `list`) agrees byte-for-byte with
     /// `legal_moves`.
-    fn walk_into_agrees<G: Geometry, V: WideVariant<G>>(
-        pos: &mut GenericPosition<G, V>,
+    fn walk_into_agrees<G: Geometry, V: WideVariant<G>, const R: usize>(
+        pos: &mut GenericPosition<G, V, R>,
         depth: u32,
         list: &mut WideMoveList,
     ) {

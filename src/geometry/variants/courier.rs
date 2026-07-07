@@ -227,7 +227,11 @@ impl WideVariant<Courier12x8> for CourierRules {
 /// with [`Courier::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the pieces, the no-castling / single-step-pawn rules, and the
 /// baring / stalemate-loss terminal rules.
-pub type Courier = GenericPosition<Courier12x8, CourierRules>;
+pub type Courier = GenericPosition<
+    Courier12x8,
+    CourierRules,
+    { <CourierRules as WideVariant<Courier12x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -253,9 +257,9 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Courier::startpos();
-        assert_eq!(gperft::<Courier12x8, _>(&pos, 1), 26);
-        assert_eq!(gperft::<Courier12x8, _>(&pos, 2), 678);
-        assert_eq!(gperft::<Courier12x8, _>(&pos, 3), 18406);
+        assert_eq!(gperft::<Courier12x8, _, _>(&pos, 1), 26);
+        assert_eq!(gperft::<Courier12x8, _, _>(&pos, 2), 678);
+        assert_eq!(gperft::<Courier12x8, _, _>(&pos, 3), 18406);
     }
 
     /// The back-rank array, a..l: R N E(Alfil) B M(Man) K _ W E... mirror.

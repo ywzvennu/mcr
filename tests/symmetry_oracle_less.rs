@@ -72,8 +72,8 @@ macro_rules! symmetric_start {
             let black = <$pos>::from_fen(&black_fen)
                 .expect("the colour-mirrored start position must be a legal, parseable FEN");
             for &depth in $depths {
-                let w = gperft::<$geom, _>(&white, depth);
-                let b = gperft::<$geom, _>(&black, depth);
+                let w = gperft::<$geom, _, _>(&white, depth);
+                let b = gperft::<$geom, _, _>(&black, depth);
                 assert_eq!(
                     w,
                     b,

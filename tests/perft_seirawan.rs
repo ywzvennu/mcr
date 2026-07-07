@@ -63,7 +63,7 @@ const PARTIAL_RESERVE: &str =
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Seirawan::from_fen(fen).expect("valid Seirawan FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Seirawan perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

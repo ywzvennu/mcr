@@ -63,7 +63,7 @@ const ONE_PAWN_HAND: &str = "3k3/7/7/7/7/7/3K3[**P**p] w - - 0 1";
 /// Runs `Chennis::perft` to `depth` from `fen`.
 fn perft(fen: &str, depth: u32) -> u64 {
     let pos = Chennis::from_fen(fen).expect("the Chennis FEN parses");
-    gperft::<Chennis7x7, _>(&pos, depth)
+    gperft::<Chennis7x7, _, _>(&pos, depth)
 }
 
 #[test]

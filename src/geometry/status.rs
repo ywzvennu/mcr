@@ -205,7 +205,7 @@ impl GameStatus {
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// The consolidated [`GameStatus`] derivable from this position alone.
     ///
     /// Delegates to [`end_reason`](GenericPosition::end_reason) and
@@ -230,7 +230,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericGame<G, V, R> {
     /// The consolidated [`GameStatus`] of the current position, including the
     /// history-dependent rules.
     ///
@@ -255,7 +255,11 @@ mod tests {
 
     /// Plays the move `from`->`to` (by square index) through a [`GenericGame`],
     /// asserting it is legal.
-    fn play<G: Geometry, V: WideVariant<G>>(game: &mut GenericGame<G, V>, from: u8, to: u8) {
+    fn play<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &mut GenericGame<G, V, R>,
+        from: u8,
+        to: u8,
+    ) {
         let mv: WideMove = game
             .legal_moves()
             .into_iter()

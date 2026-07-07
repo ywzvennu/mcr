@@ -86,7 +86,7 @@ const FLYING_GENERAL: &str = "3k3/7/7/3R3/7/7/3K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Minixiangqi::from_fen(fen).expect("valid Minixiangqi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Minixiangqi7x7, _>(&pos, depth);
+        let got = gperft::<Minixiangqi7x7, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Minixiangqi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

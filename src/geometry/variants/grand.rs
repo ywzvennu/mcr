@@ -150,7 +150,10 @@ impl WideVariant<Grand10x10> for GrandRules {
         }
     }
 
-    fn promotion_targets(color: Color, board: &Board<Grand10x10>) -> alloc::vec::Vec<WideRole> {
+    fn promotion_targets<const R: usize>(
+        color: Color,
+        board: &Board<Grand10x10, R>,
+    ) -> alloc::vec::Vec<WideRole> {
         // A pawn may promote to a role only while the player holds fewer than the
         // starting count of it on the board — FSF's `promotionLimit`. Counting the
         // live board makes "promote only to a captured type" exact for the
@@ -207,9 +210,9 @@ impl WideVariant<Grand10x10> for GrandRules {
     /// The two compounds count as mating material (matching Fairy-Stockfish, which
     /// classes the cardinal and marshal as major pieces). Adjudication-only and
     /// behind the default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(
-        board: &Board<Grand10x10>,
-        _state: &GenericState<Grand10x10>,
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Grand10x10, R>,
+        _state: &GenericState<Grand10x10, R>,
     ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
@@ -223,7 +226,8 @@ impl WideVariant<Grand10x10> for GrandRules {
 /// the [`StandardChess`](crate::geometry::StandardChess) compound defaults, so
 /// only the array, no-castling, pawn rules, promotion zone, and
 /// promote-to-captured rule distinguish it.
-pub type Grand = GenericPosition<Grand10x10, GrandRules>;
+pub type Grand =
+    GenericPosition<Grand10x10, GrandRules, { <GrandRules as WideVariant<Grand10x10>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod insufficient_material_tests {

@@ -289,10 +289,10 @@ impl WideVariant<Gorogoro5x6> for GorogoroRules {
         }
     }
 
-    fn drop_targets(
+    fn drop_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Gorogoro5x6>,
+        board: &Board<Gorogoro5x6, R>,
     ) -> Bitboard<Gorogoro5x6> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Pawn/Lance may not land on the last rank, nor
@@ -390,4 +390,8 @@ impl GorogoroRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`Gorogoro::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the hand, drops, and two-rank promotion zone.
-pub type Gorogoro = GenericPosition<Gorogoro5x6, GorogoroRules>;
+pub type Gorogoro = GenericPosition<
+    Gorogoro5x6,
+    GorogoroRules,
+    { <GorogoroRules as WideVariant<Gorogoro5x6>>::ROLE_SPAN },
+>;

@@ -297,4 +297,8 @@ fn letter_of_file(file: u8, color: Color) -> char {
 /// Construct the starting position with
 /// [`Cambodian::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Cambodian::from_fen`](GenericPosition::from_fen).
-pub type Cambodian = GenericPosition<Chess8x8, CambodianRules>;
+pub type Cambodian = GenericPosition<
+    Chess8x8,
+    CambodianRules,
+    { <CambodianRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

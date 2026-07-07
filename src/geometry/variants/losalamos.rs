@@ -151,7 +151,11 @@ impl WideVariant<Losalamos6x6> for LosalamosRules {
 /// [`Losalamos::from_fen`](GenericPosition::from_fen). The army is the standard
 /// chess pieces minus the Bishop; there is no castling, no pawn double-step, and
 /// no en passant, and pawns promote on the far rank to Queen, Rook, or Knight.
-pub type Losalamos = GenericPosition<Losalamos6x6, LosalamosRules>;
+pub type Losalamos = GenericPosition<
+    Losalamos6x6,
+    LosalamosRules,
+    { <LosalamosRules as WideVariant<Losalamos6x6>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

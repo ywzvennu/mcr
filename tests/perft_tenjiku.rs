@@ -97,9 +97,9 @@ fn startpos_round_trips() {
 #[test]
 fn startpos_perft_regression() {
     let pos = Tenjiku::startpos();
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 72);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 5663);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 3), 424582);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 72);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 2), 5663);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 3), 424582);
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {
@@ -332,8 +332,8 @@ fn white_role_at(pos: &Tenjiku, file: u8, rank: u8, role: WideRole) -> bool {
 fn fire_demon_igui_burns_all_adjacent_perft() {
     let fen = "16/16/16/16/16/16/16/6pPp7/k6****I8/6pPp7/16/16/16/16/16/K15 w - - 0 1";
     let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 9);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 73);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 9);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 2), 73);
 
     // The igui (from == to) burns all four diagonal Black Pawns but not the two
     // friendly Pawns walling the file.
@@ -396,8 +396,8 @@ fn fire_demon_igui_burns_all_adjacent_perft() {
 fn fire_demon_arrival_burn_on_empty_square_perft() {
     let fen = "16/16/16/16/16/16/7P8/6p1p7/k6****I8/6PPP7/16/16/16/16/16/K15 w - - 0 1";
     let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 10);
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 2), 64);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 10);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 2), 64);
 
     // Sliding onto the empty h9 burns both g9 and i9 (arrival burn, no displacement).
     let after = after_move(fen, "h8h9");
@@ -479,7 +479,7 @@ fn sq_index(file: u8, rank: u8) -> u8 {
 fn jump_general_single_jump_perft() {
     let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/16/16/r15/p15/****R15 w - - 0 1";
     let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 20);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 20);
 
     // The a-file targets are exactly a2 (ordinary capture) and a3 (jump-capture).
     let got = targets(fen, 0, 0);
@@ -510,7 +510,7 @@ fn jump_general_single_jump_perft() {
 fn jump_general_over_three_pieces_perft() {
     let fen = "7k7K/16/16/16/16/16/16/16/16/16/16/r15/p15/p15/p15/****R15 w - - 0 1";
     let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 22);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 22);
 
     let got = targets(fen, 0, 0);
     for r in 1..=4 {
@@ -639,7 +639,7 @@ fn jump_general_delivers_check_over_a_screen() {
         pos.is_check(),
         "the Rook General jump-checks the King over the a2 screen"
     );
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 3);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 3);
     // Every legal reply leaves the King out of the jump-check.
     for m in pos.legal_moves().iter() {
         let after = pos.play(m);
@@ -672,7 +672,7 @@ fn king_may_not_step_into_a_jump_check() {
     let fen = "15k/16/16/16/16/16/16/16/16/16/16/16/16/2K13/3P****r11/16 w - - 0 1";
     let pos = Tenjiku::from_fen(fen).expect("valid Tenjiku FEN");
     assert!(!pos.is_check(), "the King is not in check on c3");
-    assert_eq!(perft::<Tenjiku16x16, _>(&pos, 1), 7);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&pos, 1), 7);
     let king_targets = targets(fen, 2, 2);
     assert!(
         !king_targets.contains(&sq_index(2, 1)),
@@ -819,7 +819,7 @@ fn engine_matches_independent_brute_force_depth2() {
     let engine = Tenjiku::startpos();
     let bf = brute::Position::startpos();
     for depth in 1..=2 {
-        let e = perft::<Tenjiku16x16, _>(&engine, depth);
+        let e = perft::<Tenjiku16x16, _, _>(&engine, depth);
         let b = brute::perft(&bf, depth);
         assert_eq!(
             e, b,
@@ -839,7 +839,7 @@ fn engine_matches_independent_brute_force_depth2() {
 fn engine_matches_independent_brute_force_depth3() {
     let engine = Tenjiku::startpos();
     let bf = brute::Position::startpos();
-    assert_eq!(perft::<Tenjiku16x16, _>(&engine, 3), 424582);
+    assert_eq!(perft::<Tenjiku16x16, _, _>(&engine, 3), 424582);
     assert_eq!(brute::perft(&bf, 3), 424582);
 }
 

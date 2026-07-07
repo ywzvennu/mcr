@@ -32,7 +32,7 @@ const CASTLE: &str = "r4k3r/pppppppppp/10/10/10/10/PPPPPPPPPP/R4K3R w KQkq - 0 1
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Gothic::from_fen(fen).expect("valid Gothic FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Gothic perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
