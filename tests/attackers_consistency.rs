@@ -39,21 +39,21 @@
 //! [`WideVariant::role_attacks`]: mcr::geometry::WideVariant::role_attacks
 
 use mcr::geometry::{
-    AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules, CapablancaRules,
-    CapahouseRules, ChakRules, ChancellorRules, ChennisRules, CourierRules, DobutsuRules,
-    DragonRules, DuckRules, EmpireRules, FogOfWarRules, GenericPosition, Geometry, GorogoroRules,
-    GrandRules, GrandhouseRules, HoppelPoppelRules, JanggiRules, JieqiRules, JudkinsRules,
-    KhansRules, KnightmateRules, KyotoshogiRules, MakpongRules, MakrukRules, ManchuRules,
-    MansindamRules, MicroRules, MinishogiRules, MinixiangqiRules, OpulentRules, OrdaRules,
-    OrdamirrorRules, PlacementRules, SeirawanRules, ShakoRules, ShatarRules, ShatranjRules,
-    ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules, ShouseRules, SittuyinRules, SpartanRules,
-    Square, StandardChess, SynochessRules, TencubedRules, ToriRules, WashogiRules, WideRole,
-    WideVariant, XiangfuRules, XiangqiRules,
+    AliceRules, AseanRules, Bitboard, BughouseRules, CambodianRules, CannonShogiRules,
+    CapablancaRules, CapahouseRules, ChakRules, ChancellorRules, ChennisRules, ChuRules,
+    CourierRules, DaiRules, DobutsuRules, DragonRules, DuckRules, EmpireRules, FogOfWarRules,
+    GenericPosition, Geometry, GorogoroRules, GrandRules, GrandhouseRules, HoppelPoppelRules,
+    JanggiRules, JieqiRules, JudkinsRules, KhansRules, KnightmateRules, KyotoshogiRules,
+    MakpongRules, MakrukRules, ManchuRules, MansindamRules, MicroRules, MinishogiRules,
+    MinixiangqiRules, OpulentRules, OrdaRules, OrdamirrorRules, PlacementRules, SeirawanRules,
+    ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
+    ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, TencubedRules,
+    TenjikuRules, ToriRules, WashogiRules, WideRole, WideVariant, XiangfuRules, XiangqiRules,
 };
 use mcr::geometry::{
-    Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Courier12x8, Dobutsu3x4, Gorogoro5x6, Grand10x10,
-    Judkins6x6, Micro4x5, Minishogi5x5, Minixiangqi7x7, Shogi9x9, Tori7x7, Washogi11x11,
-    Xiangqi9x10,
+    Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Chu12x12, Courier12x8, Dai15x15, Dobutsu3x4,
+    Gorogoro5x6, Grand10x10, Judkins6x6, Micro4x5, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
+    Tenjiku16x16, Tori7x7, Washogi11x11, Xiangqi9x10,
 };
 use mcr::Color;
 
@@ -1446,5 +1446,88 @@ variant_test!(
         "r1oukuo1r/9/1cj3jc1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1CJ3JC1/9/R1OUKUO1R w - - 0 1",
         "4k4/9/9/9/9/9/9/4j4/3U5/3K5 w - - 0 1",
         "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1",
+    ]
+);
+
+// -- Chu Shogi (12x12 large shogi) ------------------------------------------
+//
+// Chu is one of the oracle-less large-shogi variants (validated against the HaChu
+// reference engine only to shallow depth; see `tests/perft_chu.rs`), so this
+// consistency guard is a primary structural check on its move generation. The Lion
+// (`***N`) is the interesting attacker: its short-range attack set (the 24 squares
+// of its area move, reverse-projected by `attackers_to` for king safety) must match
+// the forward relation. The corpus places a lone Lion beside enemy pieces so both
+// its distance-1 and distance-2 captures enter the relation; the startpos and the
+// long random playouts exercise every other Chu mover (the ranging Rook/Bishop
+// generals, the Kylin/Phoenix, the promoting pieces).
+variant_test!(
+    chu,
+    Chu12x12,
+    ChuRules,
+    "chu",
+    [
+        "k11/12/12/12/12/12/5***Npp4/12/12/12/12/K11 w - - 0 1",
+        "k11/12/12/12/12/12/5***Np5/12/12/12/12/K11 w - - 0 1",
+    ]
+);
+
+// -- Dai Shogi (15x15 large shogi) ------------------------------------------
+//
+// Dai is HaChu-oracle-validated to depth 3 only (`tests/perft_dai.rs`), so this
+// guard adds an oracle-free structural check across its whole army. The corpus
+// isolates a ranging piece behind an own blocker (so the forward slide relation is
+// occupancy-clipped exactly as `attackers_to` clips it) and a lone stepper; the
+// startpos and playouts cover the Lion, the Flying-family sliders, and the
+// promotions.
+variant_test!(
+    dai,
+    Dai15x15,
+    DaiRules,
+    "dai",
+    [
+        "14k/15/15/15/15/15/7P7/7***X7/15/15/15/15/15/15/K14 w - - 0 1",
+        "14k/15/15/15/15/15/15/7M7/15/15/15/15/15/15/K14 w - - 0 1",
+    ]
+);
+
+// -- Tenjiku Shogi (16x16 large shogi) --------------------------------------
+//
+// Tenjiku has NO usable engine oracle at all (HaChu crashes on `variant tenjiku`;
+// see `tests/perft_tenjiku.rs`), so its move generation leans on hand-derivation
+// plus an independent in-repo generator. This consistency guard is therefore an
+// especially load-bearing internal check. It exercises the two hardest attackers:
+// the Fire Demon (`***E`), whose burn/area attack set surrounds it, and the
+// range-jumping Generals (the Vice General / Great General reached in the
+// playouts), whose occupancy-dependent jump-attacks `attackers_to` must reverse-
+// project exactly as the generator forward-projects them.
+variant_test!(
+    tenjiku,
+    Tenjiku16x16,
+    TenjikuRules,
+    "tenjiku",
+    [
+        "14k1/16/16/16/16/16/16/6P1P7/7***E8/16/16/16/16/16/16/1K14 w - - 0 1",
+        "15k/16/16/16/16/16/16/16/16/16/7r8/16/7P8/16/7K8/16 w - - 0 1",
+    ]
+);
+
+// -- Alice Chess (two-board 8x8 teleport) -----------------------------------
+//
+// Alice has no external oracle (FSF implements no two-board teleport variant); it
+// is validated by an independent brute-force generator (`tests/perft_alice.rs`).
+// Its check detection runs the standard-chess attack relation on the plane the king
+// occupies, so `attackers_to` is exercised exactly as for standard chess — the
+// value here is confirming that the two-plane state (pieces mid-teleport on board B)
+// never leaks a phantom attacker into the relation on board A. The corpus uses
+// ordinary chess tactical positions (all pieces on plane A at the root); the
+// playouts drive pieces onto board B, where the guard holds at every reached node.
+variant_test!(
+    alice,
+    Chess8x8,
+    AliceRules,
+    "alice",
+    [
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
     ]
 );

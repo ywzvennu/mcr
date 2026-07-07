@@ -140,7 +140,11 @@ size, start FEN, notable pieces, special rules, and validation oracle — see
 position's `to_fen()`) by `tests/variants_doc.rs`, which also drift-checks the
 committed copy against a fresh render, so the reference cannot fall behind the
 code. Per-variant perft / node-rate figures live in
-[`docs/perf-variants.md`](docs/perf-variants.md).
+[`docs/perf-variants.md`](docs/perf-variants.md). The handful of variants with no
+Fairy-Stockfish oracle (the HaChu large shogi and the fully independent Alice /
+Jieqi / Tenjiku / Wa Shogi) have their exact oracle, validated depth, and residual
+trust gap documented in
+[`docs/oracle-less-validation.md`](docs/oracle-less-validation.md).
 
 ### Geometry families
 
