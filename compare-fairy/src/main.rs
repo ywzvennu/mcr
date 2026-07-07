@@ -96,6 +96,7 @@ mod shogun;
 mod shoshogi;
 mod shouse;
 mod sittuyin;
+mod sortofalmost;
 mod spartan;
 mod suicide;
 mod synochess;
@@ -475,6 +476,11 @@ fn main() {
     // Archbishop, and Amazon compounds added (the queen side castles with the
     // Chancellor).
     let perfect_mismatches = perfect::run(&mut engine, opts.full);
+    // Sort-of-almost chess is a FSF built-in (no variants.ini needed), like almost:
+    // it rides the same generic 8x8 engine as standard chess, but only White's queen
+    // is replaced by a Chancellor (Black keeps its queen), with matching asymmetric
+    // per-colour promotion sets.
+    let sortofalmost_mismatches = sortofalmost::run(&mut engine, opts.full);
     // Petrified chess is a FSF built-in (no variants.ini needed): the pawnsideways
     // base plus turn-to-stone captures and a pseudo-royal Commoner, on the generic
     // 8x8 engine.
@@ -599,6 +605,7 @@ fn main() {
         + legan_mismatches
         + losalamos_mismatches
         + perfect_mismatches
+        + sortofalmost_mismatches
         + petrified_mismatches
         + grasshopper_mismatches
         + newzealand_mismatches
