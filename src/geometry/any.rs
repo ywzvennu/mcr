@@ -29,11 +29,11 @@ use super::{
     Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi,
     Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Losers, Makpong,
     Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern, Newzealand,
-    Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect,
-    Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
-    Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Synochess, Tencubed,
-    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
-    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
+    Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Paradigm, Pawnback,
+    Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
+    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide,
+    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
+    WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -843,6 +843,7 @@ wide_variants! {
     Opulent, Opulent, Opulent, "opulent";
     Orda, Orda, Orda, "orda";
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
+    Paradigm, Paradigm, Paradigm, "paradigm";
     Pawnback, Pawnback, Pawnback, "pawnback", "pawn-back", "pawnbackchess";
     Pawnsideways, Pawnsideways, Pawnsideways, "pawnsideways", "pawn-sideways";
     Perfect, Perfect, Perfect, "perfect", "perfectchess";
@@ -1096,7 +1097,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 98, "all 98 fairy variants are covered");
+        assert_eq!(count, 99, "all 99 fairy variants are covered");
     }
 
     #[test]
@@ -1634,6 +1635,12 @@ mod tests {
             WideVariantId::Ordamirror,
             Ordamirror,
             AnyWideVariant::Ordamirror,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Paradigm,
+            Paradigm,
+            AnyWideVariant::Paradigm,
             2
         );
         agrees_with_typed!(

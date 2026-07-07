@@ -630,6 +630,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Symmetric horde mirror; no castling, single-step pawns; a pawn promotes to Lancer, Kheshig, Archer, or Falcon; flag-win (campmate) when a king reaches the far rank. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant ordamirror`).",
         },
+        WideVariantId::Paradigm => Meta {
+            display: "Paradigm chess (8x8)",
+            pieces: "Standard chess army with both bishops replaced by the Bishop-Horse (mcr overflow `****x`/`****X`) — a Bishop slide combined with a hobbled Xiangqi Horse (a knight leap blocked when its leg, the orthogonal step toward the leap, is occupied).",
+            rules: "Standard 8x8 chess with double step, en passant, castling, and the fifty-move rule; a pawn promotes on the last rank to Queen, Bishop-Horse, Rook, or Knight (never an ordinary Bishop). The Bishop-Horse gives check and pins along its diagonals and gives check by its horse leaps; because a horse check can be answered by blocking its leg, king safety takes the per-move full-verify path. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant paradigm`).",
+        },
         WideVariantId::Pawnback => Meta {
             display: "Pawn back chess",
             pieces: "Standard chess army with a pawn that may also step backward (`p`/`P`).",
