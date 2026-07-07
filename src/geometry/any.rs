@@ -27,12 +27,12 @@ use super::{
     Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
     EuroShogi, Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian,
     Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel, Janggi,
-    Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos,
-    Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern,
-    Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror, Paradigm,
-    Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar,
-    Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square,
-    Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi,
+    Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
+    Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere,
+    Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror,
+    Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako,
+    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan,
+    Square, Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi,
     WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu,
     Xiangqi, Yari,
 };
@@ -825,6 +825,7 @@ wide_variants! {
     Khans, Khans, Khans, "khans";
     Kinglet, Kinglet, Kinglet, "kinglet";
     Knightmate, Knightmate, Knightmate, "knightmate";
+    Koedem, Koedem, Koedem, "koedem";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
     Legan, Legan, Legan, "legan";
     Losalamos, Losalamos, Losalamos, "losalamos", "losalamoschess", "los-alamos";
@@ -1106,7 +1107,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 103, "all 103 fairy variants are covered");
+        assert_eq!(count, 104, "all 104 fairy variants are covered");
     }
 
     #[test]
@@ -1591,6 +1592,7 @@ mod tests {
             AnyWideVariant::Knightmate,
             2
         );
+        agrees_with_typed!(WideVariantId::Koedem, Koedem, AnyWideVariant::Koedem, 2);
         agrees_with_typed!(
             WideVariantId::Kyotoshogi,
             Kyotoshogi,

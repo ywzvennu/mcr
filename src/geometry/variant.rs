@@ -210,6 +210,19 @@ pub struct ExtinctionRule {
     /// chess / Kinglet / Three-kings). The node still truncates to zero moves
     /// either way; this only flips which side the terminal credits.
     pub extinct_wins: bool,
+    /// The minimum count the **opponent** must hold of a watched role (or, under
+    /// [`count_total`](Self::count_total), of its whole army) for the extinction to
+    /// be decisive — Fairy-Stockfish's `extinctionOpponentPieceCount`. A side is
+    /// extinct only when its own count is at/below [`threshold`](Self::threshold)
+    /// **and** the opponent holds at least `opponent_min`. The extinction count is
+    /// taken **with the hand** (board pieces plus reserves), so a Koedem side that
+    /// owns a Commoner in hand counts toward the "own all Commoners" total.
+    ///
+    /// The default `0` is a no-op (`opponent_count >= 0` is always true), so every
+    /// existing extinction variant — which never seeds a hand — is byte-identical.
+    /// Koedem sets it to `2`: a side loses only when it holds no Commoner and the
+    /// opponent owns **both** (FSF `extinctionOpponentPieceCount = 2`).
+    pub opponent_min: usize,
 }
 
 /// The promotion configuration a variant exposes: which squares promote and to
@@ -1366,6 +1379,26 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// non-empty move set empty — stalemate detection is unaffected.
     fn mandatory_captures() -> bool {
         false
+    }
+
+    /// The role a side **must drop before doing anything else** while it holds one
+    /// in hand — Fairy-Stockfish's `mustDrop` / `mustDropType` (Koedem's Commoner).
+    /// The default is `None`, so every other variant is byte-identical (no filter).
+    ///
+    /// When this returns `Some(role)` and the side to move holds at least one such
+    /// piece in hand ([`hand_count`](super::position::GenericPosition::hand_count)),
+    /// its legal moves are narrowed to **only the drops of that role** — every board
+    /// move and every drop of any other held role is illegal until the reserve of
+    /// `role` is emptied. Like [`mandatory_captures`](Self::mandatory_captures) the
+    /// narrowing runs after ordinary generation, at the single movegen chokepoint,
+    /// so it composes with the rest of the rules; it fires only while the reserve is
+    /// non-empty, so a side with no such piece in hand plays normally.
+    ///
+    /// Koedem returns [`WideRole::King`] (its non-royal Commoner): a captured king
+    /// enters a hand only via FEN, and while it is there the holder must re-deploy it
+    /// before any other move (FSF `mustDropType = COMMONER`).
+    fn must_drop_role() -> Option<WideRole> {
+        None
     }
 
     // --- Pin confinement for leapers (default OFF) ------------------------

@@ -95,6 +95,7 @@ impl WideVariant<Chess8x8> for LosersRules {
             threshold: 1,
             count_total: true,
             extinct_wins: true,
+            opponent_min: 0,
         })
     }
 

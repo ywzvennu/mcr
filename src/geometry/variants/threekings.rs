@@ -139,6 +139,7 @@ impl WideVariant<Chess8x8> for ThreekingsRules {
             threshold: 2,
             count_total: false,
             extinct_wins: false,
+            opponent_min: 0,
         })
     }
 

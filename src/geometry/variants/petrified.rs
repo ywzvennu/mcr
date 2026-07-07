@@ -140,6 +140,7 @@ impl WideVariant<Chess8x8> for PetrifiedRules {
             threshold: 0,
             count_total: false,
             extinct_wins: false,
+            opponent_min: 0,
         })
     }
 

@@ -457,6 +457,15 @@ pub(crate) const SPECS: &[Spec] = &[
         dialect: crate::knightmate::to_fsf_dialect,
     },
     Spec {
+        // Koedem shares the standard-chess dialect (its king is a Commoner by rule,
+        // not by letter) and the `[..]` crazyhouse hand bracket, so the FEN passes
+        // to FSF unchanged.
+        id: WideVariantId::Koedem,
+        fsf: "koedem",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         id: WideVariantId::Kyotoshogi,
         fsf: "kyotoshogi",
         needs_ini: false,

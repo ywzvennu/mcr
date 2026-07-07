@@ -1392,11 +1392,12 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// its length — byte-identical to before.
     #[must_use]
     pub fn legal_move_count(&self) -> usize {
-        // Mandatory-capture variants cannot be bulk-counted: the capture narrowing
-        // must inspect the whole move set before it knows which moves survive. Route
-        // them through the materialising `generate_list`, which applies the filter,
-        // and return its length. Gated behind `mandatory_captures()` (default-off).
-        if V::mandatory_captures() {
+        // Mandatory-capture and must-drop variants cannot be bulk-counted: the
+        // narrowing must inspect the whole move set before it knows which moves
+        // survive. Route them through the materialising `generate_list`, which
+        // applies the filter, and return its length. Gated behind
+        // `mandatory_captures()` / `must_drop_role()` (both default-off).
+        if V::mandatory_captures() || V::must_drop_role().is_some() {
             let mut list = WideMoveList::new();
             self.generate_list(&mut list);
             return list.len();
@@ -1559,8 +1560,20 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         // `has_king`.
         let maybe_king = board.king_of(us);
         if maybe_king.is_none() {
+            // A kingless side plays on when the loss of its (non-royal) king is not,
+            // by itself, terminal. That is Kinglet (its extinction watches only the
+            // Pawn, not the King), and Koedem, whose "own all Commoners" terminal
+            // (`opponent_min > 0`) only fires once the *opponent* owns every king —
+            // a kingless Koedem side whose opponent owns just one plays on with its
+            // other pieces. In both cases the authoritative extinction check at the
+            // top of this generator (`extinction_loser`) has already truncated the
+            // genuinely-terminal positions, so reaching here kingless means the side
+            // is not extinct. Every other case keeps "kingless = no moves": a royal
+            // side, Fog of War / Dobutsu (no extinction rule; king loss is the loss),
+            // and plain Extinction (a kingless side is already extinct, caught above).
             let king_loss_survivable = V::non_royal_king()
-                && V::extinction_rule().is_some_and(|r| !r.watched.contains(&WideRole::King));
+                && V::extinction_rule()
+                    .is_some_and(|r| !r.watched.contains(&WideRole::King) || r.opponent_min > 0);
             if !king_loss_survivable {
                 return;
             }
@@ -3101,17 +3114,39 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         [self.state.turn, self.state.turn.opposite()]
             .into_iter()
             .find(|&color| {
+                let opp = color.opposite();
                 if rule.count_total {
                     // The whole army (FSF `extinctionPieceTypes = ALL_PIECES`):
                     // "extinct" when the side's total piece count is at/below the
                     // threshold — giveaway (0, no pieces) / losers (1, a bare king).
+                    // The opponent-count clause (FSF `extinctionOpponentPieceCount`)
+                    // is inert at the default `opponent_min == 0` (`>= 0` always
+                    // holds), so every existing count_total variant is byte-identical.
                     (self.board.by_color(color).count() as usize) <= rule.threshold
+                        && (self.board.by_color(opp).count() as usize) >= rule.opponent_min
                 } else {
+                    // Per-role extinction, counted **with the hand** (board pieces
+                    // plus reserves): a side is extinct in `role` when it owns at/below
+                    // `threshold` of it, and the terminal is decisive only when the
+                    // opponent owns at least `opponent_min` (FSF's "own all"
+                    // `extinctionOpponentPieceCount`). Every existing per-role variant
+                    // seeds no hand and leaves `opponent_min == 0`, so the added terms
+                    // (`+ 0` reserves, `>= 0` opponent) are byte-identical; Koedem
+                    // sets `opponent_min == 2` and counts a Commoner held in hand.
                     rule.watched.iter().any(|&role| {
-                        self.board.pieces(color, role).count() as usize <= rule.threshold
+                        self.count_with_hand(color, role) <= rule.threshold
+                            && self.count_with_hand(opp, role) >= rule.opponent_min
                     })
                 }
             })
+    }
+
+    /// The number of `role` pieces `color` owns **with the hand** — board pieces
+    /// plus reserves ([`hand_count`](Self::hand_count)). For a variant without a
+    /// hand the reserve is always zero, so this equals the plain board count.
+    #[inline]
+    fn count_with_hand(&self, color: Color, role: WideRole) -> usize {
+        self.board.pieces(color, role).count() as usize + self.hand_count(color, role) as usize
     }
 
     /// Returns the flag goal rank of the side to move (`us`) when it is
@@ -6651,6 +6686,24 @@ impl WideMoveList {
         }
     }
 
+    /// The must-drop filter (Fairy-Stockfish `mustDrop` / `mustDropType`): keeps
+    /// only the drops of `role`, dropping every board move and every other-role
+    /// drop. Called only while the side to move actually holds `role` in hand
+    /// (Koedem's Commoner), so a side with no such reserve is never narrowed; every
+    /// non-Koedem variant, whose [`must_drop_role`](super::WideVariant::must_drop_role)
+    /// is `None`, never reaches this and is byte-identical.
+    fn retain_must_drop_role(&mut self, role: WideRole) {
+        let kept: Vec<WideMove> = self
+            .iter()
+            .copied()
+            .filter(|mv| mv.is_drop() && mv.drop_role() == Some(role))
+            .collect();
+        self.clear();
+        for mv in kept {
+            self.push(mv);
+        }
+    }
+
     /// Collects the moves into a freshly allocated `Vec<WideMove>` — the boundary
     /// conversion the owned-`Vec`
     /// [`legal_moves`](GenericPosition::legal_moves) uses.
@@ -7025,6 +7078,17 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         // is byte-identical.
         if V::mandatory_captures() {
             out.retain_captures_if_any();
+        }
+        // Must-drop narrowing (Koedem's `mustDrop` / `mustDropType = COMMONER`):
+        // while the side to move holds the must-drop role in hand, its only legal
+        // moves are drops of that role — every board move and every other-role drop
+        // is illegal until the reserve is emptied (FSF's `mustDrop` predicate).
+        // Gated behind `must_drop_role()` (default-`None`) and the reserve being
+        // non-empty, so every other variant's list is byte-identical.
+        if let Some(role) = V::must_drop_role() {
+            if self.hand_count(self.state.turn, role) > 0 {
+                out.retain_must_drop_role(role);
+            }
         }
     }
 }
