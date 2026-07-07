@@ -64,7 +64,11 @@
 //! - **Zobrist hashing** — incrementally maintained [`Zobrist`] keys.
 //! - **Outcomes and draws** — [`Outcome`], the precise [`EndReason`] labels,
 //!   repetition tracking ([`count_repetitions`], [`is_repetition`]), and the
-//!   move-validating [`Game`] driver.
+//!   move-validating [`ChessGame`] driver.
+//! - **Unified game** — [`Game`], one variant-agnostic handle spanning **all**
+//!   variants (both families) with a single play surface ([`GameMove`],
+//!   [`GameOutcome`]); the production entry point for a bot, server, or front-end
+//!   that plays any variant without naming its family.
 //! - **Concrete variants** — the [`VariantPosition`] / [`Variant`] family and the
 //!   [`AnyVariant`] / [`VariantId`] runtime dispatch described above.
 //! - **Fairy variants** — the whole generic-geometry layer under [`geometry`](mod@geometry):
@@ -204,6 +208,7 @@ mod chess_move;
 mod color;
 mod epd;
 mod file;
+mod game;
 pub mod geometry;
 #[cfg(feature = "magic")]
 mod magic;
@@ -233,6 +238,7 @@ pub use crate::chess_move::{Move, MoveKind};
 pub use crate::color::Color;
 pub use crate::epd::{Epd, EpdError};
 pub use crate::file::File;
+pub use crate::game::{Game, GameFenError, GameMove, GameOutcome};
 // The first fairy variant on the generic engine (Makruk / Thai chess). The
 // `GenericPosition`-based generic layer lives under `geometry`; its concrete
 // variants are surfaced at the crate root for convenience.
@@ -240,7 +246,9 @@ pub use crate::geometry::{Makruk, MakrukRules};
 #[cfg(feature = "magic")]
 pub use crate::magic::attack_table_len;
 pub use crate::movelist::MoveList;
-pub use crate::outcome::{count_repetitions, is_repetition, EndReason, Game, IllegalMove, Outcome};
+pub use crate::outcome::{
+    count_repetitions, is_repetition, ChessGame, EndReason, IllegalMove, Outcome,
+};
 pub use crate::pgn::{Pgn, PgnError, PgnMove, PgnResult};
 pub use crate::piece::{Piece, Role};
 #[cfg(feature = "parallel")]
