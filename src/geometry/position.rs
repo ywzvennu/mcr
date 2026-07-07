@@ -4361,7 +4361,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                             out.push(WideMove::new(from, one, WideMoveKind::Quiet));
                         }
                     }
-                    if V::pawn_may_double_push_from(from.rank(), us) {
+                    if V::pawn_may_double_push_from_sq(from, us) {
                         if let Some(two) = from.offset(0, 2 * forward) {
                             if !occupied.contains(two)
                                 && check_mask.contains(two)

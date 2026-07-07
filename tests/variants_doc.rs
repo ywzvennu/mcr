@@ -804,6 +804,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "11x11 Shogi-family game with a persistent hand and FSF-style captures-to-hand drops; captures bank unpromoted and flip sides, a dropped piece is always unpromoted, and a Sparrow Pawn or Oxcart may not be dropped on the last rank. Optional promotion for a move starting or ending in the furthest three ranks (forced for a Sparrow Pawn or Oxcart on the last rank); the Treacherous Fox, Cloud Eagle and Crane King never promote. Win by capturing the Crane King.",
             oracle: "Rules-only (no FSF perft oracle): Fairy-Stockfish has no Wa Shogi variant and HaChu's perft is unreliable, so it is rules-validated (as for Alice / Fog-of-War / Bughouse) via hand-derived low-depth perft, property/unit tests, and attacker-consistency playouts.",
         },
+        WideVariantId::Wolf => Meta {
+            display: "Wolf chess (8x10)",
+            pieces: "An 8-file by 10-rank army with no Knight: King, Queen, Rook, Bishop, a Wolf (Chancellor = Rook+Knight, mcr Elephant), a Fox (Archbishop = Bishop+Knight, mcr Hawk), a Nightrider (riding knight), Sergeants (a forward King with an initial double step), and — reachable only by promotion — a Wolf Elephant (Nightrider + Queen).",
+            rules: "8x10 chess with no castling; pawns and sergeants double-step from their home rank plus the inner b/c/f/g files one rank ahead, and pawns capture en passant. A pawn promotes to Queen, Wolf, Fox, Rook, Bishop, or Wolf Elephant. The knight-ray riders (Nightrider, Wolf Elephant) route king safety through the per-move full-verify path. Win by checkmate.",
+            oracle: "Rules-only (no FSF perft oracle): the available Fairy-Stockfish build lacks the 10-rank wolf board, so it is rules-validated (as for Okisaki Shogi / Gustav 3) via hand-derived low-depth perft and an independent from-scratch 8x10 generator.",
+        },
         WideVariantId::Xiangfu => Meta {
             display: "Xiang Fu (9x9 Xiangqi-themed drops)",
             pieces: "Champion (royal, ring-confined), Pupil (drop-only commoner), Horse, Chariot, Cannon, Crossbow (diagonal cannon), Bishop, and Mahout (non-jumping two-leaper).",
