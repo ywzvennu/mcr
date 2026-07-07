@@ -100,6 +100,7 @@ mod sittuyin;
 mod sortofalmost;
 mod spartan;
 mod suicide;
+mod supply;
 mod synochess;
 mod tencubed;
 mod threekings;
@@ -556,6 +557,10 @@ fn main() {
     // Xiangqi, so jieqi::run drives FSF `UCI_Variant xiangqi` on the identity-
     // reveal Xiangqi equivalent of each Jieqi position.
     let jieqi_mismatches = jieqi::run(&mut engine, opts.full);
+    // Supply (Xiangqi with drops) is a large-board FSF built-in the available binary
+    // lacks; its empty-hand play is Xiangqi, so supply::run drives FSF `UCI_Variant
+    // xiangqi` on the bracket-stripped equivalent of each empty-hand Supply position.
+    let supply_mismatches = supply::run(&mut engine, opts.full);
     // Ataxx is a FSF built-in (no variants.ini needed). It is not a chess
     // variant, so mcr drives its standalone `mcr::ataxx` module, not AnyVariant.
     let ataxx_mismatches = ataxx::run(&mut engine, opts.full);
@@ -640,6 +645,7 @@ fn main() {
         + chennis_mismatches
         + xiangfu_mismatches
         + jieqi_mismatches
+        + supply_mismatches
         + ataxx_mismatches
         > 0
     {

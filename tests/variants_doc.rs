@@ -402,6 +402,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Antichess (giveaway without castling), mandatory captures, king-promotion, and the same losing-wins terminal. A stalemate is decided by piece count: the stalemated side with fewer pieces wins, an equal count draws.",
             oracle: "Fairy-Stockfish (`UCI_Variant suicide`).",
         },
+        WideVariantId::Supply => Meta {
+            display: "Supply chess (Xiangqi with drops, 9x10)",
+            pieces: "Standard Xiangqi army (Chariots, hobbled Horses, river-bound Elephants, palace Advisors, General, over-screen Cannons, river-crossing Soldiers), plus a hand of captured pieces that may be dropped.",
+            rules: "Full Xiangqi movement, palace, river, flying-general, perpetual-check and stalemate-is-loss rules, plus piece drops restricted to the dropping side's own half — each piece only onto a square it could legally stand (Advisor palace points, Elephant points, Soldier residences) — and a drop may not give check. A two-board game whose hand is fed by the partner board (never by a capture on this board), so single-board play never drops and equals Xiangqi. Win by checkmate.",
+            oracle: "Independent in-repo 9x10 generator for the drop mechanic; empty-hand play equals FSF-pinned Xiangqi (the available Fairy-Stockfish binary is a non-large-board build and implements neither `supply` nor `xiangqi`).",
+        },
         WideVariantId::Losers => Meta {
             display: "Losers chess (8x8)",
             pieces: "The standard chess army (a royal king).",

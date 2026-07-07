@@ -266,6 +266,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Sortofalmost), "perft_sortofalmost.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Spartan), "perft_spartan.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Suicide), "perft_suicide.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_with_fewer_pieces_wins")),
+    row(Game::Wide(WideVariantId::Supply), "perft_supply.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("the available FSF binary is a non-large-board build lacking supply (9x10 Xiangqi-with-drops) and even xiangqi; an independent from-scratch 9x10 generator is the second source (and empty-hand play equals FSF-pinned Xiangqi)"), DrawTest::Named("supply_stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Synochess), "perft_synochess.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Tencubed), "perft_tencubed.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Tenjiku), "perft_tenjiku.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("HaChu-only large shogi; HaChu crashes on 16x16 and FSF has no tenjiku"), DrawTest::Named("tenjiku_one_sided_attack_repetition_draws")),
@@ -302,9 +303,9 @@ const EXPECTED_TODO498: usize = 0;
 
 /// The by-design difffuzz exclusion count (Alice, Duck, Jieqi + the HaChu-only
 /// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi, Okisaki Shogi, Yari
-/// Shogi, Gustav 3, and Omicron) — the `11` in the `SPECS.len() == ALL.len() - 11`
+/// Shogi, Gustav 3, Omicron, and Supply) — the `12` in the `SPECS.len() == ALL.len() - 12`
 /// invariant that `compare-fairy/src/difffuzz.rs` asserts on its own side.
-const DIFFFUZZ_EXCLUSIONS: usize = 11;
+const DIFFFUZZ_EXCLUSIONS: usize = 12;
 
 /// The variants CI holds back from the **deep rotating** difffuzz sweep (12 games ×
 /// 90 plies), each hitting a documented FSF *oracle* limitation whose false

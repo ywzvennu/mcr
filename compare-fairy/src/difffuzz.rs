@@ -247,6 +247,13 @@ fn centaur_to_fsf(fen: &str) -> String {
 ///   (`setoption UCI_Variant omicron` falls back to standard chess), so there is no
 ///   usable oracle here. It is rules-only, cross-checked against an independent
 ///   from-scratch 12x10 generator (with walls); it carries no FSF spec.
+/// * **Supply** — 9x10 Xiangqi-with-drops; an FSF built-in, but the available FSF
+///   binary is a non-large-board build that has neither `supply` nor even `xiangqi`
+///   (both fall back to standard chess), so there is no live FSF oracle in the
+///   generic `SPECS` sweep. It has its own comparison loop ([`crate::supply`]) that,
+///   on an FSF built `largeboards=yes`, drives the empty-hand Xiangqi equivalence
+///   live against `UCI_Variant xiangqi`; the drop mechanic is cross-checked against
+///   an independent from-scratch 9x10 generator. It is excluded from `SPECS`.
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1859,6 +1866,7 @@ mod tests {
             WideVariantId::Yari,
             WideVariantId::Gustav3,
             WideVariantId::Omicron,
+            WideVariantId::Supply,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1866,12 +1874,12 @@ mod tests {
                 excluded.as_str()
             );
         }
-        // Every shipped variant minus the 11 by-design exclusions (Alice / Duck /
+        // Every shipped variant minus the 12 by-design exclusions (Alice / Duck /
         // Jieqi, the HaChu-only large-shogi Chu / Dai / Tenjiku, and the oracle-less
-        // Wa Shogi, Okisaki Shogi, Yari Shogi, Gustav 3, and Omicron, which the
+        // Wa Shogi, Okisaki Shogi, Yari Shogi, Gustav 3, Omicron, and Supply, which the
         // available Fairy-Stockfish build does not implement); the deeper-sweep
         // follow-ups stay in SPECS but are skipped via `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 11);
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 12);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never

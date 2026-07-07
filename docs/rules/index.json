@@ -1883,6 +1883,23 @@
     }
   },
   {
+    "name": "supply",
+    "family": "wide",
+    "width": 9,
+    "height": 10,
+    "start_fen": "rjoukuojr/9/1c5c1/z1z1z1z1z/9/9/Z1Z1Z1Z1Z/1C5C1/9/RJOUKUOJR[] w - - 0 1",
+    "roles": [
+      "Rook",
+      "King",
+      "Cannon",
+      "Advisor",
+      "Horse",
+      "XiangqiElephant",
+      "Soldier"
+    ],
+    "oracle": "independent"
+  },
+  {
     "name": "synochess",
     "family": "wide",
     "width": 8,
