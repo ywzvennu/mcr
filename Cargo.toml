@@ -146,6 +146,10 @@ harness = false
 name = "footprint"
 harness = false
 
+[[bench]]
+name = "concrete_vs_generic"
+harness = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
