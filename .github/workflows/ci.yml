@@ -425,6 +425,23 @@ jobs:
         run: |
           cargo run --release --manifest-path compare-fairy/Cargo.toml -- --quick
 
+      # Move-SET differential (issue #556): the count-based checks above (quick +
+      # difffuzz) can be fooled by a *compensating* movegen error — one illegal move
+      # generated while an equal-subtree legal move is missed leaves every node count
+      # unchanged. `--moveset` closes that blind spot by asserting mcr's legal-move
+      # SET equals FSF's `go perft 1` divide set at each node, walked breadth-first to
+      # a shallow depth (default depth 2, node-capped per variant), across every
+      # FSF-backed variant. It is bounded and fast (~a few seconds, ~13k nodes) so it
+      # belongs on the per-PR tier. Known FSF *generator* limitations are NOT hard-red
+      # here: the harness applies its existing allow-lists — the per-move discounts of
+      # `fsf_omits_move` and the whole-node artifact skips (S-Chess corner-castle,
+      # Empire no-queenside-castle), plus the `HELD_BACK` variant follow-ups — exactly
+      # as the difffuzz sweep does, so only a genuine set divergence exits non-zero.
+      # MCR_FSF_VARIANTS_INI (exported above) supplies the non-builtin variants.
+      - name: Move-set differential vs FSF (shallow, allow-listed)
+        run: |
+          cargo run --release --manifest-path compare-fairy/Cargo.toml -- --moveset
+
   # Heavy differential + deep-perft job, GATED to the weekly schedule and manual
   # `workflow_dispatch` only (never per-PR), because it builds Fairy-Stockfish
   # from source (~2 min, GPL-3.0+) and runs the slow deep `--ignored` perft
@@ -721,3 +738,96 @@ jobs:
       # assert any threshold (runner timing is too noisy to gate on).
       - name: Run benches (informational baseline)
         run: cargo bench --all-features --bench perft --bench variants --bench footprint
+
+  # Perft nodes/sec (NPS) signal (issue #561). Perft is a pure move-generation +
+  # make/unmake tree walk, so its throughput is the single best aggregate signal
+  # for a movegen performance regression. This job runs the `perft` criterion bench
+  # (startpos depth 4 = 197281 nodes; kiwipete depth 3 = 97862 nodes), converts each
+  # bench's mean time into nodes/sec, logs the numbers to the job summary, and
+  # uploads a small `perft-nps.json` metric artifact so a maintainer can chart the
+  # trend across runs.
+  #
+  # NOT per-PR: it is gated to push-to-main / schedule / manual (`if: not
+  # pull_request`), matching the repo's `perf-baseline` / `coverage` posture — shared
+  # CI runners are too noisy for a tight wall-clock threshold, and a per-PR timing
+  # gate would flake. On push-to-main it leaves an NPS breadcrumb per merge (a cheap
+  # regression trail); the weekly schedule keeps the series going even without merges.
+  #
+  # The floor is deliberately LENIENT and catastrophic-only: it trips only if
+  # startpos-d4 throughput falls below `NPS_FLOOR` (10 Mn/s), which is ~5-8x below a
+  # normal runner reading, so it fires on an order-of-magnitude regression (e.g. an
+  # accidental O(n^2) in movegen or a per-node allocation) but never on ordinary
+  # runner noise. It is NOT a ratchet — do not raise it toward the observed value, or
+  # it will flake. See `docs/ci-fsf.md` for the rationale.
+  perft-nps:
+    name: perft-nps (movegen throughput signal)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      # Exact perft node counts for the two bench positions (tests/perft.rs). Used to
+      # convert criterion's mean time-per-iter into nodes/sec.
+      NODES_STARTPOS_D4: '197281'
+      NODES_KIWIPETE_D3: '97862'
+      # Catastrophic-only floor on startpos-d4 throughput (nodes/sec). Lenient by
+      # design; see the job comment above.
+      NPS_FLOOR: '10000000'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      # Run only the perft bench (fast: two shallow positions). Criterion writes each
+      # bench's statistics to target/criterion/perft/<id>/new/estimates.json, whose
+      # `.mean.point_estimate` is the mean time-per-iteration in nanoseconds.
+      - name: Run perft bench
+        run: cargo bench --bench perft
+
+      # Convert mean ns/iter -> nodes/sec for each position, log to the step summary,
+      # and emit perft-nps.json. `jq` is preinstalled on ubuntu-latest.
+      - name: Compute + surface perft NPS
+        run: |
+          set -euo pipefail
+          est() { jq '.mean.point_estimate' "target/criterion/perft/$1/new/estimates.json"; }
+          nps() { awk "BEGIN { printf \"%.0f\", $1 / ($2 * 1e-9) }"; }
+
+          mean_start="$(est startpos_d4)"
+          mean_kiwi="$(est kiwipete_d3)"
+          nps_start="$(nps "$NODES_STARTPOS_D4" "$mean_start")"
+          nps_kiwi="$(nps "$NODES_KIWIPETE_D3" "$mean_kiwi")"
+
+          mnps() { awk "BEGIN { printf \"%.1f\", $1 / 1e6 }"; }
+
+          {
+            echo "## Perft NPS (movegen throughput)"
+            echo ""
+            echo "| position | nodes | mean time | nodes/sec |"
+            echo "|---|---:|---:|---:|"
+            echo "| startpos d4 | $NODES_STARTPOS_D4 | $(awk "BEGIN{printf \"%.3f ms\", $mean_start/1e6}") | $(mnps "$nps_start") Mn/s |"
+            echo "| kiwipete d3 | $NODES_KIWIPETE_D3 | $(awk "BEGIN{printf \"%.3f ms\", $mean_kiwi/1e6}") | $(mnps "$nps_kiwi") Mn/s |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          jq -n \
+            --argjson nodes_start "$NODES_STARTPOS_D4" --argjson mean_start "$mean_start" --argjson nps_start "$nps_start" \
+            --argjson nodes_kiwi "$NODES_KIWIPETE_D3" --argjson mean_kiwi "$mean_kiwi" --argjson nps_kiwi "$nps_kiwi" \
+            '{
+               startpos_d4: { nodes: $nodes_start, mean_ns: $mean_start, nodes_per_sec: $nps_start },
+               kiwipete_d3: { nodes: $nodes_kiwi,  mean_ns: $mean_kiwi,  nodes_per_sec: $nps_kiwi }
+             }' > perft-nps.json
+          cat perft-nps.json
+
+          echo "startpos-d4 NPS: $nps_start (floor: $NPS_FLOOR)"
+          if [ "$nps_start" -lt "$NPS_FLOOR" ]; then
+            echo "::error::perft startpos-d4 throughput $nps_start n/s fell below the catastrophic floor $NPS_FLOOR n/s"
+            exit 1
+          fi
+
+      - name: Upload perft NPS metric
+        uses: actions/upload-artifact@v7
+        with:
+          name: perft-nps
+          path: perft-nps.json
+          if-no-files-found: error
