@@ -2550,6 +2550,19 @@ fn bishops_share_one_colour<G: Geometry>(bishops: Bitboard<G>) -> bool {
 pub struct StandardChess;
 
 impl<G: Geometry> WideVariant<G> for StandardChess {
+    /// The standard army — Pawn, Knight, Bishop, Rook, Queen, King — occupies the
+    /// six leading [`WideRole`] discriminants (indices `0..=5`), and the default
+    /// `[Knight, Bishop, Rook, Queen]` promotion set stays within that prefix, so
+    /// the movegen loops iterate only this far. See [`WideVariant::ROLE_SPAN`].
+    ///
+    /// Without this override `StandardChess` would inherit the default
+    /// [`WideRole::COUNT`] span and loop every role per movegen call — it is the
+    /// generic mirror behind `GenericPosition<Chess8x8, StandardChess>` but is not
+    /// a [`WideVariantId`](super::WideVariantId) arm, so the coverage
+    /// meta-test does not walk it; the value here matches the standard-army
+    /// registered variants (e.g. `nocastle`).
+    const ROLE_SPAN: usize = 6;
+
     fn starting_position() -> (Board<G>, GenericState<G>) {
         // The standard 8x8 array. This variant is only instantiated at 8x8
         // (`Chess8x8`); the FEN is the canonical start placement.
