@@ -953,6 +953,40 @@ mod tests {
         }
     }
 
+    /// Shared probe surface for the `role_span_covers_all_fieldable_roles` walk so
+    /// one walker can guard both a registered [`AnyWideVariant`] arm and an
+    /// unregistered generic [`GenericPosition<G, V>`] mirror (issue #579). Both
+    /// expose the same `max_fielded_role_index` / `legal_moves` / `play` surface.
+    trait RoleSpanProbe: Sized {
+        fn max_fielded_role_index(&self) -> usize;
+        fn child_moves(&self) -> Vec<WideMove>;
+        fn play_move(&self, mv: &WideMove) -> Self;
+    }
+
+    impl RoleSpanProbe for AnyWideVariant {
+        fn max_fielded_role_index(&self) -> usize {
+            AnyWideVariant::max_fielded_role_index(self)
+        }
+        fn child_moves(&self) -> Vec<WideMove> {
+            self.legal_moves()
+        }
+        fn play_move(&self, mv: &WideMove) -> Self {
+            self.play(mv)
+        }
+    }
+
+    impl<G: Geometry, V: WideVariant<G>> RoleSpanProbe for GenericPosition<G, V> {
+        fn max_fielded_role_index(&self) -> usize {
+            GenericPosition::max_fielded_role_index(self)
+        }
+        fn child_moves(&self) -> Vec<WideMove> {
+            self.legal_moves()
+        }
+        fn play_move(&self, mv: &WideMove) -> Self {
+            self.play(mv)
+        }
+    }
+
     /// Safety meta-test for issue #514: the movegen role loops are bounded to each
     /// variant's [`ROLE_SPAN`](super::WideVariant::ROLE_SPAN), so a span set below a
     /// role the variant can actually field would silently drop that role's pieces.
@@ -965,15 +999,20 @@ mod tests {
     /// catches roles introduced by promotions, drops, gating, and reveals — not just
     /// the start army. A too-small span fails here (and would also diverge the
     /// per-variant perft suites); this test makes the requirement explicit.
+    ///
+    /// The [`WideVariantId::ALL`] walk covers every *registered* variant, but a
+    /// generic [`WideVariant`] impl that is **not** a `WideVariantId` arm — the
+    /// reference [`StandardChess`] mirror behind `GenericPosition<Chess8x8,
+    /// StandardChess>` — escaped this gate and silently kept the `ROLE_SPAN =
+    /// COUNT` default (issue #579). Those unregistered impls are walked directly
+    /// below via the same generic [`walk`] over their own `GenericPosition`.
     #[test]
     fn role_span_covers_all_fieldable_roles() {
-        fn walk(
-            pos: &AnyWideVariant,
-            span: usize,
-            id: WideVariantId,
-            depth: u32,
-            budget: &mut u64,
-        ) {
+        // Generic over the concrete position type so it can walk both an
+        // `AnyWideVariant` arm and an unregistered `GenericPosition<G, V>` mirror.
+        // The `max_fielded_role_index` / `legal_moves` / `play` surface is shared
+        // by both, so a single walker guards every `WideVariant` impl.
+        fn walk<P: RoleSpanProbe>(pos: &P, span: usize, id: &str, depth: u32, budget: &mut u64) {
             let max = pos.max_fielded_role_index();
             assert!(
                 max < span,
@@ -985,12 +1024,12 @@ mod tests {
             if depth == 0 || *budget == 0 {
                 return;
             }
-            for mv in pos.legal_moves() {
+            for mv in pos.child_moves() {
                 if *budget == 0 {
                     break;
                 }
                 *budget -= 1;
-                let child = pos.play(&mv);
+                let child = pos.play_move(&mv);
                 walk(&child, span, id, depth - 1, budget);
             }
         }
@@ -1000,7 +1039,17 @@ mod tests {
             // variant so the walk reaches promotions/drops/reveals on many lines
             // without an unbounded blow-up on the wide giant-shogi variants.
             let mut budget: u64 = 100_000;
-            walk(&pos, id.role_span(), id, 6, &mut budget);
+            walk(&pos, id.role_span(), &id.to_string(), 6, &mut budget);
+        }
+        // Unregistered generic `WideVariant` impls that no `WideVariantId` arm
+        // covers. `StandardChess` is the reference standard-chess mirror; without
+        // this its `ROLE_SPAN` was unchecked (issue #579). If a new unregistered
+        // generic impl on a shipped path appears, add it here.
+        {
+            type Std = GenericPosition<crate::geometry::Chess8x8, crate::geometry::StandardChess>;
+            let pos = Std::startpos();
+            let mut budget: u64 = 100_000;
+            walk(&pos, Std::ROLE_SPAN, "StandardChess", 6, &mut budget);
         }
     }
 
