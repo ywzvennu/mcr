@@ -244,6 +244,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Opulent), "perft_opulent.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Orda), "perft_orda.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Ordamirror), "perft_ordamirror.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
+    row(Game::Wide(WideVariantId::Paradigm), "perft_paradigm.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Pawnback), "perft_pawnback.rs", PerftOracle::Fsf, 5, Difffuzz::InSpecs, DrawTest::Named("pawnback_pawn_shuffle_reaches_move_rule_draw")),
     row(Game::Wide(WideVariantId::Pawnsideways), "perft_pawnsideways.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Perfect), "perft_perfect.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),

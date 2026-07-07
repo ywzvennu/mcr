@@ -948,6 +948,17 @@ pub(crate) const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::sortofalmost::to_fsf_dialect,
     },
+    // Paradigm chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess with the
+    // bishops replaced by Bishop + hobbled-Horse compounds — so it takes its own
+    // dialect rewrite (Bishop-Horse `****x`->`b`).
+    Spec {
+        id: WideVariantId::Paradigm,
+        fsf: "paradigm",
+        needs_ini: false,
+        dialect: crate::paradigm::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

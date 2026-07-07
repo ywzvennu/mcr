@@ -80,6 +80,7 @@ mod nocastle;
 mod opulent;
 mod orda;
 mod ordamirror;
+mod paradigm;
 mod pawnback;
 mod pawnsideways;
 mod perfect;
@@ -499,6 +500,11 @@ fn main() {
     // is handled on the ordinary single-king king-safety path).
     let newzealand_mismatches = newzealand::run(&mut engine, opts.full);
     let nightrider_mismatches = nightrider::run(&mut engine, opts.full);
+    // Paradigm chess is a FSF built-in (no variants.ini needed), like nightrider: it
+    // rides the same generic 8x8 engine as standard chess with the bishops replaced
+    // by Bishop + hobbled-Horse compounds (its lame-horse king safety takes the
+    // full-verify path).
+    let paradigm_mismatches = paradigm::run(&mut engine, opts.full);
     let xiangqi_mismatches = xiangqi::run(&mut engine, opts.full);
     // Manchu is a FSF built-in (no variants.ini needed), like xiangqi.
     let manchu_mismatches = manchu::run(&mut engine, opts.full);
@@ -610,6 +616,7 @@ fn main() {
         + grasshopper_mismatches
         + newzealand_mismatches
         + nightrider_mismatches
+        + paradigm_mismatches
         + xiangqi_mismatches
         + manchu_mismatches
         + janggi_mismatches

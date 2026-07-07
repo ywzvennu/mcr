@@ -1479,6 +1479,24 @@
     }
   },
   {
+    "name": "paradigm",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rn****xqk****xnr/pppppppp/8/8/8/8/PPPPPPPP/RN****XQK****XNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Rook",
+      "Queen",
+      "King",
+      "BishopHorse"
+    ],
+    "oracle": {
+      "fairy_stockfish": "paradigm"
+    }
+  },
+  {
     "name": "pawnback",
     "family": "wide",
     "width": 8,
@@ -1767,6 +1785,25 @@
     ],
     "oracle": {
       "fairy_stockfish": "sittuyin"
+    }
+  },
+  {
+    "name": "sortofalmost",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBEKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King",
+      "Elephant"
+    ],
+    "oracle": {
+      "fairy_stockfish": "sortofalmost"
     }
   },
   {

@@ -1406,6 +1406,32 @@ pub enum WideRole {
     /// role**: its FEN token is `****U` / `****u`, recycling the free base letter
     /// `u`.
     YariSilver = 153,
+
+    // --- Paradigm chess (8x8) piece (§ Milestone 16, issue #585) --------------
+    //
+    // Paradigm chess (a FSF built-in, `UCI_Variant paradigm`) is standard chess
+    // with **both bishops replaced** by a single compound piece: FSF's
+    // `remove_piece(BISHOP)` + `add_piece(CUSTOM_PIECE_1, 'b', "BnN")`. The Betza
+    // `BnN` decodes (against FSF's own parser, `piece.cpp`, where the modifier `n`
+    // is the **lame-leaper** flag — *not* "narrow") as a **Bishop slide** (`B`)
+    // plus a **hobbled/lame Knight** (`nN`), i.e. the Xiangqi **Horse**: it leaps to
+    // all eight knight squares but each leap is blocked when the orthogonally-
+    // adjacent square one step toward the leap's long axis is occupied (the horse's
+    // "leg"). Confirmed square-for-square against FSF `go perft`: on an open board
+    // the piece reaches the 13 bishop diagonal squares **and** all 8 knight squares,
+    // and a blocker on the leg removes exactly the two leaps hobbled by it.
+    /// Bishop-Horse (FSF paradigm `b`, Betza `BnN`) — a **Bishop + Xiangqi-Horse**
+    /// compound: it slides any distance diagonally (Bishop) **and** leaps like a
+    /// knight, each leap hobbled by an occupied leg (the lame Knight `nN`, the
+    /// [`WideRole::Horse`]'s move). Moves and captures alike on both components.
+    /// (Paradigm chess.) Because every single-letter base and the `*` / `**` / `=` /
+    /// `***` overflow banks are exhausted, it is a **fifth-tier overflow role**
+    /// ([`is_overflow5`](WideRole::is_overflow5)): its FEN token is the
+    /// [`OVERFLOW_PREFIX`] **quadrupled** (`****`) plus the free base letter `x`
+    /// (FSF's `b` being already the Bishop here, and taken in the fifth tier by the
+    /// Tenjiku [`WideRole::BishopGeneral`]), so `****X` (white) / `****x` (black);
+    /// the `compare-fairy` harness maps `****x → b` when driving FSF.
+    BishopHorse = 154,
 }
 
 impl WideRole {
@@ -1432,7 +1458,7 @@ impl WideRole {
     /// #441 for the budget audit and the widening design. Do **not** grow this past
     /// `256` without another field widening (a fresh wire-format version bump
     /// touching `super::binary` and [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 154;
+    pub const COUNT: usize = 155;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1590,6 +1616,7 @@ impl WideRole {
         WideRole::YariBishop,
         WideRole::YariGold,
         WideRole::YariSilver,
+        WideRole::BishopHorse,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1984,6 +2011,12 @@ impl WideRole {
             WideRole::YariBishop => 'a',
             WideRole::YariGold => 'p',
             WideRole::YariSilver => 'u',
+            // Paradigm's Bishop-Horse compound — a fifth-tier overflow role (`****`)
+            // recycling the free base letter `x` (FSF spells the piece `b`, already
+            // the Bishop here and taken in the fifth tier by the Tenjiku Bishop
+            // General). The `compare-fairy` harness maps `****x → b` when driving
+            // FSF's `paradigm`.
+            WideRole::BishopHorse => 'x',
         }
     }
 
@@ -2484,6 +2517,7 @@ impl WideRole {
                 | WideRole::YariBishop
                 | WideRole::YariGold
                 | WideRole::YariSilver
+                | WideRole::BishopHorse
         )
     }
 
@@ -2525,6 +2559,10 @@ impl WideRole {
             'a' => Some(WideRole::YariBishop),
             'p' => Some(WideRole::YariGold),
             'u' => Some(WideRole::YariSilver),
+            // Paradigm's Bishop-Horse: recycles the free fifth-tier base `x` (FSF's
+            // `b` being the Bishop / Tenjiku Bishop General here); the harness maps
+            // `****x → b` when driving FSF's `paradigm`.
+            'x' => Some(WideRole::BishopHorse),
             _ => None,
         }
     }
@@ -2745,6 +2783,7 @@ impl fmt::Display for WideRole {
             WideRole::YariBishop => "yari-bishop",
             WideRole::YariGold => "yari-gold",
             WideRole::YariSilver => "yari-silver",
+            WideRole::BishopHorse => "bishop-horse",
         })
     }
 }
