@@ -324,7 +324,7 @@ pub fn run(engine: &mut Engine, fsf_bin: &str, full: bool) -> usize {
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Chennis::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Chennis7x7, _>(&pos, depth);
+    let mcr_nodes = gperft::<Chennis7x7, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = to_fsf_dialect(case.fen);
@@ -361,7 +361,7 @@ mod tests {
         ];
         for case in CASES {
             let pos = Chennis::from_fen(case.fen).expect("corpus FEN parses");
-            let n = gperft::<Chennis7x7, _>(&pos, 2);
+            let n = gperft::<Chennis7x7, _, _>(&pos, 2);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)

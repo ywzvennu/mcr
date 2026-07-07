@@ -231,7 +231,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Opulent::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Grand10x10, _>(&pos, depth);
+    let mcr_nodes = gperft::<Grand10x10, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
@@ -263,7 +263,7 @@ mod tests {
         let pinned = [("startpos", 2500u64), ("midgame", 2705), ("promo", 28)];
         for case in CASES {
             let pos = Opulent::from_fen(case.fen).expect("corpus FEN parses");
-            let n = gperft::<Grand10x10, _>(&pos, 2);
+            let n = gperft::<Grand10x10, _, _>(&pos, 2);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)

@@ -227,7 +227,7 @@ vs FSF UCI_Variant dobutsu (issue #233):"
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Dobutsu::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Dobutsu3x4, _>(&pos, depth);
+    let mcr_nodes = gperft::<Dobutsu3x4, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
@@ -270,7 +270,7 @@ mod tests {
             } else {
                 3
             };
-            let n = gperft::<Dobutsu3x4, _>(&pos, depth);
+            let n = gperft::<Dobutsu3x4, _, _>(&pos, depth);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)
