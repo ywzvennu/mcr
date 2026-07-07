@@ -217,7 +217,7 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
     // mcr side: the generic Courier position.
     let pos = Courier::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Courier12x8, _>(&pos, depth);
+    let mcr_nodes = gperft::<Courier12x8, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: rewrite the mcr dialect to FSF's letters.
@@ -257,7 +257,7 @@ mod tests {
             let case = CASES.iter().find(|c| c.label == label).expect("label");
             let pos = Courier::from_fen(case.fen).expect("corpus FEN parses");
             assert_eq!(
-                gperft::<Courier12x8, _>(&pos, depth),
+                gperft::<Courier12x8, _, _>(&pos, depth),
                 want,
                 "{label} perft({depth})"
             );

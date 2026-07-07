@@ -225,7 +225,7 @@ pub fn run(engine: &mut Engine, full: bool) -> usize {
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = FogOfWar::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_nodes = gperft::<Chess8x8, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     engine.set_variant("fogofwar", false)?;
@@ -269,7 +269,7 @@ mod tests {
                 .copied()
                 .expect("a pinned count for the case");
             assert_eq!(
-                gperft::<Chess8x8, _>(&pos, depth),
+                gperft::<Chess8x8, _, _>(&pos, depth),
                 want,
                 "{} perft",
                 case.label

@@ -233,7 +233,7 @@ UCI_Variant minixiangqi (issue #196):"
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Minixiangqi::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Minixiangqi7x7, _>(&pos, depth);
+    let mcr_nodes = gperft::<Minixiangqi7x7, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let fsf_fen = fen_to_fsf(case.fen);
@@ -264,7 +264,7 @@ mod tests {
     fn corpus_fens_parse_and_match_pinned_shallow_counts() {
         for case in CASES {
             let pos = Minixiangqi::from_fen(case.fen).expect("corpus FEN parses");
-            let _ = gperft::<Minixiangqi7x7, _>(&pos, 2);
+            let _ = gperft::<Minixiangqi7x7, _, _>(&pos, 2);
         }
     }
 

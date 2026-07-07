@@ -203,7 +203,7 @@ UCI_Variant minishogi (issue #195):"
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Minishogi::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Minishogi5x5, _>(&pos, depth);
+    let mcr_nodes = gperft::<Minishogi5x5, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // mcr and FSF share the Minishogi FEN dialect, so the FEN is passed verbatim.
@@ -243,7 +243,7 @@ mod tests {
         ];
         for case in CASES {
             let pos = Minishogi::from_fen(case.fen).expect("corpus FEN parses");
-            let n = gperft::<Minishogi5x5, _>(&pos, 2);
+            let n = gperft::<Minishogi5x5, _, _>(&pos, 2);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)

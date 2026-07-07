@@ -257,7 +257,7 @@ FSF UCI_Variant torishogi (issue #231):"
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Tori::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Tori7x7, _>(&pos, depth);
+    let mcr_nodes = gperft::<Tori7x7, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // Rewrite the mcr `*`-overflow FEN into FSF's bare-letter / `+`-token dialect.
@@ -296,7 +296,7 @@ mod tests {
         ];
         for case in CASES {
             let pos = Tori::from_fen(case.fen).expect("corpus FEN parses");
-            let n = gperft::<Tori7x7, _>(&pos, 2);
+            let n = gperft::<Tori7x7, _, _>(&pos, 2);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)

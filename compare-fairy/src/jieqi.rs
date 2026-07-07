@@ -267,7 +267,7 @@ UCI_Variant xiangqi on the identity-reveal equivalent (issue #278):"
 fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String> {
     let pos = Jieqi::from_fen(&case.fen).map_err(|e| format!("mcr rejected Jieqi FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Xiangqi9x10, _>(&pos, depth);
+    let mcr_nodes = gperft::<Xiangqi9x10, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     let xiangqi_mcr = jieqi_to_xiangqi_mcr(&case.fen)?;
@@ -330,8 +330,8 @@ mod tests {
             let mcr = jieqi_to_xiangqi_mcr(&case.fen).expect("converts");
             let xq = mcr::geometry::Xiangqi::from_fen(&mcr).expect("Xiangqi parses");
             assert_eq!(
-                gperft::<Xiangqi9x10, _>(&jq, case.depth),
-                gperft::<Xiangqi9x10, _>(&xq, case.depth),
+                gperft::<Xiangqi9x10, _, _>(&jq, case.depth),
+                gperft::<Xiangqi9x10, _, _>(&xq, case.depth),
                 "{}: Jieqi vs Xiangqi-equivalent perft({})",
                 case.label,
                 case.depth,

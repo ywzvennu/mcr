@@ -193,7 +193,7 @@ fn run_case(engine: &mut Engine, case: &Case, depth: u32) -> Result<Row, String>
     // mcr side: the generic ASEAN position (mcr `s`/`m` dialect).
     let pos = Asean::from_fen(case.fen).map_err(|e| format!("mcr rejected FEN: {e:?}"))?;
     let mcr_start = Instant::now();
-    let mcr_nodes = gperft::<Chess8x8, _>(&pos, depth);
+    let mcr_nodes = gperft::<Chess8x8, _, _>(&pos, depth);
     let mcr_secs = mcr_start.elapsed().as_secs_f64();
 
     // FSF side: asean is a FSF built-in; rewrite the FEN to FSF's `b`/`q` dialect.
@@ -244,7 +244,7 @@ mod tests {
         ];
         for case in CASES {
             let pos = Asean::from_fen(case.fen).expect("corpus FEN parses");
-            let n = gperft::<Chess8x8, _>(&pos, 2);
+            let n = gperft::<Chess8x8, _, _>(&pos, 2);
             let want = pinned
                 .iter()
                 .find(|(l, _)| *l == case.label)
