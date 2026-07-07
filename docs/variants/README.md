@@ -3,7 +3,7 @@
 
 # mcr per-variant reference
 
-One engine-derived page per variant — **101** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
+One engine-derived page per variant — **106** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
 
 ## 3x4
 
@@ -59,6 +59,7 @@ One engine-derived page per variant — **101** in all, grouped by board size (`
 - [cambodian](cambodian.md)
 - [chaturanga](chaturanga.md)
 - [chigorin](chigorin.md)
+- [codrus](codrus.md)
 - [coregal](coregal.md)
 - [dragon](dragon.md)
 - [duck](duck.md)
@@ -67,6 +68,7 @@ One engine-derived page per variant — **101** in all, grouped by board size (`
 - [extinction](extinction.md)
 - [fogofwar](fogofwar.md)
 - [georgian](georgian.md)
+- [giveaway](giveaway.md)
 - [grasshopper](grasshopper.md)
 - [hoppelpoppel](hoppelpoppel.md)
 - [karouk](karouk.md)
@@ -74,8 +76,10 @@ One engine-derived page per variant — **101** in all, grouped by board size (`
 - [kinglet](kinglet.md)
 - [knightmate](knightmate.md)
 - [legan](legan.md)
+- [losers](losers.md)
 - [makpong](makpong.md)
 - [makruk](makruk.md)
+- [misere](misere.md)
 - [newzealand](newzealand.md)
 - [nightrider](nightrider.md)
 - [nocastle](nocastle.md)
@@ -95,6 +99,7 @@ One engine-derived page per variant — **101** in all, grouped by board size (`
 - [shouse](shouse.md)
 - [sittuyin](sittuyin.md)
 - [spartan](spartan.md)
+- [suicide](suicide.md)
 - [synochess](synochess.md)
 - [threekings](threekings.md)
 - [torpedo](torpedo.md)

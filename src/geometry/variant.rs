@@ -189,11 +189,27 @@ pub struct ExtinctionRule {
     /// The piece types whose disappearance ends the game. A side loses when it
     /// holds `threshold` **or fewer** of *any* of these roles. Extinction chess
     /// lists the whole standard army; a single-role slice models Kinglet / Codrus.
+    /// Ignored when [`count_total`](Self::count_total) is set (the total-piece
+    /// modes count *every* piece of the side instead of any one role).
     pub watched: &'static [WideRole],
     /// The count at or below which a watched role counts as **extinct** for its
     /// side. Extinction / Kinglet / Codrus use `0` (the type is gone); Three-kings
     /// uses `1` (reduced to a lone king). Mirrors FSF's `extinctionPieceCount`.
     pub threshold: usize,
+    /// Watch the side's **total** piece count rather than any one
+    /// [`watched`](Self::watched) role: the side is "extinct" when its *whole*
+    /// army (every piece, of every type) falls to `threshold` or fewer. This is
+    /// Fairy-Stockfish's `extinctionPieceTypes = ALL_PIECES` — giveaway / suicide
+    /// (`threshold = 0`, no pieces at all) and losers (`threshold = 1`, a bare
+    /// king). When set, `watched` is ignored. The default is `false` (per-role).
+    pub count_total: bool,
+    /// Invert the outcome direction: the **extinct** side **wins** rather than
+    /// loses (Fairy-Stockfish's `extinctionValue = +VALUE_MATE`, the antichess /
+    /// giveaway / losers / codrus family — "losing wins"). The default is `false`,
+    /// the ordinary extinction *loss* (`extinctionValue = -VALUE_MATE`, Extinction
+    /// chess / Kinglet / Three-kings). The node still truncates to zero moves
+    /// either way; this only flips which side the terminal credits.
+    pub extinct_wins: bool,
 }
 
 /// The promotion configuration a variant exposes: which squares promote and to
@@ -1277,6 +1293,59 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     ///
     /// [outcome]: super::position::GenericPosition::outcome
     fn stalemate_is_loss() -> bool {
+        false
+    }
+
+    /// Returns `true` if **stalemate is a win** for the stalemated side to move
+    /// rather than a draw — the antichess / giveaway / losers / codrus rule
+    /// (Fairy-Stockfish `stalemateValue = +VALUE_MATE`). The default is `false`.
+    /// Like [`stalemate_is_loss`](WideVariant::stalemate_is_loss) this affects only
+    /// the reported [outcome]; a stalemated node already generates zero moves, so
+    /// perft is unchanged. Mutually exclusive with `stalemate_is_loss` and
+    /// [`stalemate_piece_count`](WideVariant::stalemate_piece_count).
+    ///
+    /// [outcome]: super::position::GenericPosition::outcome
+    fn stalemate_is_win() -> bool {
+        false
+    }
+
+    /// Returns `true` if a **stalemate is decided by piece count** — the side to
+    /// move with **fewer** pieces wins, an equal count draws (Suicide chess,
+    /// Fairy-Stockfish `stalematePieceCount = true`). The default is `false`. When
+    /// set it takes precedence over [`stalemate_is_win`](WideVariant::stalemate_is_win);
+    /// it too affects only the reported [outcome] (perft is unchanged).
+    ///
+    /// [outcome]: super::position::GenericPosition::outcome
+    fn stalemate_piece_count() -> bool {
+        false
+    }
+
+    /// Returns `true` if **checkmate is a win** for the checkmated side to move
+    /// rather than a loss — the misère / losers rule (Fairy-Stockfish
+    /// `checkmateValue = +VALUE_MATE`: get mated to win). The default is `false`
+    /// (the ordinary checkmate loss). Consulted only on a royal-king variant
+    /// (there is no checkmate when [`non_royal_king`](WideVariant::non_royal_king)
+    /// is set); it affects only the reported [outcome], never move generation.
+    ///
+    /// [outcome]: super::position::GenericPosition::outcome
+    fn checkmate_is_win() -> bool {
+        false
+    }
+
+    /// Returns `true` if **captures are mandatory**: whenever the side to move has
+    /// at least one legal capture, every one of its legal moves must be a capture
+    /// (Fairy-Stockfish `mustCapture` — antichess / giveaway / suicide / losers /
+    /// codrus). The default is `false`, so every other variant is byte-identical
+    /// (no post-filter).
+    ///
+    /// The filter runs **after** the ordinary legal-move generation, so it composes
+    /// with king safety exactly as Fairy-Stockfish's `legal()` does
+    /// (`must_capture() && !capture(m) && has_capture()`): on a royal-king variant
+    /// (losers) the captures are chosen from the already king-safe moves; on a
+    /// non-royal variant (giveaway) from the pseudo-legal set. Because the filter
+    /// only ever drops non-captures **when a capture exists**, it can never turn a
+    /// non-empty move set empty — stalemate detection is unaffected.
+    fn mandatory_captures() -> bool {
         false
     }
 
@@ -2374,6 +2443,12 @@ pub struct DrawHooks {
     pub wins_on_check: bool,
     /// [`WideVariant::extinction_rule`] returns `Some`.
     pub extinction_rule: bool,
+    /// [`WideVariant::stalemate_is_win`] is `true`.
+    pub stalemate_is_win: bool,
+    /// [`WideVariant::stalemate_piece_count`] is `true`.
+    pub stalemate_piece_count: bool,
+    /// [`WideVariant::checkmate_is_win`] is `true`.
+    pub checkmate_is_win: bool,
 }
 
 impl DrawHooks {
@@ -2395,6 +2470,9 @@ impl DrawHooks {
             || self.move_rule_plies
             || self.wins_on_check
             || self.extinction_rule
+            || self.stalemate_is_win
+            || self.stalemate_piece_count
+            || self.checkmate_is_win
     }
 
     /// The canonical names of the overridden hooks, in declaration order — a
@@ -2416,6 +2494,9 @@ impl DrawHooks {
             (self.move_rule_plies, "move_rule_plies"),
             (self.wins_on_check, "wins_on_check"),
             (self.extinction_rule, "extinction_rule"),
+            (self.stalemate_is_win, "stalemate_is_win"),
+            (self.stalemate_piece_count, "stalemate_piece_count"),
+            (self.checkmate_is_win, "checkmate_is_win"),
         ] {
             if on {
                 out.push(name);

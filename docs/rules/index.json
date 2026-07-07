@@ -550,6 +550,24 @@
     "oracle": "ha_chu"
   },
   {
+    "name": "codrus",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "codrus"
+    }
+  },
+  {
     "name": "coregal",
     "family": "wide",
     "width": 8,
@@ -810,6 +828,24 @@
     ],
     "oracle": {
       "fairy_stockfish": "georgian"
+    }
+  },
+  {
+    "name": "giveaway",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "giveaway"
     }
   },
   {
@@ -1124,6 +1160,24 @@
     }
   },
   {
+    "name": "losers",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "losers"
+    }
+  },
+  {
     "name": "makpong",
     "family": "wide",
     "width": 8,
@@ -1250,6 +1304,24 @@
     ],
     "oracle": {
       "fairy_stockfish": "minixiangqi"
+    }
+  },
+  {
+    "name": "misere",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "misere"
     }
   },
   {
@@ -1718,6 +1790,24 @@
     ],
     "oracle": {
       "fairy_stockfish": "spartan"
+    }
+  },
+  {
+    "name": "suicide",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "suicide"
     }
   },
   {

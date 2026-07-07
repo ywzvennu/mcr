@@ -902,6 +902,41 @@ pub(crate) const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // The antichess / giveaway family (#583), appended at the end to keep every
+    // earlier variant's fuzz seed stable. All five are FSF built-ins spelled with
+    // the identical standard-chess letters (the king is `k`/`K`; the Commoner
+    // demotion and forced captures are rules, not letters), so the FEN passes
+    // through unchanged.
+    Spec {
+        id: WideVariantId::Giveaway,
+        fsf: "giveaway",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Suicide,
+        fsf: "suicide",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Losers,
+        fsf: "losers",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Misere,
+        fsf: "misere",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Codrus,
+        fsf: "codrus",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

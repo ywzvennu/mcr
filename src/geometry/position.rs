@@ -782,6 +782,9 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             move_rule_plies: V::move_rule_plies().is_some(),
             wins_on_check: V::wins_on_check(),
             extinction_rule: V::extinction_rule().is_some(),
+            stalemate_is_win: V::stalemate_is_win(),
+            stalemate_piece_count: V::stalemate_piece_count(),
+            checkmate_is_win: V::checkmate_is_win(),
         }
     }
 
@@ -1385,6 +1388,15 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// its length — byte-identical to before.
     #[must_use]
     pub fn legal_move_count(&self) -> usize {
+        // Mandatory-capture variants cannot be bulk-counted: the capture narrowing
+        // must inspect the whole move set before it knows which moves survive. Route
+        // them through the materialising `generate_list`, which applies the filter,
+        // and return its length. Gated behind `mandatory_captures()` (default-off).
+        if V::mandatory_captures() {
+            let mut list = WideMoveList::new();
+            self.generate_list(&mut list);
+            return list.len();
+        }
         if self.uses_standard_path() {
             let mut sink = WideCountSink::default();
             self.generate_standard_into(&mut sink);
@@ -3085,9 +3097,16 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         [self.state.turn, self.state.turn.opposite()]
             .into_iter()
             .find(|&color| {
-                rule.watched
-                    .iter()
-                    .any(|&role| self.board.pieces(color, role).count() as usize <= rule.threshold)
+                if rule.count_total {
+                    // The whole army (FSF `extinctionPieceTypes = ALL_PIECES`):
+                    // "extinct" when the side's total piece count is at/below the
+                    // threshold — giveaway (0, no pieces) / losers (1, a bare king).
+                    (self.board.by_color(color).count() as usize) <= rule.threshold
+                } else {
+                    rule.watched.iter().any(|&role| {
+                        self.board.pieces(color, role).count() as usize <= rule.threshold
+                    })
+                }
             })
     }
 
@@ -5793,7 +5812,14 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         let reason = self.end_reason()?;
         Some(match reason {
             WideEndReason::Checkmate => WideOutcome::Decisive {
-                winner: self.state.turn.opposite(),
+                // Misère / losers invert checkmate: the mated side **to move** wins
+                // (FSF `checkmateValue = +VALUE_MATE`). Gated behind the default-off
+                // `checkmate_is_win()`, so ordinary variants keep the checker's win.
+                winner: if V::checkmate_is_win() {
+                    self.state.turn
+                } else {
+                    self.state.turn.opposite()
+                },
             },
             WideEndReason::VariantWin => {
                 // Flag-rank "campmate" (Synochess) is won by the side whose king
@@ -5814,11 +5840,15 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                         Some(loser) => loser.opposite(),
                         None => self.state.turn,
                     }
-                } else if V::extinction_rule().is_some() {
-                    // Extinction: the side whose watched type went extinct has lost,
-                    // so its opponent wins, whichever side is to move.
+                } else if let Some(rule) = V::extinction_rule() {
+                    // Extinction: the side whose watched type (or whole army) went
+                    // extinct is identified by `extinction_loser`. In the ordinary
+                    // direction its opponent wins (Extinction chess / Three-kings);
+                    // in the inverted `extinct_wins` direction (giveaway / suicide /
+                    // losers / codrus — "losing wins") that extinct side itself wins.
                     match self.extinction_loser() {
-                        Some(loser) => loser.opposite(),
+                        Some(side) if rule.extinct_wins => side,
+                        Some(side) => side.opposite(),
                         None => self.state.turn,
                     }
                 } else {
@@ -5831,11 +5861,10 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             WideEndReason::Impasse => WideOutcome::Decisive {
                 winner: self.state.turn,
             },
-            // Stalemate is a loss for the side to move in variants that say so
-            // (Synochess); otherwise the usual draw.
-            WideEndReason::Stalemate if V::stalemate_is_loss() => WideOutcome::Decisive {
-                winner: self.state.turn.opposite(),
-            },
+            // Stalemate resolution: a loss for the stalemated side (Synochess),
+            // a win for it (antichess / giveaway / losers / codrus), decided by
+            // piece count (suicide), or — the default — the usual draw.
+            WideEndReason::Stalemate => self.stalemate_outcome(),
             // The perpetual-check / chase / attack-repetition losses need the move
             // history to know which side was the aggressor, so they are resolved by
             // [`GenericGame`](super::game::GenericGame), never produced here. A
@@ -5843,8 +5872,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             WideEndReason::PerpetualCheckLoss
             | WideEndReason::PerpetualChaseLoss
             | WideEndReason::AttackRepetitionLoss => WideOutcome::Draw,
-            WideEndReason::Stalemate
-            | WideEndReason::InsufficientMaterial
+            WideEndReason::InsufficientMaterial
             | WideEndReason::VariantDraw
             | WideEndReason::Repetition
             | WideEndReason::Sennichite
@@ -5852,6 +5880,42 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             | WideEndReason::CountingDraw
             | WideEndReason::MoveRule => WideOutcome::Draw,
         })
+    }
+
+    /// Resolves the [`WideOutcome`] of a **stalemate** (the side to move is not in
+    /// check yet has no legal move) under this variant's stalemate rule, in
+    /// priority order:
+    ///
+    /// * [`stalemate_is_loss`](super::WideVariant::stalemate_is_loss) — the
+    ///   stalemated side loses (Synochess);
+    /// * [`stalemate_piece_count`](super::WideVariant::stalemate_piece_count) —
+    ///   Suicide chess: the side with **fewer** pieces wins, an equal count draws
+    ///   (FSF `stalematePieceCount`);
+    /// * [`stalemate_is_win`](super::WideVariant::stalemate_is_win) — the
+    ///   stalemated side **wins** (antichess / giveaway / losers / codrus);
+    /// * otherwise the ordinary **draw**.
+    fn stalemate_outcome(&self) -> WideOutcome {
+        let us = self.state.turn;
+        if V::stalemate_is_loss() {
+            return WideOutcome::Decisive {
+                winner: us.opposite(),
+            };
+        }
+        if V::stalemate_piece_count() {
+            let ours = self.board.by_color(us).count();
+            let theirs = self.board.by_color(us.opposite()).count();
+            return match ours.cmp(&theirs) {
+                core::cmp::Ordering::Less => WideOutcome::Decisive { winner: us },
+                core::cmp::Ordering::Greater => WideOutcome::Decisive {
+                    winner: us.opposite(),
+                },
+                core::cmp::Ordering::Equal => WideOutcome::Draw,
+            };
+        }
+        if V::stalemate_is_win() {
+            return WideOutcome::Decisive { winner: us };
+        }
+        WideOutcome::Draw
     }
 
     /// Whether the **side to move** meets the impasse / jishogi (entering-king)
@@ -6539,6 +6603,24 @@ impl WideMoveList {
             .chain(self.spill.iter())
     }
 
+    /// The mandatory-capture filter (Fairy-Stockfish `mustCapture`): if the list
+    /// holds **at least one capture**, drops every non-capture move, keeping only
+    /// the captures in push order; otherwise a no-op. It therefore can never turn a
+    /// non-empty list empty (stalemate detection is unaffected). Called only for
+    /// [`mandatory_captures`](super::WideVariant::mandatory_captures) variants —
+    /// antichess / giveaway / suicide / losers / codrus — so every other variant's
+    /// list is untouched.
+    fn retain_captures_if_any(&mut self) {
+        if !self.iter().any(|mv| mv.is_capture()) {
+            return;
+        }
+        let kept: Vec<WideMove> = self.iter().copied().filter(|mv| mv.is_capture()).collect();
+        self.clear();
+        for mv in kept {
+            self.push(mv);
+        }
+    }
+
     /// Collects the moves into a freshly allocated `Vec<WideMove>` — the boundary
     /// conversion the owned-`Vec`
     /// [`legal_moves`](GenericPosition::legal_moves) uses.
@@ -6904,6 +6986,15 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             self.generate_standard_into(out);
         } else {
             self.generate_special_into(out);
+        }
+        // Mandatory-capture narrowing (antichess / giveaway / suicide / losers /
+        // codrus): after the ordinary legal moves are produced, keep only captures
+        // whenever any capture is available — Fairy-Stockfish's `mustCapture`,
+        // applied on the legal set exactly as its `legal()` predicate does. Gated
+        // behind `mandatory_captures()` (default-off), so every other variant's list
+        // is byte-identical.
+        if V::mandatory_captures() {
+            out.retain_captures_if_any();
         }
     }
 }

@@ -278,6 +278,12 @@ pub struct DrawRules {
     /// Whether stalemate is a loss for the stalemated side
     /// ([`WideVariant::stalemate_is_loss`]).
     pub stalemate_is_loss: bool,
+    /// Whether stalemate is a **win** for the stalemated side (antichess family),
+    /// [`WideVariant::stalemate_is_win`].
+    pub stalemate_is_win: bool,
+    /// Whether stalemate is decided by piece count — fewer pieces wins (Suicide),
+    /// [`WideVariant::stalemate_piece_count`].
+    pub stalemate_piece_count: bool,
     /// Whether reducing a side to a lone king is an immediate draw (Shatar Robado),
     /// [`WideVariant::has_bare_king_draw`].
     pub has_bare_king_draw: bool,
@@ -327,6 +333,9 @@ pub struct TerminalRules {
     pub flag_win: Option<FlagWin>,
     /// Whether stalemate is a loss (mirrors the draw-rules field).
     pub stalemate_is_loss: bool,
+    /// Whether being **checkmated wins** for the mated side (misère / losers),
+    /// [`WideVariant::checkmate_is_win`].
+    pub checkmate_is_win: bool,
     /// Whether giving check wins the game outright (Checkshogi),
     /// [`WideVariant::wins_on_check`].
     pub wins_on_check: bool,
@@ -397,10 +406,18 @@ pub enum RoyalRule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExtinctionInfo {
-    /// The roles whose disappearance ends the game.
+    /// The roles whose disappearance ends the game. Empty (and ignored) when
+    /// [`count_total`](Self::count_total) is set.
     pub watched: Vec<WideRole>,
-    /// The count at or below which a watched role is extinct for its side.
+    /// The count at or below which a watched role (or the whole army) is extinct
+    /// for its side.
     pub threshold: usize,
+    /// Watch the side's **total** piece count rather than any one role
+    /// (Fairy-Stockfish `extinctionPieceTypes = ALL_PIECES`).
+    pub count_total: bool,
+    /// The extinct side **wins** rather than loses ("losing wins" — antichess /
+    /// giveaway / losers / codrus).
+    pub extinct_wins: bool,
 }
 
 /// The flag / campmate win parameters.
@@ -468,9 +485,9 @@ pub struct SpecialMechanics {
     /// adjacent non-pawn (a 3x3 blast). A concrete-8x8 mechanic; `false` for every
     /// wide variant.
     pub atomic_blast: bool,
-    /// Antichess: captures are mandatory — when any capture is available the side
-    /// to move must play one. A concrete-8x8 mechanic; `false` for every wide
-    /// variant.
+    /// Captures are mandatory — when any capture is available the side to move
+    /// must play one ([`WideVariant::mandatory_captures`]). The concrete antichess
+    /// and the wide antichess family (giveaway / suicide / losers / codrus).
     pub mandatory_captures: bool,
     /// Racing Kings: no move may give check (nor leave a king in check) — checks
     /// are wholly illegal. A concrete-8x8 mechanic; `false` for every wide variant.
@@ -740,6 +757,8 @@ fn derive_draw<G: Geometry, V: WideVariant<G>>() -> DrawRules {
         impasse: V::impasse_rule().map(impasse_info),
         has_bikjang: V::has_bikjang(),
         stalemate_is_loss: V::stalemate_is_loss(),
+        stalemate_is_win: V::stalemate_is_win(),
+        stalemate_piece_count: V::stalemate_piece_count(),
         has_bare_king_draw: V::has_bare_king_draw(),
         has_bare_king_loss: V::has_bare_king_loss(),
         perpetual_check_loses: V::perpetual_check_loses(),
@@ -774,6 +793,8 @@ fn derive_terminal<G: Geometry, V: WideVariant<G>>() -> TerminalRules {
     let extinction = V::extinction_rule().map(|rule| ExtinctionInfo {
         watched: rule.watched.to_vec(),
         threshold: rule.threshold,
+        count_total: rule.count_total,
+        extinct_wins: rule.extinct_wins,
     });
     let flag_win = V::has_flag_win().then(|| FlagWin {
         rank_white: V::flag_rank(Color::White),
@@ -784,6 +805,7 @@ fn derive_terminal<G: Geometry, V: WideVariant<G>>() -> TerminalRules {
         extinction,
         flag_win,
         stalemate_is_loss: V::stalemate_is_loss(),
+        checkmate_is_win: V::checkmate_is_win(),
         wins_on_check: V::wins_on_check(),
         temple_win: V::has_temple_win(),
         bare_king_draw: V::has_bare_king_draw(),
@@ -828,10 +850,12 @@ fn derive_mechanics<G: Geometry, V: WideVariant<G>>() -> SpecialMechanics {
         has_jump_captures: V::has_jump_captures(),
         allows_pass: V::allows_pass(),
         confine_pins_to_segment: V::confine_pins_to_segment(),
-        // Concrete-8x8-only mechanics (atomic blast / mandatory captures /
-        // no-check racing / horde asymmetry / 960 shuffle): never on the wide layer.
+        // Mandatory captures (antichess / giveaway / suicide / losers / codrus):
+        // read from the wide hook. The remaining concrete-8x8-only mechanics
+        // (atomic blast / no-check racing / horde asymmetry / 960 shuffle) never
+        // appear on the wide layer.
         atomic_blast: false,
-        mandatory_captures: false,
+        mandatory_captures: V::mandatory_captures(),
         checks_forbidden: false,
         asymmetric_armies: false,
         shuffled_setup: false,

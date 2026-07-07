@@ -148,6 +148,8 @@ impl WideVariant<Chess8x8> for KingletRules {
         Some(ExtinctionRule {
             watched: KINGLET_WATCHED,
             threshold: 0,
+            count_total: false,
+            extinct_wins: false,
         })
     }
 

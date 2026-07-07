@@ -34,6 +34,7 @@ mod capahouse;
 mod chak;
 mod chaturanga;
 mod chennis;
+mod codrus;
 mod coregal;
 mod corpus;
 mod courier;
@@ -46,6 +47,7 @@ mod extinction;
 mod fogofwar;
 mod gardner;
 mod georgian;
+mod giveaway;
 mod gorogoro;
 mod grand;
 mod grandhouse;
@@ -62,12 +64,14 @@ mod legan;
 mod locate;
 mod locate_hachu;
 mod losalamos;
+mod losers;
 mod makpong;
 mod makruk;
 mod manchu;
 mod mansindam;
 mod minishogi;
 mod minixiangqi;
+mod misere;
 mod modern;
 mod moveset;
 mod newzealand;
@@ -93,6 +97,7 @@ mod shoshogi;
 mod shouse;
 mod sittuyin;
 mod spartan;
+mod suicide;
 mod synochess;
 mod tencubed;
 mod threekings;
@@ -417,6 +422,15 @@ fn main() {
     let modern_mismatches = modern::run(&mut engine, opts.full);
     // Extinction chess is a FSF built-in (no variants.ini needed), like coregal.
     let extinction_mismatches = extinction::run(&mut engine, opts.full);
+    // The antichess / giveaway family (#583) are FSF built-ins (no variants.ini
+    // needed): mandatory captures, a non-royal Commoner king (giveaway / suicide /
+    // codrus) or an inverted royal-king terminal (losers / misere), all on the same
+    // generic 8x8 engine.
+    let giveaway_mismatches = giveaway::run(&mut engine, opts.full);
+    let suicide_mismatches = suicide::run(&mut engine, opts.full);
+    let losers_mismatches = losers::run(&mut engine, opts.full);
+    let misere_mismatches = misere::run(&mut engine, opts.full);
+    let codrus_mismatches = codrus::run(&mut engine, opts.full);
     // Three kings chess is a FSF built-in (no variants.ini needed), like extinction.
     let threekings_mismatches = threekings::run(&mut engine, opts.full);
     // Kinglet chess is a FSF built-in (no variants.ini needed), like extinction: it
@@ -569,6 +583,11 @@ fn main() {
         + coregal_mismatches
         + modern_mismatches
         + extinction_mismatches
+        + giveaway_mismatches
+        + suicide_mismatches
+        + losers_mismatches
+        + misere_mismatches
+        + codrus_mismatches
         + threekings_mismatches
         + kinglet_mismatches
         + torpedo_mismatches

@@ -24,15 +24,16 @@ use core::str::FromStr;
 use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
-    Chigorin, Chu, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire, EuroShogi,
-    Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian, Gorogoro,
-    Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi, Judkins, Karouk,
-    Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Makpong, Makruk, Manchu, Mansindam,
-    Micro, Minishogi, Minixiangqi, Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Opulent,
-    Orda, Ordamirror, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight,
-    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
-    Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
-    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
+    Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
+    EuroShogi, Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian,
+    Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, HoppelPoppel, Janggi, Janus, Jieqi,
+    Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos, Losers, Makpong,
+    Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern, Newzealand,
+    Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect,
+    Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
+    Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Suicide, Synochess, Tencubed, Tenjiku,
+    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
+    WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -793,6 +794,7 @@ wide_variants! {
     Chennis, Chennis, Chennis, "chennis";
     Chigorin, Chigorin, Chigorin, "chigorin";
     Chu, Chu, Box<Chu>, "chu", "chushogi", "chu-shogi";
+    Codrus, Codrus, Codrus, "codrus";
     Coregal, Coregal, Coregal, "coregal";
     Courier, Courier, Courier, "courier";
     Dai, Dai, Box<Dai>, "dai", "daishogi", "dai-shogi";
@@ -806,6 +808,7 @@ wide_variants! {
     FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gardner, Gardner, Gardner, "gardner";
     Georgian, Georgian, Georgian, "georgian";
+    Giveaway, Giveaway, Giveaway, "giveaway";
     Gorogoro, Gorogoro, Gorogoro, "gorogoro", "gorogoroplus";
     Gothic, Gothic, Gothic, "gothic";
     Grand, Grand, Grand, "grand";
@@ -823,6 +826,7 @@ wide_variants! {
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
     Legan, Legan, Legan, "legan";
     Losalamos, Losalamos, Losalamos, "losalamos", "losalamoschess", "los-alamos";
+    Losers, Losers, Losers, "losers", "loserschess";
     Makpong, Makpong, Makpong, "makpong";
     Makruk, Makruk, Makruk, "makruk";
     Manchu, Manchu, Manchu, "manchu", "manchuchess";
@@ -830,6 +834,7 @@ wide_variants! {
     Micro, Micro, Micro, "micro", "microshogi", "micro-shogi";
     Minishogi, Minishogi, Minishogi, "minishogi";
     Minixiangqi, Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
+    Misere, Misere, Misere, "misere", "misère", "miserechess";
     Modern, Modern, Modern, "modern";
     Newzealand, Newzealand, Newzealand, "newzealand";
     Nightrider, Nightrider, Nightrider, "nightrider";
@@ -855,6 +860,7 @@ wide_variants! {
     Shouse, Shouse, Shouse, "shouse", "seirawanhouse";
     Sittuyin, Sittuyin, Sittuyin, "sittuyin", "burmese";
     Spartan, Spartan, Spartan, "spartan";
+    Suicide, Suicide, Suicide, "suicide", "suicidechess";
     Synochess, Synochess, Synochess, "synochess";
     Tencubed, Tencubed, Tencubed, "tencubed";
     Tenjiku, Tenjiku, Box<Tenjiku>, "tenjiku", "tenjikushogi", "tenjiku-shogi";
@@ -1089,7 +1095,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 92, "all 92 fairy variants are covered");
+        assert_eq!(count, 97, "all 97 fairy variants are covered");
     }
 
     #[test]
@@ -1497,6 +1503,7 @@ mod tests {
             AnyWideVariant::Chigorin,
             2
         );
+        agrees_with_typed!(WideVariantId::Codrus, Codrus, AnyWideVariant::Codrus, 2);
         agrees_with_typed!(WideVariantId::Courier, Courier, AnyWideVariant::Courier, 2);
         agrees_with_typed!(WideVariantId::Dobutsu, Dobutsu, AnyWideVariant::Dobutsu, 2);
         agrees_with_typed!(WideVariantId::Dragon, Dragon, AnyWideVariant::Dragon, 2);
@@ -1520,6 +1527,12 @@ mod tests {
             WideVariantId::Georgian,
             Georgian,
             AnyWideVariant::Georgian,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Giveaway,
+            Giveaway,
+            AnyWideVariant::Giveaway,
             2
         );
         agrees_with_typed!(
@@ -1573,6 +1586,7 @@ mod tests {
             AnyWideVariant::Losalamos,
             2
         );
+        agrees_with_typed!(WideVariantId::Losers, Losers, AnyWideVariant::Losers, 2);
         agrees_with_typed!(WideVariantId::Makpong, Makpong, AnyWideVariant::Makpong, 2);
         agrees_with_typed!(WideVariantId::Makruk, Makruk, AnyWideVariant::Makruk, 2);
         agrees_with_typed!(WideVariantId::Manchu, Manchu, AnyWideVariant::Manchu, 2);
@@ -1595,6 +1609,7 @@ mod tests {
             AnyWideVariant::Minixiangqi,
             2
         );
+        agrees_with_typed!(WideVariantId::Misere, Misere, AnyWideVariant::Misere, 2);
         agrees_with_typed!(
             WideVariantId::Newzealand,
             Newzealand,
@@ -1676,6 +1691,7 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Spartan, Spartan, AnyWideVariant::Spartan, 2);
+        agrees_with_typed!(WideVariantId::Suicide, Suicide, AnyWideVariant::Suicide, 2);
         agrees_with_typed!(
             WideVariantId::Synochess,
             Synochess,

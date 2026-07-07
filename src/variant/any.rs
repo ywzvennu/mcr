@@ -55,7 +55,7 @@ impl FromStr for VariantId {
     /// - [`RacingKings`](VariantId::RacingKings): `racingkings`, `racing`
     /// - [`Horde`](VariantId::Horde): `horde`
     /// - [`Atomic`](VariantId::Atomic): `atomic`
-    /// - [`Antichess`](VariantId::Antichess): `antichess`, `giveaway`
+    /// - [`Antichess`](VariantId::Antichess): `antichess`
     /// - [`Crazyhouse`](VariantId::Crazyhouse): `crazyhouse`, `zh`, `house`
     ///
     /// # Errors
@@ -72,7 +72,7 @@ impl FromStr for VariantId {
             "racingkings" | "racing" => VariantId::RacingKings,
             "horde" => VariantId::Horde,
             "atomic" => VariantId::Atomic,
-            "antichess" | "giveaway" => VariantId::Antichess,
+            "antichess" => VariantId::Antichess,
             "crazyhouse" | "zh" | "house" => VariantId::Crazyhouse,
             _ => return Err(UnknownVariant(normalized)),
         };
@@ -327,7 +327,6 @@ mod tests {
             ("racingkings", VariantId::RacingKings),
             ("horde", VariantId::Horde),
             ("atomic", VariantId::Atomic),
-            ("giveaway", VariantId::Antichess),
             ("antichess", VariantId::Antichess),
             ("zh", VariantId::Crazyhouse),
             ("house", VariantId::Crazyhouse),
