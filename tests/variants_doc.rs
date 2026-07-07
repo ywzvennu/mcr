@@ -576,6 +576,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess with castling disabled — neither side may ever castle; double step, en passant, and promotion to Queen/Rook/Bishop/Knight are standard. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant nocastle`).",
         },
+        WideVariantId::OkisakiShogi => Meta {
+            display: "Okisaki Shogi (10x10 Shogi)",
+            pieces: "Standard Shogi army plus a Queen and a vertical rook (a rook confined to its file, sliding both directions); the Knight is the ordinary chess knight, not the forward-only Shogi knight.",
+            rules: "10x10 Shogi with a hand and drops and a three-rank promotion zone; nifu and dead-piece pawn-drop rules, no uchifuzume. Pawns, Silvers, chess Knights, vertical rooks, Rooks and Bishops promote (the Queen, Gold and King do not). Sennichite (four-fold) is a draw, perpetual check loses, stalemate is a loss. Win by checkmate.",
+            oracle: "Rules-validated (no FSF oracle — the available Fairy-Stockfish build lacks large boards); hand-derived start count cross-checked against an independent from-scratch 10x10 generator.",
+        },
         WideVariantId::Opulent => Meta {
             display: "Opulent chess (10x10)",
             pieces: "Standard sliders plus an augmented Knight (Knight + Wazir), Chancellor, Archbishop, Wizard (Camel + Ferz), and Lion (Ferz + Dabbaba + Threeleaper).",

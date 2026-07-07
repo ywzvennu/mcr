@@ -4,7 +4,7 @@
 //! mcr ships two parallel variant families (see the crate docs): the concrete 8x8
 //! engine ([`VariantId`]: standard chess and the eight classic 8x8 variants) and
 //! the generic-geometry fairy layer
-//! ([`WideVariantId`](crate::geometry::WideVariantId): the 90 wider or
+//! ([`WideVariantId`](crate::geometry::WideVariantId): the 91 wider or
 //! differently-shaped variants). Each exposes its own structured
 //! [`VariantRules`](crate::geometry::VariantRules) model — [`VariantId::rules`]
 //! and [`WideVariantId::rules`](crate::geometry::WideVariantId::rules) — but a
@@ -53,7 +53,7 @@ impl VariantRef {
     /// ([`VariantId::rules`]) or wide
     /// ([`WideVariantId::rules`](crate::geometry::WideVariantId::rules)) derivation.
     ///
-    /// The single unified entry point spanning all ~99 variants: available for
+    /// The single unified entry point spanning all ~100 variants: available for
     /// every [`VariantRef::ALL`] without panicking, with every field derived from
     /// the variant's own move-generation hooks.
     #[must_use]
@@ -111,7 +111,7 @@ const fn build_all() -> [VariantRef; CONCRETE_COUNT + WIDE_COUNT] {
 // on each variant's derived [`VariantRules`], so a caller can select variants by a
 // property (board size, a rule, a mechanic) without hand-walking the two registries
 // or restating any rule. Every helper is a thin wrapper over [`VariantRef::matching`]
-// and re-derives one variant's rules per candidate — cheap for a catalog of ~99, and
+// and re-derives one variant's rules per candidate — cheap for a catalog of ~100, and
 // pay-per-call (no cache), so use it for setup / tooling rather than a hot loop.
 
 /// Whether a role is a pawn-family role (an ordinary pawn or a Spartan hoplite),

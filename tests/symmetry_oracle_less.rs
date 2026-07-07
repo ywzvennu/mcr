@@ -16,7 +16,8 @@
 //! the validation goal there, and colour symmetry would contradict it. This test
 //! confirmed that asymmetry rather than papering over it.
 //!
-//! For the five symmetric starts, that symmetry `σ` is a rules isomorphism, so for
+//! For the six symmetric starts (Chu, Dai, Alice, Jieqi, Wa Shogi, and the 10x10
+//! Okisaki Shogi), that symmetry `σ` is a rules isomorphism, so for
 //! the start position
 //! `A = (board, White to move)` and the same board with the turn handed to Black,
 //! `B = (board, Black to move) = σ(A)`, perft must agree at every depth:
@@ -34,8 +35,8 @@
 //! FSF-differential sweep the oracle-backed variants enjoy.
 
 use mcr::geometry::{
-    perft as gperft, Alice, Chess8x8, Chu, Chu12x12, Dai, Dai15x15, Jieqi, Washogi, Washogi11x11,
-    Xiangqi9x10,
+    perft as gperft, Alice, Chess8x8, Chu, Chu12x12, Dai, Dai15x15, Grand10x10, Jieqi,
+    OkisakiShogi, Washogi, Washogi11x11, Xiangqi9x10,
 };
 
 /// Returns `fen` with its side-to-move field flipped (`w` <-> `b`), leaving every
@@ -120,6 +121,13 @@ symmetric_start!(
     Washogi11x11,
     Washogi::startpos(),
     &[1, 2]
+);
+symmetric_start!(
+    okisakishogi_colour_symmetric,
+    OkisakiShogi,
+    Grand10x10,
+    OkisakiShogi::startpos(),
+    &[1, 2, 3]
 );
 
 // Tenjiku is intentionally NOT here: its start array reproduces HaChu's documented

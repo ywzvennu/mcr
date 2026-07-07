@@ -30,6 +30,7 @@ Selected by `ValidationOracle` (runtime) and the non-`Fsf` `PerftOracle` rows:
 | Alice Chess | 8x8 ×2 | Independent | depth 1–4 vs in-repo brute force | depth 5 | independent in-repo two-board generator |
 | Jieqi | 9x10 | Independent (Hand-derived) | depth 1–4 live vs **FSF Xiangqi** (identity reveal) | — | FSF `xiangqi`, via the identity-reveal equivalence |
 | Wa Shogi | 11x11 | Independent | depth 1–3 vs in-repo brute force | depth 4 | independent in-repo 11x11 generator |
+| Okisaki Shogi | 10x10 | Independent | depth 1 hand-derived; depths 1–3 vs in-repo generator | depth 4 | independent in-repo 10x10 generator |
 
 "Second source" is what stands in for the missing FSF oracle. For the HaChu-oracle
 variants it is the HaChu engine (driven as a subprocess by `compare-fairy`, never
@@ -139,6 +140,23 @@ catch a large class of move-generation defects independently of the perft pins.
   **independent from-scratch 11x11 generator** (issue #500).
 - **perft(4) = 9531440** is an engine-only pin (`#[ignore]`d).
 - **Residual gap:** no external oracle; two in-repo implementations agree to
+  depth 3; depth ≥ 4 is single-source.
+
+### Okisaki Shogi — FSF built-in, but no large-board binary
+- Okisaki Shogi is a Fairy-Stockfish built-in (`okisakishogi`), but the FSF binary
+  available here is a **non-large-board build**: asked for `UCI_Variant okisakishogi`
+  it silently stays in standard chess (a `go perft` returns the 20-move chess root),
+  so there is **no live FSF oracle**.
+- **perft(1) = 37** is **hand-derived** (the per-piece enumeration is tabulated in
+  `tests/perft_okisakishogi.rs`); **perft(2) = 1369 = 37²** follows from the armies
+  starting four ranks apart (no White first move alters Black's reply count).
+- **perft(2)/(3)** for the start position and **perft(1)–(3)** for two midgame
+  positions (one where nifu fully suppresses a held pawn's drops, one with a Queen in
+  hand exercising 58 drops) are produced **identically** by the engine and an
+  **independent from-scratch 10x10 generator** in the same test file (its own board
+  model, move tables, hand/drops, nifu, per-piece promotion and king safety).
+- **perft(4) = 1697913** is an engine-only regression pin (`#[ignore]`d).
+- **Residual gap:** no external engine oracle; two in-repo implementations agree to
   depth 3; depth ≥ 4 is single-source.
 
 ## Summary of what is and is not claimed
