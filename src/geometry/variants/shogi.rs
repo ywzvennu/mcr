@@ -359,6 +359,12 @@ impl WideVariant<Shogi9x9> for ShogiRules {
         true
     }
 
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
+
     // --- Impasse / jishogi (entering king) --------------------------------
     //
     // Terminal-only adjudication (reported from the single position), never

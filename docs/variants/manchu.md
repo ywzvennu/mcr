@@ -106,7 +106,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 
 **Draw / adjudication rules**
 
-- No special draw rules beyond the standard checkmate / stalemate.
+- Stalemate is a loss for the stalemated side
 
 ## Special mechanics
 

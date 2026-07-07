@@ -276,6 +276,12 @@ impl WideVariant<Shogi9x9> for ShoShogiRules {
         // side.
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // As Shogi (FSF `shoshogi_variant` inherits `stalemateValue = -VALUE_MATE`
+        // from the shogi base); adjudication only, so perft is byte-identical.
+        <ShogiRules as WideVariant<Shogi9x9>>::stalemate_is_loss()
+    }
 }
 
 /// Sho Shogi (old 9x9 Shogi without drops) as a [`GenericPosition`] over the 9x9
