@@ -726,6 +726,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "A setup phase places the eight non-pawn pieces onto own territory (rooks on the back rank), then no castling; a Met-driven special pawn promotion in place or by a ferz step. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant sittuyin`).",
         },
+        WideVariantId::Sortofalmost => Meta {
+            display: "Sort-of-almost chess (8x8)",
+            pieces: "Standard chess army, but only White's Queen is replaced by a Chancellor (Rook + Knight, mcr Elephant `e`/`E`); Black keeps its Queen.",
+            rules: "Asymmetric heavy pieces: standard 8x8 chess with castling, double step, and en passant, but White fields a Chancellor and Black a Queen. Each side promotes only to the heavy piece it fields — White to Chancellor, Rook, Bishop, or Knight; Black to Queen, Rook, Bishop, or Knight. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant sortofalmost`).",
+        },
         WideVariantId::Spartan => Meta {
             display: "Spartan chess (8x8)",
             pieces: "Standard White army vs Black Spartans: Lieutenant, General, Captain, Warlord (Archbishop), two Kings, and Berolina Hoplite pawns.",

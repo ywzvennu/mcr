@@ -31,9 +31,9 @@ use super::{
     Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern, Newzealand,
     Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Pawnback, Pawnsideways, Perfect,
     Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi,
-    Shogi, Shogun, Shouse, Sittuyin, Spartan, Square, Suicide, Synochess, Tencubed, Tenjiku,
-    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
-    WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
+    Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Synochess, Tencubed,
+    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
+    WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -859,6 +859,7 @@ wide_variants! {
     ShoShogi, ShoShogi, ShoShogi, "shoshogi", "sho-shogi";
     Shouse, Shouse, Shouse, "shouse", "seirawanhouse";
     Sittuyin, Sittuyin, Sittuyin, "sittuyin", "burmese";
+    Sortofalmost, Sortofalmost, Sortofalmost, "sortofalmost", "sortofalmostchess";
     Spartan, Spartan, Spartan, "spartan";
     Suicide, Suicide, Suicide, "suicide", "suicidechess";
     Synochess, Synochess, Synochess, "synochess";
@@ -1095,7 +1096,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 97, "all 97 fairy variants are covered");
+        assert_eq!(count, 98, "all 98 fairy variants are covered");
     }
 
     #[test]
@@ -1688,6 +1689,12 @@ mod tests {
             WideVariantId::Sittuyin,
             Sittuyin,
             AnyWideVariant::Sittuyin,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Sortofalmost,
+            Sortofalmost,
+            AnyWideVariant::Sortofalmost,
             2
         );
         agrees_with_typed!(WideVariantId::Spartan, Spartan, AnyWideVariant::Spartan, 2);

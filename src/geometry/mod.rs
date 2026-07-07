@@ -103,10 +103,11 @@ pub use variants::{
     Pawnsideways, PawnsidewaysRules, Perfect, PerfectRules, Petrified, PetrifiedRules, Placement,
     PlacementRules, Pocketknight, PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules,
     Shatar, ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules,
-    Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Spartan,
-    SpartanRules, Suicide, SuicideRules, Synochess, SynochessRules, Tencubed, TencubedRules,
-    Tenjiku, TenjikuRules, Threekings, ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules,
-    Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules, Yari, YariRules,
+    Shogi, ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules,
+    Sortofalmost, SortofalmostRules, Spartan, SpartanRules, Suicide, SuicideRules, Synochess,
+    SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules,
+    Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi,
+    XiangqiRules, Yari, YariRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 

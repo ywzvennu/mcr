@@ -937,6 +937,17 @@ pub(crate) const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Sort-of-almost chess is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess with only
+    // White's queen replaced by a Rook+Knight Chancellor (Black keeps its queen) —
+    // so it takes the placement-only chancellor `e`->`c` rewrite.
+    Spec {
+        id: WideVariantId::Sortofalmost,
+        fsf: "sortofalmost",
+        needs_ini: false,
+        dialect: crate::sortofalmost::to_fsf_dialect,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

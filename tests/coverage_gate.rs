@@ -260,6 +260,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::ShoShogi), "perft_shoshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("shoshogi_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Shouse), "perft_shouse.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Sittuyin), "perft_sittuyin.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("sittuyin_pieces_honour_count_matches_asean_base")),
+    row(Game::Wide(WideVariantId::Sortofalmost), "perft_sortofalmost.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Spartan), "perft_spartan.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Suicide), "perft_suicide.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_with_fewer_pieces_wins")),
     row(Game::Wide(WideVariantId::Synochess), "perft_synochess.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
