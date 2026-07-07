@@ -164,6 +164,23 @@
 //! `no_std`), and the runtime-built `magic` slider table. Accordingly the
 //! `magic`, `book`, and `parallel` features imply `std`.
 //!
+//! ### WebAssembly (`wasm32-unknown-unknown`)
+//!
+//! The wasm-safe feature set is simply `--no-default-features` (no `std`, and
+//! therefore none of the `std::fs` book loader, rayon `parallel` perft, or
+//! `magic` table — the parts that would not link on `wasm32-unknown-unknown`).
+//! `serde` is wasm-safe and may be added. The library compiles to wasm with:
+//!
+//! ```text
+//! cargo build --lib --target wasm32-unknown-unknown --no-default-features
+//! cargo build --lib --target wasm32-unknown-unknown --no-default-features --features serde
+//! ```
+//!
+//! On wasm, load opening books through the in-memory
+//! [`Book::from_bytes`] with caller-supplied bytes (the `book` file loader is
+//! unavailable), and use the serial [`perft`] rather than `perft_parallel`. See
+//! `tests/wasm_smoke.rs` for a functional smoke test of this surface.
+//!
 //! [`docs/variants.md`]: https://github.com/ywzvennu/mcr/blob/main/docs/variants.md
 //! [`docs/perf-variants.md`]: https://github.com/ywzvennu/mcr/blob/main/docs/perf-variants.md
 #![doc(html_root_url = "https://docs.rs/mcr")]
