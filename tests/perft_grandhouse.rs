@@ -50,7 +50,7 @@ const MID: &str =
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Grandhouse::from_fen(fen).expect("valid Grandhouse FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Grand10x10, _>(&pos, depth);
+        let got = gperft::<Grand10x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Grandhouse perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

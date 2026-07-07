@@ -93,7 +93,7 @@ const CANNON_CASTLE_335: &str =
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Shako::from_fen(fen).expect("valid Shako FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Grand10x10, _>(&pos, depth);
+        let got = gperft::<Grand10x10, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Shako perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

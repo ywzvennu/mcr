@@ -217,7 +217,10 @@ impl WideVariant<Shogi9x9> for XiangfuRules {
         true
     }
 
-    fn royal_squares(board: &Board<Shogi9x9>, color: Color) -> Bitboard<Shogi9x9> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Shogi9x9, R>,
+        color: Color,
+    ) -> Bitboard<Shogi9x9> {
         board.pieces(color, WideRole::Champion)
     }
 
@@ -255,7 +258,11 @@ impl WideVariant<Shogi9x9> for XiangfuRules {
         }
     }
 
-    fn drop_targets(_role: WideRole, color: Color, board: &Board<Shogi9x9>) -> Bitboard<Shogi9x9> {
+    fn drop_targets<const R: usize>(
+        _role: WideRole,
+        color: Color,
+        board: &Board<Shogi9x9, R>,
+    ) -> Bitboard<Shogi9x9> {
         // Any held piece drops onto an empty square in the dropping side's own first
         // two ranks (FSF `whiteDropRegion = *1 *2`, `blackDropRegion = *8 *9`).
         // Captured Champions are always demoted to Pupils before they reach the
@@ -276,7 +283,8 @@ impl WideVariant<Shogi9x9> for XiangfuRules {
 /// with [`Xiangfu::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the ring confinement, the captures-to-hand
 /// drops, and the pseudo-royal duple-check Champions.
-pub type Xiangfu = GenericPosition<Shogi9x9, XiangfuRules>;
+pub type Xiangfu =
+    GenericPosition<Shogi9x9, XiangfuRules, { <XiangfuRules as WideVariant<Shogi9x9>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

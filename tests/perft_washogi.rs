@@ -52,7 +52,7 @@ const ENGINE_PINS: &[(u32, u64)] = &[(1, 57), (2, 3204), (3, 174_579)];
 fn engine_startpos_perft_pins() {
     let pos = Washogi::from_fen(STARTPOS).expect("valid Wa Shogi FEN");
     for &(depth, expected) in ENGINE_PINS {
-        let got = gperft::<Washogi11x11, _>(&pos, depth);
+        let got = gperft::<Washogi11x11, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "engine Wa Shogi perft({depth}) mismatch (rules-validated, no perft oracle)"
@@ -64,7 +64,7 @@ fn engine_startpos_perft_pins() {
 #[ignore = "deep perft; run with --release --test perft_washogi -- --include-ignored"]
 fn engine_startpos_perft_deep() {
     let pos = Washogi::from_fen(STARTPOS).expect("valid Wa Shogi FEN");
-    assert_eq!(gperft::<Washogi11x11, _>(&pos, 4), 9_531_440);
+    assert_eq!(gperft::<Washogi11x11, _, _>(&pos, 4), 9_531_440);
 }
 
 /// The engine and the **independent** brute-force generator must agree on every
@@ -74,7 +74,7 @@ fn engine_matches_independent_brute_force() {
     let engine = Washogi::from_fen(STARTPOS).expect("valid Wa Shogi FEN");
     let bf = brute::Position::startpos();
     for depth in 1..=3 {
-        let e = gperft::<Washogi11x11, _>(&engine, depth);
+        let e = gperft::<Washogi11x11, _, _>(&engine, depth);
         let b = brute::perft(&bf, depth);
         assert_eq!(
             e, b,
@@ -107,7 +107,7 @@ fn pinned_fox_cannot_take_its_forward_jump() {
     // Correct perft(1) = 5: the four Crane-King steps (c1, e1, c2, e2) plus the
     // Fox's `d2d3` capture of the pinning Oxcart. The illegal `d2d4` jump is gone.
     assert_eq!(
-        gperft::<Washogi11x11, _>(&pos, 1),
+        gperft::<Washogi11x11, _, _>(&pos, 1),
         5,
         "pinned Fox must not keep its illegal d2d4 jump"
     );

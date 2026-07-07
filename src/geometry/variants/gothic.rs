@@ -127,7 +127,10 @@ impl WideVariant<Cap10x8> for GothicRules {
     /// ([`WideRole::Hawk`]) and Chancellor ([`WideRole::Elephant`]), so the ordinary
     /// insufficient-material draw applies. Adjudication-only and behind the
     /// default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Cap10x8>, _state: &GenericState<Cap10x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Cap10x8, R>,
+        _state: &GenericState<Cap10x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -137,7 +140,8 @@ impl WideVariant<Cap10x8> for GothicRules {
 /// Construct the starting position with
 /// [`Gothic::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Gothic::from_fen`](GenericPosition::from_fen).
-pub type Gothic = GenericPosition<Cap10x8, GothicRules>;
+pub type Gothic =
+    GenericPosition<Cap10x8, GothicRules, { <GothicRules as WideVariant<Cap10x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

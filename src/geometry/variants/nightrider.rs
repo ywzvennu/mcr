@@ -179,7 +179,11 @@ impl WideVariant<Chess8x8> for NightriderRules {
 /// (mcr dialect) with [`Nightrider::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the riding-knight movement, the full-verify king safety,
 /// and the `q r b n` promotion.
-pub type Nightrider = GenericPosition<Chess8x8, NightriderRules>;
+pub type Nightrider = GenericPosition<
+    Chess8x8,
+    NightriderRules,
+    { <NightriderRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

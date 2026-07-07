@@ -146,7 +146,10 @@ impl WideVariant<Chess9x9> for ModernRules {
     /// mating material (matching Fairy-Stockfish, which classes the archbishop as a
     /// major piece). Adjudication-only and behind the default-off hook, so perft
     /// stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess9x9>, _state: &GenericState<Chess9x9>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess9x9, R>,
+        _state: &GenericState<Chess9x9, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -158,7 +161,8 @@ impl WideVariant<Chess9x9> for ModernRules {
 /// [`Modern::from_fen`](GenericPosition::from_fen). The Archbishop reuses the
 /// [`StandardChess`](crate::geometry::StandardChess) compound default, so only the
 /// array and the promotion set distinguish it from standard chess widened to 9x9.
-pub type Modern = GenericPosition<Chess9x9, ModernRules>;
+pub type Modern =
+    GenericPosition<Chess9x9, ModernRules, { <ModernRules as WideVariant<Chess9x9>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod insufficient_material_tests {

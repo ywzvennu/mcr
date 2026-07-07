@@ -147,7 +147,11 @@ impl WideVariant<Chess8x8> for ChaturangaRules {
 /// with [`Chaturanga::from_fen`](GenericPosition::from_fen). It behaves exactly
 /// like [`Shatranj`](super::Shatranj) except that it starts from the standard chess
 /// array and baring the enemy king is not a win. See the [module docs](self).
-pub type Chaturanga = GenericPosition<Chess8x8, ChaturangaRules>;
+pub type Chaturanga = GenericPosition<
+    Chess8x8,
+    ChaturangaRules,
+    { <ChaturangaRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -174,14 +178,14 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Chaturanga::startpos();
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 16);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 256);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 4176);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 16);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 256);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 3), 4176);
         // Same numbers Shatranj produces from its (mirrored) startpos.
         let shatranj = Shatranj::startpos();
         assert_eq!(
-            gperft::<Chess8x8, _>(&pos, 3),
-            gperft::<Chess8x8, _>(&shatranj, 3)
+            gperft::<Chess8x8, _, _>(&pos, 3),
+            gperft::<Chess8x8, _, _>(&shatranj, 3)
         );
     }
 

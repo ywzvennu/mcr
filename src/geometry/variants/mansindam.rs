@@ -353,7 +353,11 @@ impl WideVariant<Shogi9x9> for MansindamRules {
         }
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Shogi9x9>) -> Bitboard<Shogi9x9> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Shogi9x9, R>,
+    ) -> Bitboard<Shogi9x9> {
         let mut mask = !board.occupied();
         if role == WideRole::Pawn {
             // A dropped Pawn may not land on the last rank (it would be immobile —
@@ -379,4 +383,8 @@ impl WideVariant<Shogi9x9> for MansindamRules {
 /// [`Mansindam::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the army, the mandatory promotion zone, the crazyhouse hand and drops, and
 /// the campmate flag win.
-pub type Mansindam = GenericPosition<Shogi9x9, MansindamRules>;
+pub type Mansindam = GenericPosition<
+    Shogi9x9,
+    MansindamRules,
+    { <MansindamRules as WideVariant<Shogi9x9>>::ROLE_SPAN },
+>;

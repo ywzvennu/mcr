@@ -129,7 +129,10 @@ impl WideVariant<Chess8x8> for KingletRules {
         true
     }
 
-    fn royal_squares(_board: &Board<Chess8x8>, _color: Color) -> Bitboard<Chess8x8> {
+    fn royal_squares<const R: usize>(
+        _board: &Board<Chess8x8, R>,
+        _color: Color,
+    ) -> Bitboard<Chess8x8> {
         // The king is **not royal**: an empty royal set makes the generic
         // king-safety machinery report "never in check". A side loses not by
         // checkmate but by pawn extinction (below).
@@ -169,7 +172,8 @@ impl WideVariant<Chess8x8> for KingletRules {
 /// [`Kinglet::from_fen`](GenericPosition::from_fen). Movement is the no-check
 /// standard-chess set with Commoner-only promotion; the game ends by pawn
 /// extinction.
-pub type Kinglet = GenericPosition<Chess8x8, KingletRules>;
+pub type Kinglet =
+    GenericPosition<Chess8x8, KingletRules, { <KingletRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

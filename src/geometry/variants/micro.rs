@@ -297,4 +297,5 @@ impl WideVariant<Micro4x5> for MicroRules {
 /// may carry the hand as a `[..]` holdings bracket — with
 /// [`Micro::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the capture-flip promotion, the hand, and drops.
-pub type Micro = GenericPosition<Micro4x5, MicroRules>;
+pub type Micro =
+    GenericPosition<Micro4x5, MicroRules, { <MicroRules as WideVariant<Micro4x5>>::ROLE_SPAN }>;

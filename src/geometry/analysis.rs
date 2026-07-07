@@ -53,7 +53,7 @@ use super::GenericPosition;
 use super::Geometry;
 use crate::Color;
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// The **attack (threat) set** of a `role` piece of `color` standing on
     /// `sq`, computed exactly as [`attackers_to`](Self::attackers_to) computes
     /// the forward relation it must reproduce.
@@ -137,7 +137,9 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
     pub fn attack_map(&self, side: Color) -> Bitboard<G> {
         let board = self.board();
         let mut acc = Bitboard::EMPTY;
-        for role in WideRole::ALL {
+        // Only the first `R` roles are stored (the variant's span); a role past it
+        // is never on the board, so the scan is bounded to `R` to stay in range.
+        for role in WideRole::ALL.into_iter().take(R) {
             let pieces = board.pieces(side, role);
             if pieces.is_empty() {
                 continue;

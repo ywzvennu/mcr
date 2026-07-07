@@ -34,7 +34,7 @@ const PROMO: &str = "2r2k/1P4/6/6/6/K5 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Losalamos::from_fen(fen).expect("valid Los Alamos FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Losalamos6x6, _>(&pos, depth);
+        let got = gperft::<Losalamos6x6, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Los Alamos perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

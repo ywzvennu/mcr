@@ -309,4 +309,8 @@ impl WideVariant<Minishogi5x5> for KyotoshogiRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`Kyotoshogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the per-move flip, the hand, and the dual-form drops.
-pub type Kyotoshogi = GenericPosition<Minishogi5x5, KyotoshogiRules>;
+pub type Kyotoshogi = GenericPosition<
+    Minishogi5x5,
+    KyotoshogiRules,
+    { <KyotoshogiRules as WideVariant<Minishogi5x5>>::ROLE_SPAN },
+>;

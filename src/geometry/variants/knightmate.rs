@@ -209,7 +209,10 @@ impl WideVariant<Chess8x8> for KnightmateRules {
     /// Knight-Bishop / Bishop-Knight are *unbound* minors FSF draws against a bare
     /// king but the standard-army helper does not classify — see its module docs.)
     /// Adjudication-only and behind the default-off hook, so perft is byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -221,7 +224,11 @@ impl WideVariant<Chess8x8> for KnightmateRules {
 /// [`Knightmate::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect,
 /// Commoner `*u`) with [`Knightmate::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the royal Knight, the Commoners, and the promotion set.
-pub type Knightmate = GenericPosition<Chess8x8, KnightmateRules>;
+pub type Knightmate = GenericPosition<
+    Chess8x8,
+    KnightmateRules,
+    { <KnightmateRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -339,10 +346,10 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Knightmate::startpos();
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 18);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 324);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 6765);
-        assert_eq!(gperft::<Chess8x8, _>(&pos, 4), 139774);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 18);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 324);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 3), 6765);
+        assert_eq!(gperft::<Chess8x8, _, _>(&pos, 4), 139774);
     }
 }
 

@@ -41,7 +41,7 @@ fn cap(back: &str, cases: &[(u32, u64)]) {
     );
     let pos = Capablanca::from_fen(&fen).expect("valid randomised Capablanca FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(got, expected, "Capablanca-960 perft({depth}) for {fen}");
     }
 }
@@ -77,12 +77,12 @@ fn capablanca_shredder_fen_parses() {
     assert_eq!(a.castling(), b.castling(), "JAja == KQkq for corner rooks");
     for depth in 1..=4 {
         assert_eq!(
-            gperft::<Cap10x8, _>(&a, depth),
-            gperft::<Cap10x8, _>(&b, depth),
+            gperft::<Cap10x8, _, _>(&a, depth),
+            gperft::<Cap10x8, _, _>(&b, depth),
         );
     }
     // FSF-confirmed: this randomised castle position has perft(4) = 887784.
-    assert_eq!(gperft::<Cap10x8, _>(&a, 4), 887784);
+    assert_eq!(gperft::<Cap10x8, _, _>(&a, 4), 887784);
 }
 
 /// The randomised-castling discovered-check edge case: White may castle queenside
@@ -93,8 +93,8 @@ fn capablanca_shredder_fen_parses() {
 fn capablanca_castle_discovered_check_forbidden() {
     let fen = "4k5/10/10/10/10/10/10/rR2K4R w Q - 0 1";
     let pos = Capablanca::from_fen(fen).expect("valid");
-    assert_eq!(gperft::<Cap10x8, _>(&pos, 1), 19);
-    assert_eq!(gperft::<Cap10x8, _>(&pos, 2), 225);
+    assert_eq!(gperft::<Cap10x8, _, _>(&pos, 1), 19);
+    assert_eq!(gperft::<Cap10x8, _, _>(&pos, 2), 225);
     // No castling move is generated at the root.
     assert!(
         !pos.legal_moves().into_iter().any(|m| matches!(
@@ -113,8 +113,8 @@ fn capablanca_castle_discovered_check_forbidden() {
 fn capahouse_random_castle() {
     let fen = "r3k4r/pppppppppp/10/10/10/10/PPPPPPPPPP/R3K4R[] w KQkq - 0 1";
     let pos = Capahouse::from_fen(fen).expect("valid Capahouse FEN");
-    assert_eq!(gperft::<Cap10x8, _>(&pos, 2), 961);
-    assert_eq!(gperft::<Cap10x8, _>(&pos, 3), 29210);
+    assert_eq!(gperft::<Cap10x8, _, _>(&pos, 2), 961);
+    assert_eq!(gperft::<Cap10x8, _, _>(&pos, 3), 29210);
 }
 
 // -- Seirawan (S-Chess, 8x8, gating) ------------------------------------------
@@ -125,9 +125,9 @@ fn capahouse_random_castle() {
 fn seirawan_random_start() {
     let fen = "nrbqkbrn/pppppppp/8/8/8/8/PPPPPPPP/NRBQKBRN[HEhe] w KQACDFHkqacdfh - 0 1";
     let pos = Seirawan::from_fen(fen).expect("valid randomised Seirawan FEN");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 22);
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 484);
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 14008);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 22);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 484);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 3), 14008);
 }
 
 /// A castling-rich Seirawan position (back rank cleared, full reserves and gating
@@ -137,9 +137,9 @@ fn seirawan_random_start() {
 fn seirawan_castle_rich() {
     let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R[HEhe] w KQkq - 0 1";
     let pos = Seirawan::from_fen(fen).expect("valid Seirawan FEN");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 47);
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 2209);
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 3), 80141);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 47);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 2209);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 3), 80141);
 }
 
 #[test]
@@ -147,5 +147,5 @@ fn seirawan_castle_rich() {
 fn seirawan_castle_rich_deep() {
     let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R[HEhe] w KQkq - 0 1";
     let pos = Seirawan::from_fen(fen).expect("valid Seirawan FEN");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 4), 2907399);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 4), 2907399);
 }

@@ -221,16 +221,18 @@ impl<'de, G: Geometry> Deserialize<'de> for WideBoard<G> {
 
 // -- GenericPosition<G, V> --------------------------------------------------
 
-impl<G: Geometry, V: WideVariant<G>> Serialize for GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> Serialize for GenericPosition<G, V, R> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_fen())
     }
 }
 
-impl<'de, G: Geometry, V: WideVariant<G>> Deserialize<'de> for GenericPosition<G, V> {
+impl<'de, G: Geometry, V: WideVariant<G>, const R: usize> Deserialize<'de>
+    for GenericPosition<G, V, R>
+{
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let fen = <&str>::deserialize(deserializer)?;
-        GenericPosition::<G, V>::from_fen(fen).map_err(DeError::custom)
+        GenericPosition::<G, V, R>::from_fen(fen).map_err(DeError::custom)
     }
 }
 
@@ -246,10 +248,10 @@ struct GenericPlacementRepr {
     black: Vec<u8>,
 }
 
-impl Serialize for GenericPlacement {
+impl<const R: usize> Serialize for GenericPlacement<R> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let counts = |color: Color| -> Vec<u8> {
-            (0..WideRole::COUNT)
+            (0..R)
                 .map(|i| match WideRole::from_index(i) {
                     Some(role) => self.count(color, role),
                     None => 0,
@@ -264,15 +266,15 @@ impl Serialize for GenericPlacement {
     }
 }
 
-impl<'de> Deserialize<'de> for GenericPlacement {
+impl<'de, const R: usize> Deserialize<'de> for GenericPlacement<R> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let GenericPlacementRepr { white, black } =
             GenericPlacementRepr::deserialize(deserializer)?;
-        if white.len() != WideRole::COUNT || black.len() != WideRole::COUNT {
+        if white.len() != R || black.len() != R {
             return Err(DeError::custom("pocket must carry one count per WideRole"));
         }
-        let mut white_counts = [0u8; WideRole::COUNT];
-        let mut black_counts = [0u8; WideRole::COUNT];
+        let mut white_counts = [0u8; R];
+        let mut black_counts = [0u8; R];
         white_counts.copy_from_slice(&white);
         black_counts.copy_from_slice(&black);
         Ok(GenericPlacement::new(white_counts, black_counts))

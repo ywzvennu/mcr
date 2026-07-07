@@ -160,4 +160,8 @@ impl WideVariant<Chess8x8> for PetrifiedRules {
 }
 
 /// Petrified chess as a ready-to-use position type over [`Chess8x8`].
-pub type Petrified = GenericPosition<Chess8x8, PetrifiedRules>;
+pub type Petrified = GenericPosition<
+    Chess8x8,
+    PetrifiedRules,
+    { <PetrifiedRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

@@ -135,7 +135,10 @@ impl WideVariant<Chess8x8> for GeorgianRules {
     /// The ordinary insufficient-material draw, as in [`Amazon`](super::Amazon)
     /// (the Amazon counts as mating material). Adjudication-only and behind the
     /// default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         <AmazonRules as WideVariant<Chess8x8>>::is_insufficient_material(board, state)
     }
 }
@@ -146,7 +149,11 @@ impl WideVariant<Chess8x8> for GeorgianRules {
 /// [`Georgian::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Georgian::from_fen`](GenericPosition::from_fen). It is the
 /// [`Amazon`](super::Amazon) ruleset with castling and en passant removed.
-pub type Georgian = GenericPosition<Chess8x8, GeorgianRules>;
+pub type Georgian = GenericPosition<
+    Chess8x8,
+    GeorgianRules,
+    { <GeorgianRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

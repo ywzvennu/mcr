@@ -80,7 +80,7 @@ const CASTLING: &str = "r3k2r/pppp1ppp/8/8/3****N4/8/PPPP1PPP/R3K2R w KQkq - 0 1
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Nightrider::from_fen(fen).expect("valid Nightrider FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Nightrider perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

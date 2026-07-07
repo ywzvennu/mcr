@@ -184,4 +184,5 @@ impl WideVariant<Chess8x8> for MakrukRules {
 /// Construct the starting position with [`Makruk::startpos`](GenericPosition::startpos)
 /// or parse a FEN with
 /// [`Makruk::from_fen`](GenericPosition::from_fen).
-pub type Makruk = GenericPosition<Chess8x8, MakrukRules>;
+pub type Makruk =
+    GenericPosition<Chess8x8, MakrukRules, { <MakrukRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

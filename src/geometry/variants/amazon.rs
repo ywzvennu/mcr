@@ -158,7 +158,10 @@ impl WideVariant<Chess8x8> for AmazonRules {
     /// (bishop or knight) vs king, and same-colour bishops only. The Amazon counts
     /// as mating material. Adjudication-only and behind the default-off hook, so
     /// perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -170,7 +173,8 @@ impl WideVariant<Chess8x8> for AmazonRules {
 /// [`Amazon::from_fen`](GenericPosition::from_fen). Only the array, the Amazon's
 /// Queen + Knight movement, and the no-Queen promotion set distinguish it from
 /// standard chess.
-pub type Amazon = GenericPosition<Chess8x8, AmazonRules>;
+pub type Amazon =
+    GenericPosition<Chess8x8, AmazonRules, { <AmazonRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

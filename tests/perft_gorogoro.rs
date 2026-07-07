@@ -90,7 +90,7 @@ const NIFU: &str = "2k2/5/5/P4/5/2K2[P] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Gorogoro::from_fen(fen).expect("valid Gorogoro FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Gorogoro5x6, _>(&pos, depth);
+        let got = gperft::<Gorogoro5x6, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Gorogoro perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

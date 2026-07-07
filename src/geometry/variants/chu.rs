@@ -520,7 +520,10 @@ impl WideVariant<Chu12x12> for ChuRules {
         true
     }
 
-    fn royal_squares(board: &Board<Chu12x12>, color: Color) -> Bitboard<Chu12x12> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Chu12x12, R>,
+        color: Color,
+    ) -> Bitboard<Chu12x12> {
         board.kings_of(color) | board.pieces(color, WideRole::CrownPrince)
     }
 
@@ -528,7 +531,7 @@ impl WideVariant<Chu12x12> for ChuRules {
         true
     }
 
-    fn royal_constraint_active(board: &Board<Chu12x12>, color: Color) -> bool {
+    fn royal_constraint_active<const R: usize>(board: &Board<Chu12x12, R>, color: Color) -> bool {
         // A royal (King or Prince) is royal only while the side holds at most one of
         // them; with two, neither is royal and the constraint is off.
         let royals = board.kings_of(color) | board.pieces(color, WideRole::CrownPrince);
@@ -604,7 +607,8 @@ const LION_OFFSETS: [(i8, i8); 24] = [
 /// [`Chu::startpos`](GenericPosition::startpos) or parse a FEN (mcr dialect) with
 /// [`Chu::from_fen`](GenericPosition::from_fen). See the [module docs](self) for the
 /// army, the two-royal rule, the promotion zone, and the Lion's validation status.
-pub type Chu = GenericPosition<Chu12x12, ChuRules>;
+pub type Chu =
+    GenericPosition<Chu12x12, ChuRules, { <ChuRules as WideVariant<Chu12x12>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

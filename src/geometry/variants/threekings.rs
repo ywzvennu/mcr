@@ -117,7 +117,10 @@ impl WideVariant<Chess8x8> for ThreekingsRules {
         true
     }
 
-    fn royal_squares(_board: &Board<Chess8x8>, _color: Color) -> Bitboard<Chess8x8> {
+    fn royal_squares<const R: usize>(
+        _board: &Board<Chess8x8, R>,
+        _color: Color,
+    ) -> Bitboard<Chess8x8> {
         // The kings are **not royal**: an empty royal set makes the generic
         // king-safety machinery report "never in check". A side loses not by
         // checkmate but by extinction (below), when it is reduced to two kings.
@@ -147,7 +150,11 @@ impl WideVariant<Chess8x8> for ThreekingsRules {
 /// [`Threekings::startpos`](GenericPosition::startpos) or parse a plain-chess FEN
 /// with [`Threekings::from_fen`](GenericPosition::from_fen). Movement is the
 /// no-check standard-chess set; the game ends when a side is reduced to two kings.
-pub type Threekings = GenericPosition<Chess8x8, ThreekingsRules>;
+pub type Threekings = GenericPosition<
+    Chess8x8,
+    ThreekingsRules,
+    { <ThreekingsRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

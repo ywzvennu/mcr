@@ -77,7 +77,7 @@ const CHECK_PROMO: &str = "4k3/1P3P2/8/8/3*u4/8/4r3/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Knightmate::from_fen(fen).expect("valid Knightmate FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Knightmate perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

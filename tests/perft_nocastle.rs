@@ -54,7 +54,7 @@ const ROOKS_KINGS: &str = "r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Nocastle::from_fen(fen).expect("valid no-castle FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "no-castle perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

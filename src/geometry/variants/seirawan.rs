@@ -185,7 +185,10 @@ impl WideVariant<Chess8x8> for SeirawanRules {
     ///
     /// Adjudication-only and behind the default-off hook, so perft stays
     /// byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         if state.gating.any_reserve(Color::White) || state.gating.any_reserve(Color::Black) {
             return false;
         }
@@ -202,7 +205,11 @@ impl WideVariant<Chess8x8> for SeirawanRules {
 /// [`Seirawan::from_fen`](GenericPosition::from_fen). The Hawk and Elephant reuse
 /// the generic compound movement defaults; only the reserves, gating, and the
 /// widened promotion set distinguish it from standard chess.
-pub type Seirawan = GenericPosition<Chess8x8, SeirawanRules>;
+pub type Seirawan = GenericPosition<
+    Chess8x8,
+    SeirawanRules,
+    { <SeirawanRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod insufficient_material_tests {
@@ -278,7 +285,10 @@ mod insufficient_material_tests {
         // A lone rook mates; the Hawk (B+N) and Elephant (R+N) compounds are mating
         // material even with the reserve spent.
         assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KR1[] w - - 0 1"), None);
-        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KH1[] w - - 0 1"), None);
+        // A board Hawk is the global `a` letter (the `H`/`E` dialect is the reserve
+        // bracket only); earlier this used `H`, which is Hoplite — a role Seirawan
+        // never fields, now past the exact role span (#580).
+        assert_eq!(end_reason("5k2/8/8/8/8/8/8/5Ka1[] w - - 0 1"), None);
         assert_eq!(end_reason("5k2/8/8/8/8/8/8/5KE1[] w - - 0 1"), None);
     }
 }

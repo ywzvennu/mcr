@@ -152,9 +152,9 @@ impl WideBook {
     /// The move is **not** checked for legality here; legality is enforced on
     /// [`lookup`](WideBook::lookup). Storing only legal moves is the caller's
     /// choice (a book of moves that can never be played simply never matches).
-    pub fn insert_at<G: Geometry, V: WideVariant<G>>(
+    pub fn insert_at<G: Geometry, V: WideVariant<G>, const R: usize>(
         &mut self,
-        position: &GenericPosition<G, V>,
+        position: &GenericPosition<G, V, R>,
         mv: WideMove,
         weight: u16,
     ) {
@@ -179,9 +179,9 @@ impl WideBook {
     /// [`legal_moves`](super::GenericPosition::legal_moves). An empty vector means
     /// the position is not in the book (or only holds entries no longer legal).
     #[must_use]
-    pub fn lookup<G: Geometry, V: WideVariant<G>>(
+    pub fn lookup<G: Geometry, V: WideVariant<G>, const R: usize>(
         &self,
-        position: &GenericPosition<G, V>,
+        position: &GenericPosition<G, V, R>,
     ) -> Vec<WideBookEntry> {
         let stored = self.entries(position.zobrist());
         if stored.is_empty() {
@@ -201,9 +201,9 @@ impl WideBook {
     /// Equivalent to [`lookup`](WideBook::lookup) on `game.position()`, but uses
     /// the game's incrementally-maintained key directly.
     #[must_use]
-    pub fn lookup_game<G: Geometry, V: WideVariant<G>>(
+    pub fn lookup_game<G: Geometry, V: WideVariant<G>, const R: usize>(
         &self,
-        game: &GenericGame<G, V>,
+        game: &GenericGame<G, V, R>,
     ) -> Vec<WideBookEntry> {
         let stored = self.entries(game.position_key());
         if stored.is_empty() {

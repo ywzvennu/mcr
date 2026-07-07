@@ -46,7 +46,7 @@ const MID: &str = "r1abqkbenr/pp1ppppppp/2p7/10/2n7/2N7/PP1PPPPPPP/R1ABQKBENR[Nn
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Capahouse::from_fen(fen).expect("valid Capahouse FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Capahouse perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

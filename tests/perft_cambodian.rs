@@ -48,7 +48,7 @@ const MID_OPEN: &str = "rnsmksnr/8/1ppppppp/p7/7P/PPPPPPP1/8/RNSKMSNR w DEde - 0
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Cambodian::from_fen(fen).expect("valid Cambodian FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Cambodian perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

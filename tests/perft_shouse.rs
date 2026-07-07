@@ -87,7 +87,7 @@ fn check(p: &Perft, max_depth: u32) {
             continue;
         }
         assert_eq!(
-            gperft::<Chess8x8, _>(&pos, depth),
+            gperft::<Chess8x8, _, _>(&pos, depth),
             nodes,
             "S-House perft depth {depth} for FEN {}",
             p.fen,
@@ -120,7 +120,7 @@ fn double_check_gating_matches_fsf() {
     for (fen, want) in [(DOUBLE_CHECK_GATE_1, 5649), (DOUBLE_CHECK_GATE_2, 3813)] {
         let pos = Shouse::from_fen(fen).expect("S-House FEN parses");
         assert_eq!(
-            gperft::<Chess8x8, _>(&pos, 2),
+            gperft::<Chess8x8, _, _>(&pos, 2),
             want,
             "S-House double-check gating perft(2) for FEN {fen}",
         );
@@ -133,7 +133,7 @@ fn startpos_deep_matches_fsf() {
     check(&STARTPOS_PERFT, 4);
     // FSF startpos depth 5 = 2_107_498_685.
     let pos = Shouse::from_fen(STARTPOS).expect("FEN parses");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 5), 2_107_498_685);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 5), 2_107_498_685);
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn drops_and_gates_deep_matches_fsf() {
     check(&DROPS_AND_GATES_PERFT, 3);
     // FSF depth 4 = 707_042_638.
     let pos = Shouse::from_fen(DROPS_AND_GATES).expect("FEN parses");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 4), 707_042_638);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 4), 707_042_638);
 }
 
 /// Promoted-revert depth 4 is the S-House depth-≥4 per-PR floor: it is only

@@ -106,8 +106,8 @@ const SEEDS: [u64; 6] = [
 /// path unchanged.
 ///
 /// This is the ground truth `attackers_to` (the reverse projection) must reproduce.
-fn forward_attacks_to<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn forward_attacks_to<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     target: Square<G>,
     by: Color,
     occupied: Bitboard<G>,
@@ -149,8 +149,8 @@ fn squares_of<G: Geometry>(bb: Bitboard<G>) -> Vec<u8> {
 /// square `t` and every color `c`, `attackers_to(t, c)` (the reverse projection)
 /// must EXACTLY equal the forward attack relation computed independently. Also
 /// cross-checks the king-safety direction on each royal king square.
-fn assert_consistent<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn assert_consistent<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     variant: &str,
     fen: &str,
 ) {

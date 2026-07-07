@@ -70,7 +70,7 @@ const PROMOTED_SLIDERS: &str = "1k3/5/1+s3/5/1K2+P[] w - - 0 1";
 /// Runs `Kyotoshogi::perft` to `depth` from `fen`.
 fn perft(fen: &str, depth: u32) -> u64 {
     let pos = Kyotoshogi::from_fen(fen).expect("the Kyoto Shogi FEN parses");
-    gperft::<Minishogi5x5, _>(&pos, depth)
+    gperft::<Minishogi5x5, _, _>(&pos, depth)
 }
 
 #[test]

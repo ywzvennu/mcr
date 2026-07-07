@@ -58,8 +58,8 @@ impl std::error::Error for UnknownWideVariant {}
 /// [`WideMove::to_uci`] needs the board geometry as a type argument; this helper
 /// recovers it from the position type so the runtime [`AnyWideVariant`] dispatch
 /// can forward without naming `G`.
-fn move_to_uci<G: Geometry, V: WideVariant<G>>(
-    _pos: &GenericPosition<G, V>,
+fn move_to_uci<G: Geometry, V: WideVariant<G>, const R: usize>(
+    _pos: &GenericPosition<G, V, R>,
     mv: &WideMove,
 ) -> String {
     mv.to_uci::<G>()
@@ -72,8 +72,8 @@ fn move_to_uci<G: Geometry, V: WideVariant<G>>(
 /// `parse_uci` on [`GenericPosition`](super::GenericPosition), so a UCI string is
 /// resolved against the legal moves it could name — guaranteeing the result is
 /// both legal and renders back to the same string.
-fn find_uci<G: Geometry, V: WideVariant<G>>(
-    pos: &GenericPosition<G, V>,
+fn find_uci<G: Geometry, V: WideVariant<G>, const R: usize>(
+    pos: &GenericPosition<G, V, R>,
     uci: &str,
 ) -> Option<WideMove> {
     pos.legal_moves()
@@ -90,8 +90,8 @@ fn find_uci<G: Geometry, V: WideVariant<G>>(
 /// recovers `G` from the position type — as [`move_to_uci`] does — and validates
 /// the index against that board so an out-of-range value is handled instead of
 /// panicking.
-fn square_of<G: Geometry, V: WideVariant<G>>(
-    _pos: &GenericPosition<G, V>,
+fn square_of<G: Geometry, V: WideVariant<G>, const R: usize>(
+    _pos: &GenericPosition<G, V, R>,
     index: u8,
 ) -> Option<Square<G>> {
     Square::try_new(index)
@@ -917,7 +917,6 @@ mod tests {
     use core::mem::size_of;
 
     use super::*;
-    use crate::geometry::{GenericPlacement, WideRole};
     use proptest::prelude::*;
 
     /// Fills `list` with `pos`'s legal moves via the allocation-free
@@ -975,7 +974,7 @@ mod tests {
         }
     }
 
-    impl<G: Geometry, V: WideVariant<G>> RoleSpanProbe for GenericPosition<G, V> {
+    impl<G: Geometry, V: WideVariant<G>, const R: usize> RoleSpanProbe for GenericPosition<G, V, R> {
         fn max_fielded_role_index(&self) -> usize {
             GenericPosition::max_fielded_role_index(self)
         }
@@ -1147,23 +1146,30 @@ mod tests {
     /// role-count growth is auto-derived and must NOT move it.
     #[test]
     fn any_wide_variant_size_ceiling() {
-        // Fixed-overhead band = u128 arm's non-role state + enum discriminant.
-        // Width is align_of::<Bitboard<u128>>() - 2 = 14 (padding jitter). Bump
-        // only for a real field change / an un-boxed arm, never for a new role.
-        const FIXED_LOW: usize = 144;
-        const FIXED_HIGH: usize = 158;
-        // The widest inline arm is `u128`-backed (16-byte bitboards); its role
-        // arrays scale with COUNT and are derived, not committed.
-        let role_arrays = WideRole::COUNT * 16 + size_of::<GenericPlacement>();
+        // The facade is sized by its widest **inline** arm (a `u128` position; the
+        // U256 large-shogi arms are boxed) plus the enum discriminant / padding.
+        // With per-variant exact sizing (#580) each arm stores exactly its own
+        // `ROLE_SPAN` role bitboards, so the widest inline arm is simply the
+        // largest `u128`-backed position; the facade should exceed it only by a
+        // small discriminant that fits the arm's tail padding. The per-variant
+        // fixed-overhead bloat tripwire lives in `per_backing_position_size_ceiling`
+        // (which checks that widest arm too); this guards the facade wrapping cost
+        // and that no large (U256) arm has been un-boxed.
+        const DISC_MAX: usize = 16;
+        let max_u128 = WideVariantId::ALL
+            .iter()
+            .filter(|id| id.position_backing_bits() == 128)
+            .map(|id| id.position_footprint().0)
+            .max()
+            .expect("a u128-backed variant exists");
         let actual = size_of::<AnyWideVariant>();
-        let fixed = actual - role_arrays;
         assert!(
-            (FIXED_LOW..=FIXED_HIGH).contains(&fixed),
-            "size_of::<AnyWideVariant>() = {actual}: fixed overhead {fixed} B is \
-             outside the committed [{FIXED_LOW}, {FIXED_HIGH}] band (size = role \
-             arrays {role_arrays} + fixed {fixed}). A size-sensitive field grew, or \
-             a large arm was un-boxed. Role-count growth is auto-derived and must \
-             not move this band; adjust it only deliberately (see \
+            actual >= max_u128 && actual - max_u128 <= DISC_MAX,
+            "size_of::<AnyWideVariant>() = {actual}: expected the widest inline \
+             (u128) arm size {max_u128} plus at most a {DISC_MAX} B discriminant. A \
+             large (U256) arm may have been un-boxed, or the facade grew a field. \
+             Per-variant role/field growth is guarded by \
+             per_backing_position_size_ceiling; adjust this only deliberately (see \
              docs/perf-regression.md)."
         );
     }
@@ -1229,38 +1235,31 @@ mod tests {
         // align_of::<Bitboard>() - 2 (tail-padding jitter). Move a band only when
         // a genuine non-role field on the position changes — never for a new role.
         const FIXED: &[(u32, usize, usize)] = &[(64, 72, 78), (128, 128, 142), (256, 224, 238)];
-        let count = WideRole::COUNT;
-        let placement = size_of::<GenericPlacement>();
-        for &(bits, low, high) in FIXED {
-            // All positions over a backing are the same size (they differ only in a
-            // zero-sized rule marker); the bucket keeps the per-variant reporting
-            // and feeds the populated-bucket guard below.
-            let mut max = 0usize;
-            let mut worst = "";
-            for &id in WideVariantId::ALL {
-                if id.position_backing_bits() != bits {
-                    continue;
-                }
-                let (size, _align) = id.position_footprint();
-                if size > max {
-                    max = size;
-                    worst = id.as_str();
-                }
-            }
-            // DERIVED role-array contribution: the per-role bitboard masks plus the
-            // two per-role in-hand tallies. Scales with COUNT with no committed
-            // constant, so a role addition never touches this test.
-            let bitboard = (bits / 8) as usize;
-            let role_arrays = count * bitboard + placement;
-            let fixed = max - role_arrays;
+        // With per-variant exact sizing (#580) each position stores exactly
+        // `ROLE_SPAN` role bitboards and `2 * ROLE_SPAN` in-hand tallies, so the
+        // role-array contribution is DERIVED from the variant's own span (not the
+        // global `COUNT`) and every variant is checked, not just the widest.
+        for &id in WideVariantId::ALL {
+            let bits = id.position_backing_bits();
+            let (bitboard, low, high) = FIXED
+                .iter()
+                .find(|&&(b, _, _)| b == bits)
+                .map(|&(b, low, high)| ((b / 8) as usize, low, high))
+                .unwrap_or_else(|| panic!("unexpected backing width {bits}"));
+            let (size, _align) = id.position_footprint();
+            let span = id.role_span();
+            let role_arrays = span * bitboard + 2 * span;
+            let fixed = size - role_arrays;
             assert!(
                 (low..=high).contains(&fixed),
-                "{bits}-bit-backed position ({worst}): fixed overhead {fixed} B is \
-                 outside the committed [{low}, {high}] band (size {max} = role arrays \
+                "{}-bit-backed position ({}, span {span}): fixed overhead {fixed} B is \
+                 outside the committed [{low}, {high}] band (size {size} = role arrays \
                  {role_arrays} + fixed {fixed}). A non-role field on Board / \
-                 GenericState / the position changed its size. Role-count growth is \
-                 auto-derived and must NOT move this band; adjust it only \
-                 deliberately (see docs/perf-regression.md)."
+                 GenericState / the position changed its size. Role-count / span \
+                 growth is auto-derived and must NOT move this band; adjust it only \
+                 deliberately (see docs/perf-regression.md).",
+                bits,
+                id.as_str(),
             );
         }
         // Sanity: every backing bucket is actually populated, so a band can never

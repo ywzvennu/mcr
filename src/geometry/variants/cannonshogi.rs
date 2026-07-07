@@ -439,7 +439,11 @@ impl WideVariant<Shogi9x9> for CannonShogiRules {
         }
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Shogi9x9>) -> Bitboard<Shogi9x9> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Shogi9x9, R>,
+    ) -> Bitboard<Shogi9x9> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Lance may not land on the last rank, nor a
         // Knight on the last two ranks (it would then have no move). The Soldier has
@@ -491,4 +495,8 @@ impl WideVariant<Shogi9x9> for CannonShogiRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`CannonShogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the cannon army, the hand, drops, and the promotion zone.
-pub type CannonShogi = GenericPosition<Shogi9x9, CannonShogiRules>;
+pub type CannonShogi = GenericPosition<
+    Shogi9x9,
+    CannonShogiRules,
+    { <CannonShogiRules as WideVariant<Shogi9x9>>::ROLE_SPAN },
+>;

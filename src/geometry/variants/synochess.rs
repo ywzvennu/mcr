@@ -186,11 +186,11 @@ impl WideVariant<Chess8x8> for SynochessRules {
         true
     }
 
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         role: WideRole,
         _color: Color,
         sq: Square<Chess8x8>,
-        board: &Board<Chess8x8>,
+        board: &Board<Chess8x8, R>,
     ) -> Option<Bitboard<Chess8x8>> {
         // Only the Cannon needs the whole board (its screen and target may not be a
         // cannon). Every other role returns `None` and falls back to the
@@ -274,8 +274,8 @@ impl WideVariant<Chess8x8> for SynochessRules {
         true
     }
 
-    fn extra_royal_attack(
-        board: &Board<Chess8x8>,
+    fn extra_royal_attack<const R: usize>(
+        board: &Board<Chess8x8, R>,
         sq: Square<Chess8x8>,
         by: Color,
         occupied: Bitboard<Chess8x8>,
@@ -336,7 +336,11 @@ impl WideVariant<Chess8x8> for SynochessRules {
         false
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // Only Black drops, only the Soldier, only onto an empty square of rank 5.
         if color.is_white() || role != WideRole::Soldier {
             return Bitboard::EMPTY;
@@ -358,7 +362,11 @@ impl WideVariant<Chess8x8> for SynochessRules {
 /// with [`Synochess::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the armies, the Soldier pocket, and the campmate / king-faceoff
 /// rules.
-pub type Synochess = GenericPosition<Chess8x8, SynochessRules>;
+pub type Synochess = GenericPosition<
+    Chess8x8,
+    SynochessRules,
+    { <SynochessRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

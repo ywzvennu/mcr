@@ -81,7 +81,7 @@ fn check(p: &Perft, max_depth: u32) {
             continue;
         }
         assert_eq!(
-            gperft::<Chess8x8, _>(&pos, depth),
+            gperft::<Chess8x8, _, _>(&pos, depth),
             nodes,
             "Dragon perft depth {depth} for FEN {}",
             p.fen,
@@ -115,7 +115,7 @@ fn startpos_deep_matches_fsf() {
     check(&STARTPOS_PERFT, 5);
     // FSF startpos depth 6 = 125_432_340.
     let pos = Dragon::from_fen(STARTPOS).expect("FEN parses");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 6), 125_432_340);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 6), 125_432_340);
 }
 
 #[test]

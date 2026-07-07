@@ -267,7 +267,11 @@ impl WideVariant<Chess8x8> for ShinobiRules {
         false
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         // The dropping side's own half: ranks 1-4 (0-based 0-3) for White, ranks
         // 5-8 (0-based 4-7) for Black.
         let mut mask = !board.occupied() & Self::own_half(color);
@@ -335,4 +339,5 @@ impl ShinobiRules {
 /// with [`Shinobi::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the clan pieces, the fixed-reserve hand and drops, the
 /// mandatory promotion zone, and the flag win.
-pub type Shinobi = GenericPosition<Chess8x8, ShinobiRules>;
+pub type Shinobi =
+    GenericPosition<Chess8x8, ShinobiRules, { <ShinobiRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

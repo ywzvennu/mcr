@@ -89,7 +89,7 @@ const FLAG_RACE: &str = "8/4K3/8/8/8/4k3/8/8[] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Shinobi::from_fen(fen).expect("valid Shinobi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Shinobi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
@@ -141,7 +141,7 @@ not the Orda Archer/Lancer (`LY1FK1YL`)"
     // any FEN round trip.
     for &(depth, expected) in &[(1u32, 112u64), (2, 2238), (3, 224144)] {
         assert_eq!(
-            gperft::<Chess8x8, _>(&start, depth),
+            gperft::<Chess8x8, _, _>(&start, depth),
             expected,
             "Shinobi::startpos() perft({depth}) must equal the FSF-confirmed {expected}"
         );
@@ -178,12 +178,12 @@ fn flag_race() {
     // A king already on its flag rank ends the game: the opponent has no reply.
     let terminal = Shinobi::from_fen("4K3/8/8/8/8/4k3/8/8[] b - - 0 1").expect("valid FEN");
     assert_eq!(
-        gperft::<Chess8x8, _>(&terminal, 1),
+        gperft::<Chess8x8, _, _>(&terminal, 1),
         0,
         "a king on its flag rank is a terminal node with zero children"
     );
     // The same board with the flagged side to move is NOT terminal (it has not yet
     // been the opponent's turn to register the loss): five king moves (FSF).
     let not_yet = Shinobi::from_fen("4K3/8/8/8/8/4k3/8/8[] w - - 0 1").expect("valid FEN");
-    assert_eq!(gperft::<Chess8x8, _>(&not_yet, 1), 5);
+    assert_eq!(gperft::<Chess8x8, _, _>(&not_yet, 1), 5);
 }

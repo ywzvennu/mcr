@@ -297,10 +297,10 @@ impl WideVariant<Judkins6x6> for JudkinsRules {
         }
     }
 
-    fn drop_targets(
+    fn drop_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Judkins6x6>,
+        board: &Board<Judkins6x6, R>,
     ) -> Bitboard<Judkins6x6> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Pawn may not land on the last rank, nor a
@@ -390,4 +390,8 @@ impl JudkinsRules {
 /// may carry the hand as a `[..]` holdings bracket — with
 /// [`Judkins::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the hand, drops, and two-rank promotion zone.
-pub type Judkins = GenericPosition<Judkins6x6, JudkinsRules>;
+pub type Judkins = GenericPosition<
+    Judkins6x6,
+    JudkinsRules,
+    { <JudkinsRules as WideVariant<Judkins6x6>>::ROLE_SPAN },
+>;

@@ -104,7 +104,11 @@ impl WideVariant<Shogi9x9> for CheckShogiRules {
         <ShogiRules as WideVariant<Shogi9x9>>::role_promotion_forced(role, color, to_rank)
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Shogi9x9>) -> Bitboard<Shogi9x9> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Shogi9x9, R>,
+    ) -> Bitboard<Shogi9x9> {
         <ShogiRules as WideVariant<Shogi9x9>>::drop_targets(role, color, board)
     }
 
@@ -146,4 +150,8 @@ impl WideVariant<Shogi9x9> for CheckShogiRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`CheckShogi::from_fen`](GenericPosition::from_fen). It is standard Shogi
 /// except that **giving check wins**; see the [module docs](self).
-pub type CheckShogi = GenericPosition<Shogi9x9, CheckShogiRules>;
+pub type CheckShogi = GenericPosition<
+    Shogi9x9,
+    CheckShogiRules,
+    { <CheckShogiRules as WideVariant<Shogi9x9>>::ROLE_SPAN },
+>;

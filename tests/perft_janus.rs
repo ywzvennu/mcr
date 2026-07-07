@@ -34,7 +34,7 @@ const CASTLE: &str = "r3k4r/pppppppppp/10/10/10/10/PPPPPPPPPP/R3K4R w KQkq - 0 1
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Janus::from_fen(fen).expect("valid Janus FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Cap10x8, _>(&pos, depth);
+        let got = gperft::<Cap10x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Janus perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

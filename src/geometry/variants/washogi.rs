@@ -558,10 +558,10 @@ impl WideVariant<Washogi11x11> for WashogiRules {
         }
     }
 
-    fn drop_targets(
+    fn drop_targets<const R: usize>(
         role: WideRole,
         color: Color,
-        board: &Board<Washogi11x11>,
+        board: &Board<Washogi11x11, R>,
     ) -> Bitboard<Washogi11x11> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Sparrow Pawn or Oxcart may not land on the last
@@ -605,4 +605,8 @@ impl WideVariant<Washogi11x11> for WashogiRules {
 /// may carry the hand as a `[..]` holdings bracket — with
 /// [`Washogi::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the animal army, the hand, drops, and the promotion zone.
-pub type Washogi = GenericPosition<Washogi11x11, WashogiRules>;
+pub type Washogi = GenericPosition<
+    Washogi11x11,
+    WashogiRules,
+    { <WashogiRules as WideVariant<Washogi11x11>>::ROLE_SPAN },
+>;

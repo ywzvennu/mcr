@@ -74,7 +74,7 @@ const CAMPMATE_WHITE: &str = "8/4K3/8/8/8/8/4k3/8 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Synochess::from_fen(fen).expect("valid Synochess FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Synochess perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

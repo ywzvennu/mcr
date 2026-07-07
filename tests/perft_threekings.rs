@@ -51,7 +51,7 @@ const KING_CAPTURE: &str = "kn1qk1nk/pppp1ppp/8/4Q3/8/8/PPPP1PPP/KNB1KBNK w - - 
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Threekings::from_fen(fen).expect("valid Three kings FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Three kings perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

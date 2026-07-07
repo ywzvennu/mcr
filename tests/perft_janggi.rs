@@ -81,7 +81,7 @@ const IN_CHECK_NO_PASS: &str = "9/1k7/9/9/9/9/9/4z4/4K4/9 w - - 0 1";
 
 fn perft(fen: &str, depth: u32) -> u64 {
     let pos = Janggi::from_fen(fen).expect("Janggi FEN parses");
-    gperft::<Xiangqi9x10, _>(&pos, depth)
+    gperft::<Xiangqi9x10, _, _>(&pos, depth)
 }
 
 // ---- Startpos: shallow layers run by default, deep layers ignored -------------

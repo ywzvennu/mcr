@@ -76,7 +76,7 @@ const DEPLOY_MID: &str = "8/8/4pppp/pppp4/4PPPP/PPPP4/8/3M2R1[NNRKSSnnrrkmss] b 
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Sittuyin::from_fen(fen).expect("valid Sittuyin FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Sittuyin perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

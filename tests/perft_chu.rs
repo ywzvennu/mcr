@@ -57,10 +57,10 @@ fn startpos_round_trips() {
 #[test]
 fn startpos_perft_regression() {
     let pos = Chu::startpos();
-    assert_eq!(perft::<Chu12x12, _>(&pos, 1), 36);
-    assert_eq!(perft::<Chu12x12, _>(&pos, 2), 1296);
-    assert_eq!(perft::<Chu12x12, _>(&pos, 3), 48319);
-    assert_eq!(perft::<Chu12x12, _>(&pos, 4), 1802285);
+    assert_eq!(perft::<Chu12x12, _, _>(&pos, 1), 36);
+    assert_eq!(perft::<Chu12x12, _, _>(&pos, 2), 1296);
+    assert_eq!(perft::<Chu12x12, _, _>(&pos, 3), 48319);
+    assert_eq!(perft::<Chu12x12, _, _>(&pos, 4), 1802285);
 }
 
 /// The UCI strings of every legal move from `from_sq` in `fen`.

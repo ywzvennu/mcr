@@ -67,37 +67,37 @@ fn bench_perft(c: &mut Criterion) {
         // Self-validate against the known-correct count before measuring, so a
         // movegen regression fails the bench rather than silently timing wrong
         // numbers.
-        let got = perft::<Chu12x12, _>(&chu, depth);
+        let got = perft::<Chu12x12, _, _>(&chu, depth);
         assert_eq!(
             got, expected,
             "chu startpos perft({depth}) = {got}, expected {expected}"
         );
         group.bench_function(format!("chu_12x12/startpos_d{depth}"), |b| {
-            b.iter(|| perft::<Chu12x12, _>(black_box(&chu), black_box(depth)));
+            b.iter(|| perft::<Chu12x12, _, _>(black_box(&chu), black_box(depth)));
         });
     }
 
     let dai = Dai::startpos();
     for &(depth, expected) in DAI_PERFT {
-        let got = perft::<Dai15x15, _>(&dai, depth);
+        let got = perft::<Dai15x15, _, _>(&dai, depth);
         assert_eq!(
             got, expected,
             "dai startpos perft({depth}) = {got}, expected {expected}"
         );
         group.bench_function(format!("dai_15x15/startpos_d{depth}"), |b| {
-            b.iter(|| perft::<Dai15x15, _>(black_box(&dai), black_box(depth)));
+            b.iter(|| perft::<Dai15x15, _, _>(black_box(&dai), black_box(depth)));
         });
     }
 
     let tenjiku = Tenjiku::startpos();
     for &(depth, expected) in TENJIKU_PERFT {
-        let got = perft::<Tenjiku16x16, _>(&tenjiku, depth);
+        let got = perft::<Tenjiku16x16, _, _>(&tenjiku, depth);
         assert_eq!(
             got, expected,
             "tenjiku startpos perft({depth}) = {got}, expected {expected}"
         );
         group.bench_function(format!("tenjiku_16x16/startpos_d{depth}"), |b| {
-            b.iter(|| perft::<Tenjiku16x16, _>(black_box(&tenjiku), black_box(depth)));
+            b.iter(|| perft::<Tenjiku16x16, _, _>(black_box(&tenjiku), black_box(depth)));
         });
     }
 

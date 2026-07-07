@@ -238,4 +238,5 @@ impl WideVariant<Chess8x8> for OrdaRules {
 /// army) with [`Orda::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Orda::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the piece movements, the Queen/Kheshig promotion, and the flag-win rule.
-pub type Orda = GenericPosition<Chess8x8, OrdaRules>;
+pub type Orda =
+    GenericPosition<Chess8x8, OrdaRules, { <OrdaRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

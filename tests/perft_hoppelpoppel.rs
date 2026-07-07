@@ -90,7 +90,7 @@ const TACTIC: &str = "4k3/Pp4*h1/8/3*b4/3*H4/8/1p2*H3/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = HoppelPoppel::from_fen(fen).expect("valid Hoppel-Poppel FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Hoppel-Poppel perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

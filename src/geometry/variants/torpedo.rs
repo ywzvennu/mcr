@@ -108,7 +108,8 @@ impl WideVariant<Chess8x8> for TorpedoRules {
 /// [`Torpedo::from_fen`](GenericPosition::from_fen). Every rule is the standard
 /// [`StandardChess`] default except the pawn double-step, which is available from
 /// any rank.
-pub type Torpedo = GenericPosition<Chess8x8, TorpedoRules>;
+pub type Torpedo =
+    GenericPosition<Chess8x8, TorpedoRules, { <TorpedoRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

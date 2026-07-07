@@ -89,7 +89,7 @@ fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Mansindam::from_fen(fen).expect("valid Mansindam FEN");
     assert_eq!(pos.to_fen(), fen, "Mansindam FEN round-trips: {fen}");
     for &(depth, expected) in cases {
-        let got = gperft::<Shogi9x9, _>(&pos, depth);
+        let got = gperft::<Shogi9x9, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Mansindam perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

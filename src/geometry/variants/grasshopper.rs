@@ -211,4 +211,8 @@ impl WideVariant<Chess8x8> for GrasshopperRules {
 /// [`Grasshopper::from_fen`](GenericPosition::from_fen). The Grasshopper uses the
 /// reusable [`attacks::grasshopper_attacks`] hopper primitive; everything else is
 /// standard chess with single-step pawns.
-pub type Grasshopper = GenericPosition<Chess8x8, GrasshopperRules>;
+pub type Grasshopper = GenericPosition<
+    Chess8x8,
+    GrasshopperRules,
+    { <GrasshopperRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

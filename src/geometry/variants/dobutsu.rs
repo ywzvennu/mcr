@@ -264,7 +264,10 @@ impl WideVariant<Dobutsu3x4> for DobutsuRules {
         true
     }
 
-    fn royal_squares(_board: &Board<Dobutsu3x4>, _color: Color) -> Bitboard<Dobutsu3x4> {
+    fn royal_squares<const R: usize>(
+        _board: &Board<Dobutsu3x4, R>,
+        _color: Color,
+    ) -> Bitboard<Dobutsu3x4> {
         // The Lion is **not royal**: there is no check, pin, or self-check filter.
         // An empty royal set makes the generic king-safety machinery report "never
         // in check". A side loses by extinction (its Lion captured) or by the
@@ -297,4 +300,8 @@ impl WideVariant<Dobutsu3x4> for DobutsuRules {
 /// [`Dobutsu::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the animal moves, the non-royal Lion, the hand / drops, the forced Chick
 /// promotion, and the safe-try flag win.
-pub type Dobutsu = GenericPosition<Dobutsu3x4, DobutsuRules>;
+pub type Dobutsu = GenericPosition<
+    Dobutsu3x4,
+    DobutsuRules,
+    { <DobutsuRules as WideVariant<Dobutsu3x4>>::ROLE_SPAN },
+>;

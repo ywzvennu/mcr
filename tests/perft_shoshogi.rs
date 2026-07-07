@@ -66,7 +66,7 @@ const LONE_CROWN_PRINCE: &str = "3k5/9/9/9/9/9/9/r8/4**C4 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = ShoShogi::from_fen(fen).expect("valid Sho Shogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Shogi9x9, _>(&pos, depth);
+        let got = gperft::<Shogi9x9, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Sho Shogi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
@@ -169,7 +169,7 @@ fn in_check_de_promotion_is_a_legal_evasion() {
         "the four legal evasions, including the crown-prince promotion"
     );
     assert_eq!(
-        gperft::<Shogi9x9, _>(&pos, 1),
+        gperft::<Shogi9x9, _, _>(&pos, 1),
         4,
         "perft(1) is the legal-move count"
     );

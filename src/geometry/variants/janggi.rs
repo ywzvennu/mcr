@@ -227,9 +227,9 @@ impl JanggiRules {
     /// cannon may land on the opposite corner (jump over the centre), capturing a
     /// non-cannon there or moving onto it if empty. Returns the (at most one)
     /// opposite-corner target square.
-    fn cannon_palace_diag(
+    fn cannon_palace_diag<const R: usize>(
         sq: Square<Xiangqi9x10>,
-        board: &Board<Xiangqi9x10>,
+        board: &Board<Xiangqi9x10, R>,
     ) -> Bitboard<Xiangqi9x10> {
         let mut bb = Bitboard::<Xiangqi9x10>::EMPTY;
         if !Self::is_palace_diag_point(sq) {
@@ -334,11 +334,11 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
         true
     }
 
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         role: WideRole,
         _color: Color,
         sq: Square<Xiangqi9x10>,
-        board: &Board<Xiangqi9x10>,
+        board: &Board<Xiangqi9x10, R>,
     ) -> Option<Bitboard<Xiangqi9x10>> {
         // Only the Cannon needs the whole board (screen/target may not be a cannon,
         // plus the palace-diagonal jump over a centre screen). Every other role
@@ -511,7 +511,11 @@ impl WideVariant<Xiangqi9x10> for JanggiRules {
 /// with [`Janggi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the palace diagonals, the screen-cannon,
 /// the pass move, and the bikjang facing rule.
-pub type Janggi = GenericPosition<Xiangqi9x10, JanggiRules>;
+pub type Janggi = GenericPosition<
+    Xiangqi9x10,
+    JanggiRules,
+    { <JanggiRules as WideVariant<Xiangqi9x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -534,9 +538,9 @@ mod tests {
     #[test]
     fn startpos_matches_fsf_shallow() {
         let p = startpos();
-        assert_eq!(gperft::<Xiangqi9x10, _>(&p, 1), 32);
-        assert_eq!(gperft::<Xiangqi9x10, _>(&p, 2), 1024);
-        assert_eq!(gperft::<Xiangqi9x10, _>(&p, 3), 33000);
+        assert_eq!(gperft::<Xiangqi9x10, _, _>(&p, 1), 32);
+        assert_eq!(gperft::<Xiangqi9x10, _, _>(&p, 2), 1024);
+        assert_eq!(gperft::<Xiangqi9x10, _, _>(&p, 3), 33000);
     }
 
     #[test]

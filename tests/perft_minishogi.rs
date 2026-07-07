@@ -85,7 +85,7 @@ const NIFU: &str = "2k2/5/P4/5/2K2[P] w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Minishogi::from_fen(fen).expect("valid Minishogi FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Minishogi5x5, _>(&pos, depth);
+        let got = gperft::<Minishogi5x5, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Minishogi perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

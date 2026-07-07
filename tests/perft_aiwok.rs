@@ -41,7 +41,7 @@ const MID: &str = "rns**sksnr/8/pp1ppp1p/2p2p2/2P2P2/PP1PPP1P/8/RNSK**SSNR w - -
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Aiwok::from_fen(fen).expect("valid Ai-Wok FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Aiwok perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

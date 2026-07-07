@@ -259,7 +259,10 @@ impl WideVariant<Chess8x8> for SpartanRules {
         }
     }
 
-    fn promotion_targets(color: Color, board: &Board<Chess8x8>) -> Vec<WideRole> {
+    fn promotion_targets<const R: usize>(
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Vec<WideRole> {
         // Promotion is **per army**, so the target set depends on the *promoting
         // side*, not just the board. The generic engine routes *every* promotion
         // through this hook, White's included, so White must be handled explicitly:
@@ -296,4 +299,5 @@ impl WideVariant<Chess8x8> for SpartanRules {
 /// parse a FEN with [`Spartan::from_fen`](GenericPosition::from_fen). See the
 /// [module docs](self) for the piece movements, multi-king / duple-check rule,
 /// and the Berolina Hoplite.
-pub type Spartan = GenericPosition<Chess8x8, SpartanRules>;
+pub type Spartan =
+    GenericPosition<Chess8x8, SpartanRules, { <SpartanRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

@@ -354,8 +354,8 @@ impl WideVariant<Xiangqi9x10> for JieqiRules {
         true
     }
 
-    fn extra_royal_attack(
-        board: &Board<Xiangqi9x10>,
+    fn extra_royal_attack<const R: usize>(
+        board: &Board<Xiangqi9x10, R>,
         sq: Square<Xiangqi9x10>,
         by: Color,
         occupied: Bitboard<Xiangqi9x10>,
@@ -385,7 +385,11 @@ impl WideVariant<Xiangqi9x10> for JieqiRules {
 /// face-down pieces as `=D`/`=d`) with
 /// [`Jieqi::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the hidden movement, the reveal model, and how correctness is validated.
-pub type Jieqi = GenericPosition<Xiangqi9x10, JieqiRules>;
+pub type Jieqi = GenericPosition<
+    Xiangqi9x10,
+    JieqiRules,
+    { <JieqiRules as WideVariant<Xiangqi9x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -551,8 +555,8 @@ mod tests {
     /// depth-1 move count equals the FSF-confirmed Xiangqi value.
     #[test]
     fn all_dark_startpos_depth1_equals_xiangqi() {
-        let jq = gperft::<Xiangqi9x10, JieqiRules>(&Jieqi::startpos(), 1);
-        let xq = gperft::<Xiangqi9x10, XiangqiRules>(&Xiangqi::startpos(), 1);
+        let jq = gperft::<Xiangqi9x10, JieqiRules, _>(&Jieqi::startpos(), 1);
+        let xq = gperft::<Xiangqi9x10, XiangqiRules, _>(&Xiangqi::startpos(), 1);
         assert_eq!(jq, xq, "Jieqi all-dark depth-1 == Xiangqi depth-1");
     }
 
@@ -563,8 +567,8 @@ mod tests {
     #[test]
     fn all_dark_tree_equals_xiangqi_to_depth_3() {
         for depth in 1..=3 {
-            let jq = gperft::<Xiangqi9x10, JieqiRules>(&Jieqi::startpos(), depth);
-            let xq = gperft::<Xiangqi9x10, XiangqiRules>(&Xiangqi::startpos(), depth);
+            let jq = gperft::<Xiangqi9x10, JieqiRules, _>(&Jieqi::startpos(), depth);
+            let xq = gperft::<Xiangqi9x10, XiangqiRules, _>(&Xiangqi::startpos(), depth);
             assert_eq!(jq, xq, "Jieqi vs Xiangqi perft at depth {depth}");
         }
     }

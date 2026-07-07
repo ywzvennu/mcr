@@ -230,7 +230,11 @@ impl WideVariant<Chess8x8> for NewzealandRules {
 /// with [`Newzealand::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the capture-swap movements, the ROOKNI castling, and the
 /// `q r b n` promotion.
-pub type Newzealand = GenericPosition<Chess8x8, NewzealandRules>;
+pub type Newzealand = GenericPosition<
+    Chess8x8,
+    NewzealandRules,
+    { <NewzealandRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

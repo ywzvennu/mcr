@@ -269,8 +269,8 @@ impl std::error::Error for WideIllegalMove {}
 /// other variant the wrapper merely forwards [`GenericPosition::outcome`], so it is
 /// as cheap as the bare position and the perft path is untouched.
 #[derive(Debug, Clone)]
-pub struct GenericGame<G: Geometry, V: WideVariant<G>> {
-    position: GenericPosition<G, V>,
+pub struct GenericGame<G: Geometry, V: WideVariant<G>, const R: usize = { WideRole::COUNT }> {
+    position: GenericPosition<G, V, R>,
     /// The recorded history (oldest first, current last); empty unless the variant
     /// tracks repetition.
     history: Vec<HistoryEntry<G>>,
@@ -285,11 +285,11 @@ pub struct GenericGame<G: Geometry, V: WideVariant<G>> {
     key: u64,
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericGame<G, V, R> {
     /// Starts a game from `position`, seeding the history (when the variant tracks
     /// repetition) and the counting state (when it counts) from it.
     #[must_use]
-    pub fn new(position: GenericPosition<G, V>) -> Self {
+    pub fn new(position: GenericPosition<G, V, R>) -> Self {
         // Seed the incremental Zobrist key from a from-scratch compute (a no-op cost
         // for the non-tracking variants that never read it again).
         let key = position.zobrist();
@@ -326,7 +326,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// The current position.
     #[must_use]
     #[inline]
-    pub fn position(&self) -> &GenericPosition<G, V> {
+    pub fn position(&self) -> &GenericPosition<G, V, R> {
         &self.position
     }
 
@@ -779,7 +779,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// discovered *checks* creating a chase via the enemy General — needs the previous
     /// ply's king-blocker set, which this single-position query does not carry.
     fn chase_targets(
-        pos: &GenericPosition<G, V>,
+        pos: &GenericPosition<G, V, R>,
         from: Square<G>,
         to: Square<G>,
         captured: bool,
@@ -862,7 +862,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// defended solely by a General barred from recapturing by the flying General).
     #[allow(clippy::too_many_arguments)]
     fn add_chased(
-        pos: &GenericPosition<G, V>,
+        pos: &GenericPosition<G, V, R>,
         victims: Color,
         pins: Bitboard<G>,
         occ: Bitboard<G>,
@@ -936,7 +936,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// expose itself to the flying General and therefore may not, leaving `s`
     /// effectively unprotected. FSF's flying-general root exception.
     fn flying_general_bars_recapture(
-        board: &Board<G>,
+        board: &Board<G, R>,
         mover: Color,
         s: Square<G>,
         occ_wo: Bitboard<G>,
@@ -1011,7 +1011,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// chessvariants Chu ruleset). The enemy **royals** (King and Crown Prince) are
     /// excluded — an attack on a royal is a *check*, handled first and separately by
     /// the [perpetual-check](WideVariant::perpetual_check_loses) rule.
-    fn attacks_nonroyal(pos: &GenericPosition<G, V>, to: Square<G>) -> bool {
+    fn attacks_nonroyal(pos: &GenericPosition<G, V, R>, to: Square<G>) -> bool {
         let board = pos.board();
         let victims = pos.turn();
         let mover = victims.opposite();
@@ -1056,8 +1056,8 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// triggering material configuration is reached.
     fn update_counting(
         prev: Counting,
-        before: &Board<G>,
-        pos: &GenericPosition<G, V>,
+        before: &Board<G, R>,
+        pos: &GenericPosition<G, V, R>,
         rule: WideCountingRule,
     ) -> Counting {
         let board = pos.board();
@@ -1114,7 +1114,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// `rule`, or `0` for no count — a clean-room reproduction of Fairy-Stockfish's
     /// `Position::count_limit` (validated against the FSF binary's echoed counting
     /// FEN field). KHON is the Silver / Khon ([`WideRole::Silver`]).
-    fn count_limit(board: &Board<G>, side: Color, rule: WideCountingRule) -> u16 {
+    fn count_limit(board: &Board<G, R>, side: Color, rule: WideCountingRule) -> u16 {
         let opp = side.opposite();
         let pawns = Self::pawns_total(board);
         let rooks = Self::role_count(board, opp, WideRole::Rook);
@@ -1219,7 +1219,7 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     /// Whether `side`'s king stands on one of the four central squares (d4 / d5 /
     /// e4 / e5 on 8x8) — the Sittuyin centre-square counting exception. The four
     /// centre squares are the two middle files and the two middle ranks.
-    fn king_on_centre(board: &Board<G>, side: Color) -> bool {
+    fn king_on_centre(board: &Board<G, R>, side: Color) -> bool {
         let (cf0, cf1) = ((G::WIDTH - 1) / 2, G::WIDTH / 2);
         let (cr0, cr1) = ((G::HEIGHT - 1) / 2, G::HEIGHT / 2);
         board.pieces(side, WideRole::King).into_iter().any(|sq| {
@@ -1229,25 +1229,27 @@ impl<G: Geometry, V: WideVariant<G>> GenericGame<G, V> {
     }
 
     /// The number of pieces of color `color` on `board`.
-    fn total(board: &Board<G>, color: Color) -> u16 {
+    fn total(board: &Board<G, R>, color: Color) -> u16 {
         board.by_color(color).count() as u16
     }
 
     /// The number of `role` pieces of `color` on `board`.
-    fn role_count(board: &Board<G>, color: Color, role: WideRole) -> u16 {
+    fn role_count(board: &Board<G, R>, color: Color, role: WideRole) -> u16 {
         board.pieces(color, role).count() as u16
     }
 
     /// The total number of pawns (both colors) on `board`.
-    fn pawns_total(board: &Board<G>) -> u16 {
+    fn pawns_total(board: &Board<G, R>) -> u16 {
         Self::role_count(board, Color::White, WideRole::Pawn)
             + Self::role_count(board, Color::Black, WideRole::Pawn)
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> From<GenericPosition<G, V>> for GenericGame<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> From<GenericPosition<G, V, R>>
+    for GenericGame<G, V, R>
+{
     #[inline]
-    fn from(position: GenericPosition<G, V>) -> Self {
+    fn from(position: GenericPosition<G, V, R>) -> Self {
         Self::new(position)
     }
 }
@@ -1265,8 +1267,8 @@ mod tests {
     /// Plays the cyclic move pattern `cycle` one ply at a time (up to `max` plies),
     /// returning the number of plies played when the game first becomes over, or
     /// `None` if it never does.
-    fn play_until_over<G: Geometry, V: WideVariant<G>>(
-        game: &mut GenericGame<G, V>,
+    fn play_until_over<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &mut GenericGame<G, V, R>,
         cycle: &[(u8, u8)],
         max: usize,
     ) -> Option<usize> {
@@ -1282,8 +1284,8 @@ mod tests {
 
     /// Finds the legal move in `game`'s current position whose source and
     /// destination square indices are `from` and `to`.
-    fn mv_by<G: Geometry, V: WideVariant<G>>(
-        game: &GenericGame<G, V>,
+    fn mv_by<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &GenericGame<G, V, R>,
         from: u8,
         to: u8,
     ) -> WideMove {
@@ -1294,13 +1296,19 @@ mod tests {
     }
 
     /// Plays the move `from`->`to`, asserting it is legal.
-    fn play<G: Geometry, V: WideVariant<G>>(game: &mut GenericGame<G, V>, from: u8, to: u8) {
+    fn play<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &mut GenericGame<G, V, R>,
+        from: u8,
+        to: u8,
+    ) {
         let mv = mv_by(game, from, to);
         game.play(&mv).expect("legal move");
     }
 
     /// The chased victim squares of the last move, as sorted square indices.
-    fn chased_indices<G: Geometry, V: WideVariant<G>>(game: &GenericGame<G, V>) -> Vec<u8> {
+    fn chased_indices<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &GenericGame<G, V, R>,
+    ) -> Vec<u8> {
         let mut v: Vec<u8> = game.chased_squares().iter().map(|s| s.index()).collect();
         v.sort_unstable();
         v
@@ -1313,7 +1321,7 @@ mod tests {
         // Two lone kings shuffling in place: the position recurs without any
         // check, so the fourth occurrence is a plain sennichite draw.
         // 9x9: black king a9 = (0,8) = 72, white king e1 = (4,0) = 4.
-        let pos = GenericPosition::<_, _>::from_fen("k8/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k8/9/9/9/9/9/9/9/4K4 w - - 0 1")
             .expect("valid shogi fen");
         let _: &Shogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1340,7 +1348,7 @@ mod tests {
         // position recurs exactly. Every white move is a check, so the repetition is
         // a perpetual check and White (the checker) loses.
         // i2 = (8,1) = 17, i1 = (8,0) = 8; a1 = (0,0) = 0, a2 = (0,1) = 9.
-        let pos = GenericPosition::<_, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
             .expect("valid shogi fen");
         let _: &Shogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1370,7 +1378,7 @@ mod tests {
         // Sho Shogi shares Shogi's 9x9 geometry and sennichite rule (fold 4). Two
         // lone kings shuffling in place recur without check, so the fourth
         // occurrence is a plain sennichite draw.
-        let pos = GenericPosition::<_, _>::from_fen("k8/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k8/9/9/9/9/9/9/9/4K4 w - - 0 1")
             .expect("valid sho shogi fen");
         let _: &ShoShogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1394,7 +1402,7 @@ mod tests {
         // on every move, so the repetition is a perpetual check and White (the
         // checker) loses. The rook stays out of the promotion zone so it never
         // promotes and the position recurs exactly.
-        let pos = GenericPosition::<_, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("9/9/9/9/4K4/9/9/8R/k8 w - - 0 1")
             .expect("valid cannon shogi fen");
         let _: &CannonShogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1426,7 +1434,7 @@ mod tests {
         // on the third occurrence. Minixiangqi is 7x7; the palace is the central
         // 3x3 (files 2..4). White general d1, black general c7.
         // d1 = (3,0) = 3, d2 = (3,1) = 10; c7 = (2,6) = 44, c6 = (2,5) = 37.
-        let pos = GenericPosition::<_, _>::from_fen("2k4/7/7/7/7/7/3K3 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("2k4/7/7/7/7/7/3K3 w - - 0 1")
             .expect("valid minixiangqi fen");
         let _: &Minixiangqi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1453,7 +1461,7 @@ mod tests {
         // generals faced — sliding the general along the contested file is illegal),
         // so the second position also faces — a bikjang draw.
         // e1 = (4,0) = 4 (a pass is e1->e1); e10 = (4,9).
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
             .expect("valid janggi fen");
         let pos: Janggi = pos;
         assert!(
@@ -1479,7 +1487,7 @@ mod tests {
         // White's only legal moves are the two king steps that break the line
         // (e1->d1, e1->f1) and the pass (e1->e1); breaking it avoids bikjang.
         // e1=4, d1=3, f1=5.
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
             .expect("valid janggi fen");
         let pos: Janggi = pos;
         assert!(pos.is_facing_generals());
@@ -1511,7 +1519,7 @@ mod tests {
     #[test]
     fn janggi_non_facing_generals_is_not_bikjang() {
         // Generals on different files do not face: no bikjang.
-        let pos = GenericPosition::<_, _>::from_fen("3k5/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("3k5/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
             .expect("valid janggi fen");
         let pos: Janggi = pos;
         assert!(!pos.is_facing_generals());
@@ -1531,7 +1539,7 @@ mod tests {
         // check in Janggi (FSF `flyingGeneral = false`), so it could not be confused
         // with a perpetual check anyway.
         // Indices (9 wide): i9=80, i10=89 (Chariot); d10=84, d9=75 (general).
-        let pos = GenericPosition::<_, _>::from_fen("3k5/8R/9/9/9/9/9/9/4K4/9 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("3k5/8R/9/9/9/9/9/9/4K4/9 w - - 0 1")
             .expect("valid janggi fen");
         let _: &Janggi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1562,7 +1570,7 @@ mod tests {
         // repetition draws (FSF `nFoldValue = VALUE_DRAW`), not a perpetual-check
         // loss. White general e2<->e3, Black general d10<->d9.
         // e2=13, e3=22; d10=84, d9=75.
-        let pos = GenericPosition::<_, _>::from_fen("3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1")
             .expect("valid janggi fen");
         let _: &Janggi = &pos;
         let mut game = GenericGame::new(pos);
@@ -1590,7 +1598,7 @@ mod tests {
         // Validated against Fairy-Stockfish `UCI_Variant xiangqi` on the same line
         // (`go` returns a forced-mate loss for the chasing side).
         // Indices (9 wide): c4=29, e5=40 (Horse); d3=21, d6=48 (Chariot).
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/2J6/3r5/9/5K3 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/9/9/2J6/3r5/9/5K3 w - - 0 1")
             .expect("valid xiangqi fen");
         let pos: Xiangqi = pos;
         let mut game = GenericGame::new(pos);
@@ -1620,7 +1628,7 @@ mod tests {
         // Horse a1 (idx 0) shuffles a1<->c2; Chariot i6 far away shuffles i6<->i5.
         // Kings on different files (Black Ke10, White Kf1) so the flying-general
         // file is never open between them.
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/8r/9/9/9/9/J4K3 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/8r/9/9/9/9/J4K3 w - - 0 1")
             .expect("valid xiangqi fen");
         let pos: Xiangqi = pos;
         let mut game = GenericGame::new(pos);
@@ -1646,7 +1654,7 @@ mod tests {
         // an ordinary repetition **draw**. Black just shuffles its general in-palace
         // (e10<->e9), chasing nothing. Kings on different files (no flying general).
         // Indices (9 wide): c4=29, e5=40; d6=48, g6=51; e10=85, e9=76; i1 King.
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/3r2r2/9/2J6/9/9/8K w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/3r2r2/9/2J6/9/9/8K w - - 0 1")
             .expect("valid xiangqi fen");
         let pos: Xiangqi = pos;
         let mut game = GenericGame::new(pos);
@@ -1679,7 +1687,7 @@ mod tests {
         // the moved piece does not make directly (the Horse's own attack on e1 is a
         // symmetric Horse-vs-Horse and excluded). FSF `chased()` reports e1; so must
         // mcr. Indices: c1=2, d3=21, e1=4.
-        let pos = GenericPosition::<_, _>::from_fen("4k4/9/9/9/9/9/9/9/3K5/R1J1j4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("4k4/9/9/9/9/9/9/9/3K5/R1J1j4 w - - 0 1")
             .expect("valid xiangqi fen");
         let pos: Xiangqi = pos;
         let mut game = GenericGame::new(pos);
@@ -1706,9 +1714,10 @@ mod tests {
         // never checks either. No captures/promotions occur, so the position recurs.
         // Chu is 12x12, index = rank*12 + file. Ra1-file: d1=3, d2=15. Gold: d5=51,
         // d6=63. Kings: white a1=0, black l12=143.
-        let pos =
-            GenericPosition::<_, _>::from_fen("11k/12/12/12/12/12/12/3g8/12/12/12/K2R8 w - - 0 1")
-                .expect("valid chu fen");
+        let pos = GenericPosition::<_, _, _>::from_fen(
+            "11k/12/12/12/12/12/12/3g8/12/12/12/K2R8 w - - 0 1",
+        )
+        .expect("valid chu fen");
         let _: &Chu = &pos;
         let mut game = GenericGame::new(pos);
         assert_eq!(game.repetition_count(), 1);
@@ -1740,7 +1749,7 @@ mod tests {
         // the fourth occurrence is a plain sennichite draw — exactly as before #472.
         // White Ka1<->a2 (0<->12), Black Kl12<->l11 (143<->131).
         let pos =
-            GenericPosition::<_, _>::from_fen("11k/12/12/12/12/12/12/12/12/12/12/K11 w - - 0 1")
+            GenericPosition::<_, _, _>::from_fen("11k/12/12/12/12/12/12/12/12/12/12/K11 w - - 0 1")
                 .expect("valid chu fen");
         let _: &Chu = &pos;
         let mut game = GenericGame::new(pos);
@@ -1765,7 +1774,7 @@ mod tests {
         // occurrence. index = rank*15 + file. d1=3, d2=18; Gold d8=108, d9=123;
         // kings white a1=0, black o15=224. The Gold sits outside both five-rank
         // promotion zones (ranks 6-10) so no promotion perturbs the cycle.
-        let pos = GenericPosition::<_, _>::from_fen(
+        let pos = GenericPosition::<_, _, _>::from_fen(
             "14k/15/15/15/15/15/15/3g11/15/15/15/15/15/15/K2R11 w - - 0 1",
         )
         .expect("valid dai fen");
@@ -1801,7 +1810,7 @@ mod tests {
         //   Black: kl12=143, r i12=140 (<->i11=128) attacks White G i5=56 (<->i6=68).
         // The Golds sit outside both four-rank promotion zones, so no promotion
         // perturbs the cycle.
-        let pos = GenericPosition::<_, _>::from_fen(
+        let pos = GenericPosition::<_, _, _>::from_fen(
             "8r2k/12/12/12/3g8/12/12/8G3/12/12/12/K2R8 w - - 0 1",
         )
         .expect("valid chu fen");
@@ -1837,7 +1846,7 @@ mod tests {
         // rule (`attack_repetition_loses` is not enabled). Tenjiku is 16x16, index =
         // rank*16 + file. White: Ka1=0, R d1=3 (<->d2=19) attacks Black g d8=115
         // (<->d9=131). Black king p16=255. The Gold is outside both promotion zones.
-        let pos = GenericPosition::<_, _>::from_fen(
+        let pos = GenericPosition::<_, _, _>::from_fen(
             "15k/16/16/16/16/16/16/16/3g12/16/16/16/16/16/16/K2R12 w - - 0 1",
         )
         .expect("valid tenjiku fen");
@@ -1868,7 +1877,7 @@ mod tests {
         // `countingPly = 6` after the first move). The draw fires when the ply
         // exceeds 32, i.e. on the 28th half-move — matching the FSF binary's echoed
         // counting field (`... 32 6` after one move; the rook K+R-vs-K limit is 16).
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid makruk fen");
         let pos: Makruk = pos;
         let mut game = GenericGame::new(pos);
@@ -1890,7 +1899,7 @@ mod tests {
         // #469). The same lone-king K + Rook position as the Makruk pieces-honour
         // test, shuffled so no check ever arises, must draw on the identical 28th
         // half-move — proving Makpong now forwards Makruk's `counting_rule`.
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid makpong fen");
         let pos: Makpong = pos;
         let mut game = GenericGame::new(pos);
@@ -1911,7 +1920,7 @@ mod tests {
         // count applies: limit 64 full moves (FSF `countingLimit = 128`), the count
         // starting from zero. The draw fires when the ply exceeds 128, i.e. on the
         // 130th half-move — matching the FSF echo (`... 128 0` after one move).
-        let pos = GenericPosition::<_, _>::from_fen("k4r2/8/8/8/8/8/8/2R4K w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k4r2/8/8/8/8/8/8/2R4K w - - 0 1")
             .expect("valid makruk fen");
         let pos: Makruk = pos;
         let mut game = GenericGame::new(pos);
@@ -1932,7 +1941,7 @@ mod tests {
         // `countingPly = 0`): K + Rook vs lone king gives limit 16 moves
         // (`countingLimit = 32`), so the draw fires when the ply exceeds 32 — the
         // 34th half-move (FSF echo `... 32 0` after one move).
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid asean fen");
         let pos: Asean = pos;
         let mut game = GenericGame::new(pos);
@@ -1949,7 +1958,7 @@ mod tests {
         // 6`). The draw fires when the ply exceeds 30 — the 26th half-move (FSF echo
         // `... 30 6` after one move). Cambodian shares the Makruk array but carries
         // the `DEde` leap-rights field.
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w DEde - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w DEde - 0 1")
             .expect("valid cambodian fen");
         let pos: Cambodian = pos;
         let mut game = GenericGame::new(pos);
@@ -1967,7 +1976,7 @@ mod tests {
         // (`countingLimit = 32`), the count starting from zero, so the draw fires
         // when the ply exceeds 32 — the 34th half-move. (The black king shuffles
         // a8<->a7, never touching the four central squares.)
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid sittuyin fen");
         let pos: Sittuyin = pos;
         let mut game = GenericGame::new(pos);
@@ -1991,7 +2000,7 @@ mod tests {
         // fires when the ply exceeds 42: the 44th half-move, ten plies later than
         // the non-centre base case above. The rook shuffles c1<->c2 (never checking
         // the e-file king) and the king shuffles e5<->e6.
-        let pos = GenericPosition::<_, _>::from_fen("8/8/8/4k3/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("8/8/8/4k3/8/8/8/2R3K1 w - - 0 1")
             .expect("valid sittuyin fen");
         let pos: Sittuyin = pos;
         let mut game = GenericGame::new(pos);
@@ -2014,7 +2023,7 @@ mod tests {
         // (`countingLimit = 32`), the count starting from the piece total
         // (`countingPly = 6`) — must therefore draw on the identical 28th half-move,
         // proving Ai-Wok inherits Makruk's counting terminal.
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/2R3K1 w - - 0 1")
             .expect("valid aiwok fen");
         let pos: Aiwok = pos;
         let mut game = GenericGame::new(pos);
@@ -2040,7 +2049,7 @@ mod tests {
     fn euroshogi_sennichite_is_a_draw() {
         // Euro Shogi is 8x8. Black king a8 = 56, White king e1 = 4; a quiet
         // king shuffle recurs to a four-fold sennichite draw.
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
             .expect("valid euroshogi fen");
         let _: &EuroShogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -2060,7 +2069,7 @@ mod tests {
     #[test]
     fn gorogoro_sennichite_is_a_draw() {
         // Gorogoro is 5 wide x 6 tall. Black king a6 = 25, White king c1 = 2.
-        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/5/2K2[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k4/5/5/5/5/2K2[] w - - 0 1")
             .expect("valid gorogoro fen");
         let _: &Gorogoro = &pos;
         let mut game = GenericGame::new(pos);
@@ -2080,7 +2089,7 @@ mod tests {
     #[test]
     fn judkins_sennichite_is_a_draw() {
         // Judkins Shogi is 6x6. Black king a6 = 30, White king c1 = 2.
-        let pos = GenericPosition::<_, _>::from_fen("k5/6/6/6/6/2K3[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k5/6/6/6/6/2K3[] w - - 0 1")
             .expect("valid judkins fen");
         let _: &Judkins = &pos;
         let mut game = GenericGame::new(pos);
@@ -2102,7 +2111,7 @@ mod tests {
         // Kyoto Shogi is 5x5. Black king a5 = 20, White king c1 = 2. The kings
         // never flip (only non-royal pieces toggle form on a move), so a lone-king
         // shuffle recurs cleanly to a four-fold sennichite draw.
-        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
             .expect("valid kyotoshogi fen");
         let _: &Kyotoshogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -2123,8 +2132,8 @@ mod tests {
     fn micro_sennichite_is_a_draw() {
         // Micro Shogi is 4 wide x 5 tall. Black king d5 = 19, White king a1 = 0
         // (kept on opposite files three apart, so neither ever checks).
-        let pos =
-            GenericPosition::<_, _>::from_fen("3k/4/4/4/K3[] w - - 0 1").expect("valid micro fen");
+        let pos = GenericPosition::<_, _, _>::from_fen("3k/4/4/4/K3[] w - - 0 1")
+            .expect("valid micro fen");
         let _: &Micro = &pos;
         let mut game = GenericGame::new(pos);
         assert_eq!(game.repetition_count(), 1);
@@ -2144,7 +2153,7 @@ mod tests {
     fn minishogi_sennichite_is_a_draw() {
         // Minishogi (5x5) shares Shogi's sennichite (fold 4). Black king a5 = 20,
         // White king c1 = 2.
-        let pos = GenericPosition::<_, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k4/5/5/5/2K2[] w - - 0 1")
             .expect("valid minishogi fen");
         let _: &Minishogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -2165,7 +2174,7 @@ mod tests {
     fn shogun_sennichite_is_a_draw() {
         // Shogun Chess is 8x8 and scores a four-fold repetition as sennichite.
         // Black king a8 = 56, White king e1 = 4.
-        let pos = GenericPosition::<_, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k7/8/8/8/8/8/8/4K3[] w - - 0 1")
             .expect("valid shogun fen");
         let _: &Shogun = &pos;
         let mut game = GenericGame::new(pos);
@@ -2186,7 +2195,7 @@ mod tests {
     fn tori_sennichite_is_a_draw() {
         // Tori Shogi is 7x7; its royal is a plain King (`k`). Black king a7 = 42,
         // White king d1 = 3.
-        let pos = GenericPosition::<_, _>::from_fen("k6/7/7/7/7/7/3K3[] w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("k6/7/7/7/7/7/3K3[] w - - 0 1")
             .expect("valid tori fen");
         let _: &Tori = &pos;
         let mut game = GenericGame::new(pos);
@@ -2208,7 +2217,7 @@ mod tests {
         // Wa Shogi is 11x11; the royal Crane King is a plain King (`k`). Black king
         // i11 = 118, White king c1 = 2 (files far apart, no check).
         let pos =
-            GenericPosition::<_, _>::from_fen("8k2/11/11/11/11/11/11/11/11/11/2K8[] w - - 0 1")
+            GenericPosition::<_, _, _>::from_fen("8k2/11/11/11/11/11/11/11/11/11/2K8[] w - - 0 1")
                 .expect("valid washogi fen");
         let _: &Washogi = &pos;
         let mut game = GenericGame::new(pos);
@@ -2242,9 +2251,9 @@ mod tests {
             Some(100)
         }
 
-        fn is_insufficient_material(
-            board: &crate::geometry::Board<crate::geometry::Chess8x8>,
-            _state: &crate::geometry::GenericState<crate::geometry::Chess8x8>,
+        fn is_insufficient_material<const R: usize>(
+            board: &crate::geometry::Board<crate::geometry::Chess8x8, R>,
+            _state: &crate::geometry::GenericState<crate::geometry::Chess8x8, R>,
         ) -> bool {
             board.occupied().count() == 2
         }
@@ -2284,7 +2293,7 @@ mod tests {
         // the position is not an insufficient-material draw). The position recurs
         // without progress and is drawn on its third occurrence.
         // Cap10x8 index = rank*10 + file. Kf1 = 5, f2 = 15; kf8 = 75, f7 = 65.
-        let pos = GenericPosition::<_, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 0 1")
+        let pos = GenericPosition::<_, _, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 0 1")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let mut game = GenericGame::new(pos);
@@ -2306,7 +2315,7 @@ mod tests {
         // Halfmove clock at the 100-ply limit with legal moves available (a lone
         // queen keeps the position out of the insufficient-material rule): the
         // GenericGame reports a move-rule draw.
-        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 100 80")
+        let pos = GenericPosition::<_, _, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 100 80")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let game = GenericGame::new(pos);
@@ -2314,7 +2323,7 @@ mod tests {
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
         assert!(game.is_draw());
         // One ply below the limit the game is still live.
-        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 99 80")
+        let pos = GenericPosition::<_, _, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 99 80")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let game = GenericGame::new(pos);
@@ -2325,7 +2334,7 @@ mod tests {
     fn capablanca_move_clock_resets_on_pawn_move_and_captures() {
         // A pawn push resets the clock; a plain king move only advances it.
         // Pawn f5 = 45 -> f6 = 55; kings far apart so no check intervenes.
-        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/5P4/10/10/10/5K4 w - - 98 60")
+        let pos = GenericPosition::<_, _, _>::from_fen("5k4/10/10/5P4/10/10/10/5K4 w - - 98 60")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let mut game = GenericGame::new(pos);
@@ -2336,7 +2345,7 @@ mod tests {
 
         // A capture also resets the clock. White rook on a1 takes a black rook on
         // a8 up the open a-file. Ra1 = 0, ra8 = 70.
-        let pos = GenericPosition::<_, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 40 30")
+        let pos = GenericPosition::<_, _, _>::from_fen("r4k4/10/10/10/10/10/10/R4K4 w - - 40 30")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let mut game = GenericGame::new(pos);
@@ -2345,7 +2354,7 @@ mod tests {
         assert_eq!(game.position().halfmove_clock(), 0);
 
         // A non-progress king move advances the clock instead of resetting it.
-        let pos = GenericPosition::<_, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 50 40")
+        let pos = GenericPosition::<_, _, _>::from_fen("5k4/10/10/10/10/10/10/Q4K4 w - - 50 40")
             .expect("valid capablanca fen");
         let _: &Capablanca = &pos;
         let mut game = GenericGame::new(pos);
@@ -2358,7 +2367,10 @@ mod tests {
     /// Walks the legal-move tree to `depth`, asserting at every node that the key
     /// [`GenericGame::play`] maintains **incrementally** equals a from-scratch
     /// recompute of the current position.
-    fn walk_game_key<G: Geometry, V: WideVariant<G>>(game: &GenericGame<G, V>, depth: u32) {
+    fn walk_game_key<G: Geometry, V: WideVariant<G>, const R: usize>(
+        game: &GenericGame<G, V, R>,
+        depth: u32,
+    ) {
         assert_eq!(
             game.position_key(),
             game.position().zobrist(),

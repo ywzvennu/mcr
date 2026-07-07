@@ -285,7 +285,11 @@ impl WideVariant<Chess8x8> for EuroShogiRules {
         true
     }
 
-    fn drop_targets(role: WideRole, color: Color, board: &Board<Chess8x8>) -> Bitboard<Chess8x8> {
+    fn drop_targets<const R: usize>(
+        role: WideRole,
+        color: Color,
+        board: &Board<Chess8x8, R>,
+    ) -> Bitboard<Chess8x8> {
         let mut mask = !board.occupied();
         // Dead-piece rule: a dropped Pawn may not land on the last rank (it would
         // then have no move). The modified Knight always has a sideways move, so it
@@ -358,4 +362,8 @@ impl EuroShogiRules {
 /// placement may carry the hand as a `[..]` holdings bracket — with
 /// [`EuroShogi::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the modified Knight, the hand, drops, and the mandatory promotion zone.
-pub type EuroShogi = GenericPosition<Chess8x8, EuroShogiRules>;
+pub type EuroShogi = GenericPosition<
+    Chess8x8,
+    EuroShogiRules,
+    { <EuroShogiRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;

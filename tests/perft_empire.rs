@@ -114,7 +114,7 @@ const ISSUE_359_EP_FLYING_GENERAL: &str = "3k4/8/8/3Pp3/8/8/8/3K4 w - e6 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Empire::from_fen(fen).expect("valid Empire FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Empire perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

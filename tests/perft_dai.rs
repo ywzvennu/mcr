@@ -63,9 +63,9 @@ fn startpos_round_trips() {
 #[test]
 fn startpos_perft_regression() {
     let pos = Dai::startpos();
-    assert_eq!(perft::<Dai15x15, _>(&pos, 1), 71);
-    assert_eq!(perft::<Dai15x15, _>(&pos, 2), 5041);
-    assert_eq!(perft::<Dai15x15, _>(&pos, 3), 357836);
+    assert_eq!(perft::<Dai15x15, _, _>(&pos, 1), 71);
+    assert_eq!(perft::<Dai15x15, _, _>(&pos, 2), 5041);
+    assert_eq!(perft::<Dai15x15, _, _>(&pos, 3), 357836);
 }
 
 /// A deeper mcr-only regression pin (perft(4) = 25400968). Not oracle-validated (a
@@ -78,7 +78,7 @@ fn startpos_perft_regression() {
 #[ignore = "slow: ~25M-node depth-4 perft on 15x15; run explicitly in release"]
 fn startpos_perft_depth4() {
     let pos = Dai::startpos();
-    assert_eq!(perft::<Dai15x15, _>(&pos, 4), 25400968);
+    assert_eq!(perft::<Dai15x15, _, _>(&pos, 4), 25400968);
 }
 
 fn targets(fen: &str, file: u8, rank: u8) -> Vec<u8> {

@@ -245,7 +245,10 @@ impl WideVariant<Grand10x10> for OpulentRules {
         }
     }
 
-    fn promotion_targets(color: Color, board: &Board<Grand10x10>) -> alloc::vec::Vec<WideRole> {
+    fn promotion_targets<const R: usize>(
+        color: Color,
+        board: &Board<Grand10x10, R>,
+    ) -> alloc::vec::Vec<WideRole> {
         // Promote-only-to-a-captured-type: a pawn may promote to a role only while
         // the side holds fewer than the starting count of it on the board (FSF
         // `promotionLimit`). Read live from the board, exactly as Grand does.
@@ -308,9 +311,9 @@ impl WideVariant<Grand10x10> for OpulentRules {
     /// lone minor vs king, and same-colour bishops only. Every fairy piece counts as
     /// mating material. Adjudication-only and behind the default-off hook, so perft
     /// stays byte-identical.
-    fn is_insufficient_material(
-        board: &Board<Grand10x10>,
-        _state: &GenericState<Grand10x10>,
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Grand10x10, R>,
+        _state: &GenericState<Grand10x10, R>,
     ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
@@ -323,7 +326,11 @@ impl WideVariant<Grand10x10> for OpulentRules {
 /// with [`Opulent::from_fen`](GenericPosition::from_fen). See the [module docs](self)
 /// for the army (Wizard + Lion leapers), the no-castling / pawn rules, and the
 /// three-rank promote-to-captured zone.
-pub type Opulent = GenericPosition<Grand10x10, OpulentRules>;
+pub type Opulent = GenericPosition<
+    Grand10x10,
+    OpulentRules,
+    { <OpulentRules as WideVariant<Grand10x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {
@@ -373,9 +380,9 @@ mod tests {
     #[test]
     fn startpos_perft_matches_fsf() {
         let pos = Opulent::startpos();
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 1), 50);
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 2), 2500);
-        assert_eq!(gperft::<Grand10x10, _>(&pos, 3), 133829);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 1), 50);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 2), 2500);
+        assert_eq!(gperft::<Grand10x10, _, _>(&pos, 3), 133829);
     }
 
     /// The Lion leaps one square diagonally (Ferz), or two/three squares straight

@@ -362,8 +362,8 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
         Some(2)
     }
 
-    fn extra_royal_attack(
-        board: &Board<Xiangqi9x10>,
+    fn extra_royal_attack<const R: usize>(
+        board: &Board<Xiangqi9x10, R>,
         sq: Square<Xiangqi9x10>,
         by: Color,
         occupied: Bitboard<Xiangqi9x10>,
@@ -420,7 +420,11 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
 /// with [`Xiangqi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the piece movements, the palace / river confinement, and the
 /// flying-general rule.
-pub type Xiangqi = GenericPosition<Xiangqi9x10, XiangqiRules>;
+pub type Xiangqi = GenericPosition<
+    Xiangqi9x10,
+    XiangqiRules,
+    { <XiangqiRules as WideVariant<Xiangqi9x10>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

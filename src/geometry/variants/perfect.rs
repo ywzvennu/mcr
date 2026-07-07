@@ -187,7 +187,10 @@ impl WideVariant<Chess8x8> for PerfectRules {
     /// vs king, king and a lone minor (bishop or knight) vs king, and same-colour
     /// bishops only. The three compounds count as mating material. Adjudication-only
     /// and behind the default-off hook, so perft stays byte-identical.
-    fn is_insufficient_material(board: &Board<Chess8x8>, _state: &GenericState<Chess8x8>) -> bool {
+    fn is_insufficient_material<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+    ) -> bool {
         crate::geometry::variant::standard_insufficient_material(board)
     }
 }
@@ -200,7 +203,8 @@ impl WideVariant<Chess8x8> for PerfectRules {
 /// reuse the [`StandardChess`] compound defaults; the
 /// array, the Amazon's Queen + Knight movement, the seven-role promotion set, and the
 /// queen-side Chancellor castle distinguish it.
-pub type Perfect = GenericPosition<Chess8x8, PerfectRules>;
+pub type Perfect =
+    GenericPosition<Chess8x8, PerfectRules, { <PerfectRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

@@ -274,11 +274,11 @@ impl WideVariant<Shogi9x9> for ChakRules {
         true
     }
 
-    fn role_attacks_board(
+    fn role_attacks_board<const R: usize>(
         role: WideRole,
         color: Color,
         sq: Square<Shogi9x9>,
-        board: &Board<Shogi9x9>,
+        board: &Board<Shogi9x9, R>,
     ) -> Option<Bitboard<Shogi9x9>> {
         match role {
             // The Quetzal's hop set already folds quiet jumps and over-screen
@@ -372,7 +372,10 @@ impl WideVariant<Shogi9x9> for ChakRules {
         true
     }
 
-    fn royal_squares(board: &Board<Shogi9x9>, color: Color) -> Bitboard<Shogi9x9> {
+    fn royal_squares<const R: usize>(
+        board: &Board<Shogi9x9, R>,
+        color: Color,
+    ) -> Bitboard<Shogi9x9> {
         board.kings_of(color) | board.pieces(color, WideRole::DivineLord)
     }
 
@@ -427,7 +430,8 @@ impl WideVariant<Shogi9x9> for ChakRules {
 /// [`Chak::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the piece movements, the King/Lord promotion, the region confinement, and the
 /// temple-square win.
-pub type Chak = GenericPosition<Shogi9x9, ChakRules>;
+pub type Chak =
+    GenericPosition<Shogi9x9, ChakRules, { <ChakRules as WideVariant<Shogi9x9>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

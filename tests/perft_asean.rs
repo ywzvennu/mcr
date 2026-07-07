@@ -48,7 +48,7 @@ const PROMO: &str = "1n2k3/P1P5/8/8/8/8/p1P5/1N2K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Asean::from_fen(fen).expect("valid ASEAN FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "ASEAN perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

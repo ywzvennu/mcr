@@ -45,7 +45,7 @@ const MID_ROBADO: &str = "4k3/4p3/8/8/8/8/3D4/4K3 w - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Shatar::from_fen(fen).expect("valid Shatar FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Shatar perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
@@ -231,8 +231,8 @@ fn bare_king_is_a_robado_draw() {
     let pos = Shatar::from_fen(white_to_move).expect("valid");
     assert_eq!(pos.legal_move_count(), 0, "bare-king node has no moves");
     assert_eq!(pos.outcome(), Some(WideOutcome::Draw), "Robado is a draw");
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 1), 0);
-    assert_eq!(gperft::<Chess8x8, _>(&pos, 2), 0);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 1), 0);
+    assert_eq!(gperft::<Chess8x8, _, _>(&pos, 2), 0);
 
     // Same board, black to move: still a terminal draw with no continuation.
     let black_to_move = "7k/8/8/8/3D4/8/8/K7 b - - 0 1";

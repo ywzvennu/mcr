@@ -175,4 +175,5 @@ impl WideVariant<Chess8x8> for ShatarRules {
 ///
 /// Construct the starting position with [`Shatar::startpos`](GenericPosition::startpos)
 /// or parse a FEN with [`Shatar::from_fen`](GenericPosition::from_fen).
-pub type Shatar = GenericPosition<Chess8x8, ShatarRules>;
+pub type Shatar =
+    GenericPosition<Chess8x8, ShatarRules, { <ShatarRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;

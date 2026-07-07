@@ -94,7 +94,7 @@ const CAPTURES: &str = "4k3/8/8/3=t4/2PPP3/3=s4/3P4/4K3 b - - 0 1";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Khans::from_fen(fen).expect("valid Khan's Chess FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Chess8x8, _>(&pos, depth);
+        let got = gperft::<Chess8x8, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Khan's Chess perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"

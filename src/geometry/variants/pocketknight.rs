@@ -151,7 +151,11 @@ impl WideVariant<Chess8x8> for PocketknightRules {
 /// or parse a FEN — including the `[Nn]` holdings bracket — with
 /// [`Pocketknight::from_fen`](GenericPosition::from_fen). Every rule is the
 /// standard [`StandardChess`] default except the added pocket Knight and drops.
-pub type Pocketknight = GenericPosition<Chess8x8, PocketknightRules>;
+pub type Pocketknight = GenericPosition<
+    Chess8x8,
+    PocketknightRules,
+    { <PocketknightRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

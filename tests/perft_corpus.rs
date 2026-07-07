@@ -602,7 +602,7 @@ struct GeomCase {
 }
 
 /// Emits a `<cheap>` / `<deep>` `#[test]` pair that runs every [`GeomCase`] in
-/// `$cases` through `gperft::<$geom, _>`, the cheap test keeping depths
+/// `$cases` through `gperft::<$geom, _, _>`, the cheap test keeping depths
 /// `<= cheap_max` and the `#[ignore]`d deep test the rest. `$ty` is the variant
 /// position type (its `from_fen` parses the mcr-dialect FEN).
 macro_rules! geom_group {
@@ -616,7 +616,7 @@ macro_rules! geom_group {
                     c.fen,
                     c.nodes,
                     |d| d <= c.cheap_max,
-                    |d| gperft::<$geom, _>(&pos, d),
+                    |d| gperft::<$geom, _, _>(&pos, d),
                 );
             }
         }
@@ -631,7 +631,7 @@ macro_rules! geom_group {
                     c.fen,
                     c.nodes,
                     |d| d > c.cheap_max,
-                    |d| gperft::<$geom, _>(&pos, d),
+                    |d| gperft::<$geom, _, _>(&pos, d),
                 );
             }
         }
@@ -826,9 +826,9 @@ geom_group!(
 #[test]
 fn chu_cheap() {
     let pos = Chu::startpos();
-    assert_eq!(gperft::<Chu12x12, _>(&pos, 1), 36);
-    assert_eq!(gperft::<Chu12x12, _>(&pos, 2), 1296);
-    assert_eq!(gperft::<Chu12x12, _>(&pos, 3), 48319);
+    assert_eq!(gperft::<Chu12x12, _, _>(&pos, 1), 36);
+    assert_eq!(gperft::<Chu12x12, _, _>(&pos, 2), 1296);
+    assert_eq!(gperft::<Chu12x12, _, _>(&pos, 3), 48319);
 }
 
 /// Chu start-position perft, deep layer (depth 4): an mcr regression pin.
@@ -836,5 +836,5 @@ fn chu_cheap() {
 #[ignore = "deep perft; run with --release --test perft_corpus -- --ignored"]
 fn chu_deep() {
     let pos = Chu::startpos();
-    assert_eq!(gperft::<Chu12x12, _>(&pos, 4), 1802285);
+    assert_eq!(gperft::<Chu12x12, _, _>(&pos, 4), 1802285);
 }

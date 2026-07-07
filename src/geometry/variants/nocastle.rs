@@ -104,7 +104,11 @@ impl WideVariant<Chess8x8> for NocastleRules {
 /// [`Nocastle::startpos`](GenericPosition::startpos) or parse a FEN with
 /// [`Nocastle::from_fen`](GenericPosition::from_fen). Every rule is the standard
 /// [`StandardChess`] default except castling, which is disabled.
-pub type Nocastle = GenericPosition<Chess8x8, NocastleRules>;
+pub type Nocastle = GenericPosition<
+    Chess8x8,
+    NocastleRules,
+    { <NocastleRules as WideVariant<Chess8x8>>::ROLE_SPAN },
+>;
 
 #[cfg(test)]
 mod tests {

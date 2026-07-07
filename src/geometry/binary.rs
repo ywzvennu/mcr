@@ -248,11 +248,11 @@ fn decode_bitset<G: Geometry>(cur: &mut Cursor<'_>) -> Result<Bitboard<G>, WireE
 }
 
 /// Appends one colour's hand / setup pocket as a sparse `(role, count)` list.
-fn encode_hand(pocket: &GenericPlacement, color: Color, out: &mut Vec<u8>) {
+fn encode_hand<const R: usize>(pocket: &GenericPlacement<R>, color: Color, out: &mut Vec<u8>) {
     let count_at = out.len();
     out.push(0);
     let mut n = 0u8;
-    for role in WideRole::ALL {
+    for role in WideRole::ALL.into_iter().take(R) {
         let c = pocket.count(color, role);
         if c != 0 {
             out.push(role.index() as u8);
@@ -264,14 +264,14 @@ fn encode_hand(pocket: &GenericPlacement, color: Color, out: &mut Vec<u8>) {
 }
 
 /// Reads one colour's pocket into a per-role count array.
-fn decode_hand(cur: &mut Cursor<'_>) -> Result<[u8; WideRole::COUNT], WireError> {
+fn decode_hand<const R: usize>(cur: &mut Cursor<'_>) -> Result<[u8; R], WireError> {
     let n = cur.u8()?;
-    let mut counts = [0u8; WideRole::COUNT];
+    let mut counts = [0u8; R];
     for _ in 0..n {
         let role = cur.u8()?;
         let count = cur.u8()?;
         let idx = role as usize;
-        if idx >= WideRole::COUNT {
+        if idx >= R {
             return Err(WireError::BadRole(role));
         }
         counts[idx] = count;
@@ -336,7 +336,7 @@ impl WideMove {
     }
 }
 
-impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
+impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// Encodes this position to the compact binary wire form: [`TAG_POSITION`]
     /// followed by the position body (see the [module docs](self)). The geometry
     /// and variant are fixed by the type, so they are not stored; use
@@ -507,10 +507,13 @@ impl<G: Geometry, V: WideVariant<G>> GenericPosition<G, V> {
         let occupied = decode_bitset::<G>(&mut cur)?;
         let n = occupied.into_iter().count();
         let colour = cur.take(n.div_ceil(8))?;
-        let mut board = Board::<G>::empty();
+        let mut board = Board::<G, R>::empty();
         for (i, sq) in occupied.into_iter().enumerate() {
             let role_ix = cur.u8()?;
             let role = WideRole::from_index(role_ix as usize).ok_or(WireError::BadRole(role_ix))?;
+            if role.index() >= R {
+                return Err(WireError::BadRole(role_ix));
+            }
             let color = if colour[i / 8] & (1 << (i % 8)) != 0 {
                 Color::Black
             } else {

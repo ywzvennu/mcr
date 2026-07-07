@@ -285,7 +285,8 @@ impl WideVariant<Chess8x8> for KhansRules {
 /// [`Khans::from_fen`](GenericPosition::from_fen). See the [module docs](self) for
 /// the piece movements, the soldier's forced promotion to a Khan, and the flag-win
 /// rule.
-pub type Khans = GenericPosition<Chess8x8, KhansRules>;
+pub type Khans =
+    GenericPosition<Chess8x8, KhansRules, { <KhansRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
 
 #[cfg(test)]
 mod tests {

@@ -39,7 +39,7 @@ const MIDGAME: &str = "1nbqk/rPp1p/2p2/P2PP/RNBQK w - - 0 5";
 fn check(fen: &str, cases: &[(u32, u64)]) {
     let pos = Gardner::from_fen(fen).expect("valid Gardner FEN");
     for &(depth, expected) in cases {
-        let got = gperft::<Minishogi5x5, _>(&pos, depth);
+        let got = gperft::<Minishogi5x5, _, _>(&pos, depth);
         assert_eq!(
             got, expected,
             "Gardner perft({depth}) for {fen}: expected {expected} (FSF-confirmed), got {got}"
