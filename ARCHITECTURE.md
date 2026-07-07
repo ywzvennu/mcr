@@ -166,6 +166,7 @@ drift-checked variant list is in [`docs/variants.md`](docs/variants.md)):
 | `Chennis7x7` | 7x7 (49) | `u128` | Chennis |
 | `Gorogoro5x6` | 5x6 (30) | `u64` | Gorogoro Shogi Plus |
 | `Minishogi5x5` | 5x5 (25) | `u64` | Minishogi, Kyoto Shogi |
+| `YariShogi7x9` | 7x9 (63) | `u64` | Yari Shogi |
 | `Dobutsu3x4` | 3x4 (12) | `u64` | Dobutsu |
 | `Chu12x12` | 12x12 (144) | `U256` | Chu Shogi |
 

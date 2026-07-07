@@ -1350,6 +1350,62 @@ pub enum WideRole {
     /// KNIROO ([`WideRole::Lancer`]). (New Zealand chess.) A **fifth-tier overflow
     /// role**: its FEN token is `****K` / `****k`; the harness maps `****k → r`.
     Rookni = 148,
+
+    // --- Yari Shogi (spear shogi, 7x9) army (§ Milestone 16, issue #584) -------
+    //
+    // Yari Shogi (槍将棋, https://en.wikipedia.org/wiki/Yari_shogi) is a 9-rank by
+    // 7-file shogi drop variant on the [`YariShogi7x9`](super::YariShogi7x9)
+    // geometry (FSF built-in `yarishogi`). Its "spear" army is a set of genuinely
+    // new **forward-biased** movers; the King is a plain royal
+    // [`WideRole::King`], the Shogi Pawn reuses [`WideRole::Pawn`] (a `fW` stepper),
+    // the lance-like Rook `l` reuses the standard [`WideRole::Rook`] (a full
+    // orthogonal slide, and the promoted form of the Yari Rook), so only the five
+    // custom pieces below need roles. FSF's built binary lacks the 9-rank
+    // `yarishogi` board (largeboards off), so Yari is validated **oracle-less**:
+    // hand-derived low-depth perft plus the crate-wide make/unmake, children-sum,
+    // colour-symmetry, and attacker-consistency invariants — there is no
+    // `compare-fairy` FSF rewrite. Every single-letter FEN base (`a..=z`) and the
+    // `*` / `**` / `=` / `***` overflow banks are exhausted, so all five are
+    // **fifth-tier overflow** roles ([`is_overflow5`](WideRole::is_overflow5))
+    // whose FEN token is the [`OVERFLOW_PREFIX`] **quadrupled** (`****`) plus a
+    // recycled base letter (free within the `****` tier) whose case carries the
+    // colour. The three promoted forms (Yari Gold, Yari Silver, and the standard
+    // Rook) revert to their base on capture via the variant's
+    // [`role_hand_base`](super::WideVariant::role_hand_base) hook, not the global
+    // `+`-token machinery, so they are **not** [`is_promoted`](WideRole::is_promoted).
+    /// Yari Rook (FSF `r`, Betza `frlR`) — a forward/left/right rook: slides any
+    /// distance straight **forward** or to either **side**, but never backward.
+    /// Promotes to a standard [`WideRole::Rook`] (full orthogonal slide). (Yari
+    /// Shogi.) A **fifth-tier overflow role**: its FEN token is `****O` (white) /
+    /// `****o` (black), recycling the free base letter `o`.
+    YariRook = 149,
+    /// Yari Knight (FSF `n`, Betza `fRffN`) — a forward rook **plus** the two
+    /// narrow-forward knight leaps (`(±1, +2)`): it slides any distance straight
+    /// forward, or jumps two ranks forward and one file to either side. Promotes to
+    /// a Yari Gold. (Yari Shogi.) A **fifth-tier overflow role**: its FEN token is
+    /// `****J` / `****j`, recycling the free base letter `j`.
+    YariKnight = 150,
+    /// Yari Bishop (FSF `b`, Betza `fFfR`) — a forward rook **plus** the two
+    /// forward-diagonal Ferz steps: it slides any distance straight forward, or
+    /// steps one square diagonally forward to either side. Promotes to a Yari Gold.
+    /// (Yari Shogi.) A **fifth-tier overflow role**: its FEN token is `****A` /
+    /// `****a`, recycling the free base letter `a`.
+    YariBishop = 151,
+    /// Yari Gold (FSF `g`, Betza `WfFbR`) — a Wazir (four orthogonal steps) **plus**
+    /// the two forward-diagonal Ferz steps **plus** a backward rook slide (the
+    /// single straight-back Wazir step extended to any distance). The promoted form
+    /// of the Yari Knight and the Yari Bishop; reverts to a Yari Bishop in hand when
+    /// captured. Does not itself promote. (Yari Shogi.) A **fifth-tier overflow
+    /// role**: its FEN token is `****P` / `****p`, recycling the free base letter
+    /// `p`.
+    YariGold = 152,
+    /// Yari Silver (FSF `s`, Betza `fKbR`) — a forward King (the three forward
+    /// one-steps: straight and both diagonals) **plus** a backward rook slide. The
+    /// promoted form of the Shogi Pawn; reverts to a [`WideRole::Pawn`] in hand when
+    /// captured. Does not itself promote. (Yari Shogi.) A **fifth-tier overflow
+    /// role**: its FEN token is `****U` / `****u`, recycling the free base letter
+    /// `u`.
+    YariSilver = 153,
 }
 
 impl WideRole {
@@ -1376,7 +1432,7 @@ impl WideRole {
     /// #441 for the budget audit and the widening design. Do **not** grow this past
     /// `256` without another field widening (a fresh wire-format version bump
     /// touching `super::binary` and [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 149;
+    pub const COUNT: usize = 154;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1529,6 +1585,11 @@ impl WideRole {
         WideRole::Grasshopper,
         WideRole::Nightrider,
         WideRole::Rookni,
+        WideRole::YariRook,
+        WideRole::YariKnight,
+        WideRole::YariBishop,
+        WideRole::YariGold,
+        WideRole::YariSilver,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -1912,6 +1973,17 @@ impl WideRole {
             // letter, distinct here by the `****` prefix the board FEN I/O adds). The
             // `compare-fairy` harness maps `****k → r` when driving New Zealand chess.
             WideRole::Rookni => 'k',
+            // Yari Shogi spear army — fifth-tier overflow roles (`****`), each a
+            // distinct recycled base letter free within the fifth tier (FSF's own
+            // mnemonics `r`/`n`/`b`/`g`/`s` are all taken there by the Tenjiku
+            // generals and the New Zealand Rookni). Yari is oracle-less (the built
+            // FSF binary lacks the 9-rank board), so these letters need only be
+            // self-consistent for mcr's own FEN round-trip.
+            WideRole::YariRook => 'o',
+            WideRole::YariKnight => 'j',
+            WideRole::YariBishop => 'a',
+            WideRole::YariGold => 'p',
+            WideRole::YariSilver => 'u',
         }
     }
 
@@ -2407,6 +2479,11 @@ impl WideRole {
                 | WideRole::Dog
                 | WideRole::Nightrider
                 | WideRole::Rookni
+                | WideRole::YariRook
+                | WideRole::YariKnight
+                | WideRole::YariBishop
+                | WideRole::YariGold
+                | WideRole::YariSilver
         )
     }
 
@@ -2440,6 +2517,14 @@ impl WideRole {
             // New Zealand chess ROOKNI: recycles the free fifth-tier base `k` (FSF's
             // `r` being the RookGeneral's here); the harness maps `****k → r`.
             'k' => Some(WideRole::Rookni),
+            // Yari Shogi spear army — distinct `****` bases free within the fifth
+            // tier (FSF's `r`/`n`/`b`/`g`/`s` are taken by the Tenjiku generals /
+            // Rookni). Yari is oracle-less, so no `compare-fairy` rewrite applies.
+            'o' => Some(WideRole::YariRook),
+            'j' => Some(WideRole::YariKnight),
+            'a' => Some(WideRole::YariBishop),
+            'p' => Some(WideRole::YariGold),
+            'u' => Some(WideRole::YariSilver),
             _ => None,
         }
     }
@@ -2655,6 +2740,11 @@ impl fmt::Display for WideRole {
             WideRole::Grasshopper => "grasshopper",
             WideRole::Nightrider => "nightrider",
             WideRole::Rookni => "rookni",
+            WideRole::YariRook => "yari-rook",
+            WideRole::YariKnight => "yari-knight",
+            WideRole::YariBishop => "yari-bishop",
+            WideRole::YariGold => "yari-gold",
+            WideRole::YariSilver => "yari-silver",
         })
     }
 }

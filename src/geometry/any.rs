@@ -32,7 +32,7 @@ use super::{
     Orda, Ordamirror, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight,
     Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Spartan,
     Square, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
-    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi,
+    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -864,6 +864,7 @@ wide_variants! {
     Washogi, Washogi, Washogi, "washogi", "wa-shogi", "wa";
     Xiangfu, Xiangfu, Xiangfu, "xiangfu";
     Xiangqi, Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
+    Yari, Yari, Yari, "yarishogi", "yari-shogi", "yari";
 }
 
 impl WideVariantId {
@@ -902,7 +903,8 @@ impl WideVariantId {
             | WideVariantId::Jieqi
             | WideVariantId::OkisakiShogi
             | WideVariantId::Tenjiku
-            | WideVariantId::Washogi => Independent,
+            | WideVariantId::Washogi
+            | WideVariantId::Yari => Independent,
             // The HaChu large-shogi reference engine.
             WideVariantId::Chu | WideVariantId::Dai => HaChu,
             // Fairy-Stockfish under a name that differs from mcr's canonical spelling.
@@ -1087,7 +1089,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 91, "all 91 fairy variants are covered");
+        assert_eq!(count, 92, "all 92 fairy variants are covered");
     }
 
     #[test]

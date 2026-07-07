@@ -1260,7 +1260,7 @@ mod tests {
     use crate::geometry::variants::{
         Aiwok, Asean, Cambodian, CannonShogi, Capablanca, Chu, Dai, EuroShogi, Gorogoro, Janggi,
         Judkins, Kyotoshogi, Makpong, Makruk, Micro, Minishogi, Minixiangqi, OkisakiShogi,
-        ShoShogi, Shogi, Shogun, Sittuyin, Tenjiku, Tori, Washogi, Xiangqi,
+        ShoShogi, Shogi, Shogun, Sittuyin, Tenjiku, Tori, Washogi, Xiangqi, Yari,
     };
     use crate::geometry::{GenericPosition, Geometry, WideEndReason, WideMove, WideVariant};
 
@@ -2252,6 +2252,29 @@ mod tests {
             play(&mut game, 107, 118); // black K i10->i11
         }
         assert_eq!(game.repetition_count(), 4);
+        assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
+        assert_eq!(game.outcome(), Some(WideOutcome::Draw));
+        assert!(game.is_draw());
+    }
+
+    #[test]
+    fn yari_sennichite_is_a_draw() {
+        // Yari Shogi is 7 files by 9 ranks; the royal is a plain King (`k`). Black
+        // king a9 = 56, White king d1 = 3 (files far apart, no check). Yari uses a
+        // threefold repetition (`nFoldRule = 3`), so the start position recurring a
+        // third time — after two king-shuffle cycles — is the draw.
+        let pos = GenericPosition::<_, _, _>::from_fen("k6/7/7/7/7/7/7/7/3K3[] w - - 0 1")
+            .expect("valid yari fen");
+        let _: &Yari = &pos;
+        let mut game = GenericGame::new(pos);
+        assert_eq!(game.repetition_count(), 1);
+        for _ in 0..2 {
+            play(&mut game, 3, 10); // white K d1->d2
+            play(&mut game, 56, 49); // black K a9->a8
+            play(&mut game, 10, 3); // white K d2->d1
+            play(&mut game, 49, 56); // black K a8->a9
+        }
+        assert_eq!(game.repetition_count(), 3);
         assert_eq!(game.end_reason(), Some(WideEndReason::Sennichite));
         assert_eq!(game.outcome(), Some(WideOutcome::Draw));
         assert!(game.is_draw());

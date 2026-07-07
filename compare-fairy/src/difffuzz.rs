@@ -233,6 +233,10 @@ fn centaur_to_fsf(fen: &str) -> String {
 ///   back to standard chess), so there is no usable oracle here. It is rules-only,
 ///   cross-checked against an independent from-scratch 10x10 generator; it carries no
 ///   FSF spec.
+/// * **Yari** — 9-rank Yari Shogi needs Fairy-Stockfish's large-board build, which
+///   the project's binary is compiled without (`setoption UCI_Variant yarishogi`
+///   falls back to chess), so it has no live FSF oracle and is rules-only; it
+///   carries no FSF spec.
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         // Almost Chess shares Capablanca's `e -> c` chancellor rewrite (its only
@@ -1785,6 +1789,7 @@ mod tests {
             WideVariantId::Tenjiku,
             WideVariantId::Washogi,
             WideVariantId::OkisakiShogi,
+            WideVariantId::Yari,
         ] {
             assert!(
                 !ids.contains(&excluded),
@@ -1794,10 +1799,10 @@ mod tests {
         }
         // Every shipped variant minus the 8 by-design exclusions (Alice / Duck /
         // Jieqi, the HaChu-only large-shogi Chu / Dai / Tenjiku, and the oracle-less
-        // Wa Shogi and Okisaki Shogi, which the available Fairy-Stockfish build does
-        // not implement); the deeper-sweep follow-ups stay in SPECS but are skipped
-        // via `HELD_BACK` on the default run.
-        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 8);
+        // Wa Shogi, Okisaki Shogi, and Yari Shogi, which the available Fairy-Stockfish
+        // build does not implement); the deeper-sweep follow-ups stay in SPECS but are
+        // skipped via `HELD_BACK` on the default run.
+        assert_eq!(SPECS.len(), WideVariantId::ALL.len() - 9);
     }
 
     /// Every `HELD_BACK` id is a real, distinct fuzzable spec (so a rename can never

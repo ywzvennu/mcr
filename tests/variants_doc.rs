@@ -756,6 +756,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "9x10 board with palace, river, and flying-general (generals may not face on an open file); soldiers step sideways only after crossing the river. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant xiangqi`).",
         },
+        WideVariantId::Yari => Meta {
+            display: "Yari Shogi (spear shogi, 9x7)",
+            pieces: "A forward-biased spear army: King, Shogi Pawn, Yari Rook (forward/sideways), Yari Knight (forward rook + narrow-forward knight leaps), Yari Bishop (forward rook + forward diagonals), and their promoted Yari Gold / Yari Silver / Rook.",
+            rules: "9-rank by 7-file Shogi with a hand and drops (nifu, but pawn-drop mate allowed); optional promotion in the far three ranks, forced only when a piece would be immobile. Win by checkmate.",
+            oracle: "Rules-only (no FSF perft oracle): the built Fairy-Stockfish binary lacks the 9-rank yarishogi board, validated via hand-derived low-depth perft cross-checked by an independent brute-force generator, plus property / colour-symmetry / attacker-consistency tests.",
+        },
     }
 }
 

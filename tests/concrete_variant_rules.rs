@@ -31,8 +31,12 @@ fn all_spans_both_families() {
     assert_eq!(concrete, VariantId::ALL.len(), "every concrete variant");
     assert_eq!(wide, WideVariantId::ALL.len(), "every wide variant");
     assert_eq!(concrete, 9, "nine concrete variants");
-    assert_eq!(wide, 91, "ninety-one wide variants");
-    assert_eq!(VariantRef::ALL.len(), 100, "one hundred variants in all");
+    assert_eq!(wide, 92, "ninety-two wide variants");
+    assert_eq!(
+        VariantRef::ALL.len(),
+        101,
+        "one hundred one variants in all"
+    );
 }
 
 /// Every entry in `VariantRef::ALL` derives a fully-populated `VariantRules`

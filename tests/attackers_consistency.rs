@@ -49,11 +49,12 @@ use mcr::geometry::{
     ShakoRules, ShatarRules, ShatranjRules, ShinobiRules, ShoShogiRules, ShogiRules, ShogunRules,
     ShouseRules, SittuyinRules, SpartanRules, Square, StandardChess, SynochessRules, TencubedRules,
     TenjikuRules, ToriRules, WashogiRules, WideRole, WideVariant, XiangfuRules, XiangqiRules,
+    YariRules,
 };
 use mcr::geometry::{
     Cap10x8, Chennis7x7, Chess8x8, Chess9x9, Chu12x12, Courier12x8, Dai15x15, Dobutsu3x4,
     Gorogoro5x6, Grand10x10, Judkins6x6, Micro4x5, Minishogi5x5, Minixiangqi7x7, Shogi9x9,
-    Tenjiku16x16, Tori7x7, Washogi11x11, Xiangqi9x10,
+    Tenjiku16x16, Tori7x7, Washogi11x11, Xiangqi9x10, YariShogi7x9,
 };
 use mcr::Color;
 
@@ -1042,6 +1043,23 @@ variant_test!(
         "5k5/11/11/3**v3**t3/11/5K5/11/3**V3**T3/11/11/11 w - - 0 1",
         "5k5/11/11/3=x3=z3/5=h5/5K5/5=H5/3=X3=Z3/11/11/11[**b**B] w - - 0 1",
         "5k5/11/4**b1**b4/11/11/5K5/11/4**B1**B4/11/11/11[**b**B**t**T**q**Q] w - - 0 1",
+    ]
+);
+
+// -- Yari Shogi (9x7 spear shogi) -------------------------------------------
+// The start array, a drop/promotion midgame with hands, and a promoted-piece board
+// (a Yari Gold, Yari Silver and Rook of each colour) exercise the forward-biased
+// spear pieces, whose reverse attacker projection is colour-flipped. Rules-validated
+// (no FSF perft oracle); the FENs are hand-constructed.
+variant_test!(
+    yari,
+    YariShogi7x9,
+    YariRules,
+    "yari",
+    [
+        "****o****j****jk****a****a****o/7/ppppppp/7/7/7/PPPPPPP/7/****O****A****AK****J****J****O[] w - - 0 1",
+        "k5****o/4****j2/2****J2****Ap/7/7/7/P6/7/****O2K3[****APp] w - - 0 1",
+        "k6/7/2****p****ur2/7/7/7/2****P****UR2/7/3K3[] w - - 0 1",
     ]
 );
 
