@@ -255,6 +255,12 @@ impl WideVariant<Xiangqi9x10> for ManchuRules {
         // face each other down an otherwise-empty file.
         XiangqiRules::extra_royal_attack(board, sq, by, occupied)
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 /// Manchu (yipaisanxianqi) as a [`GenericPosition`] over the 9x10 [`Xiangqi9x10`]
@@ -271,6 +277,7 @@ pub type Manchu = GenericPosition<Xiangqi9x10, ManchuRules>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::position::WideOutcome;
 
     /// The canonical start FEN round-trips through the mcr dialect.
     #[test]
@@ -307,6 +314,26 @@ mod tests {
         assert_eq!(
             banner_moves, 24,
             "rook (16, e1 blocked by king) + horse (8)"
+        );
+    }
+
+    /// Stalemate is a **loss** for the side to move (FSF `stalemateValue =
+    /// -VALUE_MATE`, issue #569) — inherited from the Xiangqi base. The lone Black
+    /// general on e10 has no legal move and is not in check: White Rooks on d1, f3,
+    /// and a9 seal d10, f10, and e9 respectively, while e10 itself is unattacked
+    /// (the White general on f1 shares no file with it). Black is stalemated, so
+    /// Black loses and White wins.
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos =
+            Manchu::from_fen("4k4/R8/9/9/9/9/9/5R3/9/3R1K3 b - - 0 1").expect("valid manchu FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
         );
     }
 }

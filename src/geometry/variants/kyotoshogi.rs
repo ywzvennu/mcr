@@ -293,6 +293,12 @@ impl WideVariant<Minishogi5x5> for KyotoshogiRules {
         // side.
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 /// Kyoto Shogi (5x5 flipping Shogi) as a [`GenericPosition`] over the 5x5

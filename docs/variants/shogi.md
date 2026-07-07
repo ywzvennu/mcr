@@ -109,6 +109,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 
 - Repetition tracked; adjudicates on 4-fold repetition
 - Impasse / jishogi declaration: Sente ≥ 28, Gote ≥ 27 points; ≥ 10 own pieces in the zone; big pieces (Rook, Bishop, Dragon, DragonHorse) score 5, others 1
+- Stalemate is a loss for the stalemated side
 - Perpetual check loses for the checker
 
 ## Special mechanics

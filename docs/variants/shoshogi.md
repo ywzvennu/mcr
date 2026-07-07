@@ -116,6 +116,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 **Draw / adjudication rules**
 
 - Repetition tracked; adjudicates on 4-fold repetition
+- Stalemate is a loss for the stalemated side
 - Perpetual check loses for the checker
 
 ## Special mechanics

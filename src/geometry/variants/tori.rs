@@ -497,6 +497,12 @@ impl WideVariant<Tori7x7> for ToriRules {
         // side.
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 /// Tori Shogi (bird shogi) as a [`GenericPosition`] over the 7x7 geometry.

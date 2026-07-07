@@ -297,6 +297,12 @@ impl WideVariant<Minixiangqi7x7> for MinixiangqiRules {
         true
     }
 
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
+
     // Minixiangqi deliberately does **not** set `perpetual_chase_loses` (issue #475):
     // Fairy-Stockfish's `minixiangqi_variant()` enables `perpetualCheckIllegal` but
     // leaves `chasingRule` at its `none` default (only full `xiangqi_variant()` sets

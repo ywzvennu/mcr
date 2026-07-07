@@ -342,6 +342,12 @@ impl WideVariant<Judkins6x6> for JudkinsRules {
     fn perpetual_check_loses() -> bool {
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 impl JudkinsRules {

@@ -227,7 +227,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Losalamos), "perft_losalamos.rs", PerftOracle::Fsf, 5, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Makpong), "perft_makpong.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("makpong_pieces_honour_count_matches_makruk")),
     row(Game::Wide(WideVariantId::Makruk), "perft_makruk.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("makruk_pieces_honour_count_matches_fsf")),
-    row(Game::Wide(WideVariantId::Manchu), "perft_manchu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
+    row(Game::Wide(WideVariantId::Manchu), "perft_manchu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::Mansindam), "perft_mansindam.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Micro), "perft_micro.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("micro_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Minishogi), "perft_minishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("minishogi_sennichite_is_a_draw")),

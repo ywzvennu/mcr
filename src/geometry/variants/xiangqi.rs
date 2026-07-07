@@ -404,6 +404,12 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
     fn perpetual_chase_loses() -> bool {
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 /// Xiangqi (Chinese chess) as a [`GenericPosition`] over the 9x10 [`Xiangqi9x10`]
@@ -415,3 +421,30 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
 /// docs](self) for the piece movements, the palace / river confinement, and the
 /// flying-general rule.
 pub type Xiangqi = GenericPosition<Xiangqi9x10, XiangqiRules>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::position::WideOutcome;
+
+    /// Stalemate is a **loss** for the side to move (FSF `stalemateValue =
+    /// -VALUE_MATE`, issue #569) — a genuine Xiangqi rule, not the standard draw.
+    /// The lone Black general on e10 has no legal move and is not in check: a White
+    /// Rook on d1 seals d10, a White Rook on f3 seals f10, and a White Rook on a9
+    /// sweeps rank 9 to seal e9, while e10 itself is unattacked (the White general
+    /// on f1 shares no file with it, so the flying-general rule is inert). Black is
+    /// stalemated, so Black loses and White wins.
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos =
+            Xiangqi::from_fen("4k4/R8/9/9/9/9/9/5R3/9/3R1K3 b - - 0 1").expect("valid xiangqi FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+}

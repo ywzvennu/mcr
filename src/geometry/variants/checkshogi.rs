@@ -131,6 +131,12 @@ impl WideVariant<Shogi9x9> for CheckShogiRules {
     fn perpetual_check_loses() -> bool {
         <ShogiRules as WideVariant<Shogi9x9>>::perpetual_check_loses()
     }
+
+    fn stalemate_is_loss() -> bool {
+        // As Shogi (FSF `checkshogi_variant` inherits `stalemateValue = -VALUE_MATE`
+        // from the shogi base); adjudication only, so perft is byte-identical.
+        <ShogiRules as WideVariant<Shogi9x9>>::stalemate_is_loss()
+    }
 }
 
 /// Checkshogi (Check Shogi) as a [`GenericPosition`] over the 9x9 geometry.

@@ -302,6 +302,12 @@ impl WideVariant<Minishogi5x5> for MinishogiRules {
     fn perpetual_check_loses() -> bool {
         true
     }
+
+    fn stalemate_is_loss() -> bool {
+        // Stalemate is a loss for the stalemated side (FSF `stalemateValue =
+        // -VALUE_MATE`); adjudication only, so perft is byte-identical.
+        true
+    }
 }
 
 impl MinishogiRules {
@@ -336,3 +342,28 @@ impl MinishogiRules {
 /// [`Minishogi::from_fen`](GenericPosition::from_fen). See the [module
 /// docs](self) for the hand, drops, and single-rank promotion zone.
 pub type Minishogi = GenericPosition<Minishogi5x5, MinishogiRules>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::position::WideOutcome;
+
+    /// Stalemate is a **loss** for the side to move (FSF `stalemateValue =
+    /// -VALUE_MATE`, issue #569), inherited from the `minishogi_variant_base`. The
+    /// lone Black king on a5 (empty hand — no drops) has no legal move and is not in
+    /// check: a White Rook on b1 sweeps the b-file to seal b4/b5 and a White Rook on
+    /// e4 sweeps rank 4 to seal a4/b4, while a5 itself is unattacked. Black is
+    /// stalemated, so Black loses and White wins.
+    #[test]
+    fn stalemate_is_a_loss() {
+        let pos = Minishogi::from_fen("k4/4R/5/5/1R2K[] b - - 0 1").expect("valid minishogi FEN");
+        assert!(pos.legal_moves().is_empty(), "Black has no legal move");
+        assert!(!pos.is_check(), "Black is not in check — a true stalemate");
+        assert_eq!(
+            pos.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            })
+        );
+    }
+}
