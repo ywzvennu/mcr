@@ -110,6 +110,7 @@ impl WideVariant<Chess8x8> for CodrusRules {
             threshold: 0,
             count_total: false,
             extinct_wins: true,
+            opponent_min: 0,
         })
     }
 

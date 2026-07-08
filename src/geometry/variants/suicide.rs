@@ -111,6 +111,7 @@ impl WideVariant<Chess8x8> for SuicideRules {
             threshold: 0,
             count_total: true,
             extinct_wins: true,
+            opponent_min: 0,
         })
     }
 

@@ -125,6 +125,7 @@ impl WideVariant<Chess8x8> for GiveawayRules {
             threshold: 0,
             count_total: true,
             extinct_wins: true,
+            opponent_min: 0,
         })
     }
 

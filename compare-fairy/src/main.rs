@@ -59,6 +59,7 @@ mod jieqi;
 mod khans;
 mod kinglet;
 mod knightmate;
+mod koedem;
 mod kyotoshogi;
 mod legan;
 mod locate;
@@ -417,6 +418,10 @@ fn main() {
     // `UCI_Variant shogun`.
     let shogun_mismatches = shogun::run(&mut engine, opts.full);
     let knightmate_mismatches = knightmate::run(&mut engine, opts.full);
+    // Koedem is a FSF built-in (no variants.ini needed), like knightmate: a
+    // crazyhouse-style 8x8 with a non-royal Commoner king, must-drop, and the "own
+    // all the kings" terminal.
+    let koedem_mismatches = koedem::run(&mut engine, opts.full);
     // No-castle chess is a FSF built-in (no variants.ini needed), like knightmate.
     let nocastle_mismatches = nocastle::run(&mut engine, opts.full);
     // Coregal chess is a FSF built-in (no variants.ini needed), like nocastle.
@@ -596,6 +601,7 @@ fn main() {
         + shinobi_mismatches
         + shogun_mismatches
         + knightmate_mismatches
+        + koedem_mismatches
         + nocastle_mismatches
         + coregal_mismatches
         + modern_mismatches

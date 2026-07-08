@@ -534,6 +534,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess but the royal piece moves and checks as a Knight; standard castling; pawns promote to Commoner, Bishop, Rook, or Queen (never a Knight). Win by checkmating the royal Knight.",
             oracle: "Fairy-Stockfish (`UCI_Variant knightmate`).",
         },
+        WideVariantId::Koedem => Meta {
+            display: "Koedem (8x8 King of the dead)",
+            pieces: "Standard army whose king is a non-royal Commoner (spelled k/K); reserves ride in the crazyhouse `[..]` hand.",
+            rules: "Crazyhouse-style chess with drops fed only from the FEN hand (a capture does not bank), a non-royal Commoner king (no check or checkmate), and a must-drop rule: a Commoner held in hand must be dropped before any other move. A side loses when it owns no Commoner while the opponent owns both; a side with no legal move loses. Standard pawns, double step, en passant, and Q/R/B/N promotion.",
+            oracle: "Fairy-Stockfish (`UCI_Variant koedem`).",
+        },
         WideVariantId::Kyotoshogi => Meta {
             display: "Kyoto Shogi (5x5 flipping Shogi)",
             pieces: "Four flipping pairs — Pawn/Rook, Silver/Bishop, Lance/Gold, Knight/Gold — plus a King that never flips.",
