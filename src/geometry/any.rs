@@ -30,11 +30,11 @@ use super::{
     Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
     Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere,
     Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror,
-    Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako,
-    Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan,
-    Square, Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi,
-    WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu,
-    Xiangqi, Yari,
+    Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Raazuvaa,
+    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin,
+    Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori,
+    Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome,
+    WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -835,7 +835,7 @@ wide_variants! {
     Manchu, Manchu, Manchu, "manchu", "manchuchess";
     Mansindam, Mansindam, Mansindam, "mansindam";
     Micro, Micro, Micro, "micro", "microshogi", "micro-shogi";
-    Minishogi, Minishogi, Minishogi, "minishogi";
+    Minishogi, Minishogi, Minishogi, "minishogi", "mini";
     Minixiangqi, Minixiangqi, Minixiangqi, "minixiangqi", "minixq";
     Misere, Misere, Misere, "misere", "misère", "miserechess";
     Modern, Modern, Modern, "modern";
@@ -854,6 +854,7 @@ wide_variants! {
     Petrified, Petrified, Petrified, "petrified";
     Placement, Placement, Placement, "placement";
     Pocketknight, Pocketknight, Pocketknight, "pocketknight", "pocket-knight";
+    Raazuvaa, Raazuvaa, Raazuvaa, "raazuvaa";
     Seirawan, Seirawan, Seirawan, "seirawan", "schess", "s-chess";
     Shako, Shako, Shako, "shako";
     Shatar, Shatar, Shatar, "shatar";
@@ -1107,7 +1108,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 104, "all 104 fairy variants are covered");
+        assert_eq!(count, 105, "all 105 fairy variants are covered");
     }
 
     #[test]
@@ -1313,6 +1314,8 @@ mod tests {
             ("dark", WideVariantId::FogOfWar),
             ("KOREAN", WideVariantId::Janggi),
             ("kyoto", WideVariantId::Kyotoshogi),
+            ("mini", WideVariantId::Minishogi),
+            ("MINI", WideVariantId::Minishogi),
             ("s-chess", WideVariantId::Seirawan),
             ("schess", WideVariantId::Seirawan),
             ("cchess", WideVariantId::Xiangqi),
@@ -1685,6 +1688,12 @@ mod tests {
             WideVariantId::Placement,
             Placement,
             AnyWideVariant::Placement,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Raazuvaa,
+            Raazuvaa,
+            AnyWideVariant::Raazuvaa,
             2
         );
         agrees_with_typed!(

@@ -696,6 +696,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard 8x8 chess (castling, double step, en passant, promotion to Queen/Rook/Bishop/Knight) with one Knight in each side's pocket, droppable onto any empty square as a move; captures are not banked, so the pocket is a one-shot reserve. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant pocketknight`).",
         },
+        WideVariantId::Raazuvaa => Meta {
+            display: "Raazuvaa chess (8x8)",
+            pieces: "Standard chess army.",
+            rules: "Standard 8x8 chess with castling and the pawn double step both disabled — neither side may castle, a pawn only ever advances one square (so en passant can never arise), and promotion to Queen/Rook/Bishop/Knight is standard. The chess of the Maldives. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant raazuvaa`).",
+        },
         WideVariantId::Seirawan => Meta {
             display: "Seirawan chess (S-Chess, 8x8)",
             pieces: "Standard chess army plus a reserve Hawk (Bishop + Knight) and Elephant (Rook + Knight), one of each per side.",

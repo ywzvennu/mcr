@@ -560,6 +560,15 @@ pub(crate) const SPECS: &[Spec] = &[
         dialect: identity,
     },
     Spec {
+        // Raazuvaa: standard chess with castling and the pawn double step both
+        // disabled. mcr and FSF spell it with the identical standard-chess letters,
+        // so the dialect is identity.
+        id: WideVariantId::Raazuvaa,
+        fsf: "raazuvaa",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         id: WideVariantId::Seirawan,
         fsf: "seirawan",
         needs_ini: false,
