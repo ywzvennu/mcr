@@ -99,16 +99,16 @@ pub use variants::{
     ManchuRules, Mansindam, MansindamRules, Micro, MicroRules, Minishogi, MinishogiRules,
     Minixiangqi, MinixiangqiRules, Misere, MisereRules, Modern, ModernRules, Newzealand,
     NewzealandRules, Nightrider, NightriderRules, Nocastle, NocastleRules, OkisakiShogi,
-    OkisakiShogiRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror, OrdamirrorRules,
-    Paradigm, ParadigmRules, Pawnback, PawnbackRules, Pawnsideways, PawnsidewaysRules, Perfect,
-    PerfectRules, Petrified, PetrifiedRules, Placement, PlacementRules, Pocketknight,
-    PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar, ShatarRules, Shatranj,
-    ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi, ShogiRules, Shogun,
-    ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Sortofalmost, SortofalmostRules,
-    Spartan, SpartanRules, Suicide, SuicideRules, Synochess, SynochessRules, Tencubed,
-    TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules, Tori, ToriRules, Torpedo,
-    TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules, Yari,
-    YariRules,
+    OkisakiShogiRules, Omicron, OmicronRules, Opulent, OpulentRules, Orda, OrdaRules, Ordamirror,
+    OrdamirrorRules, Paradigm, ParadigmRules, Pawnback, PawnbackRules, Pawnsideways,
+    PawnsidewaysRules, Perfect, PerfectRules, Petrified, PetrifiedRules, Placement, PlacementRules,
+    Pocketknight, PocketknightRules, Seirawan, SeirawanRules, Shako, ShakoRules, Shatar,
+    ShatarRules, Shatranj, ShatranjRules, Shinobi, ShinobiRules, ShoShogi, ShoShogiRules, Shogi,
+    ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Sortofalmost,
+    SortofalmostRules, Spartan, SpartanRules, Suicide, SuicideRules, Synochess, SynochessRules,
+    Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings, ThreekingsRules, Tori, ToriRules,
+    Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules,
+    Yari, YariRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -463,6 +463,25 @@ geometry!(
     u128,
     12,
     8
+);
+
+geometry!(
+    /// The Omicron chess board: twelve files by ten ranks (120 squares), backed by
+    /// `u128`.
+    ///
+    /// A `u128` geometry twelve files wide (the non-power-of-two width `12`) by ten
+    /// ranks: `12 * 10 = 120 <= 128`, so it stays within a single `u128` (no
+    /// [`U256`] needed) — the most-filled single-limb board yet (120 of 128 bits). A
+    /// square index reaches `119`, and edge-masked east/west shifts must not wrap
+    /// past the twelfth file. Files run a..l, ranks 1..10. It hosts Omicron chess —
+    /// an Omega-chess widening on a walled board: the a-/l-files and the top/bottom
+    /// ranks are wall squares except the four corners, which hold Wizards, so the
+    /// real play area is a 10x8 interior plus the four corner cells (see
+    /// [`Omicron`]).
+    Omicron12x10,
+    u128,
+    12,
+    10
 );
 
 geometry!(

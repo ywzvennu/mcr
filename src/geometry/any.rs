@@ -29,11 +29,11 @@ use super::{
     Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel, Janggi,
     Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Kyotoshogi, Legan, Losalamos,
     Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere, Modern,
-    Newzealand, Nightrider, Nocastle, OkisakiShogi, Opulent, Orda, Ordamirror, Paradigm, Pawnback,
-    Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar, Shatranj,
-    Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide,
-    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
-    WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
+    Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror, Paradigm,
+    Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar,
+    Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square,
+    Suicide, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
+    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -841,6 +841,7 @@ wide_variants! {
     Nightrider, Nightrider, Nightrider, "nightrider";
     Nocastle, Nocastle, Nocastle, "nocastle";
     OkisakiShogi, OkisakiShogi, OkisakiShogi, "okisakishogi", "okisaki", "okisaki-shogi";
+    Omicron, Omicron, Omicron, "omicron";
     Opulent, Opulent, Opulent, "opulent";
     Orda, Orda, Orda, "orda";
     Ordamirror, Ordamirror, Ordamirror, "ordamirror", "orda-mirror";
@@ -912,6 +913,7 @@ impl WideVariantId {
             | WideVariantId::Gustav3
             | WideVariantId::Jieqi
             | WideVariantId::OkisakiShogi
+            | WideVariantId::Omicron
             | WideVariantId::Tenjiku
             | WideVariantId::Washogi
             | WideVariantId::Yari => Independent,
@@ -1099,7 +1101,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 100, "all 100 fairy variants are covered");
+        assert_eq!(count, 101, "all 101 fairy variants are covered");
     }
 
     #[test]
@@ -1633,6 +1635,7 @@ mod tests {
             AnyWideVariant::OkisakiShogi,
             2
         );
+        agrees_with_typed!(WideVariantId::Omicron, Omicron, AnyWideVariant::Omicron, 2);
         agrees_with_typed!(WideVariantId::Orda, Orda, AnyWideVariant::Orda, 2);
         agrees_with_typed!(
             WideVariantId::Ordamirror,
