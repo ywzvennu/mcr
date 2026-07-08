@@ -157,6 +157,23 @@ pub trait Geometry: Copy + 'static {
     /// the generic analogue of the concrete `Bitboard::FULL` (which, for the
     /// full-width `u64`, is `!0`).
     const BOARD_MASK: Self::Bits;
+
+    /// The geometry's per-type storage for its lazily-built attack tables
+    /// ([`attacks::AttackTables`](crate::geometry::attacks::AttackTables)).
+    ///
+    /// This is an implementation detail of the `std`-only movegen acceleration:
+    /// the generic attack primitives cannot hold their precomputed tables in a
+    /// compile-time `static` (const trait methods on the backing integer are not
+    /// stable), so — mirroring the [`magic`](crate::magic) feature — each geometry
+    /// owns a [`OnceLock`](std::sync::OnceLock) that the tables are built into on
+    /// first use. The [`geometry!`](crate::geometry!) macro implements this for
+    /// every geometry, so all of them share the acceleration from one edit. The
+    /// `no_std` build omits both this and the tables, keeping the original
+    /// on-the-fly attack computation.
+    #[cfg(feature = "std")]
+    #[doc(hidden)]
+    fn attack_table_cell(
+    ) -> &'static ::std::sync::OnceLock<crate::geometry::attacks::AttackTables<Self>>;
 }
 
 /// Builds the first-file mask for a board: one bit at file `0` of each of
@@ -306,6 +323,17 @@ macro_rules! geometry {
             const LAST_FILE_MASK: u64 =
                 $crate::geometry::file_a_mask_u64($width, $height) << ($width - 1);
             const BOARD_MASK: u64 = $crate::geometry::board_mask_u64($width * $height);
+
+            #[cfg(feature = "std")]
+            #[doc(hidden)]
+            fn attack_table_cell() -> &'static ::std::sync::OnceLock<
+                $crate::geometry::attacks::AttackTables<Self>,
+            > {
+                static CELL: ::std::sync::OnceLock<
+                    $crate::geometry::attacks::AttackTables<$name>,
+                > = ::std::sync::OnceLock::new();
+                &CELL
+            }
         }
     };
     ($(#[$meta:meta])* $name:ident, u128, $width:expr, $height:expr) => {
@@ -322,6 +350,17 @@ macro_rules! geometry {
             const LAST_FILE_MASK: u128 =
                 $crate::geometry::file_a_mask_u128($width, $height) << ($width - 1);
             const BOARD_MASK: u128 = $crate::geometry::board_mask_u128($width * $height);
+
+            #[cfg(feature = "std")]
+            #[doc(hidden)]
+            fn attack_table_cell() -> &'static ::std::sync::OnceLock<
+                $crate::geometry::attacks::AttackTables<Self>,
+            > {
+                static CELL: ::std::sync::OnceLock<
+                    $crate::geometry::attacks::AttackTables<$name>,
+                > = ::std::sync::OnceLock::new();
+                &CELL
+            }
         }
     };
     ($(#[$meta:meta])* $name:ident, u256, $width:expr, $height:expr) => {
@@ -340,6 +379,17 @@ macro_rules! geometry {
                 $crate::geometry::last_file_mask_u256($width, $height);
             const BOARD_MASK: $crate::geometry::U256 =
                 $crate::geometry::board_mask_u256($width as u16 * $height as u16);
+
+            #[cfg(feature = "std")]
+            #[doc(hidden)]
+            fn attack_table_cell() -> &'static ::std::sync::OnceLock<
+                $crate::geometry::attacks::AttackTables<Self>,
+            > {
+                static CELL: ::std::sync::OnceLock<
+                    $crate::geometry::attacks::AttackTables<$name>,
+                > = ::std::sync::OnceLock::new();
+                &CELL
+            }
         }
     };
 }
