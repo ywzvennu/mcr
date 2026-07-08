@@ -3991,6 +3991,19 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
 
         let pawn_role = V::pawn_drop_role();
         let check_uchifuzume = V::pawn_drop_mate_forbidden();
+        // FSF `dropChecks = false` (Supply): a drop that gives check is illegal. A
+        // drop only ever adds a friendly blocker, so it can never *discover* a check
+        // — it delivers check only when the dropped piece itself attacks the enemy
+        // king. So suppress exactly those drops (a single forward attack test per
+        // candidate; `role_attacks` is the piece's check set, e.g. the cannon's
+        // over-screen captures). Default-off, so every other hand variant is
+        // byte-identical.
+        let drop_no_check = V::drop_check_forbidden();
+        let enemy_king = if drop_no_check {
+            board.king_of(them)
+        } else {
+            None
+        };
         // Kyoto Shogi: a held (base) piece may be deployed in either its base or
         // its promoted form (FSF `dropPromoted`). Default-off, so every other hand
         // variant emits a single base-form drop per square and stays byte-identical.
@@ -4008,6 +4021,14 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                 // skipped for every non-checking pawn drop and every other piece.
                 if check_uchifuzume && role == pawn_role && self.pawn_drop_is_mate(sq) {
                     continue;
+                }
+                // dropChecks = false: skip a drop whose piece attacks the enemy king
+                // (on the post-drop occupancy, which adds only this blocker).
+                if let Some(king_sq) = enemy_king {
+                    let occ_after = occupied.with(sq);
+                    if V::role_attacks(role, us, sq, occ_after).contains(king_sq) {
+                        continue;
+                    }
                 }
                 out.push(mv);
             }

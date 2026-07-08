@@ -32,8 +32,9 @@ use super::{
     Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror, Paradigm,
     Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar,
     Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square,
-    Suicide, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason,
-    WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu, Xiangqi, Yari,
+    Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi,
+    WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu,
+    Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -865,6 +866,7 @@ wide_variants! {
     Sortofalmost, Sortofalmost, Sortofalmost, "sortofalmost", "sortofalmostchess";
     Spartan, Spartan, Spartan, "spartan";
     Suicide, Suicide, Suicide, "suicide", "suicidechess";
+    Supply, Supply, Supply, "supply";
     Synochess, Synochess, Synochess, "synochess";
     Tencubed, Tencubed, Tencubed, "tencubed";
     Tenjiku, Tenjiku, Box<Tenjiku>, "tenjiku", "tenjikushogi", "tenjiku-shogi";
@@ -914,6 +916,7 @@ impl WideVariantId {
             | WideVariantId::Jieqi
             | WideVariantId::OkisakiShogi
             | WideVariantId::Omicron
+            | WideVariantId::Supply
             | WideVariantId::Tenjiku
             | WideVariantId::Washogi
             | WideVariantId::Yari => Independent,
@@ -1101,7 +1104,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 101, "all 101 fairy variants are covered");
+        assert_eq!(count, 102, "all 102 fairy variants are covered");
     }
 
     #[test]
@@ -1712,6 +1715,7 @@ mod tests {
         );
         agrees_with_typed!(WideVariantId::Spartan, Spartan, AnyWideVariant::Spartan, 2);
         agrees_with_typed!(WideVariantId::Suicide, Suicide, AnyWideVariant::Suicide, 2);
+        agrees_with_typed!(WideVariantId::Supply, Supply, AnyWideVariant::Supply, 2);
         agrees_with_typed!(
             WideVariantId::Synochess,
             Synochess,

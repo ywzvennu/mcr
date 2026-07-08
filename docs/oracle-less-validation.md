@@ -33,6 +33,7 @@ Selected by `ValidationOracle` (runtime) and the non-`Fsf` `PerftOracle` rows:
 | Okisaki Shogi | 10x10 | Independent | depth 1 hand-derived; depths 1–3 vs in-repo generator | depth 4 | independent in-repo 10x10 generator |
 | Yari Shogi | 9x7 | Independent | startpos depth 1–4 + a midgame depth 1–3 vs in-repo brute force | — | independent in-repo 7x9 generator |
 | Gustav 3 | 10x8 | Independent | depth 1 hand-derived; startpos + two midgames depth 1–3 vs in-repo generator | depth 4 | independent in-repo 10x8 generator |
+| Supply | 9x10 | Independent (+ Xiangqi equivalence) | empty-hand start + middlegame depth 1–4 = FSF-pinned Xiangqi; two crafted hand positions depth 1–3 vs in-repo generator | depth 4 (start) | independent in-repo 9x10 Xiangqi-with-drops generator |
 
 "Second source" is what stands in for the missing FSF oracle. For the HaChu-oracle
 variants it is the HaChu engine (driven as a subprocess by `compare-fairy`, never
@@ -208,6 +209,39 @@ catch a large class of move-generation defects independently of the perft pins.
   castling rights or cannot castle within three plies).
 - **Residual gap:** no external engine oracle; two in-repo implementations agree to
   depth 3 on the start and both midgames; deeper is single-source.
+
+### Supply — FSF built-in, but no large-board binary
+- Supply is a Fairy-Stockfish built-in (`supply`) — Xiangqi (9x10) with a hand and
+  piece drops — but the FSF binary available here is a **non-large-board build**: it
+  has neither `supply` nor even the 9x10 `xiangqi` variant, and asked for either it
+  silently falls back to standard chess (`go perft` returns chess-root 20 at depth
+  1). So there is no usable live engine oracle here.
+- **Empty-hand play equals Xiangqi.** FSF `supply` leaves `capturesToHand = false`
+  and is a two-board (`twoBoards`) game whose hand is fed by the *partner* board,
+  never by a capture on this board; FSF also excludes its two-board "virtual" drops
+  from perft. On a single board the hand thus starts empty and stays empty, so every
+  Supply move tree from a normal position is Xiangqi's node-for-node. mcr models
+  Supply by delegating **all** movement, king-safety and terminal rules to its
+  FSF-validated `XiangqiRules`, adding only a hand and the region-restricted drops
+  (with `captures_to_hand = false`). `tests/perft_supply.rs` pins
+  `Supply::perft == Xiangqi::perft` at the start and a middlegame to depth 4, and
+  `compare-fairy/src/supply.rs` drives the same equivalence live against FSF
+  `UCI_Variant xiangqi` when a `largeboards=yes` binary is present — so empty-hand
+  Supply inherits Xiangqi's node-for-node FSF pin.
+- **The drop mechanic** — region-restricted drops (each piece only onto an own-half
+  square it could legally stand: Advisor palace points, Elephant points, Soldier
+  residences; Chariot/Horse/Cannon anywhere in the own half) and the
+  `dropChecks = false` rule (a drop may not give check) — has no reachable FSF
+  analogue, so it is cross-checked node-for-node, depths 1–3, against an
+  **independent from-scratch 9x10 Xiangqi-with-drops generator** (its own array
+  model, hobbled Horse, eye-blocked Elephant, over-screen Cannon, river-crossing
+  Soldier, palace/river confinement, flying general, the per-piece drop region, and
+  the drop-no-check rule) on two crafted positions that hold pieces in hand. **perft(1)
+  = 44** at the start is hand-derived and equal to Xiangqi's FSF-confirmed count.
+- **Residual gap:** empty-hand play is FSF-pinned (via the Xiangqi equivalence) to
+  depth 4; the drop mechanic is agreed node-for-node by two independent in-repo
+  implementations to depth 3, but has no external engine oracle (FSF's own drops
+  being the excluded two-board virtual drops).
 
 ## Summary of what is and is not claimed
 

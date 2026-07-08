@@ -3,7 +3,7 @@
 
 # mcr per-variant reference
 
-One engine-derived page per variant — **110** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
+One engine-derived page per variant — **111** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
 
 ## 3x4
 
@@ -123,6 +123,7 @@ One engine-derived page per variant — **110** in all, grouped by board size (`
 - [janggi](janggi.md)
 - [jieqi](jieqi.md)
 - [manchu](manchu.md)
+- [supply](supply.md)
 - [xiangqi](xiangqi.md)
 
 ## 10x8

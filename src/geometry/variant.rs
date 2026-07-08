@@ -1880,6 +1880,21 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         WideRole::Pawn
     }
 
+    /// Returns `true` if a drop that **gives check** to the opponent is forbidden
+    /// (FSF `dropChecks = false`). Only consulted when
+    /// [`has_hand`](WideVariant::has_hand) is `true`.
+    ///
+    /// The default is `false` — drops may give check (Shogi / crazyhouse). Supply
+    /// overrides it to `true`. A drop only ever *adds* a friendly blocker, so it can
+    /// never **discover** a check; it delivers check only when the dropped piece
+    /// itself attacks the enemy king. The generic drop generator therefore suppresses
+    /// exactly those drops whose piece, on its target square, attacks the enemy king
+    /// (a single attack test per candidate, no make/unmake). Kept default-`false`, so
+    /// every other hand variant is byte-identical.
+    fn drop_check_forbidden() -> bool {
+        false
+    }
+
     /// Returns `true` if a piece of `role`'s attack set is **direction-dependent**
     /// — asymmetric under a color flip, so a piece of one color attacking `sq` is
     /// found by projecting the *opposite* color's pattern back from `sq` (as a
