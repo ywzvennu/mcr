@@ -249,6 +249,24 @@
     }
   },
   {
+    "name": "atomar",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "atomar"
+    }
+  },
+  {
     "name": "berolina",
     "family": "wide",
     "width": 8,
@@ -1484,6 +1502,24 @@
     ],
     "oracle": {
       "fairy_stockfish": "nocastle"
+    }
+  },
+  {
+    "name": "nocheckatomic",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "nocheckatomic"
     }
   },
   {
