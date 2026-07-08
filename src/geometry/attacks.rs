@@ -62,12 +62,22 @@ pub use tables::AttackTables;
 #[cfg(feature = "std")]
 mod tables {
     use super::{
-        anti_diag_mask_compute, diag_mask_compute, king_attacks_compute, knight_attacks_compute,
-        pawn_attacks_compute,
+        anti_diag_mask_compute, between_compute, diag_mask_compute, king_attacks_compute,
+        knight_attacks_compute, line_compute, pawn_attacks_compute,
     };
     use crate::geometry::{Bitboard, Geometry, Square};
     use crate::Color;
     use alloc::vec::Vec;
+
+    /// Boards with at most this many squares get precomputed `between` / `line`
+    /// ray tables; wider ones (the `U256`-backed large-shogi geometries) keep the
+    /// on-the-fly ray walk. The tables are `SQUARES^2`-sized, so this caps their
+    /// footprint: at the ceiling a `u128` board (≤ 121 squares here) spends
+    /// `121^2 * 16 B * 2 ≈ 468 KiB`, whereas a 256-square `U256` board would
+    /// spend `256^2 * 32 B * 2 = 4 MiB` — not worth it for boards whose `between`
+    /// is a rarely-hit deep-search path. The per-square leaper / diagonal tables
+    /// above are only `SQUARES`-sized and are always built.
+    const RAY_TABLE_MAX_SQUARES: usize = 128;
 
     /// Per-square precomputed tables for one geometry `G`, each indexed by
     /// [`Square::index`] and sized to `G::SQUARES`.
@@ -84,6 +94,13 @@ mod tables {
         diag: Vec<Bitboard<G>>,
         /// Full NW/SE anti-diagonal line mask per square.
         anti_diag: Vec<Bitboard<G>>,
+        /// Strictly-between squares for every ordered pair `(a, b)`, indexed by
+        /// `a.index() * SQUARES + b.index()`. Empty (fall back to the ray walk)
+        /// for geometries wider than [`RAY_TABLE_MAX_SQUARES`].
+        between: Vec<Bitboard<G>>,
+        /// Full rank/file/diagonal line through every ordered pair `(a, b)`, same
+        /// indexing as `between`. Empty for the wide geometries.
+        line: Vec<Bitboard<G>>,
     }
 
     // A hand-written `Debug` avoids piling `where G::Bits: Debug` bounds onto the
@@ -114,6 +131,21 @@ mod tables {
                 diag.push(diag_mask_compute(sq));
                 anti_diag.push(anti_diag_mask_compute(sq));
             }
+            // The `SQUARES^2` ray tables, built only for boards within the
+            // footprint cap; wider boards leave them empty and ray-walk.
+            let (mut between, mut line) = (Vec::new(), Vec::new());
+            if n <= RAY_TABLE_MAX_SQUARES {
+                between = Vec::with_capacity(n * n);
+                line = Vec::with_capacity(n * n);
+                for a in 0..n {
+                    let sa = Square::<G>::new(a as u8);
+                    for b in 0..n {
+                        let sb = Square::<G>::new(b as u8);
+                        between.push(between_compute(sa, sb));
+                        line.push(line_compute(sa, sb));
+                    }
+                }
+            }
             AttackTables {
                 knight,
                 king,
@@ -121,6 +153,8 @@ mod tables {
                 pawn_black,
                 diag,
                 anti_diag,
+                between,
+                line,
             }
         }
 
@@ -164,6 +198,30 @@ mod tables {
         #[inline]
         pub(super) fn anti_diag(&self, sq: Square<G>) -> Bitboard<G> {
             self.anti_diag[sq.index() as usize]
+        }
+
+        /// Strictly-between squares for `(a, b)`, from the table when built,
+        /// else the on-the-fly ray walk (wide `U256` geometries).
+        #[inline]
+        pub(super) fn between(&self, a: Square<G>, b: Square<G>) -> Bitboard<G> {
+            if self.between.is_empty() {
+                between_compute(a, b)
+            } else {
+                let n = G::SQUARES as usize;
+                self.between[a.index() as usize * n + b.index() as usize]
+            }
+        }
+
+        /// The full line through `(a, b)`, from the table when built, else the
+        /// on-the-fly ray walk.
+        #[inline]
+        pub(super) fn line(&self, a: Square<G>, b: Square<G>) -> Bitboard<G> {
+            if self.line.is_empty() {
+                line_compute(a, b)
+            } else {
+                let n = G::SQUARES as usize;
+                self.line[a.index() as usize * n + b.index() as usize]
+            }
         }
     }
 }
@@ -1526,6 +1584,20 @@ fn step_toward<G: Geometry>(a: Square<G>, b: Square<G>) -> Option<(i8, i8)> {
 /// ```
 #[must_use]
 pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().between(a, b)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        between_compute(a, b)
+    }
+}
+
+/// On-the-fly strictly-between ray walk: the `no_std` fallback, the value the
+/// `std` table caches, and the wide-geometry (`U256`) path where the table is
+/// not built. Shared so every path is bit-identical.
+fn between_compute<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
     let Some((df, dr)) = step_toward(a, b) else {
         return Bitboard::EMPTY;
     };
@@ -1553,6 +1625,19 @@ pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
 /// ```
 #[must_use]
 pub fn line<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().line(a, b)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        line_compute(a, b)
+    }
+}
+
+/// On-the-fly full-line ray walk: the `no_std` fallback, the cached `std` value,
+/// and the wide-geometry path. Shared so every path is bit-identical.
+fn line_compute<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
     let Some((df, dr)) = step_toward(a, b) else {
         return Bitboard::EMPTY;
     };
