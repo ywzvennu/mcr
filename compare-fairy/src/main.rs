@@ -34,6 +34,7 @@ mod capahouse;
 mod chak;
 mod chaturanga;
 mod chennis;
+mod chessgi;
 mod codrus;
 mod coregal;
 mod corpus;
@@ -64,6 +65,7 @@ mod kyotoshogi;
 mod legan;
 mod locate;
 mod locate_hachu;
+mod loopchess;
 mod losalamos;
 mod losers;
 mod makpong;
@@ -409,6 +411,12 @@ fn main() {
     // crazyhouse with the hand fed externally (FSF `twoBoards`), so `go perft` is
     // meaningful and the standard piece letters need no translation.
     let bughouse_mismatches = bughouse::run(&mut engine, opts.full);
+    // Loop Chess is a FSF built-in (no variants.ini needed): crazyhouse where a
+    // captured promoted piece keeps its role in hand (`dropLoop`); standard piece
+    // letters need no translation.
+    let loopchess_mismatches = loopchess::run(&mut engine, opts.full);
+    // Chessgi is a FSF built-in: Loop plus first-rank pawn drops; standard letters.
+    let chessgi_mismatches = chessgi::run(&mut engine, opts.full);
     let spartan_mismatches = spartan::run(&mut engine, opts.full);
     let shako_mismatches = shako::run(&mut engine, opts.full);
     let shatar_mismatches = shatar::run(&mut engine, opts.full);
@@ -665,6 +673,8 @@ fn main() {
         + jieqi_mismatches
         + supply_mismatches
         + ataxx_mismatches
+        + loopchess_mismatches
+        + chessgi_mismatches
         > 0
     {
         std::process::exit(1);

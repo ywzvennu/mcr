@@ -318,6 +318,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "7x7 board where each non-royal piece flips to its alternate form on every move; captures go to hand and drop in either form; the King is confined to a 5x4 mobility region. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant chennis`).",
         },
+        WideVariantId::Chessgi => Meta {
+            display: "Chessgi (8x8)",
+            pieces: "Standard chess army plus a crazyhouse drop hand.",
+            rules: "Loop Chess (crazyhouse where captured promoted pieces keep their role in hand, `Q~` to `Q`) with the pawn drop region relaxed so a pawn may also be dropped on its own first rank — only the pawn's promotion rank (the enemy back rank) stays forbidden. No nifu. Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant chessgi`).",
+        },
         WideVariantId::Chigorin => Meta {
             display: "Chigorin Chess (8x8)",
             pieces: "Asymmetric: a White knight army (Knights + a Chancellor, no bishops or queen) vs a Black bishop army (Bishops + a Queen, no knights).",
@@ -557,6 +563,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             pieces: "Standard chess army arrayed on a corner diagonal, with a directional Legan pawn (`p`/`P`).",
             rules: "Each side attacks toward the opposite corner. Pieces move as in standard chess; the pawn moves one square diagonally toward the far corner (up-left for White, down-right for Black) and captures one square along either orthogonal of that diagonal (north or west for White, south or east for Black). No double step, no en passant, no castling. Pawns promote (Q/R/B/N) on an L-shaped corner region — {a8,b8,c8,d8,a7,a6,a5} for White, {e1,f1,g1,h1,h2,h3,h4} for Black — so promotion can occur off the last rank. The fifty-move rule and threefold repetition are standard. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant legan`).",
+        },
+        WideVariantId::LoopChess => Meta {
+            display: "Loop Chess (8x8)",
+            pieces: "Standard chess army plus a crazyhouse drop hand.",
+            rules: "Standard 8x8 chess with captures banking to hand for later drops (a pawn only on ranks 2-7, no nifu), differing from crazyhouse in one rule: a captured piece that reached the board by promotion keeps its promoted role in hand (`Q~` to `Q`) instead of demoting to a Pawn (FSF `dropLoop`). Win by checkmate.",
+            oracle: "Fairy-Stockfish (`UCI_Variant loop`).",
         },
         WideVariantId::Losalamos => Meta {
             display: "Los Alamos chess (6x6, no bishops)",
