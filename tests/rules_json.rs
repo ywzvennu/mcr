@@ -94,7 +94,11 @@ fn rules_json_is_up_to_date() {
         if regen {
             std::fs::write(&path, generated).unwrap_or_else(|e| panic!("write {name}: {e}"));
         }
-        let committed = std::fs::read_to_string(&path).unwrap_or_default();
+        // Normalize CRLF -> LF: git may check the committed file out with CRLF on
+        // Windows, but `generated` is always LF, so compare line-ending-agnostic.
+        let committed = std::fs::read_to_string(&path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert_eq!(
             &committed, generated,
             "docs/rules/{name} is out of date; regenerate with \

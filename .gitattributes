@@ -1,0 +1,6 @@
+# Force LF on the committed, generated documentation so the cross-platform
+# drift-check tests (rules_json / variant_pages_doc / variants_doc) compare the
+# freshly-rendered LF output byte-for-byte against the checked-out files on
+# Windows too. Without this, git's autocrlf checks these out with CRLF and the
+# `assert_eq!` diffs on line endings. The tests also normalize CRLF defensively.
+docs/** text eol=lf

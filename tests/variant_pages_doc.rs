@@ -689,7 +689,10 @@ fn variant_pages_are_up_to_date() {
     }
 
     let index = render_index();
-    let committed_index = std::fs::read_to_string(index_path()).unwrap_or_default();
+    // Normalize CRLF -> LF (Windows git checkout) so the diff is line-ending-agnostic.
+    let committed_index = std::fs::read_to_string(index_path())
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
     assert_eq!(
         committed_index, index,
         "docs/variants/README.md is out of date; regenerate with `REGEN=1 cargo test --test variant_pages_doc`",
@@ -698,7 +701,9 @@ fn variant_pages_are_up_to_date() {
     for &vref in &VariantRef::ALL {
         let name = vref.name();
         let page = render_page(vref);
-        let committed = std::fs::read_to_string(page_path(name)).unwrap_or_default();
+        let committed = std::fs::read_to_string(page_path(name))
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert_eq!(
             committed, page,
             "docs/variants/{name}.md is out of date; regenerate with `REGEN=1 cargo test --test variant_pages_doc`",
