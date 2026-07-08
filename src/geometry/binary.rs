@@ -89,6 +89,7 @@ const F_BOARD_B: u16 = 1 << 7;
 const F_PASSES: u16 = 1 << 8;
 const F_CLOCKS: u16 = 1 << 9;
 const F_PETRIFIED: u16 = 1 << 10;
+const F_CHECKS: u16 = 1 << 11;
 
 /// The widest board the geometry layer supports is the 16x16 Tenjiku Shogi board
 /// (256 squares, U256-backed), so an occupancy bitset never exceeds this many
@@ -411,6 +412,9 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if state.halfmove_clock != 0 || state.fullmove_number != 1 {
             flags |= F_CLOCKS;
         }
+        if state.checks_against != [0, 0] {
+            flags |= F_CHECKS;
+        }
         out.extend_from_slice(&flags.to_le_bytes());
 
         // Board (wire-format v2, issue #448): an occupancy bitset, then a colour
@@ -492,6 +496,10 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if flags & F_CLOCKS != 0 {
             push_varint(u64::from(state.halfmove_clock), out);
             push_varint(u64::from(state.fullmove_number), out);
+        }
+        if flags & F_CHECKS != 0 {
+            out.push(state.checks_against[0]);
+            out.push(state.checks_against[1]);
         }
     }
 
@@ -595,6 +603,12 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             (0, 1)
         };
 
+        let checks_against = if flags & F_CHECKS != 0 {
+            [cur.u8()?, cur.u8()?]
+        } else {
+            [0, 0]
+        };
+
         if !cur.is_empty() {
             return Err(WireError::TrailingData);
         }
@@ -616,6 +630,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             consecutive_passes,
             board_b,
             petrified,
+            checks_against,
         };
         let mut pos = Self::from_parts(board, state);
         pos.set_promoted(promoted);

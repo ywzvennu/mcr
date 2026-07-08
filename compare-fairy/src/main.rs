@@ -88,6 +88,7 @@ mod perfect;
 mod petrified;
 mod placement;
 mod pocketknight;
+mod fivecheck;
 mod raazuvaa;
 mod seirawan;
 mod shako;
@@ -400,6 +401,10 @@ fn main() {
     // needed): standard chess with castling and the pawn double step both disabled,
     // so the standard piece letters need no translation.
     let raazuvaa_mismatches = raazuvaa::run(&mut engine, opts.full);
+    // Five-check is a FSF built-in (no variants.ini needed): standard chess with a
+    // five-check win condition, so the standard piece letters and the `5+5` check
+    // field need no translation.
+    let fivecheck_mismatches = fivecheck::run(&mut engine, opts.full);
     // Bughouse is a FSF built-in (no variants.ini needed): on a single board it is
     // crazyhouse with the hand fed externally (FSF `twoBoards`), so `go perft` is
     // meaningful and the standard piece letters need no translation.
@@ -597,6 +602,7 @@ fn main() {
         + placement_mismatches
         + pocketknight_mismatches
         + raazuvaa_mismatches
+        + fivecheck_mismatches
         + bughouse_mismatches
         + spartan_mismatches
         + shako_mismatches

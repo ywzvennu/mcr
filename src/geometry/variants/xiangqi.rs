@@ -176,6 +176,7 @@ impl WideVariant<Xiangqi9x10> for XiangqiRules {
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
+            checks_against: [0, 0],
         };
         (board, state)
     }

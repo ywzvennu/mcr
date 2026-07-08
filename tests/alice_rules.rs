@@ -49,6 +49,7 @@ fn build(
         consecutive_passes: 0,
         board_b,
         petrified: Bitboard::EMPTY,
+        checks_against: [0, 0],
     };
     Alice::from_parts(board, state)
 }

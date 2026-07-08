@@ -31,11 +31,11 @@ fn all_spans_both_families() {
     assert_eq!(concrete, VariantId::ALL.len(), "every concrete variant");
     assert_eq!(wide, WideVariantId::ALL.len(), "every wide variant");
     assert_eq!(concrete, 9, "nine concrete variants");
-    assert_eq!(wide, 105, "one hundred five wide variants");
+    assert_eq!(wide, 106, "one hundred six wide variants");
     assert_eq!(
         VariantRef::ALL.len(),
-        114,
-        "one hundred fourteen variants in all"
+        115,
+        "one hundred fifteen variants in all"
     );
 }
 

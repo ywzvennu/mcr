@@ -815,7 +815,7 @@ fn derive_terminal<G: Geometry, V: WideVariant<G>>() -> TerminalRules {
         explosion_win: false,
         lose_all_wins: false,
         all_pieces_lost_loses: false,
-        check_count_to_win: None,
+        check_count_to_win: V::check_count_to_win(),
         region_win: None,
     }
 }

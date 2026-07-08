@@ -390,6 +390,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "Standard chess movement, castling, en passant, and promotion but no check or checkmate — the king is an ordinary capturable Commoner. A side loses the instant any one of its piece types is wiped out (Pawn, Knight, Bishop, Rook, Queen, or king reaches zero), so capturing the last enemy queen — or promoting your own last pawn — decides the game. Rides the generic extinction terminal (all army types, threshold 0).",
             oracle: "Fairy-Stockfish (`UCI_Variant extinction`).",
         },
+        WideVariantId::Fivecheck => Meta {
+            display: "Five-check (8x8)",
+            pieces: "Standard chess army.",
+            rules: "Standard chess plus a win for the first side to give check five times; every move, castling, en passant, promotion, and the ordinary checkmate / stalemate are standard chess, so the move set — and perft — are byte-identical to standard chess. The FEN carries a remaining-checks field `W+B` between the en-passant field and the clocks (starts `5+5`, counting each side down as it is checked). Rides the generic check-counting terminal (threshold 5).",
+            oracle: "Move set identical to standard chess; validated against Fairy-Stockfish `UCI_Variant 5check`.",
+        },
         WideVariantId::Giveaway => Meta {
             display: "Giveaway chess (8x8)",
             pieces: "Standard chess army with a non-royal Commoner king.",
