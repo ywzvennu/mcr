@@ -5583,9 +5583,16 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     /// piece reached the board by promotion), otherwise the role's own hand base
     /// ([`WideVariant::role_hand_base`]). For a non-demoting variant the mask is
     /// always empty, so this is exactly `role_hand_base`.
+    ///
+    /// A [`drop_loop`](WideVariant::drop_loop) variant (Loop Chess, Chessgi) still
+    /// tracks the promoted mask — so `~` round-trips through the FEN — but a captured
+    /// promoted piece banks as its **own promoted role** rather than a Pawn (FSF
+    /// `pieceToHand = !capturedPromoted || drop_loop() ? ~captured : PAWN`), so the
+    /// demotion branch is skipped and it falls through to `role_hand_base` (the
+    /// identity for the crazyhouse army).
     #[inline]
     fn banked_role(&self, captured: WideRole, to: Square<G>) -> WideRole {
-        if V::demotes_promoted_captures() && self.promoted.contains(to) {
+        if V::demotes_promoted_captures() && !V::drop_loop() && self.promoted.contains(to) {
             WideRole::Pawn
         } else {
             V::role_hand_base(captured)

@@ -1013,6 +1013,22 @@ pub(crate) const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: identity,
     },
+    // Loop Chess and Chessgi are appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above. Both are FSF built-ins using only
+    // standard chess pieces, so their FEN (crazyhouse hand + promoted `~` marker
+    // included) passes to FSF unchanged.
+    Spec {
+        id: WideVariantId::LoopChess,
+        fsf: "loop",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        id: WideVariantId::Chessgi,
+        fsf: "chessgi",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

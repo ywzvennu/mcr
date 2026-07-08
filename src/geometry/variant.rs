@@ -2104,6 +2104,27 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// Returns `true` if a captured piece that **reached the board by promotion**
+    /// keeps its **promoted role** when banked into the captor's hand, rather than
+    /// demoting to a Pawn — Fairy-Stockfish's `dropLoop` (the Loop Chess / Chessgi
+    /// rule). Only consulted when
+    /// [`demotes_promoted_captures`](WideVariant::demotes_promoted_captures) is also
+    /// `true` (the crazyhouse promoted mask that records which occupants arrived by
+    /// promotion must still be tracked, so `~` round-trips through the FEN and a
+    /// captured promoted Queen is *known* to be promoted; `drop_loop` then decides
+    /// only whether that Queen banks as a Queen or a Pawn).
+    ///
+    /// The default is `false` — the crazyhouse rule: a captured promoted piece
+    /// banks as a Pawn (`Q~` -> `p` in hand). Loop Chess and Chessgi override it to
+    /// `true`, so `banked_role` skips the demotion and the promoted piece enters the
+    /// hand as its own (promoted) role. FSF models this identically:
+    /// `pieceToHand = !capturedPromoted || drop_loop() ? ~captured : PAWN`. Default-off,
+    /// so every standard crazyhouse-family variant (Capahouse, Grandhouse, S-House)
+    /// keeps demoting and is byte-identical.
+    fn drop_loop() -> bool {
+        false
+    }
+
     /// Returns `true` if a piece of `role` of `color` is **forbidden from
     /// promoting** in the current `board` because the variant caps the number of
     /// its promoted form (FSF `promotionLimit`). When `true`, the generic per-piece

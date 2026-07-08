@@ -3,7 +3,7 @@
 
 # mcr per-variant reference
 
-One engine-derived page per variant — **115** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
+One engine-derived page per variant — **117** in all, grouped by board size (`files`x`ranks`). Every page is rendered straight from mcr's `VariantRules` model (board, army movement, pawn / promotion / castling rules, draws, terminal conditions, special mechanics), so it can never drift from the move generator. For the one-line summary table see [../variants.md](../variants.md).
 
 ## 3x4
 
@@ -58,6 +58,7 @@ One engine-derived page per variant — **115** in all, grouped by board size (`
 - [bughouse](bughouse.md)
 - [cambodian](cambodian.md)
 - [chaturanga](chaturanga.md)
+- [chessgi](chessgi.md)
 - [chigorin](chigorin.md)
 - [codrus](codrus.md)
 - [coregal](coregal.md)
@@ -78,6 +79,7 @@ One engine-derived page per variant — **115** in all, grouped by board size (`
 - [knightmate](knightmate.md)
 - [koedem](koedem.md)
 - [legan](legan.md)
+- [loop](loop.md)
 - [losers](losers.md)
 - [makpong](makpong.md)
 - [makruk](makruk.md)

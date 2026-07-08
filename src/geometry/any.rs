@@ -24,17 +24,17 @@ use core::str::FromStr;
 use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
-    Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
+    Chessgi, Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
     EuroShogi, Extinction, FiveCheck, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry,
     Georgian, Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel,
     Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
-    Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere,
-    Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror,
-    Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Raazuvaa,
-    Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin,
-    Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori,
-    Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome,
-    WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
+    LoopChess, Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
+    Minixiangqi, Misere, Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent,
+    Orda, Ordamirror, Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement,
+    Pocketknight, Raazuvaa, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
+    Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed, Tenjiku,
+    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
+    WideOutcome, WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -793,6 +793,7 @@ wide_variants! {
     Chaturanga, Chaturanga, Chaturanga, "chaturanga";
     CheckShogi, CheckShogi, CheckShogi, "checkshogi", "check-shogi";
     Chennis, Chennis, Chennis, "chennis";
+    Chessgi, Chessgi, Chessgi, "chessgi";
     Chigorin, Chigorin, Chigorin, "chigorin";
     Chu, Chu, Box<Chu>, "chu", "chushogi", "chu-shogi";
     Codrus, Codrus, Codrus, "codrus";
@@ -829,6 +830,7 @@ wide_variants! {
     Koedem, Koedem, Koedem, "koedem";
     Kyotoshogi, Kyotoshogi, Kyotoshogi, "kyotoshogi", "kyoto", "kyoto-shogi";
     Legan, Legan, Legan, "legan";
+    LoopChess, LoopChess, LoopChess, "loop", "loopchess";
     Losalamos, Losalamos, Losalamos, "losalamos", "losalamoschess", "los-alamos";
     Losers, Losers, Losers, "losers", "loserschess";
     Makpong, Makpong, Makpong, "makpong";
@@ -1109,7 +1111,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 106, "all 106 fairy variants are covered");
+        assert_eq!(count, 108, "all 108 fairy variants are covered");
     }
 
     #[test]
@@ -1519,6 +1521,7 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Chennis, Chennis, AnyWideVariant::Chennis, 2);
+        agrees_with_typed!(WideVariantId::Chessgi, Chessgi, AnyWideVariant::Chessgi, 2);
         agrees_with_typed!(
             WideVariantId::Chigorin,
             Chigorin,
@@ -1610,6 +1613,12 @@ mod tests {
             2
         );
         agrees_with_typed!(WideVariantId::Legan, Legan, AnyWideVariant::Legan, 2);
+        agrees_with_typed!(
+            WideVariantId::LoopChess,
+            LoopChess,
+            AnyWideVariant::LoopChess,
+            2
+        );
         agrees_with_typed!(
             WideVariantId::Losalamos,
             Losalamos,
