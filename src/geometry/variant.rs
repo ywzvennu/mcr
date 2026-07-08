@@ -2215,6 +2215,28 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    /// The number of checks a side must **deliver** to win the game, or `None` if
+    /// the variant has no check-counting rule (Five-check returns `Some(5)`; FSF's
+    /// `checkCounting = true` with a five-check goal, the `5+5` FEN field). The
+    /// default is `None`.
+    ///
+    /// This is the multi-check generalisation of
+    /// [`wins_on_check`](Self::wins_on_check) (a one-check goal): rather than a pure
+    /// property of the current position, a running per-side count of checks
+    /// delivered is carried in the position state (the `checks_against` field of
+    /// [`GenericState`]) and rides make/unmake and the FEN. When the count
+    /// against a side reaches this threshold that side has lost, reported as a
+    /// [`WideEndReason::VariantWin`] credited to the checker.
+    ///
+    /// While it is `None` the engine never touches the counter and never evaluates
+    /// the rule, so every other variant is byte-identical. **Move generation is
+    /// unaffected** — the legal-move set is exactly the base variant's, so perft is
+    /// byte-identical (the counter changes only adjudication, exactly as the
+    /// concrete three-check does).
+    fn check_count_to_win() -> Option<u8> {
+        None
+    }
+
     // --- Repetition / draw rules (default OFF) ----------------------------
     //
     // These hooks drive the history-dependent terminal rules, which a bare
@@ -2529,6 +2551,8 @@ pub struct DrawHooks {
     pub move_rule_plies: bool,
     /// [`WideVariant::wins_on_check`] is `true`.
     pub wins_on_check: bool,
+    /// [`WideVariant::check_count_to_win`] returns `Some`.
+    pub check_count_to_win: bool,
     /// [`WideVariant::extinction_rule`] returns `Some`.
     pub extinction_rule: bool,
     /// [`WideVariant::stalemate_is_win`] is `true`.
@@ -2557,6 +2581,7 @@ impl DrawHooks {
             || self.has_bare_king_loss
             || self.move_rule_plies
             || self.wins_on_check
+            || self.check_count_to_win
             || self.extinction_rule
             || self.stalemate_is_win
             || self.stalemate_piece_count
@@ -2581,6 +2606,7 @@ impl DrawHooks {
             (self.has_bare_king_loss, "has_bare_king_loss"),
             (self.move_rule_plies, "move_rule_plies"),
             (self.wins_on_check, "wins_on_check"),
+            (self.check_count_to_win, "check_count_to_win"),
             (self.extinction_rule, "extinction_rule"),
             (self.stalemate_is_win, "stalemate_is_win"),
             (self.stalemate_piece_count, "stalemate_piece_count"),
@@ -2775,6 +2801,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
+            checks_against: [0, 0],
         };
         (board, state)
     }

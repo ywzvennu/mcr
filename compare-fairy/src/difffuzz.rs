@@ -999,6 +999,20 @@ pub(crate) const SPECS: &[Spec] = &[
         needs_ini: false,
         dialect: crate::paradigm::to_fsf_dialect,
     },
+    // Five-check is appended (out of alphabetical order) for the same
+    // seed-stability reason as the entries above: a mid-list insert would re-roll
+    // every later variant's fuzz seed. A FSF built-in — standard chess with a
+    // five-check win condition — spelled identically to mcr (standard-chess letters
+    // plus the `5+5` check field, a *rule* difference, not a letter one), so it
+    // takes the `identity` dialect. Movegen is standard chess, so the fuzzer's
+    // node counts match FSF at every non-terminal node; mcr stops each game at its
+    // own five-check terminal (`outcome`), exactly where FSF's game ends.
+    Spec {
+        id: WideVariantId::Fivecheck,
+        fsf: "5check",
+        needs_ini: false,
+        dialect: identity,
+    },
 ];
 
 /// Variants whose dialect/movegen the fuzzer can drive, but whose deeper random

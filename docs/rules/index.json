@@ -777,6 +777,24 @@
     }
   },
   {
+    "name": "5check",
+    "family": "wide",
+    "width": 8,
+    "height": 8,
+    "start_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5+5 0 1",
+    "roles": [
+      "Pawn",
+      "Knight",
+      "Bishop",
+      "Rook",
+      "Queen",
+      "King"
+    ],
+    "oracle": {
+      "fairy_stockfish": "5check"
+    }
+  },
+  {
     "name": "fogofwar",
     "family": "wide",
     "width": 8,

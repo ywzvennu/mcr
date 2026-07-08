@@ -25,9 +25,9 @@ use super::{
     perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
     Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
-    EuroShogi, Extinction, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry, Georgian,
-    Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel, Janggi,
-    Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
+    EuroShogi, Extinction, FiveCheck, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry,
+    Georgian, Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel,
+    Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
     Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi, Minixiangqi, Misere,
     Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent, Orda, Ordamirror,
     Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Raazuvaa,
@@ -806,6 +806,7 @@ wide_variants! {
     Empire, Empire, Empire, "empire";
     EuroShogi, EuroShogi, EuroShogi, "euroshogi", "euro-shogi";
     Extinction, Extinction, Extinction, "extinction";
+    Fivecheck, FiveCheck, FiveCheck, "5check", "fivecheck", "five-check";
     FogOfWar, FogOfWar, FogOfWar, "fogofwar", "fog", "dark";
     Gardner, Gardner, Gardner, "gardner";
     Georgian, Georgian, Georgian, "georgian";
@@ -1108,7 +1109,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 105, "all 105 fairy variants are covered");
+        assert_eq!(count, 106, "all 106 fairy variants are covered");
     }
 
     #[test]
@@ -1263,7 +1264,7 @@ mod tests {
         // here; only the role-count-independent fixed overhead is. Band width is
         // align_of::<Bitboard>() - 2 (tail-padding jitter). Move a band only when
         // a genuine non-role field on the position changes — never for a new role.
-        const FIXED: &[(u32, usize, usize)] = &[(64, 72, 78), (128, 128, 142), (256, 224, 238)];
+        const FIXED: &[(u32, usize, usize)] = &[(64, 74, 80), (128, 130, 144), (256, 226, 240)];
         // With per-variant exact sizing (#580) each position stores exactly
         // `ROLE_SPAN` role bitboards and `2 * ROLE_SPAN` in-hand tallies, so the
         // role-array contribution is DERIVED from the variant's own span (not the
@@ -1535,6 +1536,12 @@ mod tests {
             WideVariantId::EuroShogi,
             EuroShogi,
             AnyWideVariant::EuroShogi,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Fivecheck,
+            FiveCheck,
+            AnyWideVariant::Fivecheck,
             2
         );
         agrees_with_typed!(

@@ -183,6 +183,7 @@ impl WideVariant<Chess8x8> for EuroShogiRules {
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
+            checks_against: [0, 0],
         };
         (board, state)
     }

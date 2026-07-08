@@ -198,6 +198,7 @@ impl WideVariant<Omicron12x10> for OmicronRules {
             consecutive_passes: 0,
             board_b: Bitboard::EMPTY,
             petrified: Bitboard::EMPTY,
+            checks_against: [0, 0],
         };
         (board, state)
     }

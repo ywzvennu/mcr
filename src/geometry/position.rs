@@ -460,6 +460,17 @@ pub struct GenericState<G: Geometry, const R: usize = { WideRole::COUNT }> {
     /// [`WideVariant::has_petrify`] — never fire and produced moves, state, and FEN
     /// stay byte-identical to a build without the petrify mechanic.
     pub petrified: Bitboard<G>,
+    /// **Five-check** per-side check tally: `checks_against[i]` is the number of
+    /// times color `i` (`0` White, `1` Black) has been **delivered check**, so the
+    /// checker's win is reached when the count against the enemy reaches
+    /// [`WideVariant::check_count_to_win`]. It rides the `5+5`-style FEN field as
+    /// `threshold - checks_against` remaining per side.
+    ///
+    /// `[0, 0]` for every variant whose
+    /// [`check_count_to_win`](WideVariant::check_count_to_win) is `None` — the
+    /// counter is never incremented and the terminal test never fires, so produced
+    /// moves, state, and FEN stay byte-identical to a build without the mechanic.
+    pub checks_against: [u8; 2],
 }
 
 impl<G: Geometry, const R: usize> GenericState<G, R> {
@@ -482,6 +493,7 @@ impl<G: Geometry, const R: usize> GenericState<G, R> {
             consecutive_passes: self.consecutive_passes,
             board_b: self.board_b,
             petrified: self.petrified,
+            checks_against: self.checks_against,
         }
     }
 }
@@ -501,6 +513,7 @@ impl<G: Geometry, const R: usize> core::fmt::Debug for GenericState<G, R> {
             .field("consecutive_passes", &self.consecutive_passes)
             .field("board_b", &self.board_b.count())
             .field("petrified", &self.petrified.count())
+            .field("checks_against", &self.checks_against)
             .finish()
     }
 }
@@ -524,6 +537,7 @@ impl<G: Geometry, const R: usize> PartialEq for GenericState<G, R> {
             && self.consecutive_passes == other.consecutive_passes
             && self.board_b == other.board_b
             && self.petrified == other.petrified
+            && self.checks_against == other.checks_against
     }
 }
 
@@ -551,6 +565,7 @@ impl<G: Geometry, const R: usize> core::hash::Hash for GenericState<G, R> {
         for sq in self.petrified {
             sq.index().hash(state);
         }
+        self.checks_against.hash(state);
     }
 }
 
@@ -781,6 +796,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             has_bare_king_loss: V::has_bare_king_loss(),
             move_rule_plies: V::move_rule_plies().is_some(),
             wins_on_check: V::wins_on_check(),
+            check_count_to_win: V::check_count_to_win().is_some(),
             extinction_rule: V::extinction_rule().is_some(),
             stalemate_is_win: V::stalemate_is_win(),
             stalemate_piece_count: V::stalemate_piece_count(),
@@ -5549,6 +5565,17 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             self.update_promoted_mask(mv.kind(), from, to);
         }
         self.state.turn = them;
+        // Five-check tally (default-off): the turn now belongs to `them`, so
+        // `is_check()` reports whether the move just played left `them` in check —
+        // i.e. whether the mover delivered a check. If so, credit one check against
+        // `them`. Gated behind `check_count_to_win()` (default `None`), so every
+        // other variant skips the `is_check` probe and stays byte-identical; the
+        // counter changes only adjudication, never the move set. It rides
+        // make/unmake via the wholesale state snapshot in `Undo`.
+        if V::check_count_to_win().is_some() && self.is_check() {
+            let idx = if them.is_white() { 0 } else { 1 };
+            self.state.checks_against[idx] = self.state.checks_against[idx].saturating_add(1);
+        }
     }
 
     /// The role a captured piece banks into the captor's hand: a Pawn when the
@@ -5784,6 +5811,22 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if V::wins_on_check() && self.is_check() {
             return Some(WideEndReason::VariantWin);
         }
+        // Five-check win: a side that has been delivered check the winning number of
+        // times has lost — the checker won. Gated behind the default-off
+        // `check_count_to_win()`; the per-side tally is carried in the state
+        // (`checks_against`) and updated at apply time, so this is a pure position
+        // property. Reported *before* the checkmate/stalemate test so the fifth
+        // check is the variant win it is, not a (possibly non-mating) check. Move
+        // generation is untouched, so perft stays byte-identical to the base
+        // variant. `outcome` credits the checker (the side that is *not* the one the
+        // checks were delivered against).
+        if let Some(threshold) = V::check_count_to_win() {
+            if self.state.checks_against[0] >= threshold
+                || self.state.checks_against[1] >= threshold
+            {
+                return Some(WideEndReason::VariantWin);
+            }
+        }
         // Bare-king "Robado" draw (Shatar): a side reduced to its lone king draws
         // the game immediately. Gated behind `has_bare_king_draw()` (default-off).
         // Reported before the checkmate/stalemate test so a bare-king node — which
@@ -5890,8 +5933,17 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                 // Flag-rank "campmate" (Synochess) is won by the side whose king
                 // stands on its goal rank — the side *not* to move. Other variant
                 // wins (reserved) credit the side to move.
-                let winner = if (V::has_flag_win()
-                    && self.flag_win_reached(self.state.turn.opposite()))
+                let winner = if let Some(threshold) = V::check_count_to_win() {
+                    // Five-check: the side the checks were delivered *against* has
+                    // lost, so its opponent (the checker) wins. Only one side can
+                    // reach the threshold (only the just-checked side increments).
+                    if self.state.checks_against[0] >= threshold {
+                        Color::Black
+                    } else {
+                        debug_assert!(self.state.checks_against[1] >= threshold);
+                        Color::White
+                    }
+                } else if (V::has_flag_win() && self.flag_win_reached(self.state.turn.opposite()))
                     || (V::has_temple_win() && self.temple_win_reached(self.state.turn.opposite()))
                     || (V::wins_on_check() && self.is_check())
                 {
@@ -6241,7 +6293,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     ///
     /// Returns a [`WideFenError`] for a missing or malformed field.
     pub fn from_fen(fen: &str) -> Result<Self, WideFenError> {
-        let mut fields = fen.split_whitespace();
+        let mut fields = fen.split_whitespace().peekable();
 
         let placement_field = fields.next().ok_or(WideFenError::MissingField)?;
         // Gating variants append the reserves in hand as a `[HEhe]`-style bracket
@@ -6374,6 +6426,29 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             _ => None,
         };
 
+        // Five-check carries a `W+B` remaining-checks field (Fairy-Stockfish's
+        // `checkCounting` FEN slot) between the en-passant field and the clocks,
+        // where `W`/`B` are the checks each side may still be given before losing,
+        // counting down from `check_count_to_win()`. Stored as checks *delivered
+        // against* each side (`threshold - remaining`). An absent field defaults to
+        // no checks (the `5+5` start), matching a plain six-field FEN. A variant
+        // with no check-counting rule never consumes a field here and is unchanged.
+        // The check field is optional and sits where the halfmove clock otherwise
+        // begins, so it is identified by its `+` separator (a clock is purely
+        // numeric): consume it only when the next field carries one. An absent
+        // field leaves the clocks to be read below and defaults to no checks.
+        let checks_against = if let Some(threshold) = V::check_count_to_win() {
+            match fields.peek() {
+                Some(s) if s.contains('+') => {
+                    let field = fields.next().expect("peeked field is present");
+                    parse_check_field(field, threshold)?
+                }
+                _ => [0, 0],
+            }
+        } else {
+            [0, 0]
+        };
+
         let halfmove_clock = match fields.next() {
             Some(s) => parse_clock(s)?,
             None => 0,
@@ -6400,6 +6475,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             consecutive_passes: 0,
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified,
+            checks_against,
         };
         let mut pos = Self::from_parts(board, state);
         pos.promoted = promoted;
@@ -6458,6 +6534,23 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                 }
             }
             None => out.push('-'),
+        }
+        // Five-check remaining-checks field (`W+B`), between the en-passant field
+        // and the clocks — the Fairy-Stockfish slot. Each side's value is
+        // `threshold - checks_against` (clamped), so the start reads `5+5`. Emitted
+        // only for a check-counting variant; every other variant writes the plain
+        // six-field FEN unchanged.
+        if let Some(threshold) = V::check_count_to_win() {
+            out.push(' ');
+            push_decimal(
+                &mut out,
+                u32::from(threshold - self.state.checks_against[0].min(threshold)),
+            );
+            out.push('+');
+            push_decimal(
+                &mut out,
+                u32::from(threshold - self.state.checks_against[1].min(threshold)),
+            );
         }
         out.push(' ');
         push_decimal(&mut out, self.state.halfmove_clock as u32);
@@ -7214,6 +7307,8 @@ pub enum WideFenError {
     BadEnPassant,
     /// A clock field was not a non-negative integer.
     BadClock,
+    /// The five-check `W+B` remaining-checks field was malformed.
+    BadCheckCount,
     /// Extra fields followed the six expected ones.
     TrailingData,
 }
@@ -7227,6 +7322,9 @@ impl core::fmt::Display for WideFenError {
             WideFenError::BadCastling => f.write_str("FEN castling field is malformed"),
             WideFenError::BadEnPassant => f.write_str("FEN en-passant field is malformed"),
             WideFenError::BadClock => f.write_str("FEN clock field is not an integer"),
+            WideFenError::BadCheckCount => {
+                f.write_str("FEN check-count field is not a valid 'W+B' pair")
+            }
             WideFenError::TrailingData => f.write_str("FEN has trailing data after six fields"),
         }
     }
@@ -8046,6 +8144,25 @@ fn write_square<G: Geometry>(out: &mut String, sq: Square<G>) {
 fn parse_clock(field: &str) -> Result<u16, WideFenError> {
     let v: u32 = field.parse().map_err(|_| WideFenError::BadClock)?;
     Ok(v.min(u16::MAX as u32) as u16)
+}
+
+/// Parses the five-check `W+B` remaining-checks field into checks *delivered
+/// against* each side (`[white, black]`), the inverse of the remaining count.
+///
+/// `W`/`B` are each a decimal in `0..=threshold` (the checks a side may still be
+/// given before losing); a value of `0` means that side has already been checked
+/// the winning number of times. Rejects a missing `+`, a non-numeric component,
+/// or a value exceeding `threshold`.
+fn parse_check_field(field: &str, threshold: u8) -> Result<[u8; 2], WideFenError> {
+    let (white_rem, black_rem) = field.split_once('+').ok_or(WideFenError::BadCheckCount)?;
+    let parse_one = |s: &str| -> Result<u8, WideFenError> {
+        let v: u8 = s.parse().map_err(|_| WideFenError::BadCheckCount)?;
+        if v > threshold {
+            return Err(WideFenError::BadCheckCount);
+        }
+        Ok(threshold - v)
+    };
+    Ok([parse_one(white_rem)?, parse_one(black_rem)?])
 }
 
 /// Appends a decimal integer to `out`.
