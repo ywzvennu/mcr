@@ -367,6 +367,46 @@ fn walk_inputs() -> impl Strategy<Value = (WideVariantId, u64, u32)> {
     )
 }
 
+/// Regression for the Tenjiku SAN round-trip bug: a Lion jitto pass renders as
+/// `--`, but a Fire Demon igui (burn-in-place, `from == to`) reports no square
+/// capture and so used to also satisfy the structured `Pass` shape, making `--`
+/// ambiguous and un-parseable. Every legal move at this reproduced position must
+/// SAN-round-trip. Reached count-independently via the same seeded walk the
+/// proptest shrank to `(Tenjiku, 8551047685862952971, 27)`.
+#[test]
+fn tenjiku_lion_pass_san_round_trips_with_fire_demon_igui() {
+    let pos = random_any(WideVariantId::Tenjiku, 8551047685862952971, 27);
+    // Sanity: this position must actually contain the two colliding move shapes —
+    // a Lion jitto pass (`--`) and a Fire Demon igui — or the regression is moot.
+    let mut saw_lion_pass = false;
+    let mut saw_fire_demon_igui = false;
+    for mv in pos.legal_moves() {
+        if matches!(mv.kind(), mcr::geometry::WideMoveKind::LionMove { .. })
+            && mv.from_index() == mv.to_index()
+            && !mv.is_capture()
+        {
+            saw_lion_pass = true;
+        }
+        if matches!(
+            mv.kind(),
+            mcr::geometry::WideMoveKind::FireDemonMove { igui: true }
+        ) {
+            saw_fire_demon_igui = true;
+        }
+        let san = pos.san(&mv);
+        assert_eq!(
+            pos.parse_san(&san).as_ref(),
+            Some(&mv),
+            "Tenjiku SAN round trip failed: san={san:?} for move {mv:?}"
+        );
+    }
+    assert!(saw_lion_pass, "expected a Lion jitto pass at this position");
+    assert!(
+        saw_fire_demon_igui,
+        "expected a Fire Demon igui at this position"
+    );
+}
+
 proptest! {
     // Modest case count: each case walks many nodes, so this stays fast in CI
     // while exercising the invariants broadly across all 54 variants.

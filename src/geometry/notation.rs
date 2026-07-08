@@ -566,9 +566,19 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
 
         match p.shape {
             // A bare `--` pass is a non-capturing null move (a Janggi pass or the
-            // Chu Lion's jitto pass); an igui also has `from == to` but captures, so
-            // it is excluded here and resolved by its own SAN.
-            SanShape::Pass => mv.from_index() == mv.to_index() && !mv.is_drop() && !mv.is_capture(),
+            // Chu Lion's jitto pass). A Chu Lion igui also has `from == to` but
+            // reports a capture, so `!is_capture()` already excludes it. A Tenjiku
+            // Fire Demon igui (burn-in-place) is the exception: its adjacent burn is
+            // implicit, so it reports *no* square capture yet is emphatically not a
+            // null move — it has its own SAN (`<role><sq>*`, resolved by
+            // `direct_san_match`). Excluding the Fire Demon move kind here keeps `--`
+            // unambiguous so the Lion jitto pass round-trips.
+            SanShape::Pass => {
+                mv.from_index() == mv.to_index()
+                    && !mv.is_drop()
+                    && !mv.is_capture()
+                    && !matches!(mv.kind(), WideMoveKind::FireDemonMove { .. })
+            }
             SanShape::CastleKingside => matches!(mv.kind(), WideMoveKind::CastleKingside),
             SanShape::CastleQueenside => matches!(mv.kind(), WideMoveKind::CastleQueenside),
             SanShape::Drop { role, to } => mv.drop_role() == Some(role) && mv.to_index() == to,
