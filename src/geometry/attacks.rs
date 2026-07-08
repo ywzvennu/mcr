@@ -31,6 +31,201 @@ use super::backing::BitboardBacking;
 use super::{Bitboard, Geometry, Square};
 use crate::Color;
 
+#[cfg(feature = "std")]
+pub use tables::AttackTables;
+
+// ---------------------------------------------------------------------------
+// Precomputed per-geometry attack tables (`std` only).
+// ---------------------------------------------------------------------------
+
+/// Lazily-built, per-geometry precomputed attack/line-mask tables.
+///
+/// This is the generic-layer analogue of the frozen concrete engine's
+/// compile-time `static X = const_fn()` tables (`crate::attacks`), and the
+/// generic mirror of the [`magic`](crate::magic) feature's runtime slider table:
+/// a `std`-gated acceleration that trades a first-use table build for
+/// constant-time lookups on the movegen hot path, leaving results **byte-for-byte
+/// identical** to the on-the-fly computation it replaces.
+///
+/// It cannot be a compile-time `static` the way the concrete `u64` tables are:
+/// the entries are `Bitboard<G>` over the generic backing `G::Bits`, and const
+/// trait methods on that backing are not available on stable Rust. So — exactly
+/// as `crate::magic` does with its `LazyLock` — the table is built on first use
+/// and cached. The storage is one [`std::sync::OnceLock`] per geometry, minted by
+/// the [`geometry!`](crate::geometry!) macro through
+/// [`Geometry::attack_table_cell`] so every geometry gets it from a single macro
+/// edit rather than a hand-written static apiece.
+///
+/// The `#[cfg(not(feature = "std"))]` (`no_std`) build has none of this: the
+/// attack primitives keep their original per-call computation, so the fallback is
+/// unchanged.
+#[cfg(feature = "std")]
+mod tables {
+    use super::{
+        anti_diag_mask_compute, between_compute, diag_mask_compute, king_attacks_compute,
+        knight_attacks_compute, line_compute, pawn_attacks_compute,
+    };
+    use crate::geometry::{Bitboard, Geometry, Square};
+    use crate::Color;
+    use alloc::vec::Vec;
+
+    /// Boards with at most this many squares get precomputed `between` / `line`
+    /// ray tables; wider ones (the `U256`-backed large-shogi geometries) keep the
+    /// on-the-fly ray walk. The tables are `SQUARES^2`-sized, so this caps their
+    /// footprint: at the ceiling a `u128` board (≤ 121 squares here) spends
+    /// `121^2 * 16 B * 2 ≈ 468 KiB`, whereas a 256-square `U256` board would
+    /// spend `256^2 * 32 B * 2 = 4 MiB` — not worth it for boards whose `between`
+    /// is a rarely-hit deep-search path. The per-square leaper / diagonal tables
+    /// above are only `SQUARES`-sized and are always built.
+    const RAY_TABLE_MAX_SQUARES: usize = 128;
+
+    /// Per-square precomputed tables for one geometry `G`, each indexed by
+    /// [`Square::index`] and sized to `G::SQUARES`.
+    pub struct AttackTables<G: Geometry> {
+        /// Knight leaper attacks per square.
+        knight: Vec<Bitboard<G>>,
+        /// King leaper attacks per square.
+        king: Vec<Bitboard<G>>,
+        /// White pawn attacks per square.
+        pawn_white: Vec<Bitboard<G>>,
+        /// Black pawn attacks per square.
+        pawn_black: Vec<Bitboard<G>>,
+        /// Full NE/SW diagonal line mask per square.
+        diag: Vec<Bitboard<G>>,
+        /// Full NW/SE anti-diagonal line mask per square.
+        anti_diag: Vec<Bitboard<G>>,
+        /// Strictly-between squares for every ordered pair `(a, b)`, indexed by
+        /// `a.index() * SQUARES + b.index()`. Empty (fall back to the ray walk)
+        /// for geometries wider than [`RAY_TABLE_MAX_SQUARES`].
+        between: Vec<Bitboard<G>>,
+        /// Full rank/file/diagonal line through every ordered pair `(a, b)`, same
+        /// indexing as `between`. Empty for the wide geometries.
+        line: Vec<Bitboard<G>>,
+    }
+
+    // A hand-written `Debug` avoids piling `where G::Bits: Debug` bounds onto the
+    // public type and keeps the (potentially large) tables out of any dump.
+    impl<G: Geometry> core::fmt::Debug for AttackTables<G> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.debug_struct("AttackTables").finish_non_exhaustive()
+        }
+    }
+
+    impl<G: Geometry> AttackTables<G> {
+        /// Builds every table by evaluating the same on-the-fly primitives the
+        /// `no_std` path uses, so the cached values are byte-identical.
+        fn build() -> AttackTables<G> {
+            let n = G::SQUARES as usize;
+            let mut knight = Vec::with_capacity(n);
+            let mut king = Vec::with_capacity(n);
+            let mut pawn_white = Vec::with_capacity(n);
+            let mut pawn_black = Vec::with_capacity(n);
+            let mut diag = Vec::with_capacity(n);
+            let mut anti_diag = Vec::with_capacity(n);
+            for index in 0..n {
+                let sq = Square::<G>::new(index as u8);
+                knight.push(knight_attacks_compute(sq));
+                king.push(king_attacks_compute(sq));
+                pawn_white.push(pawn_attacks_compute(Color::White, sq));
+                pawn_black.push(pawn_attacks_compute(Color::Black, sq));
+                diag.push(diag_mask_compute(sq));
+                anti_diag.push(anti_diag_mask_compute(sq));
+            }
+            // The `SQUARES^2` ray tables, built only for boards within the
+            // footprint cap; wider boards leave them empty and ray-walk.
+            let (mut between, mut line) = (Vec::new(), Vec::new());
+            if n <= RAY_TABLE_MAX_SQUARES {
+                between = Vec::with_capacity(n * n);
+                line = Vec::with_capacity(n * n);
+                for a in 0..n {
+                    let sa = Square::<G>::new(a as u8);
+                    for b in 0..n {
+                        let sb = Square::<G>::new(b as u8);
+                        between.push(between_compute(sa, sb));
+                        line.push(line_compute(sa, sb));
+                    }
+                }
+            }
+            AttackTables {
+                knight,
+                king,
+                pawn_white,
+                pawn_black,
+                diag,
+                anti_diag,
+                between,
+                line,
+            }
+        }
+
+        /// The geometry's tables, built once on first use and cached in its
+        /// per-geometry [`OnceLock`](std::sync::OnceLock).
+        #[inline]
+        pub(super) fn get() -> &'static AttackTables<G> {
+            G::attack_table_cell().get_or_init(AttackTables::build)
+        }
+
+        /// Knight attacks from `sq`.
+        #[inline]
+        pub(super) fn knight(&self, sq: Square<G>) -> Bitboard<G> {
+            self.knight[sq.index() as usize]
+        }
+
+        /// King attacks from `sq`.
+        #[inline]
+        pub(super) fn king(&self, sq: Square<G>) -> Bitboard<G> {
+            self.king[sq.index() as usize]
+        }
+
+        /// Pawn attacks of `color` from `sq`.
+        #[inline]
+        pub(super) fn pawn(&self, color: Color, sq: Square<G>) -> Bitboard<G> {
+            let table = if color.is_white() {
+                &self.pawn_white
+            } else {
+                &self.pawn_black
+            };
+            table[sq.index() as usize]
+        }
+
+        /// The full NE/SW diagonal line mask through `sq`.
+        #[inline]
+        pub(super) fn diag(&self, sq: Square<G>) -> Bitboard<G> {
+            self.diag[sq.index() as usize]
+        }
+
+        /// The full NW/SE anti-diagonal line mask through `sq`.
+        #[inline]
+        pub(super) fn anti_diag(&self, sq: Square<G>) -> Bitboard<G> {
+            self.anti_diag[sq.index() as usize]
+        }
+
+        /// Strictly-between squares for `(a, b)`, from the table when built,
+        /// else the on-the-fly ray walk (wide `U256` geometries).
+        #[inline]
+        pub(super) fn between(&self, a: Square<G>, b: Square<G>) -> Bitboard<G> {
+            if self.between.is_empty() {
+                between_compute(a, b)
+            } else {
+                let n = G::SQUARES as usize;
+                self.between[a.index() as usize * n + b.index() as usize]
+            }
+        }
+
+        /// The full line through `(a, b)`, from the table when built, else the
+        /// on-the-fly ray walk.
+        #[inline]
+        pub(super) fn line(&self, a: Square<G>, b: Square<G>) -> Bitboard<G> {
+            if self.line.is_empty() {
+                line_compute(a, b)
+            } else {
+                let n = G::SQUARES as usize;
+                self.line[a.index() as usize * n + b.index() as usize]
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Leaper primitive.
 // ---------------------------------------------------------------------------
@@ -101,6 +296,20 @@ const KING_OFFSETS: [(i8, i8); 8] = [
 /// ```
 #[must_use]
 pub fn pawn_attacks<G: Geometry>(color: Color, sq: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().pawn(color, sq)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        pawn_attacks_compute(color, sq)
+    }
+}
+
+/// On-the-fly pawn attacks: the `no_std` fallback and the value the `std` table
+/// caches. Kept separate so both paths compute bit-identically.
+#[inline]
+fn pawn_attacks_compute<G: Geometry>(color: Color, sq: Square<G>) -> Bitboard<G> {
     let offsets: [(i8, i8); 2] = if color.is_white() {
         [(-1, 1), (1, 1)]
     } else {
@@ -118,6 +327,19 @@ pub fn pawn_attacks<G: Geometry>(color: Color, sq: Square<G>) -> Bitboard<G> {
 /// ```
 #[must_use]
 pub fn knight_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().knight(sq)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        knight_attacks_compute(sq)
+    }
+}
+
+/// On-the-fly knight attacks: the `no_std` fallback and the cached `std` value.
+#[inline]
+fn knight_attacks_compute<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
     leaper_attacks(sq, &KNIGHT_OFFSETS)
 }
 
@@ -125,6 +347,19 @@ pub fn knight_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
 /// squares).
 #[must_use]
 pub fn king_attacks<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().king(sq)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        king_attacks_compute(sq)
+    }
+}
+
+/// On-the-fly king attacks: the `no_std` fallback and the cached `std` value.
+#[inline]
+fn king_attacks_compute<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
     leaper_attacks(sq, &KING_OFFSETS)
 }
 
@@ -176,6 +411,21 @@ fn first_rank_mask<G: Geometry>() -> G::Bits {
 /// square at a time.
 #[inline]
 fn diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().diag(sq)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        diag_mask_compute(sq)
+    }
+}
+
+/// On-the-fly diagonal line mask (the `HEIGHT - 1`-round directional fill): the
+/// `no_std` fallback and the value the `std` table caches. Both paths share this
+/// so the cached masks are bit-identical to the fallback.
+#[inline]
+fn diag_mask_compute<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
     diagonal_fill(
         Bitboard::from_square(sq),
         Bitboard::north_east,
@@ -187,6 +437,20 @@ fn diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
 /// `sq`. Built by the same fill as [`diag_mask`], along the NW/SE directions.
 #[inline]
 fn anti_diag_mask<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().anti_diag(sq)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        anti_diag_mask_compute(sq)
+    }
+}
+
+/// On-the-fly anti-diagonal line mask: the `no_std` fallback and the cached
+/// `std` value, shared so both paths agree bit-for-bit.
+#[inline]
+fn anti_diag_mask_compute<G: Geometry>(sq: Square<G>) -> Bitboard<G> {
     diagonal_fill(
         Bitboard::from_square(sq),
         Bitboard::north_west,
@@ -1320,6 +1584,20 @@ fn step_toward<G: Geometry>(a: Square<G>, b: Square<G>) -> Option<(i8, i8)> {
 /// ```
 #[must_use]
 pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().between(a, b)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        between_compute(a, b)
+    }
+}
+
+/// On-the-fly strictly-between ray walk: the `no_std` fallback, the value the
+/// `std` table caches, and the wide-geometry (`U256`) path where the table is
+/// not built. Shared so every path is bit-identical.
+fn between_compute<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
     let Some((df, dr)) = step_toward(a, b) else {
         return Bitboard::EMPTY;
     };
@@ -1347,6 +1625,19 @@ pub fn between<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
 /// ```
 #[must_use]
 pub fn line<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
+    #[cfg(feature = "std")]
+    {
+        AttackTables::<G>::get().line(a, b)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        line_compute(a, b)
+    }
+}
+
+/// On-the-fly full-line ray walk: the `no_std` fallback, the cached `std` value,
+/// and the wide-geometry path. Shared so every path is bit-identical.
+fn line_compute<G: Geometry>(a: Square<G>, b: Square<G>) -> Bitboard<G> {
     let Some((df, dr)) = step_toward(a, b) else {
         return Bitboard::EMPTY;
     };
