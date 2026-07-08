@@ -240,6 +240,39 @@ jobs:
       - name: compare-fairy unit tests (FSF-free)
         run: cargo test --manifest-path compare-fairy/Cargo.toml
 
+  # Companion to `compare-fairy-unit` / `bindings`: the `cli`, `compare`, and
+  # `fuzz` crates are ALSO non-workspace path-deps on mcr, so the root `cargo
+  # build` / `cargo test` never touches them and an mcr public-API change can rot
+  # them unnoticed until a scheduled job or a fresh checkout. This is not
+  # hypothetical: the #562 `Game`→`ChessGame` rename left `cli` calling the
+  # removed `Game::from_startpos()`, and it sat broken on main because nothing
+  # per-PR compiled it (the same blind spot as #588's compare-fairy break → #590).
+  # A cheap per-PR `cargo check --all-targets` against the PR's mcr catches the
+  # drift the moment it is introduced. No FSF binary needed (check-only; only the
+  # `compare` / `compare-fairy` harnesses ever drive FSF, at runtime, not build).
+  nonworkspace-check:
+    name: non-workspace crates (compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            cli
+            compare
+            fuzz
+
+      - name: cargo check (cli / compare / fuzz)
+        run: |
+          cargo check --manifest-path cli/Cargo.toml --all-targets
+          cargo check --manifest-path compare/Cargo.toml --all-targets
+          cargo check --manifest-path fuzz/Cargo.toml --all-targets
+
   # Build + smoke-test the three consumer bindings (wasm / C / Python) and catch
   # drift. Like `compare-fairy-unit`, these crates live OUTSIDE the workspace
   # (path deps on mcr, `publish = false`, `exclude`d from the published package),
