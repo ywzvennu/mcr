@@ -5,14 +5,14 @@
 //! RNG is a tiny deterministic `splitmix64`, so the same `--seed` always
 //! reproduces the same game.
 //!
-//! Standard chess plays through the `Game` driver, which tracks repetition and
+//! Standard chess plays through the `ChessGame` driver, which tracks repetition and
 //! move-clock draws and renders SAN. Variants play through `AnyVariant` and
 //! render UCI. `--pgn` additionally emits the game as PGN (built from the move
 //! list via the library's `Pgn::from_moves`).
 
 use clap::Args;
 
-use mcr::{AnyVariant, Game, Move, Outcome, Pgn, VariantId};
+use mcr::{AnyVariant, ChessGame, Move, Outcome, Pgn, VariantId};
 
 use crate::util::{self, CliError, CliResult, SplitMix64};
 
@@ -52,10 +52,10 @@ pub fn run(args: PlayArgs) -> CliResult {
     }
 }
 
-/// Standard self-play through `Game` (SAN moves, full draw detection).
+/// Standard self-play through `ChessGame` (SAN moves, full draw detection).
 fn play_standard(args: &PlayArgs) -> CliResult {
     let mut rng = SplitMix64::new(args.seed);
-    let mut game = Game::from_startpos();
+    let mut game = ChessGame::from_startpos();
     let mut moves: Vec<Move> = Vec::new();
     let mut plies = 0;
 
