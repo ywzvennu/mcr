@@ -121,6 +121,11 @@ name = "mcr-uci"
 path = "src/bin/mcr-uci.rs"
 doc = false
 bench = false
+# The UCI adapter speaks the stdin/stdout text protocol, so it is inherently a
+# `std` program (`std::io`). Gate it on the `std` feature so `--no-default-features`
+# builds (incl. the bare-metal `thumbv7em`/`wasm` no_std CI targets) skip it
+# instead of failing to resolve `std::` — the library itself stays no_std-clean.
+required-features = ["std"]
 
 [[bench]]
 name = "movegen"
