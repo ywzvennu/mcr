@@ -1432,6 +1432,46 @@ pub enum WideRole {
     /// Tenjiku [`WideRole::BishopGeneral`]), so `****X` (white) / `****x` (black);
     /// the `compare-fairy` harness maps `****x → b` when driving FSF.
     BishopHorse = 154,
+
+    // --- Wolf chess (8x10) army (§ Milestone 16, issue #585) ------------------
+    //
+    // Wolf chess (a FSF built-in, `UCI_Variant wolf`) is an 8-file by 10-rank
+    // variant with the Knight removed and a compound / rider army added: a Wolf
+    // (Chancellor, Rook+Knight → [`WideRole::Elephant`]), a Fox (Archbishop,
+    // Bishop+Knight → [`WideRole::Hawk`]), a Nightrider (`NN` →
+    // [`WideRole::Nightrider`]), and two genuinely-new pieces — the **Sergeant**
+    // (`fKifmnD`) and the **Wolf Elephant** (`NNQ`). Both are **fifth-tier overflow
+    // roles** ([`is_overflow5`](WideRole::is_overflow5)): every single-letter FEN
+    // base and the `*` / `**` / `=` / `***` overflow banks are exhausted, so each
+    // recycles a base letter free within the quadrupled-`****` tier (FSF's own `s`
+    // / `e` mnemonics are already taken there by the Tenjiku Side Soldier and Free
+    // Eagle). Wolf is validated **oracle-less** (the built FSF binary lacks the
+    // 10-rank board), so these letters need only be self-consistent for mcr's own
+    // FEN round-trip.
+    /// Sergeant (FSF wolf `s`, Betza `fKifmnD`) — a **forward King** stepper: it
+    /// moves and captures one square straight forward or to either forward diagonal
+    /// (the three squares N, NE, NW for White), plus an **initial** two-square
+    /// straight advance (move-only, blocked if the skipped square is occupied — a
+    /// lame Dabbaba, exactly a pawn's double step), available only from the
+    /// variant's double-step region. Its attack set is forward-biased, so it is
+    /// [`role_attack_is_directional`](super::WideVariant::role_attack_is_directional).
+    /// (Wolf chess.) A **fifth-tier overflow role**: its FEN token is `****Y` /
+    /// `****y`, recycling the free base letter `y`.
+    Sergeant = 155,
+    /// Wolf Elephant (FSF wolf `e`, Betza `NNQ`) — a **Nightrider + Queen**
+    /// compound: it rides the knight-rays like a [`WideRole::Nightrider`] **and**
+    /// slides any distance as a Queen (rook + bishop rays), capturing the first
+    /// piece on each ray. Moves and captures alike (a symmetric riding compound).
+    /// Because its knight-ray rides are not board lines, its variant opts into the
+    /// per-move full-verify king-safety path
+    /// ([`needs_full_verify`](super::WideVariant::needs_full_verify)), like the
+    /// Nightrider. Reachable only by pawn promotion (it is absent from the start
+    /// array). Distinct from the Rook+Knight [`WideRole::Elephant`] (the Wolf) and
+    /// the three step-elephants ([`WideRole::XiangqiElephant`] /
+    /// [`WideRole::JanggiElephant`] / [`WideRole::DrunkElephant`]). (Wolf chess.) A
+    /// **fifth-tier overflow role**: its FEN token is `****Z` / `****z`, recycling
+    /// the free base letter `z`.
+    WolfElephant = 156,
 }
 
 impl WideRole {
@@ -1458,7 +1498,7 @@ impl WideRole {
     /// #441 for the budget audit and the widening design. Do **not** grow this past
     /// `256` without another field widening (a fresh wire-format version bump
     /// touching `super::binary` and [`WideMove`](super::WideMove)).
-    pub const COUNT: usize = 155;
+    pub const COUNT: usize = 157;
 
     /// Every role, in index order (pawn first, reserved last).
     pub const ALL: [WideRole; Self::COUNT] = [
@@ -1617,6 +1657,8 @@ impl WideRole {
         WideRole::YariGold,
         WideRole::YariSilver,
         WideRole::BishopHorse,
+        WideRole::Sergeant,
+        WideRole::WolfElephant,
     ];
 
     /// Returns this role's stable array index (`0..COUNT`), the discriminant.
@@ -2017,6 +2059,13 @@ impl WideRole {
             // General). The `compare-fairy` harness maps `****x → b` when driving
             // FSF's `paradigm`.
             WideRole::BishopHorse => 'x',
+            // Wolf chess Sergeant and Wolf Elephant — fifth-tier overflow roles
+            // (`****`) recycling the free base letters `y` / `z` (FSF's own `s` /
+            // `e` being taken in the fifth tier by the Tenjiku Side Soldier and
+            // Free Eagle). Wolf is oracle-less, so these letters need only be
+            // self-consistent for mcr's own FEN round-trip.
+            WideRole::Sergeant => 'y',
+            WideRole::WolfElephant => 'z',
         }
     }
 
@@ -2518,6 +2567,8 @@ impl WideRole {
                 | WideRole::YariGold
                 | WideRole::YariSilver
                 | WideRole::BishopHorse
+                | WideRole::Sergeant
+                | WideRole::WolfElephant
         )
     }
 
@@ -2563,6 +2614,11 @@ impl WideRole {
             // `b` being the Bishop / Tenjiku Bishop General here); the harness maps
             // `****x → b` when driving FSF's `paradigm`.
             'x' => Some(WideRole::BishopHorse),
+            // Wolf chess: the Sergeant and Wolf Elephant recycle the free fifth-tier
+            // bases `y` / `z` (FSF's `s` / `e` being the Side Soldier / Free Eagle
+            // here). Wolf is oracle-less, so no `compare-fairy` rewrite applies.
+            'y' => Some(WideRole::Sergeant),
+            'z' => Some(WideRole::WolfElephant),
             _ => None,
         }
     }
@@ -2784,6 +2840,8 @@ impl fmt::Display for WideRole {
             WideRole::YariGold => "yari-gold",
             WideRole::YariSilver => "yari-silver",
             WideRole::BishopHorse => "bishop-horse",
+            WideRole::Sergeant => "sergeant",
+            WideRole::WolfElephant => "wolf-elephant",
         })
     }
 }

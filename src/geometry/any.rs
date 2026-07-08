@@ -33,7 +33,7 @@ use super::{
     Pawnback, Pawnsideways, Perfect, Petrified, Placement, Pocketknight, Seirawan, Shako, Shatar,
     Shatranj, Shinobi, ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square,
     Suicide, Supply, Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi,
-    WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Xiangfu,
+    WideEndReason, WideFenError, WideMove, WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu,
     Xiangqi, Yari,
 };
 use crate::Color;
@@ -874,6 +874,7 @@ wide_variants! {
     Tori, Tori, Tori, "tori", "torishogi";
     Torpedo, Torpedo, Torpedo, "torpedo";
     Washogi, Washogi, Washogi, "washogi", "wa-shogi", "wa";
+    Wolf, Wolf, Box<Wolf>, "wolf", "wolfchess";
     Xiangfu, Xiangfu, Xiangfu, "xiangfu";
     Xiangqi, Xiangqi, Xiangqi, "xiangqi", "cchess", "chinesechess";
     Yari, Yari, Yari, "yarishogi", "yari-shogi", "yari";
@@ -919,6 +920,7 @@ impl WideVariantId {
             | WideVariantId::Supply
             | WideVariantId::Tenjiku
             | WideVariantId::Washogi
+            | WideVariantId::Wolf
             | WideVariantId::Yari => Independent,
             // The HaChu large-shogi reference engine.
             WideVariantId::Chu | WideVariantId::Dai => HaChu,
@@ -1104,7 +1106,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 102, "all 102 fairy variants are covered");
+        assert_eq!(count, 103, "all 103 fairy variants are covered");
     }
 
     #[test]
@@ -1175,9 +1177,15 @@ mod tests {
         // (which checks that widest arm too); this guards the facade wrapping cost
         // and that no large (U256) arm has been un-boxed.
         const DISC_MAX: usize = 16;
+        // Wolf is a `u128`-backed arm but, like the U256 large-shogi arms, it is
+        // **boxed** in the facade: its span-157 rider army makes its inline position
+        // (~2960 B) a lone outlier that would otherwise dominate the enum (and trip
+        // `clippy::large_enum_variant`), so `wide_variants!` stores it behind a
+        // `Box`. A boxed arm contributes only a pointer, so it is excluded from the
+        // "widest **inline** arm" computation here exactly as the U256 arms are.
         let max_u128 = WideVariantId::ALL
             .iter()
-            .filter(|id| id.position_backing_bits() == 128)
+            .filter(|id| id.position_backing_bits() == 128 && **id != WideVariantId::Wolf)
             .map(|id| id.position_footprint().0)
             .max()
             .expect("a u128-backed variant exists");

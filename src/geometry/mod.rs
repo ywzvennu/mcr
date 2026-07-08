@@ -107,8 +107,8 @@ pub use variants::{
     ShogiRules, Shogun, ShogunRules, Shouse, ShouseRules, Sittuyin, SittuyinRules, Sortofalmost,
     SortofalmostRules, Spartan, SpartanRules, Suicide, SuicideRules, Supply, SupplyRules,
     Synochess, SynochessRules, Tencubed, TencubedRules, Tenjiku, TenjikuRules, Threekings,
-    ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules, Xiangfu,
-    XiangfuRules, Xiangqi, XiangqiRules, Yari, YariRules,
+    ThreekingsRules, Tori, ToriRules, Torpedo, TorpedoRules, Washogi, WashogiRules, Wolf,
+    WolfRules, Xiangfu, XiangfuRules, Xiangqi, XiangqiRules, Yari, YariRules,
 };
 pub use wide_move::{GateRole, GateSquare, WideMove, WideMoveKind};
 
@@ -368,6 +368,20 @@ geometry!(
     u128,
     10,
     8
+);
+
+geometry!(
+    /// An eight-files by ten-ranks board (80 squares), backed by `u128`.
+    ///
+    /// The board of **Wolf chess**: a standard eight-wide file span but ten ranks
+    /// tall, so a square index reaches `79` and the longest file spans ten cells
+    /// (rank 10 renders as two digits, `a10`). Unlike [`Cap10x8`] (ten files by
+    /// eight ranks) the extra length is on the **rank** axis, exercising the
+    /// `u128` backing at the top of the file rather than a wide edge mask.
+    Wolf8x10,
+    u128,
+    8,
+    10
 );
 
 geometry!(

@@ -564,6 +564,25 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         rank == Self::double_push_rank(color)
     }
 
+    /// Returns `true` if a pawn of `color` standing on the specific square `sq`
+    /// may make its **two-square advance** — the square-aware refinement of
+    /// [`pawn_may_double_push_from`](WideVariant::pawn_may_double_push_from), used
+    /// when the double-step region is not a whole rank.
+    ///
+    /// The default delegates to the rank-based predicate (`sq.rank()`), so every
+    /// existing variant is byte-identical. **Wolf chess** overrides it: its
+    /// double-step region is Fairy-Stockfish's `doubleStepRegion` — the pawns'
+    /// whole home rank **plus** the four inner files (b, c, f, g) one rank further
+    /// forward, where the start array's advanced pawns stand — so a pawn's
+    /// eligibility depends on its file as well as its rank. The generic pawn
+    /// generator still checks both squares ahead are empty; the en-passant target
+    /// of the step is the intermediate square (origin shifted one rank forward)
+    /// exactly as for a rank-2 double step, so the en-passant machinery stays
+    /// correct for a step made from any square.
+    fn pawn_may_double_push_from_sq(sq: Square<G>, color: Color) -> bool {
+        Self::pawn_may_double_push_from(sq.rank(), color)
+    }
+
     /// Returns `true` if this variant's pawns may also make a single **quiet**
     /// step straight **backward** — one square toward their own side along the
     /// same file, onto an empty square.

@@ -274,6 +274,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Tori), "perft_torishogi.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("tori_sennichite_is_a_draw")),
     row(Game::Wide(WideVariantId::Torpedo), "perft_torpedo.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Washogi), "perft_washogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF wa-shogi; HaChu's wa-shogi is a different ruleset (51 vs 57 start moves) — independent brute force is the second source"), DrawTest::Named("washogi_sennichite_is_a_draw")),
+    row(Game::Wide(WideVariantId::Wolf), "perft_wolf.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("the available FSF binary is a non-large-board build lacking the 10-rank wolf (8x10 compound + rider army); an independent from-scratch 8x10 generator is the second source"), DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Xiangfu), "perft_xiangfu.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Xiangqi), "perft_xiangqi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("xiangqi_perpetual_chase_loses_for_the_chaser")),
     row(Game::Wide(WideVariantId::Yari), "perft_yarishogi.rs", PerftOracle::HandDerivedX2, 3, Difffuzz::Excluded("no FSF yarishogi in the built binary (9-rank board needs large boards, off); independent brute force is the second source"), DrawTest::Named("yari_sennichite_is_a_draw")),
@@ -303,9 +304,9 @@ const EXPECTED_TODO498: usize = 0;
 
 /// The by-design difffuzz exclusion count (Alice, Duck, Jieqi + the HaChu-only
 /// large shogi Chu / Dai / Tenjiku + the oracle-less Wa Shogi, Okisaki Shogi, Yari
-/// Shogi, Gustav 3, Omicron, and Supply) — the `12` in the `SPECS.len() == ALL.len() - 12`
+/// Shogi, Gustav 3, Omicron, Supply, and Wolf) — the `13` in the `SPECS.len() == ALL.len() - 13`
 /// invariant that `compare-fairy/src/difffuzz.rs` asserts on its own side.
-const DIFFFUZZ_EXCLUSIONS: usize = 12;
+const DIFFFUZZ_EXCLUSIONS: usize = 13;
 
 /// The variants CI holds back from the **deep rotating** difffuzz sweep (12 games ×
 /// 90 plies), each hitting a documented FSF *oracle* limitation whose false
