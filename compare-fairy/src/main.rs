@@ -88,6 +88,7 @@ mod perfect;
 mod petrified;
 mod placement;
 mod pocketknight;
+mod raazuvaa;
 mod seirawan;
 mod shako;
 mod shatar;
@@ -395,6 +396,10 @@ fn main() {
     // rides the same generic engine's hand + drop mechanic (one pocket Knight per
     // side, captures never banked).
     let pocketknight_mismatches = pocketknight::run(&mut engine, opts.full);
+    // Raazuvaa ("the chess of the Maldives") is a FSF built-in (no variants.ini
+    // needed): standard chess with castling and the pawn double step both disabled,
+    // so the standard piece letters need no translation.
+    let raazuvaa_mismatches = raazuvaa::run(&mut engine, opts.full);
     // Bughouse is a FSF built-in (no variants.ini needed): on a single board it is
     // crazyhouse with the hand fed externally (FSF `twoBoards`), so `go perft` is
     // meaningful and the standard piece letters need no translation.
@@ -591,6 +596,7 @@ fn main() {
         + sittuyin_mismatches
         + placement_mismatches
         + pocketknight_mismatches
+        + raazuvaa_mismatches
         + bughouse_mismatches
         + spartan_mismatches
         + shako_mismatches
