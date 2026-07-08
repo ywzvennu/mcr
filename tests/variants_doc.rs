@@ -850,7 +850,10 @@ fn variants_doc_is_up_to_date() {
     if std::env::var_os("REGEN").is_some() || std::env::var_os("BLESS").is_some() {
         std::fs::write(&path, &generated).expect("write docs/variants.md");
     }
-    let committed = std::fs::read_to_string(&path).unwrap_or_default();
+    // Normalize CRLF -> LF (Windows git checkout) so the diff is line-ending-agnostic.
+    let committed = std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
     assert_eq!(
         committed, generated,
         "docs/variants.md is out of date; regenerate with `REGEN=1 cargo test --test variants_doc`",

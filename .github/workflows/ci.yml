@@ -105,7 +105,10 @@ jobs:
   # the magic table) are feature-gated and so are simply absent here.
   no_std:
     name: no_std
-    if: github.event_name != 'pull_request'
+    # Runs on every PR (not just push/schedule): it is cheap — three quick
+    # `cargo build`s with no test run — and PR-gating it is exactly why a
+    # `std::io` leak in the mcr-uci bin sat red on main unnoticed (no PR ever ran
+    # it). Keeping it on the fast path catches no_std regressions at the source.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
