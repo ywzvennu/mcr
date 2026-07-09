@@ -203,7 +203,7 @@ const REQUIRED: &[Required] = &[
     row(Game::Wide(WideVariantId::Dai), "perft_dai.rs", PerftOracle::HaChu, 3, Difffuzz::Excluded("HaChu-only large shogi; FSF has no dai variant"), DrawTest::Named("dai_attack_repetition_loses_for_the_attacker")),
     row(Game::Wide(WideVariantId::Dobutsu), "perft_dobutsu.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
     row(Game::Wide(WideVariantId::Dragon), "perft_dragon.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::None),
-    row(Game::Wide(WideVariantId::Duck), "perft_duck.rs", PerftOracle::Fsf, 4, Difffuzz::Excluded("FSF counts duck placements differently (#189 harness artifact)"), DrawTest::None),
+    row(Game::Wide(WideVariantId::Duck), "perft_duck.rs", PerftOracle::Fsf, 4, Difffuzz::Excluded("FSF counts duck placements differently (#189 harness artifact)"), DrawTest::Named("capturing_the_king_wins")),
     row(Game::Wide(WideVariantId::Embassy), "perft_embassy.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("move_rule_draw_when_enabled")),
     row(Game::Wide(WideVariantId::Empire), "perft_empire.rs", PerftOracle::Fsf, 4, Difffuzz::InSpecs, DrawTest::Named("stalemate_is_a_loss")),
     row(Game::Wide(WideVariantId::EuroShogi), "perft_euroshogi.rs", PerftOracle::Fsf, 3, Difffuzz::InSpecs, DrawTest::Named("euroshogi_sennichite_is_a_draw")),

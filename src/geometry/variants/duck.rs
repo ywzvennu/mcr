@@ -53,8 +53,12 @@
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{Bitboard, Board, Chess8x8, WideVariant};
+use crate::geometry::{Bitboard, Board, Chess8x8, ExtinctionRule, WideRole, WideVariant};
 use crate::Color;
+
+/// The watched role for Duck's win condition: the (non-royal) King. A side whose
+/// King is captured has zero of it and **loses**, so the capturing side wins.
+const DUCK_WATCHED: &[WideRole] = &[WideRole::King];
 
 /// The Duck-chess rule layer: a zero-sized [`WideVariant`] over [`Chess8x8`].
 ///
@@ -112,6 +116,20 @@ impl WideVariant<Chess8x8> for DuckRules {
         // and the duck generator skips check / pin filtering entirely.
         Bitboard::EMPTY
     }
+
+    /// Duck chess is won by **capturing the enemy King** (a legal move, since the
+    /// king is non-royal). Model it as extinction of the King: a side reduced to
+    /// zero Kings loses, so the capturing side wins. Adjudication only — this does
+    /// not affect movegen, so Duck perft stays byte-identical.
+    fn extinction_rule() -> Option<ExtinctionRule> {
+        Some(ExtinctionRule {
+            watched: DUCK_WATCHED,
+            threshold: 0,
+            count_total: false,
+            extinct_wins: false,
+            opponent_min: 0,
+        })
+    }
 }
 
 /// Duck chess as a [`GenericPosition`] over the 8x8 [`Chess8x8`] geometry.
@@ -123,3 +141,45 @@ impl WideVariant<Chess8x8> for DuckRules {
 /// piece move plus a duck placement); see the [module docs](self).
 pub type Duck =
     GenericPosition<Chess8x8, DuckRules, { <DuckRules as WideVariant<Chess8x8>>::ROLE_SPAN }>;
+
+#[cfg(test)]
+mod tests {
+    use super::Duck;
+    use crate::geometry::{Chess8x8, WideEndReason, WideOutcome, WideRole};
+    use crate::Color;
+
+    /// Capturing the enemy King **wins**. Duck's king is non-royal, so `Kd1xd2`
+    /// is a legal move; the extinction rule then adjudicates Black (zero Kings) as
+    /// the loser, a decisive win for White. Regression for issue #608 (previously
+    /// a king-capture drifted to a no-moves draw instead of a win).
+    #[test]
+    fn capturing_the_king_wins() {
+        // White Kd1, Black Kd2 (adjacent); the Duck sits on e4; White to move.
+        let pos = Duck::from_fen("8/8/8/8/4*3/8/3k4/3K4 w - - 0 1").expect("valid Duck FEN");
+        assert_eq!(
+            pos.end_reason(),
+            None,
+            "not terminal while both Kings stand"
+        );
+        // A full Duck ply is a piece move plus a duck relocation; take any legal
+        // ply whose piece move is Kd1xd2.
+        let capture = pos
+            .legal_moves()
+            .into_iter()
+            .find(|m| m.to_uci::<Chess8x8>().starts_with("d1d2"))
+            .expect("Kd1xd2 (+ a duck move) is legal");
+        let after = pos.play(&capture);
+        assert_eq!(
+            after.board().pieces(Color::Black, WideRole::King).count(),
+            0,
+            "Black's King was captured",
+        );
+        assert_eq!(after.end_reason(), Some(WideEndReason::VariantWin));
+        assert_eq!(
+            after.outcome(),
+            Some(WideOutcome::Decisive {
+                winner: Color::White
+            }),
+        );
+    }
+}
