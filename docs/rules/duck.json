@@ -500,7 +500,14 @@
   },
   "terminal": {
     "royal": "checkmate",
-    "extinction": null,
+    "extinction": {
+      "watched": [
+        "King"
+      ],
+      "threshold": 0,
+      "count_total": false,
+      "extinct_wins": false
+    },
     "flag_win": null,
     "stalemate_is_loss": false,
     "checkmate_is_win": false,
