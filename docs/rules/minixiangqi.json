@@ -1,4 +1,5 @@
 {
+  "family": "xiangqi",
   "board": {
     "width": 7,
     "height": 7,

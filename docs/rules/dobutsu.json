@@ -1,4 +1,5 @@
 {
+  "family": "shogi",
   "board": {
     "width": 3,
     "height": 4,

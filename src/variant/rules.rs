@@ -33,8 +33,9 @@ use crate::attacks::{
     bishop_attacks, king_attacks, knight_attacks, pawn_attacks, queen_attacks, rook_attacks,
 };
 use crate::geometry::rules::{
-    BoardRules, CastlingRules, DrawRules, FlagWin, Movement, PawnRules, PieceRules, PromotionRules,
-    RegionWin, RoyalRule, SpecialMechanics, Step, TerminalRules, ValidationOracle, VariantRules,
+    classify_family, BoardRules, CastlingRules, DrawRules, FlagWin, Movement, PawnRules,
+    PieceRules, PromotionRules, RegionWin, RoyalRule, SpecialMechanics, Step, TerminalRules,
+    ValidationOracle, VariantFamily, VariantRules,
 };
 use crate::geometry::WideRole;
 use crate::{Bitboard, Board, CastleSide, Color, Role, Square};
@@ -74,7 +75,10 @@ impl VariantId {
 fn derive_concrete<V: Variant + Default>() -> VariantRules {
     let id = V::ID;
     let (board, _rights, _state) = V::starting_board();
-    VariantRules {
+    let mut rules = VariantRules {
+        // Filled in below by `classify_family`, which reads the other fields; every
+        // concrete 8x8 variant classifies as the chess family.
+        family: VariantFamily::Fairy,
         board: derive_board::<V>(),
         army: derive_army(&board),
         pawns: concrete_pawns(id),
@@ -84,7 +88,9 @@ fn derive_concrete<V: Variant + Default>() -> VariantRules {
         terminal: concrete_terminal::<V>(id),
         mechanics: concrete_mechanics(id),
         oracle: concrete_oracle(id),
-    }
+    };
+    rules.family = classify_family(&rules);
+    rules
 }
 
 /// The concrete board is always the frozen standard 8x8 geometry on a `u64`
