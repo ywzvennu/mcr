@@ -471,6 +471,21 @@ pub struct GenericState<G: Geometry, const R: usize = { WideRole::COUNT }> {
     /// counter is never incremented and the terminal test never fires, so produced
     /// moves, state, and FEN stay byte-identical to a build without the mechanic.
     pub checks_against: [u8; 2],
+    /// **Jieqi** hidden-identity **reveal seed**: the single `u64` from which the
+    /// side's stochastic face-down → true-identity assignment is derived (a
+    /// canonical home-square draw-without-replacement from the hidden pool, see
+    /// `variants::jieqi`). A face-down piece reveals to its seed-derived identity —
+    /// which may differ from its home role — on its first move.
+    ///
+    /// `None` (the default) selects the **deterministic home-role baseline**: a
+    /// face-down piece reveals to the Xiangqi piece native to its home square, under
+    /// which the whole Jieqi tree collapses to standard Xiangqi. So for every
+    /// non-seeded position — every non-Jieqi variant, and Jieqi's own all-dark
+    /// startpos — this stays `None` and produced moves, perft, state, and FEN are
+    /// byte-identical to a build without the seed. It is stripped from any
+    /// per-player [`view_for`](GenericPosition::view_for) redaction so a client
+    /// never learns an unflipped piece's identity.
+    pub jieqi_seed: Option<u64>,
 }
 
 impl<G: Geometry, const R: usize> GenericState<G, R> {
@@ -494,6 +509,7 @@ impl<G: Geometry, const R: usize> GenericState<G, R> {
             board_b: self.board_b,
             petrified: self.petrified,
             checks_against: self.checks_against,
+            jieqi_seed: self.jieqi_seed,
         }
     }
 }
@@ -514,6 +530,7 @@ impl<G: Geometry, const R: usize> core::fmt::Debug for GenericState<G, R> {
             .field("board_b", &self.board_b.count())
             .field("petrified", &self.petrified.count())
             .field("checks_against", &self.checks_against)
+            .field("jieqi_seed", &self.jieqi_seed)
             .finish()
     }
 }
@@ -538,6 +555,7 @@ impl<G: Geometry, const R: usize> PartialEq for GenericState<G, R> {
             && self.board_b == other.board_b
             && self.petrified == other.petrified
             && self.checks_against == other.checks_against
+            && self.jieqi_seed == other.jieqi_seed
     }
 }
 
@@ -566,6 +584,7 @@ impl<G: Geometry, const R: usize> core::hash::Hash for GenericState<G, R> {
             sq.index().hash(state);
         }
         self.checks_against.hash(state);
+        self.jieqi_seed.hash(state);
     }
 }
 
@@ -5261,7 +5280,9 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                     u.touch(flipped, &self.board);
                 }
             }
-            if let Some(revealed) = V::reveal_on_move(moving.role, from) {
+            if let Some(revealed) =
+                V::reveal_on_move(moving.role, from, moving.color, self.state.jieqi_seed)
+            {
                 u.touch(revealed, &self.board);
             }
             if let Some(gate) = mv.gate() {
@@ -5532,8 +5553,10 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         // Kyoto flip above it is a post-move board rewrite at the destination — it
         // never affects the legality of the move itself, only the next position
         // sees the revealed role. Every non-Jieqi variant returns `None` and is
-        // byte-identical.
-        if let Some(revealed) = V::reveal_on_move(moving.role, from) {
+        // byte-identical. When a Jieqi seed is present the reveal is the
+        // seed-derived true identity (which may differ from the home role); with no
+        // seed (the default) it is the home-role baseline.
+        if let Some(revealed) = V::reveal_on_move(moving.role, from, us, self.state.jieqi_seed) {
             self.board.set_piece(to, WidePiece::new(us, revealed));
         }
 
@@ -6595,6 +6618,21 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             None => 1,
         };
 
+        // Jieqi carries its optional hidden-reveal **seed** as a trailing seventh
+        // field (a plain `u64`) after the fullmove number — the mcr-internal full
+        // state from which the stochastic face-down assignment is derived. It is
+        // present only for a seeded Jieqi game; a FEN without it (every other
+        // variant, and Jieqi's own baseline) parses to `None`, the home-role
+        // baseline, so a six-field FEN stays backward-compatible and byte-identical.
+        let jieqi_seed = if V::carries_reveal_seed() {
+            match fields.next() {
+                Some(s) => Some(parse_seed(s)?),
+                None => None,
+            }
+        } else {
+            None
+        };
+
         if fields.next().is_some() {
             return Err(WideFenError::TrailingData);
         }
@@ -6613,6 +6651,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified,
             checks_against,
+            jieqi_seed,
         };
         let mut pos = Self::from_parts(board, state);
         pos.promoted = promoted;
@@ -6693,6 +6732,17 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         push_decimal(&mut out, self.state.halfmove_clock as u32);
         out.push(' ');
         push_decimal(&mut out, self.state.fullmove_number as u32);
+        // Jieqi's optional hidden-reveal seed rides as a trailing seventh field (a
+        // plain `u64`) — the mcr-internal full state. Emitted only for a seeded
+        // Jieqi game; the baseline (`None`) and every other variant write the plain
+        // six-field FEN unchanged. A per-player redacted view strips it (see
+        // `to_fen_with_board`) so a client never receives the hidden assignment.
+        if V::carries_reveal_seed() {
+            if let Some(seed) = self.state.jieqi_seed {
+                out.push(' ');
+                push_decimal_u64(&mut out, seed);
+            }
+        }
         out
     }
 
@@ -6712,6 +6762,11 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
     fn to_fen_with_board(&self, board: Board<G, R>) -> String {
         let mut redacted = self.clone();
         redacted.board = board;
+        // A redacted view is what a client is shown: it must never carry Jieqi's
+        // hidden-reveal seed, or the unflipped assignment would leak. Clearing it
+        // here (the sole redaction/spectator FEN path) drops the seventh FEN field
+        // for every per-player and spectator view. Harmless when already `None`.
+        redacted.state.jieqi_seed = None;
         redacted.to_fen()
     }
 
@@ -7545,6 +7600,8 @@ pub enum WideFenError {
     BadClock,
     /// The five-check `W+B` remaining-checks field was malformed.
     BadCheckCount,
+    /// The Jieqi reveal-seed field was not an unsigned 64-bit integer.
+    BadSeed,
     /// Extra fields followed the six expected ones.
     TrailingData,
 }
@@ -7561,6 +7618,7 @@ impl core::fmt::Display for WideFenError {
             WideFenError::BadCheckCount => {
                 f.write_str("FEN check-count field is not a valid 'W+B' pair")
             }
+            WideFenError::BadSeed => f.write_str("FEN Jieqi reveal-seed field is not a u64"),
             WideFenError::TrailingData => f.write_str("FEN has trailing data after six fields"),
         }
     }
@@ -8382,6 +8440,12 @@ fn parse_clock(field: &str) -> Result<u16, WideFenError> {
     Ok(v.min(u16::MAX as u32) as u16)
 }
 
+/// Parses Jieqi's optional trailing **reveal-seed** field: a plain unsigned 64-bit
+/// decimal. Rejects a non-numeric or overflowing value.
+fn parse_seed(field: &str) -> Result<u64, WideFenError> {
+    field.parse::<u64>().map_err(|_| WideFenError::BadSeed)
+}
+
 /// Parses the five-check `W+B` remaining-checks field into checks *delivered
 /// against* each side (`[white, black]`), the inverse of the remaining count.
 ///
@@ -8408,6 +8472,26 @@ fn push_decimal(out: &mut String, mut n: u32) {
         return;
     }
     let mut digits = [0u8; 10];
+    let mut i = 0;
+    while n > 0 {
+        digits[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        i += 1;
+    }
+    while i > 0 {
+        i -= 1;
+        out.push(digits[i] as char);
+    }
+}
+
+/// Appends the base-10 digits of a `u64` to `out` (the wide analogue of
+/// [`push_decimal`], for Jieqi's trailing reveal-seed field).
+fn push_decimal_u64(out: &mut String, mut n: u64) {
+    if n == 0 {
+        out.push('0');
+        return;
+    }
+    let mut digits = [0u8; 20];
     let mut i = 0;
     while n > 0 {
         digits[i] = b'0' + (n % 10) as u8;

@@ -1928,8 +1928,38 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
     /// rewrites the moved piece's role at its destination *after* legality is
     /// decided, so the move's own legality is unaffected; only the next position
     /// sees the revealed role.
-    fn reveal_on_move(_role: WideRole, _from: Square<G>) -> Option<WideRole> {
+    /// `color` is the side owning the moving piece and `seed` is the position's
+    /// optional Jieqi hidden-reveal seed
+    /// ([`GenericState::jieqi_seed`](super::position::GenericState::jieqi_seed)). A
+    /// `None` seed selects the deterministic home-role baseline described above;
+    /// a `Some` seed selects the **stochastic** reveal — the seed-derived true
+    /// identity from the side's hidden pool, which may differ from the home role.
+    /// Every non-Jieqi variant ignores all four arguments and returns `None`, so it
+    /// is unaffected. See [`carries_reveal_seed`](WideVariant::carries_reveal_seed).
+    fn reveal_on_move(
+        _role: WideRole,
+        _from: Square<G>,
+        _color: Color,
+        _seed: Option<u64>,
+    ) -> Option<WideRole> {
         None
+    }
+
+    /// Returns `true` if this variant carries an optional Jieqi hidden-reveal
+    /// **seed** in its [`GenericState`] and FEN — the
+    /// `u64` from which the stochastic face-down → true-identity assignment is
+    /// derived.
+    ///
+    /// The default is `false`: no seed is ever read from or written to the FEN, so
+    /// every FEN stays the plain six-field form and a stray seventh field is still
+    /// rejected as [`WideFenError::TrailingData`](super::position::WideFenError::TrailingData).
+    /// Only Jieqi overrides it to `true`, gaining an optional trailing `u64` FEN
+    /// field (absent ⇒ the home-role baseline, so a six-field Jieqi FEN is
+    /// backward-compatible and byte-identical). The seed is stripped from every
+    /// per-player and spectator redacted view so a client never learns an unflipped
+    /// piece's identity.
+    fn carries_reveal_seed() -> bool {
+        false
     }
 
     /// Returns `true` if a held piece may be **dropped in either its base or its
@@ -2893,6 +2923,7 @@ impl<G: Geometry> WideVariant<G> for StandardChess {
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }

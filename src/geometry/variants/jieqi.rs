@@ -25,6 +25,30 @@
 //!   5 Soldier}` = [`HIDDEN_POOL_SIZE`] pieces (see [`Pool`]). Once revealed it
 //!   moves as that standard Xiangqi piece for the rest of the game.
 //!
+//! ## The reveal: two modes, one wired
+//!
+//! The reveal transition has two modes, selected by the optional
+//! [`GenericState::jieqi_seed`](crate::geometry::position::GenericState::jieqi_seed):
+//!
+//! * **No seed (default) — the home-role baseline.** A dark piece reveals to the
+//!   Xiangqi piece native to its home square ([`home_role`]). Deterministic, so the
+//!   whole Jieqi tree collapses to standard Xiangqi and there is no genuine hidden
+//!   information. This is the perft-validated core.
+//! * **Seed present — the stochastic shuffle (issue #609).** A dark piece reveals
+//!   to a **seed-derived** true identity drawn without replacement from its side's
+//!   [`Pool`], which may differ from its home role. The assignment is a pure
+//!   function of `(seed, color)` — a bijection from the side's 15 home squares onto
+//!   its 15-piece army (see the internal `seeded_reveal`) — so it is deterministic,
+//!   army-conserving, and independent of the order pieces flip in. The hidden state
+//!   is **symmetric**: neither player knows a face-down piece's identity before it
+//!   flips (the seed is a chance assignment the engine holds, not an owner-private
+//!   secret), and a flip is public. The seed rides an optional seventh FEN field
+//!   (a plain `u64`); a six-field FEN parses as the baseline. A per-player
+//!   [`view_for`](crate::geometry::GenericPosition::view_for) redaction **strips
+//!   the seed** and keeps every concealed piece a generic `Dark`, so a client never
+//!   learns an unflipped assignment. Face-down *movement* stays the home-role mover
+//!   in both modes.
+//!
 //! ## Validation (why Jieqi is split into a deterministic core + a seeded layer)
 //!
 //! Jieqi is **not** a Fairy-Stockfish variant: its stochastic hidden-identity
@@ -67,7 +91,9 @@ use super::xiangqi::XiangqiRules;
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{Bitboard, Board, RoyalSlider, Square, WideRole, WideVariant, Xiangqi9x10};
+use crate::geometry::{
+    Bitboard, Board, Geometry, RoyalSlider, Square, WideRole, WideVariant, Xiangqi9x10,
+};
 use crate::Color;
 
 /// The Jieqi rule layer: a zero-sized [`WideVariant`] over [`Xiangqi9x10`].
@@ -245,6 +271,71 @@ impl Default for Pool {
     }
 }
 
+/// `true` if `sq` is a face-down **home square of `color`** — one of that side's 15
+/// non-General start squares. White's army stands on ranks 1/3/4 (indices 0/2/3),
+/// Black's on ranks 10/8/7 (indices 9/7/6); a square with a [`home_role`] on the
+/// other side's ranks is the *opponent's* home square, never this color's.
+#[inline]
+fn is_home_square_of(color: Color, sq: Square<Xiangqi9x10>) -> bool {
+    if home_role(sq).is_none() {
+        return false;
+    }
+    match sq.rank() {
+        0 | 2 | 3 => color == Color::White,
+        6 | 7 | 9 => color == Color::Black,
+        _ => false,
+    }
+}
+
+/// The per-color starting `splitmix64` state: the raw `seed` for White, a fixed
+/// remixing of it for Black, so the two sides draw **independent** deterministic
+/// permutations of their (identical) hidden pools from one shared seed.
+#[inline]
+fn color_seed(seed: u64, color: Color) -> u64 {
+    match color {
+        Color::White => seed,
+        // A distinct, deterministic derivation (the splitmix64 increment) so
+        // Black's draw stream is decoupled from White's for any seed.
+        Color::Black => seed ^ 0x9E37_79B9_7F4A_7C15,
+    }
+}
+
+/// The **seed-derived true identity** a face-down piece of `color` standing on its
+/// home square `from` reveals to.
+///
+/// The assignment is a pure function of `(seed, color)`, computed by drawing
+/// **without replacement** from that side's full [`Pool`] once per home square in a
+/// fixed canonical order (rank-major, file within rank). It is therefore a
+/// *bijection* from the side's 15 home squares onto its 15-piece hidden army — so
+/// the revealed identities of a side conserve exactly the army (no duplication or
+/// loss), and the result is independent of the order the pieces actually flip in.
+/// Returns `None` for a square that is not one of `color`'s home squares.
+fn seeded_reveal(seed: u64, color: Color, from: Square<Xiangqi9x10>) -> Option<WideRole> {
+    if !is_home_square_of(color, from) {
+        return None;
+    }
+    let mut pool = Pool::full();
+    let mut s = color_seed(seed, color);
+    for rank in 0..Xiangqi9x10::HEIGHT {
+        for file in 0..Xiangqi9x10::WIDTH {
+            let Some(sq) = Square::from_file_rank(file, rank) else {
+                continue;
+            };
+            if !is_home_square_of(color, sq) {
+                continue;
+            }
+            // Exactly 15 draws for 15 home squares exhaust the 15-piece pool.
+            let drawn = pool
+                .draw(&mut s)
+                .expect("a draw for each of the 15 home squares");
+            if sq == from {
+                return Some(drawn);
+            }
+        }
+    }
+    None
+}
+
 impl WideVariant<Xiangqi9x10> for JieqiRules {
     /// The tightest prefix of `WideRole::ALL` that still contains every role
     /// this variant can field (start army, promotions, drops, gating, reveals);
@@ -268,6 +359,7 @@ impl WideVariant<Xiangqi9x10> for JieqiRules {
             board_b: Bitboard::EMPTY,
             petrified: Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }
@@ -365,16 +457,50 @@ impl WideVariant<Xiangqi9x10> for JieqiRules {
         XiangqiRules::extra_royal_attack(board, sq, by, occupied)
     }
 
-    fn reveal_on_move(role: WideRole, from: Square<Xiangqi9x10>) -> Option<WideRole> {
-        // The deterministic identity reveal: a face-down piece reveals as the
-        // Xiangqi piece native to its origin (home) square. Under this baseline the
-        // whole Jieqi tree is exactly Xiangqi (perft-validated vs FSF). The
-        // stochastic reveal-from-pool is the separate, seeded `Pool` model.
-        if matches!(role, WideRole::Dark) {
-            home_role(from)
-        } else {
-            None
+    fn reveal_on_move(
+        role: WideRole,
+        from: Square<Xiangqi9x10>,
+        color: Color,
+        seed: Option<u64>,
+    ) -> Option<WideRole> {
+        // A face-down piece reveals on its first move. With **no seed** (the
+        // default) it reveals to the Xiangqi piece native to its origin (home)
+        // square: under this baseline the whole Jieqi tree is exactly Xiangqi
+        // (perft-validated vs FSF). With a **seed** it reveals to the seed-derived
+        // true identity drawn from the side's hidden pool — which may differ from
+        // the home role. Face-down *movement* is the home-role mover in both modes;
+        // only the reveal transition consults the seed.
+        if !matches!(role, WideRole::Dark) {
+            return None;
         }
+        match seed {
+            None => home_role(from),
+            Some(s) => seeded_reveal(s, color, from),
+        }
+    }
+
+    fn carries_reveal_seed() -> bool {
+        // Jieqi carries its optional stochastic-reveal seed in the state and as a
+        // trailing FEN field. Absent ⇒ the home-role baseline (a six-field FEN is
+        // backward-compatible and byte-identical).
+        true
+    }
+
+    fn redact_board_for<const R: usize>(
+        board: &Board<Xiangqi9x10, R>,
+        _state: &GenericState<Xiangqi9x10, R>,
+        _perspective: Color,
+    ) -> Option<Board<Xiangqi9x10, R>> {
+        // Jieqi's hidden state is **symmetric**: neither player knows a face-down
+        // piece's true identity before it flips, and a flip is public. The board
+        // itself already renders every concealed piece as a generic `Dark` token
+        // and every revealed piece as its true identity, so the *board* leaks
+        // nothing — the only secret is the assignment seed, which the redaction FEN
+        // path (`to_fen_with_board`) strips. Returning `Some(*board)` (unchanged)
+        // routes `view_for` / `spectator_view` through that seed-stripping path, so
+        // a client receives an identical board with no seed. Both colors' views
+        // agree on the hidden part, exactly as the symmetric rule requires.
+        Some(*board)
     }
 }
 
@@ -583,27 +709,30 @@ mod tests {
     #[test]
     fn reveal_on_move_reveals_dark_to_home_role_only() {
         for sq in all_squares() {
-            // A face-down piece reveals to the Xiangqi piece native to its square.
-            assert_eq!(
-                JieqiRules::reveal_on_move(WideRole::Dark, sq),
-                home_role(sq),
-                "Dark at {sq:?} reveals to its home role",
-            );
-            // An already-revealed (concrete) piece is never re-revealed.
-            for role in [
-                WideRole::Rook,
-                WideRole::Horse,
-                WideRole::XiangqiElephant,
-                WideRole::Advisor,
-                WideRole::Cannon,
-                WideRole::Soldier,
-                WideRole::King,
-            ] {
+            // No seed (the baseline): a face-down piece reveals to the Xiangqi piece
+            // native to its square, independent of the color argument.
+            for color in [Color::White, Color::Black] {
                 assert_eq!(
-                    JieqiRules::reveal_on_move(role, sq),
-                    None,
-                    "concrete {role:?} at {sq:?} does not re-reveal",
+                    JieqiRules::reveal_on_move(WideRole::Dark, sq, color, None),
+                    home_role(sq),
+                    "Dark at {sq:?} reveals to its home role",
                 );
+                // An already-revealed (concrete) piece is never re-revealed.
+                for role in [
+                    WideRole::Rook,
+                    WideRole::Horse,
+                    WideRole::XiangqiElephant,
+                    WideRole::Advisor,
+                    WideRole::Cannon,
+                    WideRole::Soldier,
+                    WideRole::King,
+                ] {
+                    assert_eq!(
+                        JieqiRules::reveal_on_move(role, sq, color, None),
+                        None,
+                        "concrete {role:?} at {sq:?} does not re-reveal",
+                    );
+                }
             }
         }
     }
@@ -694,6 +823,232 @@ mod tests {
                 pool.is_empty(),
                 "the identity reveals exhaust {color:?}'s pool exactly",
             );
+        }
+    }
+
+    // -- The opt-in seeded-shuffle reveal (issue #609) ----------------------
+
+    /// The all-dark startpos FEN with a trailing reveal-seed field (mcr dialect).
+    const SEEDED_STARTPOS: &str =
+        "=d=d=d=dk=d=d=d=d/9/1=d5=d1/=d1=d1=d1=d1=d/9/9/=D1=D1=D1=D1=D/1=D5=D1/9/=D=D=D=DK=D=D=D=D w - - 0 1 42";
+
+    /// The home squares of `color`, in the same canonical order `seeded_reveal`
+    /// draws them.
+    fn home_squares_of(color: Color) -> Vec<Square<Xiangqi9x10>> {
+        all_squares()
+            .filter(|&sq| is_home_square_of(color, sq))
+            .collect()
+    }
+
+    /// Each side has exactly its 15 home squares, and they are disjoint by color.
+    #[test]
+    fn home_squares_partition_the_two_armies() {
+        let white = home_squares_of(Color::White);
+        let black = home_squares_of(Color::Black);
+        assert_eq!(white.len(), HIDDEN_POOL_SIZE, "White hides a full army");
+        assert_eq!(black.len(), HIDDEN_POOL_SIZE, "Black hides a full army");
+        for sq in &white {
+            assert!(!black.contains(sq), "square {sq:?} is not shared");
+        }
+    }
+
+    /// The seeded assignment is a **bijection** from a side's 15 home squares onto
+    /// its 15-piece hidden army: every home square gets a defined reveal, and the
+    /// multiset of reveals is exactly the army (conservation — no duplication or
+    /// loss). Checked for several seeds and both colors.
+    #[test]
+    fn seeded_reveal_is_a_bijection_conserving_the_army() {
+        for seed in [0u64, 1, 42, 0xDEAD_BEEF, u64::MAX] {
+            for color in [Color::White, Color::Black] {
+                let mut tally = [0u8; 6];
+                for sq in home_squares_of(color) {
+                    let role =
+                        seeded_reveal(seed, color, sq).expect("every home square has a reveal");
+                    let i = HIDDEN_ARMY
+                        .iter()
+                        .position(|&(r, _)| r == role)
+                        .expect("a reveal is an army role");
+                    tally[i] += 1;
+                }
+                for (i, &(_, n)) in HIDDEN_ARMY.iter().enumerate() {
+                    assert_eq!(tally[i], n, "seed {seed:#x} {color:?}: kind {i} conserved");
+                }
+            }
+            // A non-home square (the General's e1) has no seeded reveal.
+            let e1 = Square::from_file_rank(4, 0).unwrap();
+            assert_eq!(seeded_reveal(seed, Color::White, e1), None);
+        }
+    }
+
+    /// Determinism: the same seed yields the same assignment every time, and (a
+    /// sanity check that the seed is consumed) different seeds generally differ.
+    #[test]
+    fn seeded_reveal_is_deterministic() {
+        let map = |seed: u64, color: Color| -> Vec<WideRole> {
+            home_squares_of(color)
+                .into_iter()
+                .map(|sq| seeded_reveal(seed, color, sq).unwrap())
+                .collect()
+        };
+        for seed in [0u64, 7, 42, u64::MAX] {
+            assert_eq!(map(seed, Color::White), map(seed, Color::White));
+        }
+        assert_ne!(
+            map(1, Color::White),
+            map(2, Color::White),
+            "distinct seeds give distinct assignments"
+        );
+    }
+
+    /// With **no seed** the startpos is byte-identical to the baseline: its state
+    /// carries no seed and `to_fen` emits the plain six-field FEN (no seventh
+    /// field), so a round-trip is unchanged.
+    #[test]
+    fn no_seed_startpos_is_byte_identical() {
+        let start = Jieqi::startpos();
+        let fen = start.to_fen();
+        assert_eq!(fen.split(' ').count(), 6, "no seed ⇒ six-field FEN: {fen}");
+        // A freshly parsed baseline FEN carries no seed and round-trips unchanged.
+        let reparsed = Jieqi::from_fen(&fen).expect("baseline FEN parses");
+        assert_eq!(reparsed.to_fen(), fen, "baseline FEN round-trips");
+    }
+
+    /// A seeded FEN round-trips through `from_fen`/`to_fen`, preserving the trailing
+    /// seed field.
+    #[test]
+    fn seeded_fen_round_trips() {
+        let pos = Jieqi::from_fen(SEEDED_STARTPOS).expect("seeded FEN parses");
+        assert_eq!(
+            pos.to_fen(),
+            SEEDED_STARTPOS,
+            "seed survives the round-trip"
+        );
+        assert_eq!(
+            pos.to_fen().split(' ').count(),
+            7,
+            "a seeded FEN has a seventh field"
+        );
+    }
+
+    /// Under a seed a face-down piece's first move reveals its **seed-derived** true
+    /// identity (not necessarily its home role), and at least one such reveal
+    /// actually differs from the home role — proving the seed changes the game.
+    #[test]
+    fn seeded_first_move_reveals_the_seed_identity() {
+        let start = Jieqi::from_fen(SEEDED_STARTPOS).expect("seeded FEN parses");
+        let seed = 42u64;
+        let mut diverged = false;
+        for mv in start.legal_moves() {
+            let from = mv.from::<Xiangqi9x10>();
+            let Some(piece) = start.board().piece_at(from) else {
+                continue;
+            };
+            if piece.role != WideRole::Dark {
+                continue;
+            }
+            let expected =
+                seeded_reveal(seed, piece.color, from).expect("a dark piece has a seeded reveal");
+            let after = start.play(&mv);
+            let landed = after
+                .board()
+                .piece_at(mv.to::<Xiangqi9x10>())
+                .expect("the moved piece occupies its destination");
+            assert_eq!(
+                landed.role, expected,
+                "dark piece at {from:?} reveals to its seeded identity",
+            );
+            if Some(expected) != home_role(from) {
+                diverged = true;
+            }
+        }
+        assert!(
+            diverged,
+            "seed 42 makes at least one reveal differ from the home role",
+        );
+    }
+
+    /// Determinism at the game level: two positions from the same seeded FEN, played
+    /// through the same move, reach byte-identical FENs (same reveal).
+    #[test]
+    fn same_seed_same_game() {
+        let a = Jieqi::from_fen(SEEDED_STARTPOS).expect("parses");
+        let b = Jieqi::from_fen(SEEDED_STARTPOS).expect("parses");
+        let mv = a.legal_moves()[0];
+        assert_eq!(a.play(&mv).to_fen(), b.play(&mv).to_fen());
+    }
+
+    /// `view_for` never leaks the seed or an unflipped identity: the redacted FEN
+    /// has no seventh (seed) field, both colors' views agree on the (symmetric)
+    /// board, and every concealed piece still renders as a generic Dark token.
+    #[test]
+    fn view_for_strips_seed_and_stays_symmetric() {
+        let pos = Jieqi::from_fen(SEEDED_STARTPOS).expect("seeded FEN parses");
+        let seed_field = "42";
+        for color in [Color::White, Color::Black] {
+            let view = pos.view_for(color);
+            let fields: Vec<&str> = view.fen.split(' ').collect();
+            assert_eq!(
+                fields.len(),
+                6,
+                "redacted view drops the seed field: {}",
+                view.fen
+            );
+            assert!(
+                !view.fen.split(' ').any(|f| f == seed_field),
+                "the seed must never appear in a redacted view: {}",
+                view.fen
+            );
+            // Concealed pieces still render as generic Dark tokens.
+            let placement = fields[0];
+            assert!(
+                placement.contains("=d") && placement.contains("=D"),
+                "concealed pieces stay Dark in the view: {}",
+                view.fen
+            );
+        }
+        // Symmetric hidden state: both colors see the same board placement.
+        let white_placement = pos
+            .view_for(Color::White)
+            .fen
+            .split(' ')
+            .next()
+            .unwrap()
+            .to_string();
+        let black_placement = pos
+            .view_for(Color::Black)
+            .fen
+            .split(' ')
+            .next()
+            .unwrap()
+            .to_string();
+        assert_eq!(
+            white_placement, black_placement,
+            "symmetric rule: both views agree on the concealed board"
+        );
+        // The spectator view likewise carries no seed field.
+        let spectator = pos.spectator_view();
+        assert_eq!(
+            spectator.fen.split(' ').count(),
+            6,
+            "spectator drops the seed"
+        );
+    }
+
+    /// A seeded game still leaves each side's revealed identities a legal exhaustive
+    /// draw from its pool: playing out every first reveal under the seed conserves
+    /// the army exactly (the seed only permutes which square gets which identity).
+    #[test]
+    fn seeded_reveals_conserve_each_army() {
+        for color in [Color::White, Color::Black] {
+            let mut tally = [0u8; 6];
+            for sq in home_squares_of(color) {
+                let role = seeded_reveal(42, color, sq).unwrap();
+                let i = HIDDEN_ARMY.iter().position(|&(r, _)| r == role).unwrap();
+                tally[i] += 1;
+            }
+            for (i, &(_, n)) in HIDDEN_ARMY.iter().enumerate() {
+                assert_eq!(tally[i], n, "{color:?} kind {i} conserved under the seed");
+            }
         }
     }
 }

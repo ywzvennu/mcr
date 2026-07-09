@@ -112,6 +112,7 @@ impl WideVariant<Chess8x8> for PawnbackRules {
             board_b: Bitboard::EMPTY,
             petrified: Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }

@@ -90,6 +90,9 @@ const F_PASSES: u16 = 1 << 8;
 const F_CLOCKS: u16 = 1 << 9;
 const F_PETRIFIED: u16 = 1 << 10;
 const F_CHECKS: u16 = 1 << 11;
+/// A Jieqi hidden-reveal seed follows (a varint `u64`). Only a seeded Jieqi
+/// position sets it; the baseline (no seed) omits it and stays byte-identical.
+const F_SEED: u16 = 1 << 12;
 
 /// The widest board the geometry layer supports is the 16x16 Tenjiku Shogi board
 /// (256 squares, U256-backed), so an occupancy bitset never exceeds this many
@@ -415,6 +418,9 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if state.checks_against != [0, 0] {
             flags |= F_CHECKS;
         }
+        if state.jieqi_seed.is_some() {
+            flags |= F_SEED;
+        }
         out.extend_from_slice(&flags.to_le_bytes());
 
         // Board (wire-format v2, issue #448): an occupancy bitset, then a colour
@@ -500,6 +506,9 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if flags & F_CHECKS != 0 {
             out.push(state.checks_against[0]);
             out.push(state.checks_against[1]);
+        }
+        if let Some(seed) = state.jieqi_seed {
+            push_varint(seed, out);
         }
     }
 
@@ -609,6 +618,12 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             [0, 0]
         };
 
+        let jieqi_seed = if flags & F_SEED != 0 {
+            Some(cur.varint()?)
+        } else {
+            None
+        };
+
         if !cur.is_empty() {
             return Err(WireError::TrailingData);
         }
@@ -631,6 +646,7 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             board_b,
             petrified,
             checks_against,
+            jieqi_seed,
         };
         let mut pos = Self::from_parts(board, state);
         pos.set_promoted(promoted);

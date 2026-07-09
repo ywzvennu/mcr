@@ -1296,7 +1296,7 @@ mod tests {
         // here; only the role-count-independent fixed overhead is. Band width is
         // align_of::<Bitboard>() - 2 (tail-padding jitter). Move a band only when
         // a genuine non-role field on the position changes — never for a new role.
-        const FIXED: &[(u32, usize, usize)] = &[(64, 74, 80), (128, 130, 144), (256, 226, 240)];
+        const FIXED: &[(u32, usize, usize)] = &[(64, 90, 96), (128, 146, 160), (256, 242, 256)];
         // With per-variant exact sizing (#580) each position stores exactly
         // `ROLE_SPAN` role bitboards and `2 * ROLE_SPAN` in-hand tallies, so the
         // role-array contribution is DERIVED from the variant's own span (not the

@@ -114,6 +114,7 @@ impl WideVariant<Cap10x8> for CentaurRules {
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }
