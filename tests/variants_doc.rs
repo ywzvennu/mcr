@@ -240,6 +240,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             rules: "FIDE-style symmetric setup, no castling; pawns promote on the last rank to Met, Rook, Silver, or Knight; a pieces-honour counting endgame. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant asean`).",
         },
+        WideVariantId::Atomar => Meta {
+            display: "Atomar chess",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Nocheckatomic (atomic chess, non-royal Commoner king, win by Commoner extinction) with two immunities: Commoners are blast-immune (they survive an adjacent explosion, and a capturing Commoner survives its own blast) and mutually immune (a Commoner may never capture the enemy Commoner). Standard movement, castling, en passant, and Q/R/B/N promotion.",
+            oracle: "Fairy-Stockfish (`UCI_Variant atomar`).",
+        },
         WideVariantId::Berolina => Meta {
             display: "Berolina chess",
             pieces: "Standard chess army with an inverted Berolina pawn (`p`/`P`).",
@@ -641,6 +647,12 @@ fn wide_meta(id: WideVariantId) -> Meta {
             pieces: "Standard chess army.",
             rules: "Standard 8x8 chess with castling disabled — neither side may ever castle; double step, en passant, and promotion to Queen/Rook/Bishop/Knight are standard. Win by checkmate.",
             oracle: "Fairy-Stockfish (`UCI_Variant nocastle`).",
+        },
+        WideVariantId::Nocheckatomic => Meta {
+            display: "Nocheckatomic chess",
+            pieces: "Standard chess army with a non-royal Commoner king.",
+            rules: "Atomic chess without check (ICC rules): the king is an ordinary capturable Commoner, so there is no check or checkmate. Every capture detonates a 3x3 blast that removes the capturing piece and every adjacent non-pawn (pawns survive; the captured piece goes too). Standard movement, castling, en passant, and Q/R/B/N promotion. A side loses the moment its Commoner is captured or blown up. Rides the generic extinction terminal (the Commoner, threshold 0).",
+            oracle: "Fairy-Stockfish (`UCI_Variant nocheckatomic`).",
         },
         WideVariantId::OkisakiShogi => Meta {
             display: "Okisaki Shogi (10x10 Shogi)",

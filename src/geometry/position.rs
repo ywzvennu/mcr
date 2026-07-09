@@ -1629,6 +1629,14 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         if has_king {
             let mut king_targets =
                 V::role_attacks(WideRole::King, us, king_sq, occupied) & !our_pieces & !king_danger;
+            // Atomar diplomacy (`mutuallyImmuneTypes`): a mutually-immune Commoner
+            // may never capture the enemy Commoner, so its same-role capture squares
+            // are removed from the target set (the move is illegal, never generated).
+            // Default-off (`role_is_mutually_immune` is `false`), so every other
+            // variant's king target set is byte-identical.
+            if V::role_is_mutually_immune(WideRole::King) {
+                king_targets &= !board.pieces(them, WideRole::King);
+            }
             // Makpong: while in check, the king may move ONLY to capture the lone
             // checker — it may not flee to a safe square. Under double check there is
             // no single checker the king could capture, so it has no legal move; the
@@ -1657,7 +1665,12 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             let mut extra_kings = board.kings_of(us);
             extra_kings = extra_kings.without(king_sq);
             for from in extra_kings {
-                let targets = V::role_attacks(WideRole::King, us, from, occupied) & !our_pieces;
+                let mut targets = V::role_attacks(WideRole::King, us, from, occupied) & !our_pieces;
+                // Atomar diplomacy: an extra Commoner also may not take the enemy
+                // Commoner (default-off, byte-identical elsewhere).
+                if V::role_is_mutually_immune(WideRole::King) {
+                    targets &= !board.pieces(them, WideRole::King);
+                }
                 out.emit_targets(from, targets, their_pieces);
             }
         }
@@ -1751,6 +1764,14 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                     V::role_attacks(role, us, from, occupied) & !our_pieces & check_mask & pin_line;
                 if capture_only {
                     targets &= their_pieces;
+                }
+                // Atomar diplomacy (`mutuallyImmuneTypes`): a mutually-immune role
+                // may never capture the enemy piece of the *same* role. The King is
+                // handled in the dedicated king generator above (it is skipped by
+                // this loop); this covers any other mutually-immune role. Default-off,
+                // so every other variant is byte-identical.
+                if V::role_is_mutually_immune(role) {
+                    targets &= !board.pieces(them, role);
                 }
                 if promotable {
                     self.emit_promotable_targets(out, role, from, targets, their_pieces, us);
@@ -5160,6 +5181,25 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
                     }
                 }
             }
+            // Atomic blast (`blast_on_capture`): a capture detonates, removing every
+            // non-pawn piece on the eight squares around the destination (of *both*
+            // colours). Record each neighbour's role so undo can restore it. The
+            // capturer's own role and the capture victim's role are already recorded
+            // above; the destination (`to`) itself is not a neighbour of itself. This
+            // reads the pre-move board, whose neighbour set is a superset of the
+            // post-move blast (the mover vacates `from`, adding no neighbour), and a
+            // role touched but not ultimately removed — including a blast-immune
+            // Commoner spared in atomar — is a harmless no-op for undo. `is_capture()`
+            // covers ordinary captures, en passant, and capturing promotions.
+            if V::blast_on_capture() && mv.is_capture() {
+                for sq in king_attacks::<G>(to) & self.board.occupied() {
+                    if let Some(role) = self.board.role_at(sq) {
+                        if role != WideRole::Pawn {
+                            u.touch(role, &self.board);
+                        }
+                    }
+                }
+            }
             if let Some(promo) = mv.kind().promotion() {
                 u.touch(promo, &self.board);
             }
@@ -5458,6 +5498,19 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             self.board.set_piece(to, WidePiece::new(us, revealed));
         }
 
+        // Atomic blast (`blast_on_capture`, nocheckatomic / atomar): a capture
+        // detonates. Applied after the capturer has landed on `to` (and any
+        // promotion / flip / reveal rewrite at the destination), it removes the
+        // capturer at the blast centre together with every non-pawn piece — of
+        // *both* colours — on the eight adjacent squares, sparing any blast-immune
+        // role (atomar's Commoner). The neighbour role masks are snapshotted in the
+        // undo block above and both colour masks ride the whole-state `Undo`, so the
+        // removal is reversed for free. Default-off, so every non-blast variant skips
+        // this and is byte-identical.
+        if V::blast_on_capture() && mv.is_capture() {
+            self.apply_blast(to);
+        }
+
         // Castling-right updates. A king move clears *both* of its side's castling
         // rights — but only for a castling variant. A first-move-leap variant
         // (Cambodian) instead carries two independent per-piece leap rights in the
@@ -5709,6 +5762,44 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
             if let Some(square) = square {
                 self.board.set_piece(square, WidePiece::new(us, role));
                 self.state.placement.take(us, role);
+            }
+        }
+    }
+
+    /// Applies the atomic blast of a capturing move whose capturer has already
+    /// landed on `center` (the blast centre / destination square).
+    ///
+    /// Removes the capturer at `center` together with every **non-pawn** piece — of
+    /// either colour — on the eight adjacent squares, sparing any role the variant
+    /// marks [`role_is_blast_immune`](super::WideVariant::role_is_blast_immune)
+    /// (atomar's Commoner, which — because the blast set includes the capturer's own
+    /// landing square before the immune mask is applied — even survives its own
+    /// capture). Pawns adjacent to the blast survive; the captured piece itself was
+    /// already removed by the move's own board edit (for en passant it sits one rank
+    /// back, off the centre). This mirrors Fairy-Stockfish's blast bitboard
+    /// `((attacks<KING>(to) & (all ^ pawns)) | to) & (all ^ blastImmune)`.
+    ///
+    /// A rook (or the castling Commoner) blown off its home square revokes the
+    /// matching castling right, matching FSF's per-square `castlingRightsMask`.
+    fn apply_blast(&mut self, center: Square<G>) {
+        let all = self.board.occupied();
+        let pawns = self.board.by_role(WideRole::Pawn);
+        // Non-pawn neighbours of the centre, plus the centre itself (the capturer).
+        let mut blast = (king_attacks::<G>(center) & all & !pawns) | Bitboard::from_square(center);
+        // Spare every blast-immune role (atomar's Commoner). Default: no immune role,
+        // so `blast` is unchanged. Bounded to `ROLE_SPAN` like every other role scan.
+        for &role in &WideRole::ALL[..V::ROLE_SPAN] {
+            if V::role_is_blast_immune(role) {
+                blast &= !self.board.by_role(role);
+            }
+        }
+        // Only occupied squares are removable (the centre is occupied by the
+        // capturer; the immune mask above may have cleared it in atomar).
+        blast &= all;
+        for sq in blast {
+            if let Some(piece) = self.board.piece_at(sq) {
+                self.board.remove_known(sq, piece);
+                self.revoke_rights_for_square(sq, piece.color);
             }
         }
     }

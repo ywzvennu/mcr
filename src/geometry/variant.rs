@@ -1317,6 +1317,47 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         None
     }
 
+    /// Returns `true` if a **capture detonates an atomic blast** (Fairy-Stockfish
+    /// `blastOnCapture`): the capturing piece and every non-pawn piece on the eight
+    /// squares around the square it lands on are removed along with the captured
+    /// piece (nocheckatomic / atomar). The default is `false`, so the blast branch
+    /// of [`apply`](super::position::GenericPosition::play) is never taken and every
+    /// other variant is byte-identical.
+    ///
+    /// A blast variant demotes its king to a **non-royal Commoner** (there is no
+    /// pseudo-royalty in nocheckatomic / atomar), so every pseudo-legal move is
+    /// legal — a capture that blows up your own Commoner is a legal (losing) move —
+    /// and the game is decided solely by the Commoner
+    /// [`extinction_rule`](WideVariant::extinction_rule). Blowing up the enemy's
+    /// last Commoner (or capturing it) wins; the concrete king-safe *atomic*
+    /// (`extinctionPseudoRoyal`) is a different, more restrictive variant.
+    fn blast_on_capture() -> bool {
+        false
+    }
+
+    /// Returns `true` if a piece of `role` is **immune to the atomic blast**
+    /// (Fairy-Stockfish `blastImmuneTypes`): it survives an explosion on an
+    /// adjacent square, and — since the immunity is tested on the blast set that
+    /// already includes the capturer's own landing square — a blast-immune piece
+    /// even survives *its own* capture. Atomar makes the Commoner ([`WideRole::King`])
+    /// blast-immune. The default is `false` (no immunity), so nocheckatomic and
+    /// every non-blast variant are byte-identical. Consulted only when
+    /// [`blast_on_capture`](WideVariant::blast_on_capture) is set.
+    fn role_is_blast_immune(_role: WideRole) -> bool {
+        false
+    }
+
+    /// Returns `true` if a piece of `role` may **not capture another piece of the
+    /// same role** (Fairy-Stockfish `mutuallyImmuneTypes`, "diplomacy in Atomar"):
+    /// such a capture is illegal and is never generated. Atomar makes the Commoner
+    /// ([`WideRole::King`]) mutually immune, so a Commoner can stand beside the
+    /// enemy Commoner but can never take it. This is a pure capture-legality filter
+    /// on the same-role target squares; the default is `false`, so nocheckatomic and
+    /// every other variant generate the identical move set.
+    fn role_is_mutually_immune(_role: WideRole) -> bool {
+        false
+    }
+
     /// Returns `true` if **stalemate is a loss** for the stalemated side rather
     /// than a draw (Synochess `stalemateValue = loss`). The default is `false`
     /// (the standard draw). This affects only the reported [outcome]; it has no

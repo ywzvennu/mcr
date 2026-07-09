@@ -282,6 +282,14 @@ pub(crate) const SPECS: &[Spec] = &[
         dialect: crate::asean::fen_to_fsf,
     },
     Spec {
+        // Atomar shares the standard-chess dialect (its king is a Commoner by rule,
+        // not by letter); the FEN is passed to FSF unchanged.
+        id: WideVariantId::Atomar,
+        fsf: "atomar",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
         id: WideVariantId::Bughouse,
         fsf: "bughouse",
         needs_ini: false,
@@ -521,6 +529,14 @@ pub(crate) const SPECS: &[Spec] = &[
         // it with the identical standard-chess letters, so the dialect is identity.
         id: WideVariantId::Nocastle,
         fsf: "nocastle",
+        needs_ini: false,
+        dialect: identity,
+    },
+    Spec {
+        // Nocheckatomic: atomic chess with a non-royal Commoner king. Standard-chess
+        // letters (the king is a Commoner by rule), so the dialect is identity.
+        id: WideVariantId::Nocheckatomic,
+        fsf: "nocheckatomic",
         needs_ini: false,
         dialect: identity,
     },

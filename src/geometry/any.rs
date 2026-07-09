@@ -22,19 +22,19 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::str::FromStr;
 
 use super::{
-    perft, Aiwok, Alice, Almost, Amazon, Asean, Berolina, Bughouse, Cambodian, CannonShogi,
+    perft, Aiwok, Alice, Almost, Amazon, Asean, Atomar, Berolina, Bughouse, Cambodian, CannonShogi,
     Capablanca, Capahouse, Caparandom, Centaur, Chak, Chancellor, Chaturanga, CheckShogi, Chennis,
     Chessgi, Chigorin, Chu, Codrus, Coregal, Courier, Dai, Dobutsu, Dragon, Duck, Embassy, Empire,
     EuroShogi, Extinction, FiveCheck, FogOfWar, GameStatus, Gardner, GenericPosition, Geometry,
     Georgian, Giveaway, Gorogoro, Gothic, Grand, Grandhouse, Grasshopper, Gustav3, HoppelPoppel,
     Janggi, Janus, Jieqi, Judkins, Karouk, Khans, Kinglet, Knightmate, Koedem, Kyotoshogi, Legan,
     LoopChess, Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
-    Minixiangqi, Misere, Modern, Newzealand, Nightrider, Nocastle, OkisakiShogi, Omicron, Opulent,
-    Orda, Ordamirror, Paradigm, Pawnback, Pawnsideways, Perfect, Petrified, Placement,
-    Pocketknight, Raazuvaa, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi, Shogun,
-    Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed, Tenjiku,
-    Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove, WideMoveList,
-    WideOutcome, WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
+    Minixiangqi, Misere, Modern, Newzealand, Nightrider, Nocastle, Nocheckatomic, OkisakiShogi,
+    Omicron, Opulent, Orda, Ordamirror, Paradigm, Pawnback, Pawnsideways, Perfect, Petrified,
+    Placement, Pocketknight, Raazuvaa, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi,
+    Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed,
+    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
+    WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -780,6 +780,7 @@ wide_variants! {
     Almost, Almost, Almost, "almost", "almostchess";
     Amazon, Amazon, Amazon, "amazon", "amazonchess";
     Asean, Asean, Asean, "asean";
+    Atomar, Atomar, Atomar, "atomar";
     Berolina, Berolina, Berolina, "berolina";
     Bughouse, Bughouse, Bughouse, "bughouse", "bug";
     Cambodian, Cambodian, Cambodian, "cambodian", "ouk", "kambodja";
@@ -845,6 +846,7 @@ wide_variants! {
     Newzealand, Newzealand, Newzealand, "newzealand";
     Nightrider, Nightrider, Nightrider, "nightrider";
     Nocastle, Nocastle, Nocastle, "nocastle";
+    Nocheckatomic, Nocheckatomic, Nocheckatomic, "nocheckatomic", "no-check-atomic";
     OkisakiShogi, OkisakiShogi, OkisakiShogi, "okisakishogi", "okisaki", "okisaki-shogi";
     Omicron, Omicron, Omicron, "omicron";
     Opulent, Opulent, Opulent, "opulent";
@@ -1111,7 +1113,7 @@ mod tests {
         let count = names.len();
         names.dedup();
         assert_eq!(names.len(), count, "canonical names must be unique");
-        assert_eq!(count, 108, "all 108 fairy variants are covered");
+        assert_eq!(count, 110, "all 110 fairy variants are covered");
     }
 
     #[test]
@@ -1459,6 +1461,7 @@ mod tests {
         agrees_with_typed!(WideVariantId::Almost, Almost, AnyWideVariant::Almost, 2);
         agrees_with_typed!(WideVariantId::Amazon, Amazon, AnyWideVariant::Amazon, 2);
         agrees_with_typed!(WideVariantId::Asean, Asean, AnyWideVariant::Asean, 2);
+        agrees_with_typed!(WideVariantId::Atomar, Atomar, AnyWideVariant::Atomar, 2);
         agrees_with_typed!(
             WideVariantId::Berolina,
             Berolina,
@@ -1659,6 +1662,12 @@ mod tests {
             WideVariantId::Nightrider,
             Nightrider,
             AnyWideVariant::Nightrider,
+            2
+        );
+        agrees_with_typed!(
+            WideVariantId::Nocheckatomic,
+            Nocheckatomic,
+            AnyWideVariant::Nocheckatomic,
             2
         );
         agrees_with_typed!(

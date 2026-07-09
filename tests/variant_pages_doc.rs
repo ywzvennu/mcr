@@ -739,5 +739,5 @@ fn every_variant_has_a_page() {
             );
         }
     }
-    assert_eq!(VariantRef::ALL.len(), 117, "expected 117 variants");
+    assert_eq!(VariantRef::ALL.len(), 119, "expected 119 variants");
 }

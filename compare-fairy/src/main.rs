@@ -24,6 +24,7 @@
 //! instructions and exits 0 (it never blocks or fails hard on FSF absence).
 
 mod asean;
+mod atomar;
 mod ataxx;
 mod berolina;
 mod bughouse;
@@ -80,6 +81,7 @@ mod moveset;
 mod newzealand;
 mod nightrider;
 mod nocastle;
+mod nocheckatomic;
 mod opulent;
 mod orda;
 mod ordamirror;
@@ -448,6 +450,12 @@ fn main() {
     let modern_mismatches = modern::run(&mut engine, opts.full);
     // Extinction chess is a FSF built-in (no variants.ini needed), like coregal.
     let extinction_mismatches = extinction::run(&mut engine, opts.full);
+    // Nocheckatomic and Atomar are FSF built-ins (no variants.ini needed), like
+    // extinction: atomic chess with a non-royal Commoner king (every capture
+    // detonates, win by Commoner extinction), atomar adding blast-immune and
+    // mutually-immune Commoners. Standard piece letters need no translation.
+    let nocheckatomic_mismatches = nocheckatomic::run(&mut engine, opts.full);
+    let atomar_mismatches = atomar::run(&mut engine, opts.full);
     // The antichess / giveaway family (#583) are FSF built-ins (no variants.ini
     // needed): mandatory captures, a non-royal Commoner king (giveaway / suicide /
     // codrus) or an inverted royal-king terminal (losers / misere), all on the same
@@ -626,6 +634,8 @@ fn main() {
         + coregal_mismatches
         + modern_mismatches
         + extinction_mismatches
+        + nocheckatomic_mismatches
+        + atomar_mismatches
         + giveaway_mismatches
         + suicide_mismatches
         + losers_mismatches

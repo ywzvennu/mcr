@@ -482,8 +482,8 @@ pub struct SpecialMechanics {
     /// ([`WideVariant::confine_pins_to_segment`]).
     pub confine_pins_to_segment: bool,
     /// Atomic chess: a capture detonates, removing the capturing piece and every
-    /// adjacent non-pawn (a 3x3 blast). A concrete-8x8 mechanic; `false` for every
-    /// wide variant.
+    /// adjacent non-pawn (a 3x3 blast) — the concrete-8x8 atomic and the wide
+    /// nocheckatomic / atomar family ([`WideVariant::blast_on_capture`]).
     pub atomic_blast: bool,
     /// Captures are mandatory — when any capture is available the side to move
     /// must play one ([`WideVariant::mandatory_captures`]). The concrete antichess
@@ -850,11 +850,11 @@ fn derive_mechanics<G: Geometry, V: WideVariant<G>>() -> SpecialMechanics {
         has_jump_captures: V::has_jump_captures(),
         allows_pass: V::allows_pass(),
         confine_pins_to_segment: V::confine_pins_to_segment(),
-        // Mandatory captures (antichess / giveaway / suicide / losers / codrus):
-        // read from the wide hook. The remaining concrete-8x8-only mechanics
-        // (atomic blast / no-check racing / horde asymmetry / 960 shuffle) never
-        // appear on the wide layer.
-        atomic_blast: false,
+        // Mandatory captures (antichess / giveaway / suicide / losers / codrus) and
+        // the atomic blast (nocheckatomic / atomar): read from the wide hooks. The
+        // remaining concrete-8x8-only mechanics (no-check racing / horde asymmetry /
+        // 960 shuffle) never appear on the wide layer.
+        atomic_blast: V::blast_on_capture(),
         mandatory_captures: V::mandatory_captures(),
         checks_forbidden: false,
         asymmetric_armies: false,
