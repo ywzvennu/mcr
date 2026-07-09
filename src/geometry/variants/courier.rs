@@ -149,6 +149,7 @@ impl WideVariant<Courier12x8> for CourierRules {
             board_b: Bitboard::EMPTY,
             petrified: Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }

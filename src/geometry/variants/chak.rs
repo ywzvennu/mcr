@@ -228,6 +228,7 @@ impl WideVariant<Shogi9x9> for ChakRules {
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }

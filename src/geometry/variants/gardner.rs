@@ -93,6 +93,7 @@ impl WideVariant<Minishogi5x5> for GardnerRules {
             board_b: crate::geometry::Bitboard::EMPTY,
             petrified: crate::geometry::Bitboard::EMPTY,
             checks_against: [0, 0],
+            jieqi_seed: None,
         };
         (board, state)
     }

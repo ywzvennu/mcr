@@ -50,6 +50,7 @@ fn build(
         board_b,
         petrified: Bitboard::EMPTY,
         checks_against: [0, 0],
+        jieqi_seed: None,
     };
     Alice::from_parts(board, state)
 }
