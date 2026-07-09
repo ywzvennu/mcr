@@ -64,6 +64,10 @@ use crate::Color;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariantRules {
+    /// The piece-set / lineage **family** this variant belongs to (chess, large
+    /// chess, xiangqi, janggi, shogi, makruk, or the fairy catch-all), classified
+    /// from the board, army, and mechanics below. See [`VariantFamily`].
+    pub family: VariantFamily,
     /// Board geometry and the starting position.
     pub board: BoardRules,
     /// The roles present on the starting board, each with its derived move and
@@ -520,6 +524,68 @@ pub enum ValidationOracle {
     Independent,
 }
 
+/// The piece-set / lineage **family** a variant belongs to — a coarse, total
+/// classification of every [`VariantRef`](crate::VariantRef) into the historical
+/// game tradition whose army and board it uses. It is derived (by the crate-private
+/// `classify_family`) from what the variant already declares — its board
+/// dimensions, the roles in its starting army, and its special mechanics
+/// (`has_cannons` / `has_flying_general` / `has_bikjang` / `has_hand`, the counting
+/// rule, the shogi stepper pawn) — never a hand-maintained per-variant table.
+///
+/// It exists to drive two consumers that need a single grouping key: choosing a
+/// **glyph set** for rendering (western chess pieces, xiangqi discs, shogi tiles,
+/// makruk pieces) and **grouping** the ~119-variant catalog into sections. It is
+/// deliberately coarse: 8×8 fairy variants (Grasshopper, Orda, Spartan, Empire, …)
+/// all fall under [`Chess`](VariantFamily::Chess) rather than splintering, and the
+/// large western boards (Grand, Courier, Wolf, Omicron, …) all share
+/// [`Capablanca`](VariantFamily::Capablanca).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(rename_all = "snake_case")
+)]
+pub enum VariantFamily {
+    /// The **8×8 chess** tradition and everything chess-derived on a board of 8×8
+    /// or smaller: standard chess and its concrete cousins (Chess960, Atomic,
+    /// Antichess, Crazyhouse, King-of-the-Hill, Three-check, Racing Kings, Horde),
+    /// the shatranj / chaturanga / shatar ancestors, the minichess boards (Gardner
+    /// 5×5, Los Alamos 6×6), and the whole 8×8 *fairy* menagerie (Grasshopper,
+    /// Nightrider, Orda, Spartan, Empire, Knightmate, Amazon, Synochess, Shogun, …).
+    /// The western-chess glyph set.
+    Chess,
+    /// **Large chess**: a western chess army on a board wider or taller than 8×8 —
+    /// the Capablanca 10×8 group (Capablanca, Gothic, Embassy, Janus, Centaur,
+    /// Gustav3, Caparandom, Capahouse) and the other big western boards (Grand and
+    /// Grandhouse / Opulent / Tencubed / Shako on 10×10, Chancellor / Modern on 9×9,
+    /// Omicron 12×10, Courier 12×8, Wolf 8×10). Still the western-chess glyph set,
+    /// just a bigger board and a few extra officers.
+    Capablanca,
+    /// **Xiangqi** (Chinese chess) and its kin: the cannon-and-flying-general games
+    /// on a xiangqi board with a xiangqi army (no western pawn) — Xiangqi itself,
+    /// Minixiangqi, Manchu, Jieqi (dark xiangqi), and Supply. The xiangqi-disc glyph
+    /// set.
+    Xiangqi,
+    /// **Janggi** (Korean chess): distinguished from Xiangqi by the *bikjang*
+    /// facing-generals rule (and the pass move). The janggi glyph set.
+    Janggi,
+    /// **Shogi** (Japanese chess) in all sizes: standard Shogi, the small boards
+    /// (Minishogi, Judkins, Gorogoro, Micro, Dobutsu, Kyoto), the bird / wa / yari /
+    /// euro / cannon / check / okisaki offshoots, the drop-less classical Sho Shogi,
+    /// and the large shogi (Chu, Dai, Tenjiku). Identified by the shogi stepper pawn
+    /// together with a shogi army or shogi-style drops. The shogi-tile glyph set.
+    Shogi,
+    /// **Makruk** and the wider South-East-Asian tradition: the counting-endgame
+    /// games — Makruk, Makpong, Ka-Ouk, Cambodian (Ouk), ASEAN, Sittuyin (Burmese),
+    /// and Ai-Wok. The makruk glyph set.
+    Makruk,
+    /// The **fairy** catch-all: variants that fit none of the above cleanly — Chak
+    /// (a Mesoamerican fairy game), Chennis, and the shogi/xiangqi/western hybrids
+    /// that borrow drops without a native piece set (Xiangfu, Mansindam). Rendered
+    /// with a mixed / bespoke glyph set.
+    Fairy,
+}
+
 // --- derivation ----------------------------------------------------------------
 
 /// Derives the [`VariantRules`] of the wide variant `V` over geometry `G` from its
@@ -530,7 +596,9 @@ pub(crate) fn derive_rules<G: Geometry, V: WideVariant<G>>() -> VariantRules {
     let pos = GenericPosition::<G, V>::startpos();
     let board = pos.board();
 
-    VariantRules {
+    let mut rules = VariantRules {
+        // Filled in below by `classify_family`, which reads the other fields.
+        family: VariantFamily::Fairy,
         board: derive_board::<G, V>(&pos),
         army: derive_army::<G, V>(board),
         pawns: derive_pawns::<G, V>(),
@@ -540,6 +608,63 @@ pub(crate) fn derive_rules<G: Geometry, V: WideVariant<G>>() -> VariantRules {
         terminal: derive_terminal::<G, V>(),
         mechanics: derive_mechanics::<G, V>(),
         oracle: ValidationOracle::Independent,
+    };
+    rules.family = classify_family(&rules);
+    rules
+}
+
+/// Classifies a variant into its piece-set [`VariantFamily`] **purely from the rest
+/// of its derived [`VariantRules`]** — board dimensions, starting army, and special
+/// mechanics — so it can never disagree with the variant's own declarations and
+/// needs no per-variant table. A total function: every
+/// [`VariantRef::ALL`](crate::VariantRef::ALL) resolves to exactly one family (the
+/// pinned classification is locked by `tests/variant_family.rs`).
+///
+/// The tests are the authority on the exact assignment; the heuristic, in
+/// precedence order, is:
+///
+/// 1. **Janggi** — the only variant with the *bikjang* facing-generals rule
+///    ([`DrawRules::has_bikjang`]).
+/// 2. **Xiangqi** — cannons **and** the flying-general rule on a xiangqi army (no
+///    western pawn): Xiangqi, Minixiangqi, Manchu, Jieqi, Supply. (Synochess keeps
+///    its western pawns, so it stays under [`Chess`](VariantFamily::Chess).)
+/// 3. **Shogi** — the shogi stepper pawn together with either a shogi general
+///    (Gold / Silver) or shogi-style drops (a hand and no cannons). Covers standard
+///    / small / large shogi, the drop-less Sho Shogi, and the western-army drop
+///    variant Mansindam; excludes Xiangfu, whose cannons keep it a fairy hybrid.
+/// 4. **Makruk** — the South-East-Asian counting-endgame games
+///    ([`DrawRules::counting_rule`]).
+/// 5. **Capablanca** — a western army (a pawn or a queen is present) on a board
+///    larger than 8×8.
+/// 6. **Chess** — a western army on a board of 8×8 or smaller (this is where the
+///    pawnless-but-western Racing Kings and the 8×8 fairy variants land).
+/// 7. **Fairy** — everything else (Chak, Chennis, and the cannon-drop hybrid
+///    Xiangfu): no western pawn or queen and no other family's signature.
+pub(crate) fn classify_family(rules: &VariantRules) -> VariantFamily {
+    let has = |role: WideRole| rules.army.iter().any(|piece| piece.role == role);
+    let (width, height) = (rules.board.width, rules.board.height);
+    let has_pawn = has(WideRole::Pawn);
+    // A western chess army: a pawn is present, or (for the pawnless Racing Kings) a
+    // queen — the marker that separates chess-lineage armies from the fairy ones.
+    let is_western = has_pawn || has(WideRole::Queen);
+    let shogi_general = has(WideRole::Gold) || has(WideRole::Silver);
+    let is_shogi = rules.pawns.stepper
+        && (shogi_general || (rules.mechanics.has_hand && !rules.mechanics.has_cannons));
+
+    if rules.draw.has_bikjang {
+        VariantFamily::Janggi
+    } else if rules.mechanics.has_cannons && rules.mechanics.has_flying_general && !has_pawn {
+        VariantFamily::Xiangqi
+    } else if is_shogi {
+        VariantFamily::Shogi
+    } else if rules.draw.counting_rule.is_some() {
+        VariantFamily::Makruk
+    } else if is_western && (width > 8 || height > 8) {
+        VariantFamily::Capablanca
+    } else if is_western {
+        VariantFamily::Chess
+    } else {
+        VariantFamily::Fairy
     }
 }
 

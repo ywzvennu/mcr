@@ -72,7 +72,7 @@ pub use role::{WideRole, OVERFLOW_PREFIX, OVERFLOW_PREFIX_3};
 pub use rules::{
     BoardRules, CastlingRules, DrawRules, ExtinctionInfo, FlagWin, ImpasseInfo, Movement,
     PawnRules, PieceRules, PromotionRules, RegionWin, RoyalRule, SpecialMechanics, Step,
-    TerminalRules, ValidationOracle, VariantRules,
+    TerminalRules, ValidationOracle, VariantFamily, VariantRules,
 };
 pub use square::Square;
 pub use status::GameStatus;
