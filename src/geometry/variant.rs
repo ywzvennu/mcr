@@ -767,6 +767,35 @@ pub trait WideVariant<G: Geometry>: Copy + 'static {
         false
     }
 
+    // --- Per-player redaction (hidden information; default OFF) -----------
+
+    /// Redacts `board` to what `perspective` may see, or returns `None` when
+    /// this variant hides nothing from that player — the per-player view seam.
+    ///
+    /// This is the single source of truth for **hidden-information** redaction:
+    /// a downstream consumer (a server, a UI) asks the variant "what does player
+    /// `perspective` see?" and never computes visibility itself. The result is a
+    /// board whose squares the perspective may *not* see are cleared (rendered as
+    /// empty), so serializing it — the FEN a [`PlayerView`](super::PlayerView)
+    /// carries — cannot leak a hidden piece's location.
+    ///
+    /// The default returns `None`: a **perfect-information** variant (standard
+    /// chess and every variant that hides nothing) redacts nothing, so
+    /// [`GenericPosition::view_for`](super::GenericPosition::view_for) returns the
+    /// full, unredacted position — byte-identical to
+    /// [`to_fen`](super::GenericPosition::to_fen). Only a hidden-information
+    /// variant (Fog of War) overrides this. Redaction is a pure *read-only view*
+    /// over the existing board; it never affects move generation, legality, or
+    /// perft.
+    fn redact_board_for<const R: usize>(
+        board: &Board<G, R>,
+        state: &GenericState<G, R>,
+        perspective: Color,
+    ) -> Option<Board<G, R>> {
+        let _ = (board, state, perspective);
+        None
+    }
+
     // --- Spartan multi-king / duple-check (default OFF) -------------------
 
     /// Returns `true` if this variant can give a side **more than one royal

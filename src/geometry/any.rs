@@ -31,10 +31,10 @@ use super::{
     LoopChess, Losalamos, Losers, Makpong, Makruk, Manchu, Mansindam, Micro, Minishogi,
     Minixiangqi, Misere, Modern, Newzealand, Nightrider, Nocastle, Nocheckatomic, OkisakiShogi,
     Omicron, Opulent, Orda, Ordamirror, Paradigm, Pawnback, Pawnsideways, Perfect, Petrified,
-    Placement, Pocketknight, Raazuvaa, Seirawan, Shako, Shatar, Shatranj, Shinobi, ShoShogi, Shogi,
-    Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Supply, Synochess, Tencubed,
-    Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError, WideMove,
-    WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
+    Placement, PlayerView, Pocketknight, Raazuvaa, Seirawan, Shako, Shatar, Shatranj, Shinobi,
+    ShoShogi, Shogi, Shogun, Shouse, Sittuyin, Sortofalmost, Spartan, Square, Suicide, Supply,
+    Synochess, Tencubed, Tenjiku, Threekings, Tori, Torpedo, Washogi, WideEndReason, WideFenError,
+    WideMove, WideMoveList, WideOutcome, WideVariant, Wolf, Xiangfu, Xiangqi, Yari,
 };
 use crate::Color;
 
@@ -686,6 +686,34 @@ macro_rules! wide_variants {
             pub fn to_fen(&self) -> String {
                 match self {
                     $( AnyWideVariant::$variant(p) => p.to_fen(), )+
+                }
+            }
+
+            /// This position **as `perspective` may see it** — the per-player
+            /// redaction seam, forwarding
+            /// [`GenericPosition::view_for`](super::GenericPosition::view_for).
+            ///
+            /// For a perfect-information variant the returned
+            /// [`PlayerView`](super::PlayerView) is the full position (FEN and
+            /// legal moves unredacted); for a hidden-information variant (Fog of
+            /// War) it hides the pieces `perspective` may not see and limits the
+            /// move list to that perspective's own moves.
+            #[must_use]
+            pub fn view_for(&self, perspective: Color) -> PlayerView {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.view_for(perspective), )+
+                }
+            }
+
+            /// The perspective-less **spectator** view, forwarding
+            /// [`GenericPosition::spectator_view`](super::GenericPosition::spectator_view):
+            /// the full position for a perfect-information variant, or a doubly
+            /// redacted board (no side's secrets, no move list) for a
+            /// hidden-information variant in progress.
+            #[must_use]
+            pub fn spectator_view(&self) -> PlayerView {
+                match self {
+                    $( AnyWideVariant::$variant(p) => p.spectator_view(), )+
                 }
             }
 

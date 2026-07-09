@@ -56,7 +56,7 @@ use alloc::vec::Vec;
 
 use crate::catalog::VariantRef;
 use crate::geometry::rules::VariantRules;
-use crate::geometry::{AnyWideVariant, WideFenError, WideMove, WideOutcome};
+use crate::geometry::{AnyWideVariant, PlayerView, WideFenError, WideMove, WideOutcome};
 use crate::position::FenError;
 use crate::variant::AnyVariant;
 use crate::{Color, Move, Outcome, Square};
@@ -443,6 +443,57 @@ impl Game {
     pub fn rules(&self) -> VariantRules {
         self.variant().rules()
     }
+
+    /// This position **as `perspective` may see it** — the per-player redaction
+    /// seam, uniform across both variant families.
+    ///
+    /// mcr is the single source of truth for every variant's rules, including
+    /// hidden-information per-player redaction: a consumer asks the game "what
+    /// does player `perspective` see?" and never computes redaction itself. For a
+    /// perfect-information variant (standard chess, and every concrete 8×8
+    /// variant) the returned [`PlayerView`] is the *full* position — its
+    /// [`fen`](PlayerView::fen) equals [`fen`](Game::fen) and its
+    /// [`legal_ucis`](PlayerView::legal_ucis) equals [`legal_ucis`](Game::legal_ucis),
+    /// byte-identical, since there is nothing to hide. For a hidden-information
+    /// wide variant (Fog of War) the FEN hides the pieces `perspective` may not
+    /// see and the move list is limited to that perspective's own moves.
+    ///
+    /// ```
+    /// use mcr::{Color, Game, VariantRef};
+    /// // Perfect information: a perspective view is the full position.
+    /// let g = Game::new(VariantRef::from_name("chess").unwrap());
+    /// let view = g.view_for(Color::White);
+    /// assert_eq!(view.fen, g.fen());
+    /// assert_eq!(view.legal_ucis, g.legal_ucis());
+    /// ```
+    #[must_use]
+    pub fn view_for(&self, perspective: Color) -> PlayerView {
+        match self {
+            // Every concrete 8×8 variant is perfect-information: the full view.
+            Game::Concrete(_) => PlayerView {
+                perspective: Some(perspective),
+                fen: self.fen(),
+                legal_ucis: self.legal_ucis(),
+            },
+            Game::Wide(p) => p.view_for(perspective),
+        }
+    }
+
+    /// The perspective-less **spectator** view: the full position for a
+    /// perfect-information variant, or a doubly redacted board with no move list
+    /// for a hidden-information variant in progress (see
+    /// [`AnyWideVariant::spectator_view`]).
+    #[must_use]
+    pub fn spectator_view(&self) -> PlayerView {
+        match self {
+            Game::Concrete(_) => PlayerView {
+                perspective: None,
+                fen: self.fen(),
+                legal_ucis: self.legal_ucis(),
+            },
+            Game::Wide(p) => p.spectator_view(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -548,6 +599,52 @@ mod tests {
         // A bad FEN surfaces the unified error for both families.
         assert!(Game::from_fen(v("chess"), "not a fen").is_err());
         assert!(Game::from_fen(v("shogi"), "not a fen").is_err());
+    }
+
+    #[test]
+    fn view_for_perfect_information_is_the_full_position() {
+        // A perfect-information variant hides nothing: `view_for` for either
+        // color is byte-identical to the full FEN and full legal-move list, for
+        // both a concrete (chess) and a wide (shogi) variant.
+        for name in ["chess", "shogi", "xiangqi"] {
+            let g = Game::new(v(name));
+            for color in [Color::White, Color::Black] {
+                let view = g.view_for(color);
+                assert_eq!(view.perspective, Some(color));
+                assert_eq!(view.fen, g.fen(), "{name}: perfect-info fen redacted");
+                assert_eq!(
+                    view.legal_ucis,
+                    g.legal_ucis(),
+                    "{name}: perfect-info move list redacted"
+                );
+            }
+            // The spectator view of a perfect-information game is the full
+            // position with no perspective.
+            let spectator = g.spectator_view();
+            assert_eq!(spectator.perspective, None);
+            assert_eq!(spectator.fen, g.fen());
+            assert_eq!(spectator.legal_ucis, g.legal_ucis());
+        }
+    }
+
+    #[test]
+    fn view_for_fog_of_war_redacts_through_the_game_surface() {
+        // The unified Game surface delegates redaction to the wide layer: a Fog
+        // of War game hides the enemy king from White's view but shows a visible
+        // enemy pawn, and never leaks the opponent's move list.
+        let g = Game::from_fen(v("fogofwar"), "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1").unwrap();
+        let white = g.view_for(Color::White);
+        let placement = white.fen.split(' ').next().unwrap();
+        assert!(placement.contains('p'), "visible Black pawn must show");
+        assert!(
+            !placement.contains('k'),
+            "hidden Black king leaked: {}",
+            white.fen
+        );
+        // White is to move, so White sees its own moves; Black (non-mover) sees
+        // no move list through the game surface.
+        assert!(!white.legal_ucis.is_empty());
+        assert!(g.view_for(Color::Black).legal_ucis.is_empty());
     }
 
     #[test]

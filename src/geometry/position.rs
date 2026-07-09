@@ -613,6 +613,45 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> core::fmt::Debug for Generi
     }
 }
 
+/// One player's redacted view of a position: the position **as a single
+/// perspective may see it**, the seam a hidden-information variant (Fog of War,
+/// …) hides its secrets behind and a downstream server reads instead of
+/// computing redaction itself.
+///
+/// Build one with [`GenericPosition::view_for`] /
+/// [`AnyWideVariant::view_for`](super::AnyWideVariant::view_for) /
+/// [`Game::view_for`](crate::Game::view_for) for a named player, or
+/// [`spectator_view`](GenericPosition::spectator_view) for a perspective-less
+/// observer.
+///
+/// For a **perfect-information** variant (standard chess and every variant that
+/// hides nothing) the view is the *full* position: [`fen`](Self::fen) is the
+/// ordinary FEN and [`legal_ucis`](Self::legal_ucis) the full legal-move list —
+/// byte-identical to [`to_fen`](GenericPosition::to_fen) /
+/// [`legal_moves`](GenericPosition::legal_moves), since there is nothing to
+/// redact. For a **hidden-information** variant the FEN has the pieces the
+/// perspective may not see rendered as empty, and the move list is limited to
+/// what that perspective is entitled to (its own legal moves when it is to
+/// move, otherwise empty — a player never sees the opponent's move list).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PlayerView {
+    /// The perspective this view is rendered for, or `None` for a spectator
+    /// (a perspective-less observer).
+    pub perspective: Option<Color>,
+    /// The position's FEN as this perspective may see it: for a
+    /// hidden-information variant, pieces outside the perspective's view are
+    /// rendered as empty squares; for a perfect-information variant, the full
+    /// FEN unchanged.
+    pub fen: String,
+    /// The legal moves this perspective is entitled to see, as UCI strings: the
+    /// full legal-move list for a perfect-information variant, or (for a
+    /// hidden-information variant) the perspective's own legal moves when it is
+    /// to move and an empty list otherwise. A spectator of a hidden-information
+    /// game sees no move list.
+    pub legal_ucis: Vec<String>,
+}
+
 /// The maximum number of distinct [`WideRole`] masks a single
 /// [`apply`](GenericPosition::apply) can touch. Ordinary moves touch at most eight
 /// (the moving piece's role, a captured piece's role, a promotion role, a castled
@@ -6655,6 +6694,105 @@ impl<G: Geometry, V: WideVariant<G>, const R: usize> GenericPosition<G, V, R> {
         out.push(' ');
         push_decimal(&mut out, self.state.fullmove_number as u32);
         out
+    }
+
+    /// The legal moves of the side to move, rendered as UCI long-algebraic
+    /// strings.
+    fn legal_ucis(&self) -> Vec<String> {
+        self.legal_moves()
+            .iter()
+            .map(|mv| mv.to_uci::<G>())
+            .collect()
+    }
+
+    /// Returns the FEN of this position with `board` substituted for the live
+    /// board — the placement redaction path: a hidden-information view swaps in
+    /// a board whose secret pieces have been cleared, then serializes the same
+    /// FEN (turn, castling, en-passant, clocks) around it.
+    fn to_fen_with_board(&self, board: Board<G, R>) -> String {
+        let mut redacted = self.clone();
+        redacted.board = board;
+        redacted.to_fen()
+    }
+
+    /// This position **as `perspective` may see it** — the per-player redaction
+    /// seam.
+    ///
+    /// The variant's [`WideVariant::redact_board_for`] hook decides what to
+    /// hide. For a perfect-information variant (the default hook returns `None`)
+    /// this is the *full* position: the ordinary [`fen`](PlayerView::fen) and
+    /// the complete [`legal_ucis`](PlayerView::legal_ucis), byte-identical to
+    /// [`to_fen`](Self::to_fen) / [`legal_moves`](Self::legal_moves). For a
+    /// hidden-information variant the hook returns a redacted board — pieces the
+    /// perspective may not see cleared — and the move list is limited to the
+    /// perspective's own legal moves (the full list when it is to move, empty
+    /// otherwise: a player never sees the opponent's move list).
+    #[must_use]
+    pub fn view_for(&self, perspective: Color) -> PlayerView {
+        match V::redact_board_for(&self.board, &self.state, perspective) {
+            // Perfect information: nothing is hidden — the full position.
+            None => PlayerView {
+                perspective: Some(perspective),
+                fen: self.to_fen(),
+                legal_ucis: self.legal_ucis(),
+            },
+            // Hidden information: the redacted board, and only the moves this
+            // perspective is entitled to (its own, when it is to move).
+            Some(redacted) => {
+                let legal_ucis = if self.state.turn == perspective {
+                    self.legal_ucis()
+                } else {
+                    Vec::new()
+                };
+                PlayerView {
+                    perspective: Some(perspective),
+                    fen: self.to_fen_with_board(redacted),
+                    legal_ucis,
+                }
+            }
+        }
+    }
+
+    /// The perspective-less **spectator** view: what an observer with no side
+    /// sees.
+    ///
+    /// For a perfect-information variant this is the full position (the ordinary
+    /// FEN and legal-move list) with no perspective. For a hidden-information
+    /// variant the board is redacted from *neither* side — every secret piece is
+    /// hidden — and no move list is shown, so an in-progress game leaks nothing
+    /// to a spectator. The board is redacted by asking the hook to hide, in
+    /// turn, what each side would keep secret from the other and keeping only the
+    /// squares both views agree are visible.
+    #[must_use]
+    pub fn spectator_view(&self) -> PlayerView {
+        let white = V::redact_board_for(&self.board, &self.state, Color::White);
+        let black = V::redact_board_for(&self.board, &self.state, Color::Black);
+        match (white, black) {
+            // Perfect information (neither side redacts): the full position.
+            (None, None) => PlayerView {
+                perspective: None,
+                fen: self.to_fen(),
+                legal_ucis: self.legal_ucis(),
+            },
+            // Hidden information: keep only the pieces both perspectives can see
+            // (the public intersection), and show no move list.
+            _ => {
+                let white = white.unwrap_or(self.board);
+                let black = black.unwrap_or(self.board);
+                let mut spectator = self.board;
+                for square in self.board.occupied() {
+                    let public = white.is_occupied(square) && black.is_occupied(square);
+                    if !public {
+                        spectator.discard(square);
+                    }
+                }
+                PlayerView {
+                    perspective: None,
+                    fen: self.to_fen_with_board(spectator),
+                    legal_ucis: Vec::new(),
+                }
+            }
+        }
     }
 }
 
