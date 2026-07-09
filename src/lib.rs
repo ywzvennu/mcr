@@ -239,6 +239,7 @@ pub use crate::color::Color;
 pub use crate::epd::{Epd, EpdError};
 pub use crate::file::File;
 pub use crate::game::{Game, GameFenError, GameMove, GameOutcome};
+pub use crate::geometry::PlayerView;
 // The first fairy variant on the generic engine (Makruk / Thai chess). The
 // `GenericPosition`-based generic layer lives under `geometry`; its concrete
 // variants are surfaced at the crate root for convenience.

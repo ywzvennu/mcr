@@ -53,8 +53,30 @@
 use crate::geometry::position::{
     GenericCastling, GenericGating, GenericPlacement, GenericPosition, GenericState,
 };
-use crate::geometry::{Bitboard, Board, Chess8x8, WideVariant};
+use crate::geometry::{Bitboard, Board, Chess8x8, WideRole, WideVariant};
 use crate::Color;
+
+/// The squares `color` sees through the fog, computed from `board` alone: every
+/// square its own pieces occupy, plus every square any of its pieces
+/// pseudo-attacks (its raw attack pattern under the current occupancy).
+///
+/// Shared by [`FogOfWar::visible_squares`] and the per-player
+/// [`redact_board_for`](WideVariant::redact_board_for) hook so the rendered fog
+/// and the redacted view can never disagree. This is a pure read over the board
+/// — it hides nothing itself and has no effect on move generation or perft.
+fn fog_visible_squares<const R: usize>(
+    board: &Board<Chess8x8, R>,
+    color: Color,
+) -> Bitboard<Chess8x8> {
+    let occupied = board.occupied();
+    let mut visible = board.by_color(color);
+    for &role in &WideRole::ALL[..<FogOfWarRules as WideVariant<Chess8x8>>::ROLE_SPAN] {
+        for from in board.pieces(color, role) {
+            visible |= FogOfWarRules::role_attacks(role, color, from, occupied);
+        }
+    }
+    visible
+}
 
 /// The Fog of War rule layer: a zero-sized [`WideVariant`] over [`Chess8x8`].
 ///
@@ -114,6 +136,31 @@ impl WideVariant<Chess8x8> for FogOfWarRules {
         // it is to move with no king, hence no legal move — a terminal node).
         Bitboard::EMPTY
     }
+
+    /// Redacts the board to what `perspective` sees through the fog: its own
+    /// pieces stay, and every **enemy** piece on a square `perspective` cannot
+    /// see (outside its `fog_visible_squares` set) is cleared — rendered as an empty square, so
+    /// the serialized FEN never reveals a hidden enemy piece's location. Enemy
+    /// pieces on visible squares (those a friendly piece attacks) remain, which
+    /// is how an imminent capture is exposed.
+    ///
+    /// This never changes move generation, legality, or perft — it is a
+    /// read-only view over the full position, the same `visible_squares` set the
+    /// fog is drawn from.
+    fn redact_board_for<const R: usize>(
+        board: &Board<Chess8x8, R>,
+        _state: &GenericState<Chess8x8, R>,
+        perspective: Color,
+    ) -> Option<Board<Chess8x8, R>> {
+        let visible = fog_visible_squares(board, perspective);
+        let mut redacted = *board;
+        for square in board.by_color(perspective.opposite()) {
+            if !visible.contains(square) {
+                redacted.discard(square);
+            }
+        }
+        Some(redacted)
+    }
 }
 
 /// Fog of War (Dark Chess) as a [`GenericPosition`] over the 8x8 [`Chess8x8`]
@@ -150,8 +197,131 @@ impl FogOfWar {
     /// in the set by definition), so a side never loses sight of its own army.
     #[must_use]
     pub fn visible_squares(&self, color: Color) -> Bitboard<Chess8x8> {
-        let board = self.board();
-        let occupied = board.occupied();
-        board.by_color(color) | self.attacked_by(color, occupied)
+        fog_visible_squares(self.board(), color)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A position with one **hidden** and one **visible** enemy piece for each
+    // side: White has Ke1 and Pe4; Black has Ke8 and Pd5. The white pawn on e4
+    // attacks d5, so Black's pawn there is *visible* to White (and, symmetrically,
+    // Black's d5 pawn attacks e4, so White's pawn is visible to Black). Each
+    // king is far from any enemy attack and is therefore *hidden* from the
+    // opponent.
+    const MIXED_VISIBILITY_FEN: &str = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
+
+    #[test]
+    fn view_for_white_hides_black_king_but_shows_visible_pawn() {
+        let pos = FogOfWar::from_fen(MIXED_VISIBILITY_FEN).expect("valid fog position");
+        let view = pos.view_for(Color::White);
+        let placement = view
+            .fen
+            .split(' ')
+            .next()
+            .expect("fen has a placement field");
+
+        // The visible Black pawn (attacked by White's e4 pawn) IS shown — a
+        // lowercase `p` still appears in White's view.
+        assert!(
+            placement.contains('p'),
+            "the visible Black pawn must appear in White's view: {}",
+            view.fen
+        );
+        // The hidden Black king is NOT shown: no lowercase `k` leaks through.
+        assert!(
+            !placement.contains('k'),
+            "the hidden Black king leaked into White's view: {}",
+            view.fen
+        );
+        // White's own pieces (K, P) are always visible.
+        assert!(placement.contains('K') && placement.contains('P'));
+    }
+
+    #[test]
+    fn view_for_black_hides_white_king_but_shows_visible_pawn() {
+        let pos = FogOfWar::from_fen(MIXED_VISIBILITY_FEN).expect("valid fog position");
+        let view = pos.view_for(Color::Black);
+        let placement = view
+            .fen
+            .split(' ')
+            .next()
+            .expect("fen has a placement field");
+
+        // The visible White pawn (attacked by Black's d5 pawn) IS shown.
+        assert!(
+            placement.contains('P'),
+            "the visible White pawn must appear in Black's view: {}",
+            view.fen
+        );
+        // The hidden White king is NOT shown.
+        assert!(
+            !placement.contains('K'),
+            "the hidden White king leaked into Black's view: {}",
+            view.fen
+        );
+        assert!(placement.contains('k') && placement.contains('p'));
+    }
+
+    #[test]
+    fn view_for_mover_shows_own_moves_non_mover_shows_none() {
+        // White to move: White sees its own legal moves; Black (the non-mover)
+        // sees no move list — a fog player never sees the opponent's moves.
+        let white_to_move = FogOfWar::from_fen(MIXED_VISIBILITY_FEN).expect("valid");
+        assert!(!white_to_move.view_for(Color::White).legal_ucis.is_empty());
+        assert!(
+            white_to_move.view_for(Color::Black).legal_ucis.is_empty(),
+            "the non-mover must not see the opponent's move list"
+        );
+
+        // Black to move: symmetric.
+        let black_to_move = FogOfWar::from_fen("4k3/8/8/3p4/4P3/8/8/4K3 b - - 0 1").expect("valid");
+        assert!(!black_to_move.view_for(Color::Black).legal_ucis.is_empty());
+        assert!(black_to_move.view_for(Color::White).legal_ucis.is_empty());
+    }
+
+    #[test]
+    fn redacted_view_matches_the_visibility_set_square_for_square() {
+        // The redacted view agrees with `visible_squares` exactly: an enemy piece
+        // is shown iff its square is visible, and every own piece survives.
+        let pos = FogOfWar::from_fen(MIXED_VISIBILITY_FEN).expect("valid");
+        for perspective in [Color::White, Color::Black] {
+            let visible = pos.visible_squares(perspective);
+            let view = pos.view_for(perspective);
+            let placement = view.fen.split(' ').next().expect("placement");
+            let shown = Board::<Chess8x8>::from_fen_placement(placement)
+                .expect("redacted placement parses");
+
+            // Enemy pieces are present in the view iff their square is visible.
+            for sq in pos.board().by_color(perspective.opposite()) {
+                assert_eq!(
+                    shown.is_occupied(sq),
+                    visible.contains(sq),
+                    "enemy square {sq:?} shown/visible mismatch for {perspective:?}"
+                );
+            }
+            // Own pieces are always shown — a side never loses sight of its army.
+            for sq in pos.board().by_color(perspective) {
+                assert!(shown.is_occupied(sq), "own piece {sq:?} vanished");
+            }
+        }
+    }
+
+    #[test]
+    fn spectator_view_hides_both_sides_kings() {
+        // A spectator of an in-progress fog game sees only the mutually visible
+        // pieces and no move list: both kings (hidden from the opponent) are gone.
+        let pos = FogOfWar::from_fen(MIXED_VISIBILITY_FEN).expect("valid");
+        let view = pos.spectator_view();
+        let placement = view.fen.split(' ').next().expect("placement");
+        assert_eq!(view.perspective, None);
+        assert!(view.legal_ucis.is_empty(), "a spectator sees no move list");
+        assert!(
+            !placement.contains('k') && !placement.contains('K'),
+            "neither king should be visible to a spectator: {}",
+            view.fen
+        );
     }
 }
