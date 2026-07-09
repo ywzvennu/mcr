@@ -91,6 +91,7 @@ Move and capture geometry are **sampled from the engine's own move hooks** on an
 **Royalty & win condition**
 
 - Single royal king — a side loses by checkmate.
+- Extinction: lose when any watched role [King] falls to 0 or fewer
 
 **Draw / adjudication rules**
 
